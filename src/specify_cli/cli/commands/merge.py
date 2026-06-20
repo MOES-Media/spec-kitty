@@ -844,8 +844,18 @@ def _assert_status_surface_path_is_trusted(
     repo_resolved = get_main_repo_root(repo_root).resolve(strict=False)
     worktrees_root = (repo_resolved / WORKTREES_DIR).resolve(strict=False)
     kitty_specs_root = (repo_resolved / KITTY_SPECS_DIR).resolve(strict=False)
-    status_resolved = status_feature_dir.resolve(strict=False)
-    segment_claims_worktrees = is_under_worktrees_segment(status_feature_dir)
+    status_candidate = (
+        status_feature_dir
+        if status_feature_dir.is_absolute()
+        else repo_resolved / status_feature_dir
+    ).absolute()
+    segment_claims_worktrees = is_under_worktrees_segment(status_candidate)
+    claimed_root = worktrees_root if segment_claims_worktrees else kitty_specs_root
+    try:
+        status_candidate.relative_to(claimed_root)
+    except ValueError as exc:
+        raise ValueError(f"Untrusted status surface path: {status_feature_dir}") from exc
+    status_resolved = status_candidate.resolve(strict=False)
     resolves_under_worktrees = status_resolved.is_relative_to(worktrees_root)
     resolves_under_kitty_specs = status_resolved.is_relative_to(kitty_specs_root)
 
