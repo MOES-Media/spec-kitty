@@ -202,6 +202,11 @@ to match the installed CLI version.
 """.strip()
 
     elif mismatch_type == "project_newer":
+        # FR-021: route upgrade command through the single domain planner.
+        from specify_cli.compat.upgrade_hint import current_upgrade_command
+
+        upgrade_cmd = current_upgrade_command()
+
         return f"""
 {border}
 ❌ ERROR: Version Mismatch Detected
@@ -215,7 +220,7 @@ Your project is NEWER than your CLI.
 This project was created or upgraded with a newer version
 of spec-kitty-cli. Please upgrade your CLI:
 
-  pipx upgrade spec-kitty-cli
+  {upgrade_cmd}
 
 Or use the upgrade command for your install method, such as
 `uv tool upgrade spec-kitty-cli` or `python -m pip install --upgrade
