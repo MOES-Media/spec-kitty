@@ -6,7 +6,6 @@ from __future__ import annotations
 from specify_cli.missions._read_path_resolver import (
     _canonicalize_primary_read_handle,
     primary_feature_dir_for_mission,
-    resolve_feature_dir_for_mission,
 )
 import logging
 import os
@@ -799,10 +798,14 @@ def _planning_read_dir(repo_root: Path, feature: str) -> Path:
 
     The STATUS/acceptance reads (``status.events.jsonl``, acceptance-matrix) keep
     using ``status_feature_dir`` with its leniency (C-002) — they are NOT routed here.
-    """
-    from mission_runtime import is_primary_artifact_kind
 
-    from specify_cli.missions._read_path_resolver import resolve_planning_read_dir
+    coord-primary-partition-lock WP01 (T004): the final resolve routes through
+    the placement seam's ``read_dir`` rather than ``resolve_planning_read_dir``
+    directly — DRY-only consolidation (C-001), out-of-map edit (this file is not
+    a WP01 owned file; the 4 duplicate ``_planning_read_dir`` wrapper copies
+    collapse onto the seam's single read entry point).
+    """
+    from mission_runtime import is_primary_artifact_kind, placement_seam
 
     kinds = _accept_planning_artifact_kinds()
     # Guard the "resolve once and reuse" invariant: every planning artifact the gate
@@ -818,10 +821,10 @@ def _planning_read_dir(repo_root: Path, feature: str) -> Path:
             "read dir must be resolved individually (FR-002 / data-model.md)."
         )
     # Explicit ``Path`` annotation: under the project's ``follow_imports = "skip"``
-    # mypy config the cross-module ``resolve_planning_read_dir`` return is seen as
-    # ``Any``; the annotation re-narrows it (the function IS typed ``-> Path``) so the
+    # mypy config the cross-module ``PlacementSeam.read_dir`` return is seen as
+    # ``Any``; the annotation re-narrows it (the method IS typed ``-> Path``) so the
     # chokepoint return is not an ``Any`` leak — matching ``mission.py::_planning_read_dir``.
-    read_dir: Path = resolve_planning_read_dir(repo_root, feature, kind=kinds[SPEC_FILE])
+    read_dir: Path = placement_seam(repo_root, feature).read_dir(kinds[SPEC_FILE])
     return read_dir
 
 
@@ -1222,7 +1225,15 @@ def collect_feature_summary(
     strict_metadata: bool = True,
     mutate_matrix: bool = True,
 ) -> AcceptanceSummary:
-    read_feature_dir = resolve_feature_dir_for_mission(repo_root, feature)
+    # WP09/FR-001 (kind-correct): ``_primary_anchor_feature_dir`` only needs
+    # the coord-aware existence/identity read described in its own docstring
+    # ("identity/existence was already validated by the read resolution") —
+    # the ``PRIMARY_METADATA`` home, not a specific artifact's content.
+    from mission_runtime import MissionArtifactKind, placement_seam
+
+    read_feature_dir = placement_seam(repo_root, feature).read_dir(
+        MissionArtifactKind.PRIMARY_METADATA
+    )
     feature_dir = _primary_anchor_feature_dir(repo_root, feature, read_feature_dir)
     tasks_dir = feature_dir / "tasks"
     if not feature_dir.exists():

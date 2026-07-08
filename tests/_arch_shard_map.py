@@ -65,6 +65,7 @@ _ARCH_SHARD_1_FILES: tuple[str, ...] = (
     "tests/architectural/test_quarantine_marker.py",
     "tests/architectural/test_resolution_authority_gates.py",
     "tests/architectural/test_runtime_charter_doctrine_boundary.py",
+    "tests/architectural/test_session_reaper.py",
     "tests/architectural/test_shard_universe_bounded.py",
     "tests/architectural/test_shared_package_boundary.py",
     "tests/architectural/test_single_mission_surface_resolver.py",
@@ -72,6 +73,7 @@ _ARCH_SHARD_1_FILES: tuple[str, ...] = (
     "tests/architectural/test_status_module_boundary.py",
     "tests/architectural/test_topology_inference_retired.py",
     "tests/architectural/test_topology_resolution_boundary.py",
+    "tests/architectural/test_unit_contract_residual_gate.py",
     "tests/architectural/test_unregistered_shim_scanner.py",
     "tests/architectural/test_uv_lock_pin_drift.py",
     "tests/architectural/test_workflow_coherence.py",
@@ -92,6 +94,11 @@ _ARCH_SHARD_2_FILES: tuple[str, ...] = (
     "tests/architectural/test_coverage_consumer_needs.py",
     "tests/architectural/test_execution_context_parity.py",
     "tests/architectural/test_gate_coverage.py",
+    # Added post-data-model.md (new file from mission
+    # read-surface-ssot-closeout-01KWZV91, the inline meta-read gate). shard_2
+    # was the lightest by both file count (30 vs 33/31) and test-fn count
+    # (223 vs 287/232) when this file landed, so it lands here.
+    "tests/architectural/test_inline_meta_read_gate.py",
     "tests/architectural/test_job_count_ceiling.py",
     "tests/architectural/test_merge_pipeline_ratchets.py",
     "tests/architectural/test_migration_chain_integrity.py",
