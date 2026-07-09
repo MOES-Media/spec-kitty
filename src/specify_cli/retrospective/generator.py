@@ -18,6 +18,8 @@ Design decision:
 from __future__ import annotations
 
 from specify_cli.core.constants import KITTY_SPECS_DIR
+from specify_cli.core.git_ops import resolve_primary_branch
+from specify_cli.core.paths import read_target_branch_from_meta
 from specify_cli.lanes.branch_naming import resolve_mid8
 import contextlib
 import datetime
@@ -158,22 +160,20 @@ def _resolve_mission_dir(mission_handle: str, repo_root: Path) -> Path | None:
         # Match directory name prefix
         if child_path.name == mission_handle or child_path.name.endswith(f"-{mission_handle}"):
             return child_path
-        # Match via meta.json mission_id or mission_slug
-        meta_path = child_path / "meta.json"
-        if meta_path.exists():
-            try:
-                meta = json.loads(meta_path.read_text(encoding="utf-8"))
-                mid = str(meta.get("mission_id", ""))
-                slug = str(meta.get("mission_slug", ""))
-                # SELECTOR prefix-match, not a name compose: compute the canonical
-                # mid8 via the authoritative resolver and compare it to the handle
-                # (FR-001). resolve_mid8 returns "" for an empty/short mission_id,
-                # so an identity-less meta never spuriously matches a mid8 handle.
-                candidate_mid8 = resolve_mid8(slug, mission_id=mid)
-                if mid == mission_handle or candidate_mid8 == mission_handle or slug == mission_handle:
-                    return child_path
-            except (json.JSONDecodeError, OSError):
-                continue
+        # Match via meta.json mission_id or mission_slug.
+        # load_meta_or_empty (post-#2091 silent contract) absorbs a missing or
+        # malformed meta.json to {}, matching the previous try/except-continue.
+        meta = load_meta_or_empty(child_path)
+        if meta:
+            mid = str(meta.get("mission_id", ""))
+            slug = str(meta.get("mission_slug", ""))
+            # SELECTOR prefix-match, not a name compose: compute the canonical
+            # mid8 via the authoritative resolver and compare it to the handle
+            # (FR-001). resolve_mid8 returns "" for an empty/short mission_id,
+            # so an identity-less meta never spuriously matches a mid8 handle.
+            candidate_mid8 = resolve_mid8(slug, mission_id=mid)
+            if mid == mission_handle or candidate_mid8 == mission_handle or slug == mission_handle:
+                return child_path
 
     return None
 
@@ -1262,7 +1262,12 @@ def generate_retrospective(
     mission_slug = str(meta.get("mission_slug") or meta.get("slug") or feature_dir.name)
     friendly_name = str(meta.get("friendly_name") or meta.get("name") or mission_slug)
     mission_type = str(meta.get("mission_type") or "software-dev")
-    target_branch = str(meta.get("target_branch") or "main")
+    # FR-008 / #2139: delegate to the single read_target_branch_from_meta
+    # authority instead of re-embedding a local "main" default; apply the
+    # documented primary-branch fallback only when the field is genuinely
+    # absent (mirrors resolve_target_branch/get_feature_target_branch).
+    _target_branch = read_target_branch_from_meta(feature_dir)
+    target_branch = _target_branch if _target_branch is not None else resolve_primary_branch(repo_root)
     mission_number = _resolve_mission_number(meta.get("mission_number"))
 
     # ------------------------------------------------------------------

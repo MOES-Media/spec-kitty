@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-from specify_cli.missions._read_path_resolver import candidate_feature_dir_for_mission, resolve_feature_dir_for_mission
 import functools
 import json
 import re
 import subprocess
 from collections.abc import Iterable, Mapping
-from datetime import UTC, datetime
 from io import StringIO
 from pathlib import Path
 from typing import Annotated, Any, NamedTuple
@@ -21,6 +19,8 @@ from rich.panel import Panel
 from specify_cli.cli import StepTracker
 from specify_cli.cli.selector_resolution import resolve_mission_handle
 from specify_cli.core.context_validation import require_main_repo
+from specify_cli.core.time_utils import now_utc_iso
+from specify_cli.core.errors import PlacementResolutionRequired
 from specify_cli.core.git_ops import get_current_branch
 from specify_cli.core.vcs import VCSBackend
 from specify_cli.mission_metadata import resolve_mission_identity, set_vcs_lock
@@ -33,6 +33,8 @@ from specify_cli.git.protection_policy import ProtectionPolicy
 from specify_cli.core.constants import WORKTREES_DIR
 from mission_runtime import (
     CommitTarget,
+    MissionArtifactKind,
+    placement_seam,
     resolve_topology,
     routes_through_coordination,
 )
@@ -62,6 +64,10 @@ _META_JSON_FILENAME = "meta.json"
 # ``VCS_LOCK_FIELDS`` export there would let this be imported instead).
 _VCS_LOCK_META_FIELDS: frozenset[str] = frozenset({"vcs", "vcs_locked_at"})
 _MISSING_META_VALUE = object()
+# WP03 / S1192: the rich-markup error prefix, repeated across the
+# planning-artifact commit helper this WP touches -- hoisted to one constant
+# rather than restated at each ``console.print`` call site.
+_RED_ERROR_PREFIX = "[red]Error:[/red] "
 
 
 def _protected_branch_status_commit_error(branch: str, repo_root: Path) -> str | None:
@@ -699,6 +705,31 @@ def _resolve_placement_ref(
     return placement.placement_ref if placement is not None else None
 
 
+def _resolve_claim_commit_target(placement_ref: CommitTarget | None) -> CommitTarget:
+    """Resolve the WP status claim-commit target (T012 / D11 fail-closed).
+
+    A small, pure extraction (Sonar-testable) over the single seam-resolved
+    ``placement_ref`` (the SAME :class:`CommitTarget` planning artifacts AND
+    status events resolve to, C-PLACE-1). Replaces the forbidden
+    ``_get_current_branch(repo_root) or planning_branch`` grammar: when
+    ``placement_ref`` failed to resolve, this FAILS CLOSED with
+    :class:`PlacementResolutionRequired` instead of silently committing the
+    WP claim to whatever branch happens to be checked out.
+    """
+    if placement_ref is None:
+        raise PlacementResolutionRequired(
+            "Cannot resolve the canonical write placement for this mission's "
+            "WP status claim commit -- refusing to commit to the currently "
+            "checked-out branch (D11 fail-closed). This usually means the "
+            "mission's stored topology could not be resolved (e.g. a "
+            "coordination branch declared in meta.json is missing/torn down "
+            "in git). Run `spec-kitty doctor workspaces --fix`, or flatten "
+            "the mission by removing `coordination_branch` from meta.json if "
+            "the coordination topology was never used, then retry."
+        )
+    return placement_ref
+
+
 def _placement_coord_filter(
     repo_root: Path, mission_slug: str, placement_ref: CommitTarget | None
 ) -> str | None:
@@ -758,7 +789,7 @@ def _ensure_planning_artifacts_committed_git(  # noqa: C901 -- legacy orchestrat
     structural = [e for e in entries if e.is_structural]
     if structural:
         console.print(
-            "\n[red]Error:[/red] Uncommitted structural planning-artifact changes "
+            f"\n{_RED_ERROR_PREFIX}Uncommitted structural planning-artifact changes "
             "(deletions/renames) cannot be auto-committed to the coordination branch:"
         )
         for entry in structural:
@@ -882,9 +913,23 @@ def _ensure_planning_artifacts_committed_git(  # noqa: C901 -- legacy orchestrat
     # destination_ref from HEAD, so the placeholder coord_branch value
     # below is never persisted; the routing just needs *some* shape-valid
     # ref name to satisfy the pre-flight policy gate's normalisation.
-    effective_destination_ref = (
-        str(coord_branch) if coord_branch else planning_branch
-    )
+    #
+    # WP03 / T011 / D11: no inline ``coord_branch if coord_branch else
+    # planning_branch`` grammar (the forbidden pattern named in
+    # contracts/seam-api.md's consumer table). When a ``placement_ref`` was
+    # threaded (modern, non-legacy missions), it is already the ONE
+    # seam-resolved :class:`CommitTarget` planning artifacts AND status
+    # events resolve to (C-PLACE-1) -- use its ``.ref`` directly instead of
+    # reconstructing the coord/primary choice a second time from
+    # ``coord_branch``. Genuinely-legacy missions (no ``placement_ref``) keep
+    # the existing meta-derived placeholder -- out of this WP's scope
+    # (#2453; the value is never persisted, see comment above).
+    if placement_ref is not None:
+        effective_destination_ref = placement_ref.ref
+    elif coord_branch:
+        effective_destination_ref = str(coord_branch)
+    else:
+        effective_destination_ref = planning_branch
 
     is_legacy = not (coord_branch and mission_id and mid8)
     if is_legacy:
@@ -913,7 +958,7 @@ def _ensure_planning_artifacts_committed_git(  # noqa: C901 -- legacy orchestrat
         except Exception as exc:  # noqa: BLE001 — surface as exit-1
             target = coord_branch or planning_branch
             console.print(
-                f"[red]Error:[/red] Failed to commit planning artifacts to {target}: {exc}"
+                f"{_RED_ERROR_PREFIX}Failed to commit planning artifacts to {target}: {exc}"
             )
             raise typer.Exit(1) from exc
 
@@ -929,20 +974,31 @@ def _ensure_planning_artifacts_committed_git(  # noqa: C901 -- legacy orchestrat
 
 def _ensure_vcs_in_meta(feature_dir: Path, _repo_root: Path) -> VCSBackend:
     """Ensure VCS is selected and locked in meta.json."""
-    meta_path = feature_dir / "meta.json"
-    if not meta_path.exists():
-        console.print(f"[red]Error:[/red] meta.json not found in {feature_dir}")
-        console.print("Run /spec-kitty.specify first to create feature structure")
-        raise typer.Exit(1)
+    # read-surface-ssot-closeout WP05 / FR-005: route the inline
+    # ``json.loads`` read through the canonical ``load_meta`` authority. This
+    # site HARD-FAILS on a missing or malformed meta.json (both branches below
+    # raise ``typer.Exit(1)``) -- the post-#2091 contract for a hard-failing
+    # site is ``allow_missing=False`` (never ``allow_missing=True``, which
+    # would mask the guard by silently returning ``None`` instead of raising).
+    from specify_cli.mission_metadata import load_meta
 
     try:
-        meta = json.loads(meta_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
+        meta = load_meta(feature_dir, allow_missing=False, on_malformed="raise")
+    except FileNotFoundError:
+        console.print(f"[red]Error:[/red] meta.json not found in {feature_dir}")
+        console.print("Run /spec-kitty.specify first to create feature structure")
+        raise typer.Exit(1) from None
+    except ValueError as exc:
         console.print(f"[red]Error:[/red] Invalid JSON in meta.json: {exc}")
         raise typer.Exit(1) from exc
+    # ``allow_missing=False`` + ``on_malformed="raise"`` never returns ``None``
+    # (both ``None``-producing branches raise, above) -- ``or {}`` narrows the
+    # ``dict[str, Any] | None`` signature for mypy without an assert
+    # (matching ``load_meta_strict``'s own narrowing idiom).
+    meta = meta or {}
 
     if "vcs" not in meta:
-        now_iso = datetime.now(UTC).isoformat()
+        now_iso = now_utc_iso()
         set_vcs_lock(feature_dir, vcs_type="git", locked_at=now_iso)
         console.print("[cyan]→ VCS locked to git in meta.json[/cyan]")
 
@@ -1122,31 +1178,22 @@ def implement(  # noqa: C901 — orchestration function, complexity inherent
         if auto_commit is None:
             auto_commit = get_auto_commit_default(repo_root)
         _mission_number, mission_slug = detect_feature_context(mission, repo_root=repo_root)
-        feature_dir = resolve_feature_dir_for_mission(repo_root, mission_slug)
-        if not (feature_dir / "meta.json").exists():
-            feature_dir = candidate_feature_dir_for_mission(repo_root, mission_slug)
-        # FR-003 cascade layer 1: meta.json lives ONLY on the PRIMARY checkout —
-        # the coord worktree's mission dir never carries it. Both resolvers above
-        # are topology-aware and prefer the coord worktree once materialized, so
-        # ``feature_dir`` lands on a meta-less coord dir and every downstream
-        # meta read (``_ensure_vcs_in_meta``, identity resolution) fails with
-        # "meta.json not found". When the resolved dir lacks meta, anchor on the
-        # canonical primary dir so config is readable before topology is
-        # resolved. (The coord surface stays authoritative for STATUS reads,
-        # which route through the canonical surface authority, not this dir.)
-        if not (feature_dir / "meta.json").exists():
-            from specify_cli.missions._read_path_resolver import (
-                _canonicalize_primary_read_handle,
-                primary_feature_dir_for_mission,
-            )
-
-            # FR-011 / T012: fold the handle to its canonical dir NAME first so a
-            # bare mid8 / human slug resolves the durable ``<slug>-<mid8>`` home
-            # (ambiguous handle RAISES — no silent pick).
-            _canonical_handle = _canonicalize_primary_read_handle(repo_root, mission_slug)
-            primary_candidate = primary_feature_dir_for_mission(repo_root, _canonical_handle)
-            if (primary_candidate / "meta.json").exists():
-                feature_dir = primary_candidate
+        # read-surface-ssot-closeout WP05 / FR-001 / NFR-001: route through the
+        # kind-aware placement seam instead of the kind-blind
+        # ``resolve_feature_dir_for_mission`` (which could return the
+        # coordination worktree's mission dir once materialized -- the #2453
+        # coord-husk-shadows-primary defect NFR-001 closes). ``SPEC`` is a
+        # PRIMARY-partition kind (mission_runtime.artifacts), so ``read_dir``
+        # resolves the topology-blind primary directory directly: the SAME
+        # directory every downstream read in this function needs (meta.json,
+        # spec.md, tasks.md, the occurrence-map gate). This collapses the
+        # former three-step meta.json-existence cascade (resolve -> candidate
+        # fallback -> primary fallback), which existed ONLY to paper over the
+        # kind-blind resolver's coord-husk shadowing -- the kind-correct seam
+        # never returns a meta-less coord husk in the first place.
+        feature_dir = placement_seam(repo_root, mission_slug).read_dir(
+            MissionArtifactKind.SPEC
+        )
         wp_file = find_wp_file(repo_root, mission_slug, wp_id)
         declared_deps = parse_wp_dependencies(wp_file)
         tracker.complete("detect", f"Feature: {mission_slug}")
@@ -1455,16 +1502,19 @@ def implement(  # noqa: C901 — orchestration function, complexity inherent
                 if config_file.exists():
                     files_to_commit.append(config_file.resolve())
 
-                # Mechanical WP06 pre-step migration: add destination_ref +
-                # worktree_root after WP01's signature change. The status
-                # claim commit lands on the feature planning branch.
-                from specify_cli.core.git_ops import get_current_branch as _get_cur_branch
-                _cur_branch = _get_cur_branch(repo_root) or planning_branch
+                # WP03 / T011 / T012 / D11: the status claim commit routes
+                # through the SAME seam-resolved ``_placement_ref`` planning
+                # artifacts resolve to (C-PLACE-1) instead of the forbidden
+                # ``_get_current_branch(repo_root) or planning_branch``
+                # checkout-derived grammar. A resolution failure now FAILS
+                # CLOSED (see ``_resolve_claim_commit_target``) rather than
+                # silently committing to whatever branch is checked out.
+                _claim_commit_target = _resolve_claim_commit_target(_placement_ref)
                 try:
                     safe_commit(
                         repo_root=repo_root,
                         worktree_root=repo_root,
-                        target=CommitTarget(ref=_cur_branch),
+                        target=_claim_commit_target,
                         message=commit_msg,
                         paths=tuple(files_to_commit),
                     )
@@ -1487,6 +1537,13 @@ def implement(  # noqa: C901 — orchestration function, complexity inherent
         # #2155 (FR-002 / T011): a wrong-surface guard refusal must NOT be folded
         # into the soft "Could not update WP status" warning — let it propagate so
         # the defect surfaces (the inner handler already re-raised it on purpose).
+        raise
+    except PlacementResolutionRequired:
+        # WP03 / D11: a fail-closed placement-resolution refusal must NOT be
+        # folded into the soft "Could not update WP status" warning either —
+        # that would silently resurrect the checkout-derived fallback this
+        # error exists to forbid. Let it propagate so the operator sees and
+        # acts on the structured, actionable message.
         raise
     except Exception as exc:
         console.print(f"[yellow]Warning:[/yellow] Could not update WP status: {exc}")

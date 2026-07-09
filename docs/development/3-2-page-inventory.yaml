@@ -758,6 +758,12 @@
   owning_workstream: none
   current_target: true
   notes: null
+- path: docs/adr/3.x/2026-07-08-1-mission-resolver-port.md
+  tag: current
+  divio_type: none
+  owning_workstream: none
+  current_target: true
+  notes: null
 - path: docs/adr/3.x/README.md
   tag: current
   divio_type: none
@@ -1586,6 +1592,12 @@
   owning_workstream: none
   current_target: true
   notes: null
+- path: docs/contracts/index.md
+  tag: current
+  divio_type: none
+  owning_workstream: none
+  current_target: true
+  notes: null
 - path: docs/development/index.md
   tag: current
   divio_type: none
@@ -1605,6 +1617,12 @@
   current_target: true
   notes: null
 - path: docs/development/terminology-exemptions.md
+  tag: current
+  divio_type: none
+  owning_workstream: none
+  current_target: true
+  notes: null
+- path: docs/development/ui-e2e.md
   tag: current
   divio_type: none
   owning_workstream: none

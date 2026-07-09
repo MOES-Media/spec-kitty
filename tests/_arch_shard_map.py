@@ -65,6 +65,7 @@ _ARCH_SHARD_1_FILES: tuple[str, ...] = (
     "tests/architectural/test_quarantine_marker.py",
     "tests/architectural/test_resolution_authority_gates.py",
     "tests/architectural/test_runtime_charter_doctrine_boundary.py",
+    "tests/architectural/test_session_reaper.py",
     "tests/architectural/test_shard_universe_bounded.py",
     "tests/architectural/test_shared_package_boundary.py",
     "tests/architectural/test_single_mission_surface_resolver.py",
@@ -72,6 +73,7 @@ _ARCH_SHARD_1_FILES: tuple[str, ...] = (
     "tests/architectural/test_status_module_boundary.py",
     "tests/architectural/test_topology_inference_retired.py",
     "tests/architectural/test_topology_resolution_boundary.py",
+    "tests/architectural/test_unit_contract_residual_gate.py",
     "tests/architectural/test_unregistered_shim_scanner.py",
     "tests/architectural/test_uv_lock_pin_drift.py",
     "tests/architectural/test_workflow_coherence.py",
@@ -92,6 +94,15 @@ _ARCH_SHARD_2_FILES: tuple[str, ...] = (
     "tests/architectural/test_coverage_consumer_needs.py",
     "tests/architectural/test_execution_context_parity.py",
     "tests/architectural/test_gate_coverage.py",
+    # Added post-data-model.md (new file, mission mission-resolver-port-01KX1C05
+    # WP07 #2447 doctrine-phantom guard). shard_2 was tied lightest by file
+    # count (31 vs 33/31) when this file landed, so it lands here.
+    "tests/architectural/test_git_matrix_paths_resolve.py",
+    # Added post-data-model.md (new file from mission
+    # read-surface-ssot-closeout-01KWZV91, the inline meta-read gate). shard_2
+    # was the lightest by both file count (30 vs 33/31) and test-fn count
+    # (223 vs 287/232) when this file landed, so it lands here.
+    "tests/architectural/test_inline_meta_read_gate.py",
     "tests/architectural/test_job_count_ceiling.py",
     "tests/architectural/test_merge_pipeline_ratchets.py",
     "tests/architectural/test_migration_chain_integrity.py",
@@ -123,6 +134,12 @@ _ARCH_SHARD_3_FILES: tuple[str, ...] = (
     "tests/architectural/test_auth_transport_singleton.py",
     "tests/architectural/test_builtin_override_policy.py",
     "tests/architectural/test_ci_quality_path_filters.py",
+    # Added post-data-model.md (new file — mission
+    # contract-ownership-boundary-01KWYRE5 WP03, #2441). Kept in shard_3
+    # alongside its WP02 driver sibling (test_retired_contracts_absent.py) so
+    # the content-anchoring parity family runs on one leg; the pick is
+    # auditable and the completeness guard verifies the partition stays total.
+    "tests/architectural/test_contract_registry_parity.py",
     "tests/architectural/test_docs_scoped_arch_coverage.py",
     "tests/architectural/test_dossier_sync_boundary.py",
     "tests/architectural/test_events_tracker_public_imports.py",
@@ -130,6 +147,10 @@ _ARCH_SHARD_3_FILES: tuple[str, ...] = (
     "tests/architectural/test_gate_read_literal_ban.py",
     "tests/architectural/test_guard_capability_call_sites.py",
     "tests/architectural/test_layer_rules.py",
+    # Added post-data-model.md (new file at implementation time, mission
+    # mission-resolver-port-01KX1C05 WP04, #2173 FR-007). shard_3 was the
+    # lightest by def-test_ count (232 vs 287/251) when this file landed.
+    "tests/architectural/test_mission_resolver_walker_gate.py",
     "tests/architectural/test_no_dead_modules.py",
     "tests/architectural/test_no_primary_anchored_gates.py",
     "tests/architectural/test_no_prompt_filtering_added.py",
@@ -143,6 +164,11 @@ _ARCH_SHARD_3_FILES: tuple[str, ...] = (
     "tests/architectural/test_protection_resolver_call_sites.py",
     "tests/architectural/test_pytest_marker_correctness.py",
     "tests/architectural/test_real_home_isolation_guard.py",
+    # Added post-data-model.md (new file — mission
+    # contract-ownership-boundary-01KWYRE5 WP02, #2441). shard_3 and shard_2
+    # were tied at 30 files each when this landed; shard_3 was picked to keep
+    # the driver near its content-anchoring siblings and the pick auditable.
+    "tests/architectural/test_retired_contracts_absent.py",
     "tests/architectural/test_safe_commit_import_boundary.py",
     "tests/architectural/test_safety_registry_completeness.py",
     "tests/architectural/test_same_tier_uniqueness.py",

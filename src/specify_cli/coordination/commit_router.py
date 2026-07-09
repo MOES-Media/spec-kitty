@@ -28,12 +28,13 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Protocol, runtime_checkable
+from typing import Final, Literal, Protocol, runtime_checkable
 
 from mission_runtime import (
     CommitTarget,
     MissionArtifactKind,
     is_primary_artifact_kind,
+    kind_for_mission_file,
     resolve_placement_only,
     resolve_topology,
     routes_through_coordination,
@@ -72,16 +73,26 @@ logger = logging.getLogger(__name__)
 # Result type
 # ---------------------------------------------------------------------------
 
+# T021 (Sonar S1192 campsite): the router's outcome vocabulary — named once so
+# every ``CommitRouterResult`` construction site (8 across this module) shares
+# ONE spelling instead of restating the raw string. This is the "in-band
+# strangle vocabulary" the reviewer guidance calls out: the placement-outcome
+# literal is domain vocabulary, not incidental formatting, so it earns a name.
+_STATUS_COMMITTED: Final = "committed"
+_STATUS_UNCHANGED: Final = "unchanged"
+_STATUS_NO_OP_WRONG_SURFACE: Final = "no_op_wrong_surface"
+_STATUS_ERROR: Final = "error"
+
 
 @dataclass(frozen=True)
 class CommitRouterResult:
     """Typed outcome of :func:`commit_for_mission`.
 
     status values:
-    - ``"committed"``        — ``safe_commit`` landed a real commit.
-    - ``"unchanged"``        — benign no-op: artifact present + already committed.
-    - ``"no_op_wrong_surface"`` — artifact absent at resolved placement.
-    - ``"error"``            — commit failed unexpectedly.
+    - ``_STATUS_COMMITTED``        — ``safe_commit`` landed a real commit.
+    - ``_STATUS_UNCHANGED``        — benign no-op: artifact present + already committed.
+    - ``_STATUS_NO_OP_WRONG_SURFACE`` — artifact absent at resolved placement.
+    - ``_STATUS_ERROR``            — commit failed unexpectedly.
     """
 
     status: Literal["committed", "unchanged", "no_op_wrong_surface", "error"]
@@ -138,6 +149,69 @@ def commit_for_mission(
 
     Returns:
         :class:`CommitRouterResult` with the typed outcome.
+
+    Per-file partition awareness (FR-007 / C-006 / contracts/partition-aware-
+    commit-seam.md): ``files`` is classified and grouped by PARTITION (PRIMARY
+    vs PLACEMENT) *before* placement is resolved — see
+    :func:`_group_files_by_partition`. This closes the #2404 class of defect
+    (a mixed-partition batch under one ``kind`` misrouting every file to that
+    kind's partition) at the seam, with no per-caller patch. A genuinely
+    single-partition batch (the common case) still resolves placement exactly
+    once and issues exactly one commit (INV: no fast-path regression).
+    """
+    groups = _group_files_by_partition(repo_root, files, mission_slug, kind=kind)
+
+    if len(groups) <= 1:
+        effective_kind, effective_files = groups[0] if groups else (kind, files)
+        return _commit_partition_group(
+            repo_root,
+            mission_slug,
+            effective_files,
+            message,
+            policy,
+            kind=effective_kind,
+            primary_paths_created_this_invocation=primary_paths_created_this_invocation,
+            target_branch=target_branch,
+        )
+
+    # Split-and-commit (contract (a), pinned by T004): a mixed-partition batch
+    # is transparently split into one commit PER partition group, each resolved
+    # and committed through the SAME single-group path the fast path uses — no
+    # parallel commit logic, no caller-visible change to the entry point.
+    results = [
+        _commit_partition_group(
+            repo_root,
+            mission_slug,
+            group_files,
+            message,
+            policy,
+            kind=group_kind,
+            primary_paths_created_this_invocation=primary_paths_created_this_invocation,
+            target_branch=target_branch,
+        )
+        for group_kind, group_files in groups
+    ]
+    return _merge_group_results(results, groups, kind)
+
+
+def _commit_partition_group(
+    repo_root: Path,
+    mission_slug: str,
+    files: tuple[Path, ...],
+    message: str,
+    policy: _ProtectionPolicyProtocol,
+    *,
+    kind: MissionArtifactKind,
+    primary_paths_created_this_invocation: frozenset[Path] | None = None,
+    target_branch: str | None = None,
+) -> CommitRouterResult:
+    """Commit ONE single-partition file group to its resolved placement.
+
+    This is the pre-WP01 body of ``commit_for_mission`` verbatim, extracted so
+    the public entry point can invoke it once per partition group (T002/T004).
+    Every file in ``files`` MUST already belong to the SAME partition as
+    ``kind`` — :func:`_group_files_by_partition` guarantees this; this helper
+    does not re-validate it (single responsibility: resolve + commit one group).
     """
     placement: CommitTarget = resolve_placement_only(repo_root, mission_slug, kind=kind)
 
@@ -166,7 +240,7 @@ def commit_for_mission(
         # NOT the coordination worktree: the deadlock is removed by the
         # feature-branch invariant (research D-3), not by transiting coord.
         return CommitRouterResult(
-            status="no_op_wrong_surface",
+            status=_STATUS_NO_OP_WRONG_SURFACE,
             placement_ref=placement.ref,
             diagnostic=(
                 f"Refusing to commit planning artifacts to the protected branch "
@@ -192,7 +266,7 @@ def commit_for_mission(
 
     if not commit_paths:
         # All artifacts already committed (or none present) — genuine no-op.
-        return CommitRouterResult(status="unchanged", placement_ref=placement.ref)
+        return CommitRouterResult(status=_STATUS_UNCHANGED, placement_ref=placement.ref)
 
     # FR-006 / D-5: detect no-op against the wrong surface.
     if _any_path_absent(commit_paths):
@@ -202,7 +276,7 @@ def commit_for_mission(
             f"against the wrong surface and was not created."
         )
         return CommitRouterResult(
-            status="no_op_wrong_surface",
+            status=_STATUS_NO_OP_WRONG_SURFACE,
             placement_ref=placement.ref,
             diagnostic=diagnostic,
         )
@@ -218,17 +292,17 @@ def commit_for_mission(
     except subprocess.CalledProcessError as exc:
         stderr = getattr(exc, "stderr", "") or ""
         if "nothing to commit" in stderr or "nothing added to commit" in stderr:
-            return CommitRouterResult(status="unchanged", placement_ref=placement.ref)
+            return CommitRouterResult(status=_STATUS_UNCHANGED, placement_ref=placement.ref)
         return CommitRouterResult(
-            status="error",
+            status=_STATUS_ERROR,
             placement_ref=placement.ref,
             diagnostic=str(exc),
         )
     except RuntimeError as exc:
         if _is_empty_changeset_error(exc):
-            return CommitRouterResult(status="unchanged", placement_ref=placement.ref)
+            return CommitRouterResult(status=_STATUS_UNCHANGED, placement_ref=placement.ref)
         return CommitRouterResult(
-            status="error",
+            status=_STATUS_ERROR,
             placement_ref=placement.ref,
             diagnostic=str(exc),
         )
@@ -249,7 +323,7 @@ def commit_for_mission(
         _try_advance_ref(repo_root, target_branch, worktree_root)
 
     return CommitRouterResult(
-        status="committed",
+        status=_STATUS_COMMITTED,
         placement_ref=placement.ref,
         commit_hash=commit_hash,
     )
@@ -258,6 +332,122 @@ def commit_for_mission(
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+
+def _group_files_by_partition(
+    repo_root: Path,
+    files: tuple[Path, ...],
+    mission_slug: str,
+    *,
+    kind: MissionArtifactKind,
+) -> list[tuple[MissionArtifactKind, tuple[Path, ...]]]:
+    """Group ``files`` by PARTITION (PRIMARY vs PLACEMENT), not by exact kind (T002).
+
+    contracts/partition-aware-commit-seam.md: for each file, classify
+    ``kind_f = kind_for_mission_file(file, mission_slug=mission_slug)``. A
+    ``None`` classification (unrecognised path) falls back to the
+    caller-supplied ``kind`` — never dropped, never coerced into the other
+    partition (FR-007). Files are grouped by SURFACE, keyed by ONE
+    representative kind per surface, because every kind within one partition
+    resolves to the IDENTICAL placement ref (``resolve_placement_only``
+    resolves the primary ``target_branch`` for any ``_PRIMARY_ARTIFACT_KINDS``
+    member, and the same topology-routed ``destination_ref`` for any placement
+    kind) — so a single ``resolve_placement_only`` call per group suffices.
+
+    C-002: this NEVER changes kind→partition membership — it only decides which
+    of the (at most two) existing partitions each file belongs to.
+
+    Coordless-topology coincidence (regression guard, #2155): under a topology
+    that does not route through coordination (``SINGLE_BRANCH`` / ``LANES``),
+    EVERY kind's placement — primary or placement-partition — resolves to the
+    SAME ``target_branch`` (``routes_through_coordination`` gates the coord
+    divergence). Splitting such a batch into two commits would be a pure
+    regression (an existing atomic-commit caller, ``move_task``'s
+    ``WORK_PACKAGE_TASK`` + ``STATUS_STATE`` bundle, expects ONE commit) with no
+    INV-C1 benefit — both partitions' own ref IS the same ref. So the two
+    candidate refs are resolved ONCE each (only when both partitions are
+    actually present) and the groups are collapsed back into the historical
+    single-group call when they coincide; only a genuine ref DIVERGENCE
+    (coordination topology routing a placement kind elsewhere) is split.
+
+    Returns a list of ``(representative_kind, files)`` groups:
+
+    - Zero groups when ``files`` is empty.
+    - One group ``(kind, files)`` when every file shares the caller's OWN
+      partition, OR when both partitions are present but resolve to the SAME
+      ref (the fast path's byte-identical-to-today guarantee).
+    - One group ``(other_kind, files)`` when EVERY file belongs to the OTHER
+      partition (a batch that was entirely misrouted under the caller's
+      ``kind`` pre-fix — this is itself the bug fix, not a fast-path case).
+    - Two groups when the batch is genuinely mixed AND the two partitions'
+      refs diverge (the #2404 defect shape).
+    """
+    caller_is_primary = is_primary_artifact_kind(kind)
+    same_partition: list[Path] = []
+    other_partition: list[Path] = []
+    other_kind: MissionArtifactKind | None = None
+
+    for file in files:
+        kind_f = kind_for_mission_file(file, mission_slug=mission_slug) or kind
+        if is_primary_artifact_kind(kind_f) == caller_is_primary:
+            same_partition.append(file)
+        else:
+            other_partition.append(file)
+            if other_kind is None:
+                other_kind = kind_f
+
+    if not other_partition or other_kind is None:
+        return [(kind, files)] if files else []
+
+    same_ref = resolve_placement_only(repo_root, mission_slug, kind=kind).ref
+    other_ref = resolve_placement_only(repo_root, mission_slug, kind=other_kind).ref
+    if same_ref == other_ref:
+        # No real routing divergence (coordless topology) — keep the historical
+        # single-commit fast path instead of a gratuitous second commit.
+        return [(kind, files)]
+
+    groups: list[tuple[MissionArtifactKind, tuple[Path, ...]]] = []
+    if same_partition:
+        groups.append((kind, tuple(same_partition)))
+    groups.append((other_kind, tuple(other_partition)))
+    return groups
+
+
+def _merge_group_results(
+    results: list[CommitRouterResult],
+    groups: list[tuple[MissionArtifactKind, tuple[Path, ...]]],
+    caller_kind: MissionArtifactKind,
+) -> CommitRouterResult:
+    """Merge per-partition-group outcomes into the ONE result callers consume (T004).
+
+    Split-and-commit (contract shape (a)): each partition group is committed to
+    its OWN :class:`CommitTarget` (INV-C1) via :func:`_commit_partition_group`,
+    but ``commit_for_mission`` still returns a single :class:`CommitRouterResult`
+    — the historical shape every existing caller (``spec_commit_cmd.py`` /
+    ``mission_finalize.py``) already consumes.
+
+    Priority:
+    1. A real git error on ANY group is never silently swallowed — it takes
+       priority over a "committed" outcome on another group (an error is
+       actionable; masking it behind an unrelated group's success is unsafe).
+    2. Otherwise the group matching the CALLER-supplied ``kind``'s own partition
+       is authoritative — it is the artifact the caller named in this
+       invocation, and its outcome is what existing callers' UI messages
+       describe (e.g. "Tasks committed to <ref>").
+    3. If no group matches the caller's own partition (should not happen once
+       :func:`_group_files_by_partition` always includes it when present),
+       fall back to the first group's result deterministically.
+    """
+    for result in results:
+        if result.status == _STATUS_ERROR:
+            return result
+
+    caller_is_primary = is_primary_artifact_kind(caller_kind)
+    for (group_kind, _group_files), result in zip(groups, results, strict=True):
+        if is_primary_artifact_kind(group_kind) == caller_is_primary:
+            return result
+
+    return results[0]
 
 
 def _resolve_primary_target_branch(repo_root: Path, mission_slug: str) -> str:
@@ -472,7 +662,7 @@ def _resolve_planning_placement(
     return resolve_placement_only(repo_root, mission_slug, kind=kind)
 
 
-def _planning_commit_worktree(
+def _resolve_commit_worktree_for_kind(
     repo_root: Path,
     mission_slug: str,
     paths: tuple[Path, ...],
@@ -480,7 +670,19 @@ def _planning_commit_worktree(
     kind: MissionArtifactKind = MissionArtifactKind.TASKS_INDEX,
     primary_paths_created_this_invocation: frozenset[Path] | None = None,
 ) -> tuple[Path, tuple[Path, ...]]:
-    """Resolve the worktree a planning commit lands in for ``mission_slug``.
+    """Resolve the worktree a ``kind``-aware commit lands in for ``mission_slug``.
+
+    coord-primary-partition-lock WP04 / T019: renamed from the stale
+    ``_planning_commit_worktree`` — the old name lied post-D2 (planning never
+    transits coordination since write-surface-coherence WP02/WP03), yet the
+    helper is genuinely kind-aware and reachable for COORDINATION-partition
+    kinds too (its default ``kind=TASKS_INDEX`` just happens to be the primary
+    kind every LIVE planning caller passes). The
+    ``_planning_commit_worktree`` alias below is preserved for the historical
+    ``mission.<name>`` re-export shim and the existing unit-test surface
+    (DECISION: rename-with-alias, not a hard cutover — the blast radius of the
+    old name spans ``mission.py``'s deliberate shim re-export plus several
+    test modules outside this WP's ownership).
 
     WP05: ``safe_commit`` requires ``worktree_root`` HEAD to equal the
     destination ref. When :func:`routes_through_coordination` holds for the
@@ -495,6 +697,10 @@ def _planning_commit_worktree(
     PRIMARY kind (the default — every caller here commits planning artifacts)
     resolves to the primary ``target_branch`` for every topology, so it commits
     directly from the primary checkout with NO coord transit (FR-003 / C-005).
+    This is the genuine invariant guard (T019): a PRIMARY-partition kind must
+    NEVER reach the coord-staging body below — deleting or weakening this
+    early return re-opens the planning→coord mis-route the partition exists to
+    forbid, so it is preserved verbatim across the rename.
 
     #2056 WP08 / T033: the coord-staging body reuses the router's existing
     ``_resolve_mid8`` + ``CoordinationWorkspace`` + ``_stage_artifacts_in_coord_
@@ -506,7 +712,8 @@ def _planning_commit_worktree(
     """
     # PRIMARY kinds never transit coordination — commit directly from the primary
     # checkout (write-surface-coherence WP03 / T014). The coord-staging body below
-    # is reached only by coordination-partition kinds.
+    # is reached only by coordination-partition kinds. (T019: the PRIMARY-kind
+    # invariant guard — kept verbatim, never deleted, across the rename.)
     if is_primary_artifact_kind(kind):
         return repo_root, paths
 
@@ -538,6 +745,16 @@ def _planning_commit_worktree(
         primary_paths_created_this_invocation=primary_paths_created_this_invocation,
     )
     return coord_wt, tuple(coord_paths)
+
+
+# Backwards-compatible alias (T019): the historical name. ``mission.py`` still
+# re-exports ``_planning_commit_worktree as _planning_commit_worktree`` (a
+# deliberate shim for historical ``mission.<name>`` patch targets — WP09 owns
+# the final shim sweep) and several existing unit tests call
+# ``commit_router._planning_commit_worktree`` / ``commit_router_mod.
+# _planning_commit_worktree`` directly. Aliasing here keeps every one of those
+# resolving without touching files outside this WP's ownership.
+_planning_commit_worktree = _resolve_commit_worktree_for_kind
 
 
 # Backwards-compatible alias: the former mission.py name for the staging helper.

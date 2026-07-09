@@ -36,9 +36,10 @@ FR-012, SC-04.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from collections.abc import Mapping
+
+from specify_cli.mission_metadata import load_meta
 
 __all__ = [
     "PlanningBranchResolutionFailed",
@@ -71,6 +72,20 @@ def resolve_planning_branch_from_meta(meta: Mapping[str, object]) -> str:
     ``merge_target_branch`` (legacy alias seen in older fixtures).
     Whitespace-only values are treated as absent.
 
+    FR-008 / #2139 triage note: this function is a pure ``Mapping`` transform
+    (not a ``feature_dir`` reader) with a contract that deliberately diverges
+    from ``read_target_branch_from_meta`` on two axes -- the
+    ``merge_target_branch`` legacy-alias fallback, and strict
+    ``isinstance(raw, str)`` type-checking (a non-string ``target_branch``,
+    e.g. ``42``, is treated as absent here, whereas the authority coerces via
+    ``str(value)``). It already fail-closes via
+    :class:`PlanningBranchResolutionFailed` rather than a silent
+    ``"main"``/``""`` default, so it does not exhibit the divergence FR-008
+    targets; it is intentionally left as its own contract rather than routed
+    through the authority (routing would drop the legacy-alias fallback and
+    break the existing type-strict test coverage in
+    ``test_mission_finalize_tasks.py``).
+
     Raises:
         PlanningBranchResolutionFailed: When neither field carries a
             non-empty string. The caller is expected to surface this as
@@ -97,19 +112,21 @@ def load_mission_target_branch(feature_dir: Path) -> str:
     the CLI emits a single, consistent diagnostic.
     """
     meta_path = feature_dir / "meta.json"
-    if not meta_path.exists():
+    try:
+        data = load_meta(feature_dir, allow_missing=False, on_malformed="raise")
+    except FileNotFoundError as exc:
         raise PlanningBranchResolutionFailed(
             f"meta.json not found at {meta_path}. "
             "Re-run with --target-branch <ref> to override."
-        )
-    try:
-        data = json.loads(meta_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError) as exc:
+        ) from exc
+    except ValueError as exc:
         raise PlanningBranchResolutionFailed(
             f"meta.json at {meta_path} is unreadable: {exc}. "
             "Re-run with --target-branch <ref> to override."
         ) from exc
-    if not isinstance(data, dict):
+    if data is None:
+        # Unreachable: allow_missing=False + on_malformed="raise" never
+        # returns None. Narrows the type for mypy without an assert.
         raise PlanningBranchResolutionFailed(
             f"meta.json at {meta_path} is not a JSON object."
         )

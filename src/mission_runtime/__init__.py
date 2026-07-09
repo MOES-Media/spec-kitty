@@ -2,7 +2,7 @@
 
 This umbrella package is the single, screaming home for execution-state
 resolution: given a mission (and optional work package), it produces a fully
-resolved, CWD-invariant :class:`ExecutionContext`. Consumers import **only** from
+resolved, CWD-invariant :class:`MissionExecutionContext`. Consumers import **only** from
 this package root; internal submodules (``context``, ``resolution``) are
 import-forbidden from outside the package and enforced by
 ``tests/architectural/test_mission_runtime_surface.py`` (FR-005).
@@ -29,11 +29,11 @@ from mission_runtime.context import (
     ArtifactPlacementFragment,
     BranchRefFragment,
     CommitTarget,
-    ExecutionContext,
     ExecutionMode,
     IdentityFragment,
     MissionArtifactContext,
     MissionContext,
+    MissionExecutionContext,
     MissionTopology,
     StatusSurfaceFragment,
     WorkspaceFragment,
@@ -51,25 +51,30 @@ from mission_runtime.artifacts import (
 )
 from mission_runtime.resolution import (
     ActionContextError,
+    PlacementSeam,
     mission_context_for,
+    placement_seam,
     resolve_action_context,
     resolve_placement_only,
     resolve_topology,
 )
+from mission_runtime.mission_resolver_port import MissionResolver
 
 __all__ = [
     "ActionContextError",
     "ArtifactPlacementFragment",
     "BranchRefFragment",
     "CommitTarget",
-    "ExecutionContext",
     "ExecutionMode",
     "IdentityFragment",
     "MissionArtifactContext",
     "MissionArtifactHome",
     "MissionArtifactKind",
     "MissionContext",
+    "MissionExecutionContext",
+    "MissionResolver",
     "MissionTopology",
+    "PlacementSeam",
     "StatusSurfaceFragment",
     "WorkspaceFragment",
     "artifact_home_for",
@@ -79,6 +84,7 @@ __all__ = [
     "is_self_bookkeeping_path",
     "kind_for_mission_file",
     "mission_context_for",
+    "placement_seam",
     "resolve_action_context",
     "resolve_placement_only",
     "resolve_topology",

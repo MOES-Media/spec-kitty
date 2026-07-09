@@ -6,7 +6,6 @@ from __future__ import annotations
 from specify_cli.missions._read_path_resolver import (
     _canonicalize_primary_read_handle,
     primary_feature_dir_for_mission,
-    resolve_feature_dir_for_mission,
 )
 import logging
 import os
@@ -18,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from specify_cli.core.agent_config import get_auto_commit_default
+from specify_cli.core.paths import read_target_branch_from_meta
 from specify_cli.core.paths import require_explicit_feature as _require_explicit_feature
 from specify_cli.decisions.models import DecisionStatus
 from specify_cli.decisions.store import load_index
@@ -799,10 +799,14 @@ def _planning_read_dir(repo_root: Path, feature: str) -> Path:
 
     The STATUS/acceptance reads (``status.events.jsonl``, acceptance-matrix) keep
     using ``status_feature_dir`` with its leniency (C-002) — they are NOT routed here.
-    """
-    from mission_runtime import is_primary_artifact_kind
 
-    from specify_cli.missions._read_path_resolver import resolve_planning_read_dir
+    coord-primary-partition-lock WP01 (T004): the final resolve routes through
+    the placement seam's ``read_dir`` rather than ``resolve_planning_read_dir``
+    directly — DRY-only consolidation (C-001), out-of-map edit (this file is not
+    a WP01 owned file; the 4 duplicate ``_planning_read_dir`` wrapper copies
+    collapse onto the seam's single read entry point).
+    """
+    from mission_runtime import is_primary_artifact_kind, placement_seam
 
     kinds = _accept_planning_artifact_kinds()
     # Guard the "resolve once and reuse" invariant: every planning artifact the gate
@@ -818,10 +822,10 @@ def _planning_read_dir(repo_root: Path, feature: str) -> Path:
             "read dir must be resolved individually (FR-002 / data-model.md)."
         )
     # Explicit ``Path`` annotation: under the project's ``follow_imports = "skip"``
-    # mypy config the cross-module ``resolve_planning_read_dir`` return is seen as
-    # ``Any``; the annotation re-narrows it (the function IS typed ``-> Path``) so the
+    # mypy config the cross-module ``PlacementSeam.read_dir`` return is seen as
+    # ``Any``; the annotation re-narrows it (the method IS typed ``-> Path``) so the
     # chokepoint return is not an ``Any`` leak — matching ``mission.py::_planning_read_dir``.
-    read_dir: Path = resolve_planning_read_dir(repo_root, feature, kind=kinds[SPEC_FILE])
+    read_dir: Path = placement_seam(repo_root, feature).read_dir(kinds[SPEC_FILE])
     return read_dir
 
 
@@ -1068,9 +1072,13 @@ def _check_lane_gates(
 
 
 def _target_branch_for_feature(feature_dir: Path) -> str | None:
-    meta = load_meta(feature_dir) or {}
-    value = meta.get("target_branch")
-    return str(value) if value else None
+    """Thin adapter over the single ``target_branch`` read authority (FR-008 / #2139)."""
+    # str(...) narrows the cross-module Any mypy sees under this repo's
+    # `follow_imports = "skip"` override for specify_cli.* (pyproject.toml);
+    # value is already str | None here (the authority's real contract),
+    # mirroring the same cast pattern in core/paths.py:723.
+    value = read_target_branch_from_meta(feature_dir)
+    return str(value) if value is not None else None
 
 
 def _git_ref_exists(repo_root: Path, ref: str) -> bool:
@@ -1222,7 +1230,15 @@ def collect_feature_summary(
     strict_metadata: bool = True,
     mutate_matrix: bool = True,
 ) -> AcceptanceSummary:
-    read_feature_dir = resolve_feature_dir_for_mission(repo_root, feature)
+    # WP09/FR-001 (kind-correct): ``_primary_anchor_feature_dir`` only needs
+    # the coord-aware existence/identity read described in its own docstring
+    # ("identity/existence was already validated by the read resolution") —
+    # the ``PRIMARY_METADATA`` home, not a specific artifact's content.
+    from mission_runtime import MissionArtifactKind, placement_seam
+
+    read_feature_dir = placement_seam(repo_root, feature).read_dir(
+        MissionArtifactKind.PRIMARY_METADATA
+    )
     feature_dir = _primary_anchor_feature_dir(repo_root, feature, read_feature_dir)
     tasks_dir = feature_dir / "tasks"
     if not feature_dir.exists():
@@ -1681,8 +1697,10 @@ def perform_acceptance(
         parent_commit, accept_commit, commit_created = _commit_acceptance_meta(summary, actor_name, mode)
 
     branch = summary.branch or summary.feature
-    _meta = load_meta(summary.feature_dir)
-    _target_branch = (_meta or {}).get("target_branch")
+    # FR-008 / #2139: delegate to the single target_branch read authority
+    # (via the local thin adapter) instead of re-embedding a raw
+    # ``load_meta(...).get("target_branch")`` extraction here.
+    _target_branch = _target_branch_for_feature(summary.feature_dir)
     is_integration_branch = branch == _target_branch or (_target_branch is None and branch in _WELL_KNOWN_INTEGRATION_BRANCHES)
 
     instructions, cleanup_instructions = _build_acceptance_instructions(summary, mode, branch, is_integration_branch)
