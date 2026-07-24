@@ -17,6 +17,9 @@ reports.
   Grounded by a design + code + adversarial squad; formalized in ADR `2026-07-16-2`.
 - [Mission Review Report: windows-compatibility-hardening-01KP5R6K](2026-04-14-windows-compatibility-hardening-mission-review.md)
 - [Issue #1040 — ADRs as First-Class Primitive: Scope Inclusion Assessment](issue-1040-scope-assessment.md)
+- [Issue #2831 — Implement gate `charter_source missing`: reproduction and behavioral contracts](issue-2831-charter-source-repro.md)
+  — P0 repro on legacy-bundle projects; the emitted remediation cannot clear its own check
+  (`DIRECTIVE_043`) and charter presence resolves to two disagreeing sources (`DIRECTIVE_044`).
 - [Issue #1111 Analysis — Branch Alignment Report](issue-1111-analysis.md)
 - [Mission-Next Compatibility Matrix](mission-next-compatibility.md)
 - [Model-First Schema Generation](model-first-schema-generation.md)
