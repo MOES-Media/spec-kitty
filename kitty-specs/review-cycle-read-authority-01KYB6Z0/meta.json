@@ -1,0 +1,15 @@
+{
+  "coordination_branch": "kitty/mission-review-cycle-read-authority-01KYB6Z0",
+  "created_at": "2026-07-24T23:21:58.296505+00:00",
+  "flattened": false,
+  "friendly_name": "Review-Cycle Read Authority",
+  "mission_id": "01KYB6Z0RQ4DK02AE0B6Y59DDJ",
+  "mission_number": null,
+  "mission_slug": "review-cycle-read-authority-01KYB6Z0",
+  "mission_type": "software-dev",
+  "purpose_context": "On missions that use a coordination branch, a reviewer's approval is recorded on that branch while the status view keeps reading the planning partition. The operator sees a work package they just approved still flagged as rejected, with no way to clear it. This mission points the verdict read at the lifecycle authority and collapses the four divergent implementations of finding the latest review cycle onto one canonical helper, so the read path and the write path cannot drift apart again.",
+  "purpose_tldr": "Approved work packages stop appearing stale, because review verdicts are read from the lifecycle authority instead of the planning partition.",
+  "slug": "review-cycle-read-authority-01KYB6Z0",
+  "target_branch": "fix/review-cycle-read-authority",
+  "topology": "coord"
+}
