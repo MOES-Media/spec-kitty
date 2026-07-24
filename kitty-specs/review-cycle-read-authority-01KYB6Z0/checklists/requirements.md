@@ -35,7 +35,32 @@
 
 ## Notes
 
-Validation performed 2026-07-25, first pass.
+### Second pass — post-spec adversarial gate (2026-07-25)
+
+The first draft was **misdiagnosed** and has been rewritten. The post-spec gate
+(architect-alphonso lens, confirmed by an independent skeptic against live code) found that
+FR-001, FR-002, User Story 1 and Key Entities all rested on a false premise: that review-cycle
+evidence is COORD-owned and undeclared, and that the status view reads the wrong partition.
+
+Verified against live code before accepting the finding:
+
+- `review/cycle.py:186` — `validate_review_artifact` hard-requires `verdict == "rejected"`. An
+  approval never writes a review-cycle file, so there is no approved file to "read from the right
+  partition".
+- `review/cycle.py:30-52` — `_review_cycle_wp_dir` declares review-cycle files a PRIMARY
+  `WORK_PACKAGE_TASK` artifact, "NEVER the coordination husk", explicitly retiring the
+  #2646/#2697/#2275 misplacement.
+- `97f24d9bf` (coord-commit-integrity-01KY5JS8, merged 2026-07-23) is an ancestor of HEAD, so that
+  decision is live on this branch.
+- `review/artifacts.py:298` — `latest_review_artifact_verdict` already combines the file verdict
+  with the event-sourced override; `agent_utils/status.py` contains **zero** references to
+  `ReviewOverride`.
+
+The original draft would have reversed a freshly-merged, operator-signed-off invariant. C-001 now
+forbids exactly that. The mission is now narrower and better-founded: propagate an existing proven
+read to the callers that lack it.
+
+### First pass — 2026-07-25
 
 Two items required a rewrite before they passed:
 
