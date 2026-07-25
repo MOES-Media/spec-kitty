@@ -8,6 +8,9 @@ requirement_refs:
 planning_base_branch: fix/review-cycle-read-authority
 merge_target_branch: fix/review-cycle-read-authority
 branch_strategy: Planning artifacts for this mission were generated on fix/review-cycle-read-authority. During /spec-kitty.implement this WP may branch from a dependency-specific base, but completed changes must merge back into fix/review-cycle-read-authority unless the human explicitly redirects the landing branch.
+base_branch: kitty/mission-review-cycle-read-authority-01KYB6Z0
+base_commit: f661529e319c218932c546fd74dcfad98bc170da
+created_at: '2026-07-25T08:16:14.137184+00:00'
 subtasks:
 - T017
 - T018

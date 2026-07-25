@@ -12,5 +12,7 @@
   "purpose_tldr": "Approved work packages stop appearing rejected, because the status view now honours the recorded approval override the merge gate already trusts.",
   "slug": "review-cycle-read-authority-01KYB6Z0",
   "target_branch": "fix/review-cycle-read-authority",
-  "topology": "coord"
+  "topology": "coord",
+  "vcs": "git",
+  "vcs_locked_at": "2026-07-25T08:16:11.092813+00:00"
 }
