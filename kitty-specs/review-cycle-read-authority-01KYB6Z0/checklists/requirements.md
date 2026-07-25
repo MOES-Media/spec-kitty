@@ -60,6 +60,30 @@ The original draft would have reversed a freshly-merged, operator-signed-off inv
 forbids exactly that. The mission is now narrower and better-founded: propagate an existing proven
 read to the callers that lack it.
 
+### Third pass — post-spec gate re-run (2026-07-25)
+
+The re-run confirmed the re-diagnosis held: **both critical findings cleared**. What remained was an
+over-correction introduced by the second pass.
+
+Second-pass SC-004 replaced a vague criterion with a location-scoped grep ("matches only inside the
+canonical helper module"). That was wrong in both directions, and the gate proved it against live
+code:
+
+- **Too strict.** C-005's excluded sites (next-cycle-number at `workflow.py:1709`, iterate-all-cycles
+  at `arbiter.py:536`) are literal globs outside the canonical module, so the grep could never pass
+  while C-005 forbade moving them — an unsatisfiable pair.
+- **Too weak.** `ReviewCycleArtifact.latest()` (`review/artifacts.py:272-285`) globs, sorts, and
+  returns an artifact carrying `.verdict` with **no** override consultation — and lives *inside*
+  `review/artifacts.py`, consumed in production at `workflow_executor.py:1106`. A location-scoped
+  grep waves through the exact defect the mission exists to kill. Verified by direct read.
+
+SC-004 is now behavioural (verdict-deriving vs not), C-005 states the rule rather than a file list,
+FR-005 requires plan to enumerate and classify every site from source, and a new In-Scope Rule
+section names both traps explicitly so neither is left to an ungoverned search.
+
+Standing lesson: a criterion phrased as "grep returns no matches outside X" tests location, not
+behaviour. Where the defect is semantic, the criterion has to be semantic.
+
 ### First pass — 2026-07-25
 
 Two items required a rewrite before they passed:

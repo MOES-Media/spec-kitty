@@ -101,8 +101,8 @@ assert every caller reports the same verdict for the same work package state.
 | FR-001 | Status verdict honours the approval override | As an operator, I want the status view to treat a recorded approval override as superseding an earlier rejection, so that a work package I approved stops being reported as rejected. | High | Open |
 | FR-002 | Status and merge gates agree | As an operator, I want the status view and the merge gate to reach the same verdict for the same work package, so that I am never given two contradictory answers about the same state. | High | Open |
 | FR-003 | Genuine rejections are still reported | As a reviewer, I want an unoverridden rejection to keep surfacing, and an incomplete override to be refused, so that the fix removes a false positive without introducing a false negative. | High | Open |
-| FR-004 | Override-blind verdict reads are retired | As a maintainer, I want the hand-written verdict reads that ignore overrides routed through the canonical read, so that override-blindness cannot survive anywhere. | Medium | Open |
-| FR-005 | One canonical verdict implementation remains | As a maintainer, I want exactly one implementation of "current review verdict", so that its behaviour cannot drift between callers. | Medium | Open |
+| FR-004 | Override-blind verdict reads are retired | As a maintainer, I want every verdict-deriving read that ignores overrides routed through the canonical read — including any that already sits inside the canonical module — so that override-blindness cannot survive anywhere. | Medium | Open |
+| FR-005 | Every review-cycle site has a recorded disposition | As a maintainer, I want plan to enumerate every site that reaches for review-cycle records from the live tree and classify each as in-scope or excluded with a stated reason, so that no site's fate is decided by an ungoverned search. | Medium | Open |
 | FR-006 | Tolerant degradation is preserved | As an operator, I want an unreadable event log or malformed artifact to degrade to a partial answer rather than break the status view, so that diagnostics stay available when state is damaged. | High | Open |
 
 ### Non-Functional Requirements
@@ -122,7 +122,7 @@ assert every caller reports the same verdict for the same work package state.
 | C-002 | Read-path only | The mission changes how the current verdict is READ. It must not change what is written, when it is written, or the review lifecycle itself. | Technical | High | Open |
 | C-003 | Reuse the existing canonical read | The override-aware verdict read already exists and is proven in the merge and acceptance gates. The mission must route callers onto it, not author a second one. | Technical | High | Open |
 | C-004 | Override semantics are inherited, not redefined | Completeness rules for an override, and the snapshot-first/fallback precedence, are already established. The mission must adopt them unchanged so status and merge cannot diverge. | Technical | High | Open |
-| C-005 | Scope excludes adjacent cycle concerns | Next-cycle-number computation and iterate-all-cycles logic remain where they are. | Technical | Medium | Open |
+| C-005 | Scope is set by the In-Scope Rule, not by file location | A site is in scope if and only if it derives a review *verdict* from the latest review-cycle record. Sites that only count cycles, probe existence, iterate every cycle, or resolve a path for diagnostics are out of scope and stay where they are — regardless of which module they live in. | Technical | High | Open |
 | C-006 | Issue closure | The mission closes #2646 and must not claim to close #2626, which remains an independent open defect. | Business | High | Open |
 
 ### Key Entities
@@ -148,12 +148,40 @@ assert every caller reports the same verdict for the same work package state.
   states exercised by the test matrix, including the incomplete-override case.
 - **SC-003**: An unoverridden rejection is still reported in 100% of cases — no false negative is
   introduced.
-- **SC-004**: Exactly one implementation of "current review verdict" remains, verified by a
-  reproducible check rather than inspection: a search of `src/` for review-cycle file globbing
-  (`glob("review-cycle-*.md")` and equivalent) returns matches **only** inside the canonical
-  helper module. The exhaustive call-site list is deliberately deferred to plan, which must
-  enumerate it from the live tree rather than inherit a count from this spec — an unlisted
-  survivor must fail this criterion, not slip past it.
+- **SC-004**: Exactly one implementation that *derives a review verdict* from selecting the latest
+  review-cycle record remains. The check is **behavioural, not positional**: for every site that
+  reaches for review-cycle records, plan classifies it against the In-Scope Rule below, and the
+  criterion passes only when every site classified in-scope routes through the canonical
+  override-aware read. Locating a duplicate inside the canonical module does not exempt it, and
+  locating an excluded site outside the canonical module does not fail it.
+
+## In-Scope Rule
+
+A site that reaches for review-cycle records is **in scope** if and only if it derives a review
+**verdict** — an answer to "is this work package approved or rejected right now". Those must route
+through the canonical override-aware read.
+
+A site is **excluded** if it uses review-cycle records for anything else: counting them to compute
+the next cycle number, probing whether any exist, iterating all of them to collect something other
+than the current verdict, or resolving a path for a diagnostic message. Excluded sites stay where
+they are and keep their own file access.
+
+Module location is irrelevant to this classification, in both directions. Two consequences plan
+must handle explicitly rather than let a search arbitrate:
+
+- **A verdict-deriving duplicate inside the canonical module is still in scope.**
+  `ReviewCycleArtifact.latest()` selects the latest record and returns it carrying a `verdict`
+  field, with no override consultation, and is consumed in production by the fix-mode prompt path.
+  It sits beside the canonical read but is exactly the defect class in User Story 2. Plan must
+  either route it through the canonical read or record a stated reason why the fix-mode path
+  legitimately wants the file-only answer.
+- **An excluded site outside the canonical module is not a violation.** Next-cycle-number
+  computation and iterate-all-cycles logic live in other modules by design (C-005) and must not be
+  counted as surviving duplicates.
+
+Plan enumerates every site from the live tree and assigns each a disposition under this rule. The
+spec deliberately does not carry that list: a count authored here would go stale, and FR-005 exists
+so the enumeration is derived from source at plan time instead.
 
 ## Assumptions
 
