@@ -139,7 +139,7 @@ assert every caller reports the same verdict for the same work package state.
 | FR-002 | Status and merge gates agree | As an operator, I want the status view and the merge gate to reach the same verdict for the same work package, so that I am never given two contradictory answers about the same state. | High | Open |
 | FR-003 | Genuine rejections are still reported | As a reviewer, I want an unoverridden rejection to keep surfacing, and an incomplete override to be refused, so that the fix removes a false positive without introducing a false negative. | High | Open |
 | FR-004 | Override-blind verdict reads are retired | As a maintainer, I want every verdict-deriving read that ignores overrides routed through the canonical read — including any that already sits inside the canonical module — so that override-blindness cannot survive anywhere. | Medium | Open |
-| FR-005 | Every review-cycle site has a recorded disposition | As a maintainer, I want plan to enumerate every site that reaches for review-cycle records from the live tree and classify each as in-scope or excluded with a stated reason, so that no site's fate is decided by an ungoverned search. | Medium | Open |
+| FR-005 | Every verdict-input site has a recorded disposition | As a maintainer, I want plan to enumerate — from the live tree — every site that reads *either* input to a review verdict (the review-cycle record **and** the approval override) and classify each as in-scope or excluded with a stated reason, so that no site's fate is decided by an ungoverned search and no duplicate escapes because one search shape cannot see it. | Medium | Open |
 | FR-006 | Tolerant degradation is preserved | As an operator, I want an unreadable event log or malformed artifact to degrade to a partial answer rather than break the status view, so that diagnostics stay available when state is damaged. | High | Open |
 | FR-007 | An override is asserted once, not repeatedly | As an operator who already recorded an arbiter override to approve a work package, I want the transition guard to honour that recorded override on subsequent moves, so that I am not forced to re-assert it every time the work package advances. | High | Open |
 
@@ -198,9 +198,12 @@ assert every caller reports the same verdict for the same work package state.
 
 ## In-Scope Rule
 
-A site that reaches for review-cycle records is **in scope** if and only if it derives a review
-**verdict** — an answer to "is this work package approved or rejected right now". Those must route
-through the canonical override-aware read.
+A site that reads either input to a review verdict — the review-cycle **record** or the approval
+**override** — is **in scope** if and only if it derives a review **verdict**: an answer to "is this
+work package approved or rejected right now". Those must route through the canonical reads.
+
+Both inputs must be searched. A record reader is found by its file glob; an override reader has no
+glob and is invisible to that search. Enumerating only one shape is how a duplicate survives.
 
 A site is **excluded** if it uses review-cycle records for anything else: counting them to compute
 the next cycle number, probing whether any exist, iterating all of them to collect something other

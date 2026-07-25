@@ -14,8 +14,17 @@ reaches for review-cycle records (FR-005), and (2) how a caller obtains the over
 **Decision**: three consumer sites are in scope, via two override-blind functions. Seven sites are
 excluded.
 
-**Rationale**: the In-Scope Rule asks whether a site *derives a verdict*. Enumerated from source
-(`grep -rn 'glob("review-cycle-\*\.md")' src/`), ten live sites exist.
+**Rationale**: the In-Scope Rule asks whether a site *derives a verdict*. Enumeration needs **two
+passes**, because a verdict has two inputs and each is found by a different query.
+
+> **Methodology correction (post-plan gate).** The first version used only
+> `grep -rn 'glob("review-cycle-\*\.md")' src/`. That finds *record* readers and is structurally
+> blind to *override* readers, which contain no glob. A duplicate on a merge-blocking path was
+> therefore missing from the table entirely — and SC-004's "exactly one implementation remains"
+> would have been true only by omission. Both passes are now required, and IC-04's floor covers
+> both.
+
+**Pass 1 — record readers**: `grep -rn 'glob("review-cycle-\*\.md")' src/` → ten live sites.
 
 | # | Site | What it actually does | Disposition |
 |---|------|----------------------|-------------|
@@ -29,6 +38,19 @@ excluded.
 | 8 | `post_merge/review_artifact_consistency.py:138` `_latest_review_artifact_path` | Resolves a path for a schema-error message; gated *ahead* of the real canonical call at `:189` | EXCLUDED |
 | 9 | `review/arbiter.py:390` | Finds a record path | EXCLUDED (see Observation A) |
 | 10 | `review/arbiter.py:536` | Iterates every record collecting `arbiter_override` blocks | EXCLUDED (C-005) |
+
+**Pass 2 — override readers**: `grep -rn 'ReviewOverride.from_dict|get("review")' src/`.
+
+| # | Site | What it actually does | Disposition |
+|---|------|----------------------|-------------|
+| 11 | `status/wp_review.py` `resolve_event_stream_review` / `resolve_snapshot_review` | The declared canonical interpretation of the `review` slot | **CANONICAL — the survivor** |
+| 12 | `post_merge/review_artifact_consistency.py:112-127` `_snapshot_review_override` | Re-implements `.get("review")` + `ReviewOverride.from_dict` independently; feeds `rejected_review_artifact_for_terminal_lane:189` inside `find_rejected_review_artifact_conflicts` — a **merge-blocking** verdict | **IN SCOPE** — see Decision 6 |
+| 13 | `status/wp_view.py:173` | Projects the raw slot mapping into a display group; no `ReviewOverride` construction, no completeness rule, no verdict | EXCLUDED — projection, not resolution |
+| 14 | `status/models.py:553-554` | `from_dict` on the model itself — the definition, not a reader | EXCLUDED |
+
+(`retrospective/generator.py:285`, `migration/mission_state.py:900`, and
+`tasks_move_task.py:871` also match the query but read unrelated `review` keys — evidence blocks,
+migration payloads, and a config section respectively. Not review overrides.)
 
 The three in-scope **consumer** sites, reached through functions 2 and 3:
 
@@ -177,6 +199,47 @@ the drift DIRECTIVE_044 forbids.
 contract of IC-03. Required cases — override present ⇒ effective `approved`, guard permits; no
 override ⇒ effective `rejected`, guard refuses; incomplete override ⇒ effective `rejected`, guard
 refuses; unparseable record ⇒ `None`, existing refusal unchanged.
+
+## Decision 6 — `_snapshot_review_override` is consolidated, not exempted
+
+**Decision**: route `post_merge/review_artifact_consistency.py`'s `_snapshot_review_override` onto
+the canonical `wp_review` seam. This requires adding a snapshot-taking entry point to `wp_review`
+(see below) and is scoped as IC-05.
+
+**Rationale**: its own docstring calls it *"the third leg of the both-halves pair"* — it knows it is
+a third implementation. It feeds a merge-blocking verdict, so it is squarely a verdict-deriving
+site under the In-Scope Rule. Leaving it would make SC-004's "exactly one implementation remains"
+true only because the enumeration could not see it. C-003 says route callers onto the canonical
+read rather than author a second — that obligation applies to the duplicate that already exists,
+not only to the three new callers.
+
+**Not a live defect**: it reads state from `materialize(feature_dir)` (`:168`), which *is*
+annotation-aware, so it currently agrees with the canonical seam. This is drift risk and a false
+SC-004 claim, not a wrong verdict shipping today. Severity is "must not claim otherwise", not
+"users are broken".
+
+**Implementation wrinkle to hand to tasks**: `wp_review` exposes
+`resolve_event_stream_review(event_stream, wp_id)` and `resolve_snapshot_review(feature_dir,
+wp_id)`. The post-merge call site holds an **already-materialized snapshot** inside a per-WP loop,
+so neither fits: the stream variant needs a stream it does not have, and the `feature_dir` variant
+re-reduces per call, breaching NFR-002. The consolidation therefore adds a third entry point
+(resolve from an already-materialized snapshot) that the other two delegate to. That is a genuine
+addition to the canonical module, and it must not become a fourth parallel implementation.
+
+**Rejected alternative**: recording an exemption (the Decision 2 route). Rejected because, unlike
+`ReviewCycleArtifact.latest()`, this site *is* deriving an approval verdict — there is no
+behavioural reason it should read the slot differently from every other consumer.
+
+## Decision 7 — IC-03's read joins the existing transactional boundary
+
+**Decision**: `tasks_move_task.py` obtains its stream via `read_event_stream_transactional`
+(`coordination/status_transition.py:1109`) — the same primitive the merge gate uses
+(`merge/done_bookkeeping.py:290`).
+
+**Rationale**: IC-03's risk note requires the override read to sit in the same transactional
+boundary as the lane read, so the guard cannot decide on a torn view. Naming the existing primitive
+prevents an implementer from reaching for a plain `read_event_stream` and reintroducing the torn
+read the transactional variant exists to prevent, or from authoring a bespoke locking wrapper.
 
 ## Observation A — latent defect, deliberately not folded
 

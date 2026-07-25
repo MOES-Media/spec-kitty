@@ -49,7 +49,7 @@ enumerated sites explicitly excluded with recorded reasons
 | ATDD-first / red-first | ✅ Planned | Every FR gets a failing test before its fix (NFR-004, ADR `2026-07-17-1`) |
 | Close defect classes by construction (DIRECTIVE_043) | ⚠️ Partial | Consolidation removes the duplicates, but nothing structurally prevents a *new* override-blind reader. See Complexity Tracking. |
 | Terminology adherence | ✅ | Mission/WP canon; no `feature*` aliases introduced |
-| Canonical sources | ✅ | Reuses `latest_review_artifact_verdict` and the `_snapshot_review_override` pattern rather than improvising |
+| Canonical sources | ✅ | Reuses `latest_review_artifact_verdict` (verdict) and `status.wp_review` (override) rather than improvising. **`_snapshot_review_override` is a duplicate to retire (IC-05), not a pattern to imitate** — an earlier draft of this row wrongly cited it as exemplary |
 
 Post-design re-evaluation: no new violations. The one partial is tracked below rather than
 silently accepted.
@@ -149,8 +149,13 @@ tests/
   **`tasks_move_task.py` has no snapshot or stream read today** (zero `reduce(` calls; its
   `read_events_transactional` uses at `:1734`/`:2411` are lane determination, unrelated to
   annotations). A stream read must be *added* here — unlike IC-01/IC-02 this is not a switch of an
-  existing read. Placement matters: it must sit inside the same transactional boundary as the lane
-  read so the guard cannot decide on a torn view of the log.
+  existing read. It must use `read_event_stream_transactional`
+  (`coordination/status_transition.py:1109`), the same primitive the merge gate uses
+  (`merge/done_bookkeeping.py:290`), so the guard cannot decide on a torn view of the log. A plain
+  `read_event_stream` here would reintroduce exactly the torn read the transactional variant
+  exists to prevent. Also carries the effective-verdict projection (research.md Decision 5) — the
+  guard takes one `str | None`, so the two-valued rule must be projected, and getting that wrong
+  trips a *different* refusal arm rather than failing loudly.
 
 ### IC-04 — Disposition is pinned so the class cannot silently return
 
@@ -158,10 +163,29 @@ tests/
   review-cycle reader fails a test rather than passing unnoticed.
 - **Relevant requirements**: FR-005, SC-004
 - **Affected surfaces**: `tests/architectural/`
-- **Sequencing/depends-on**: IC-01, IC-02, IC-03 (the in-scope set must be retired first)
-- **Risks**: Must be non-vacuous per DIRECTIVE_043 — it needs a concrete floor (the enumerated
-  site count) and must fail on an unclassified new site, not merely on a count change. It must not
-  be a location-scoped grep; that check was already proven both too strict and too weak.
+- **Sequencing/depends-on**: IC-01, IC-02, IC-03, IC-05 (the in-scope set must be retired first)
+- **Risks**: Must be non-vacuous per DIRECTIVE_043 — it needs a concrete floor and must fail on an
+  unclassified new site, not merely on a count change. It must not be a location-scoped grep; that
+  check was proven both too strict and too weak. **Its floor must cover both enumeration passes** —
+  record readers (glob) *and* override readers (`ReviewOverride.from_dict` / `review`-slot). A
+  gate anchored only to the glob pass is blind to the duplicate class IC-05 retires, which is
+  precisely how that duplicate escaped the first enumeration.
+
+### IC-05 — Retire the third override-resolution duplicate
+
+- **Purpose**: `post_merge`'s private `_snapshot_review_override` independently re-implements the
+  canonical override read and feeds a merge-blocking verdict. Leaving it makes SC-004 true only by
+  omission.
+- **Relevant requirements**: FR-004, FR-005, SC-004; C-003
+- **Affected surfaces**: `src/specify_cli/post_merge/review_artifact_consistency.py:112-127` (call
+  site `:183`); `src/specify_cli/status/wp_review.py` — gains a snapshot-taking entry point
+- **Sequencing/depends-on**: none — independent of IC-01/02/03
+- **Risks**: The call site holds an already-materialized snapshot inside a per-WP loop, so neither
+  existing `wp_review` entry point fits (`resolve_snapshot_review` re-reduces per call and would
+  breach NFR-002). Adding the third entry point is the point of this concern — but it must be the
+  *shared* implementation the other two delegate to, not a fourth parallel copy, or this concern
+  causes the very drift it exists to remove. Not a live defect: `materialize` is annotation-aware,
+  so both implementations agree today. This is drift and a false SC-004 claim, not broken output.
 
 ## Phase Status
 
