@@ -131,6 +131,10 @@ implementation the other two delegate to.
 4. Add `tests/specify_cli/status/test_wp_review_snapshot_entry.py` covering: complete override
    returned; incomplete override rejected (parameterised over all four missing fields); absent slot
    → `None`; malformed slot → `None`, no raise.
+5. **Determinism (NFR-003)**: assert repeated resolution over an unchanged snapshot returns an
+   identical result, and that the answer never depends on filesystem enumeration order. Because
+   every in-scope consumer delegates here after this WP, this is the one place the property can be
+   established for the whole mission — it is otherwise unverified anywhere.
 
 **Files**: `src/specify_cli/status/wp_review.py`
 

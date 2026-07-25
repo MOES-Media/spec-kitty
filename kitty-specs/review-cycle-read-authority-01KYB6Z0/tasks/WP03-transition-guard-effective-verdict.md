@@ -183,6 +183,12 @@ nothing.
 
 1. Resolve the override via `wp_review.resolve_event_stream_review(event_stream, wp_id)` using the
    stream from T012.
+
+   > **Why this is permitted here when WP01/WP02 forbid it.** That prohibition is **loop-scoped**:
+   > those surfaces iterate every work package, so a per-call re-reduction costs N reductions.
+   > `move-task` operates on exactly **one** work package, so a single call is a single reduction
+   > and satisfies NFR-002. Do **not** "fix" this for consistency with WP01/WP02, and reviewers
+   > must not reject it on that basis.
 2. Adopt WP02's optional override parameter on `_get_latest_review_cycle_verdict` so the record
    verdict and `has_override` are both available.
 3. Apply the projection above when populating `MoveTaskRequest.review_verdict` at `:550-556`.

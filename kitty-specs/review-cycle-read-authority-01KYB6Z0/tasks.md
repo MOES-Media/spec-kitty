@@ -59,7 +59,7 @@ event-sourced; there is no checkbox to tick.
 **Priority**: P1 · **Requirements**: FR-001, FR-002, FR-003, FR-006
 **Independent test**: With a real event log carrying a complete override, `agent tasks status`
 emits no stale-verdict warning.
-**Prompt**: [tasks/WP01-status-board-override-aware.md](tasks/WP01-status-board-override-aware.md) (~320 lines)
+**Prompt**: [tasks/WP01-status-board-override-aware.md](tasks/WP01-status-board-override-aware.md) (~275 lines)
 
 **Subtasks**: T001, T002, T003, T004, T005
 
@@ -77,7 +77,7 @@ NFR-002 — verify by spying on `reduce`, not by counting reads.
 **Goal**: The same warning on the tasks-status surface reaches the same answer.
 **Priority**: P1 · **Requirements**: FR-001, FR-002, FR-003, FR-004, FR-006
 **Independent test**: identical fixture to WP01 yields an identical verdict on this surface.
-**Prompt**: [tasks/WP02-tasks-status-override-aware.md](tasks/WP02-tasks-status-override-aware.md) (~320 lines)
+**Prompt**: [tasks/WP02-tasks-status-override-aware.md](tasks/WP02-tasks-status-override-aware.md) (~275 lines)
 
 **Subtasks**: T006, T007, T008, T009, T010
 
@@ -96,7 +96,7 @@ shared with WP03, so its contract change has two consumers.
 **Priority**: P1 · **Requirements**: FR-007, FR-003
 **Independent test**: an override-approved work package moves `approved → done` with no override
 flags re-supplied.
-**Prompt**: [tasks/WP03-transition-guard-effective-verdict.md](tasks/WP03-transition-guard-effective-verdict.md) (~420 lines)
+**Prompt**: [tasks/WP03-transition-guard-effective-verdict.md](tasks/WP03-transition-guard-effective-verdict.md) (~285 lines)
 
 **Subtasks**: T011, T012, T013, T014, T015, T016
 
@@ -117,12 +117,13 @@ construction rather than by omission.
 **Priority**: P2 · **Requirements**: FR-004, FR-005
 **Independent test**: merge-blocking findings are byte-identical before and after, with the
 duplicate deleted.
-**Prompt**: [tasks/WP04-retire-post-merge-duplicate.md](tasks/WP04-retire-post-merge-duplicate.md) (~260 lines)
+**Prompt**: [tasks/WP04-retire-post-merge-duplicate.md](tasks/WP04-retire-post-merge-duplicate.md) (~230 lines)
 
 **Subtasks**: T017, T018, T019, T020
 
 **Implementation sketch**: add a snapshot-taking entry point to `wp_review` that the existing two
-delegate to → route `post_merge` onto it → delete `_snapshot_review_override` → prove parity.
+delegate to → route `post_merge` onto it → delete `_snapshot_review_override` → prove parity
+and determinism (NFR-003 is establishable only here, once all consumers delegate).
 
 **Dependencies**: none — **this is wave 1; WP01 and WP02 depend on it**.
 **Risks**: the new entry point must be the *shared* implementation, not a fourth copy. Not a live
@@ -135,7 +136,7 @@ defect today — this is drift and a false SC-004 claim, not broken output.
 **Goal**: A newly-added unclassified reader fails a test instead of passing unnoticed.
 **Priority**: P2 · **Requirements**: FR-005, SC-004
 **Independent test**: adding an unclassified reader turns the gate red.
-**Prompt**: [tasks/WP05-disposition-gate.md](tasks/WP05-disposition-gate.md) (~280 lines)
+**Prompt**: [tasks/WP05-disposition-gate.md](tasks/WP05-disposition-gate.md) (~225 lines)
 
 **Subtasks**: T021, T022, T023, T024
 
