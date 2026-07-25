@@ -14,16 +14,26 @@ override-aware read. No artifact moves partition; no guard rule is rewritten.
 ## Technical Context
 
 **Language/Version**: Python 3.11+
-**Primary Dependencies**: none added — the canonical read (`specify_cli.review.artifacts`) and the
-status reducer (`specify_cli.status`) already exist and are already imported at the call sites
+**Primary Dependencies**: none added — the canonical verdict read
+(`specify_cli.review.artifacts.latest_review_artifact_verdict`) and the canonical override seam
+(`specify_cli.status.wp_review.resolve_event_stream_review`) both already exist
 **Storage**: filesystem — review-cycle Markdown records (PRIMARY partition) plus the append-only
 `status.events.jsonl` event log
 **Testing**: pytest; red-first regression tests per ADR `2026-07-17-1` (NFR-004), run via
 `PWHEADLESS=1 pytest tests/ -n auto --dist loadfile`
 **Target Platform**: Linux/macOS/Windows CLI
 **Project Type**: single
-**Performance Goals**: no additional event-log read or snapshot reduction at any in-scope site —
-the reduced snapshot is already in hand at all three (NFR-002)
+**Performance Goals**: the annotation-aware event stream is read **once per mission**, then
+`resolve_event_stream_review(event_stream, wp_id)` is called per work package (NFR-002). The
+per-call `resolve_snapshot_review(feature_dir, wp_id)` must NOT be used inside a per-WP loop — it
+re-reduces on every call.
+
+> **Design note (corrected after the post-plan gate).** In-scope sites today call `read_events` +
+> `reduce(events)`. `read_events` deliberately partitions annotations out (`status/store.py:717`)
+> and `state["review"]` is assigned only inside `_apply_annotation_delta` (`reducer.py:201`), so
+> that snapshot's `review` slot is **always empty**. Every in-scope site must move to the
+> annotation-aware stream read. This is real work — an earlier draft wrongly assumed the override
+> was already in hand and would have shipped a silent no-op.
 **Constraints**: no artifact may change partition (C-001); guard conditions unchanged, only their
 input corrected (C-002); reuse the canonical read rather than authoring a second (C-003); override
 completeness semantics inherited unchanged (C-004)
@@ -63,9 +73,11 @@ kitty-specs/review-cycle-read-authority-01KYB6Z0/
 src/specify_cli/
 ├── review/artifacts.py                        # canonical read (unchanged behaviour; may gain guard docstring)
 ├── agent_utils/status.py                      # IC-01: retire _get_wp_review_verdict
+├── status/wp_review.py                        # canonical override seam — REUSED, not modified
 ├── cli/commands/agent/
+│   ├── tasks_status_cmd.py                    # IC-02: owns the events/snapshot construction (:279-283)
 │   ├── tasks_parsing_validation.py            # IC-02: retire _get_latest_review_cycle_verdict
-│   ├── tasks_move_task.py                     # IC-03: override-aware verdict into MoveTaskRequest
+│   ├── tasks_move_task.py                     # IC-03: ADDS a stream read; override-aware verdict
 │   └── tasks_transition_core.py               # IC-03: arms unchanged — pinned by tests only
 └── post_merge/review_artifact_consistency.py  # reference pattern; not modified
 
@@ -91,12 +103,16 @@ tests/
 - **Purpose**: The status board's stale-verdict warning must honour a recorded approval override so
   an approved work package stops reporting itself rejected.
 - **Relevant requirements**: FR-001, FR-002, FR-003, FR-006
-- **Affected surfaces**: `src/specify_cli/agent_utils/status.py` (`_get_wp_review_verdict:41`, call
-  site `:273`); the reduced snapshot already available at `:165-171`
+- **Affected surfaces**: `src/specify_cli/agent_utils/status.py` — `_get_wp_review_verdict:41`,
+  call site `:273`, **and the event read at `:165-168`** which must move from
+  `read_events`/`reduce(events)` to the annotation-aware stream
 - **Sequencing/depends-on**: none
-- **Risks**: The per-WP `state` mapping must be threaded from the existing `snapshot.work_packages`
-  loop to the verdict call without a second reduction (NFR-002). Tolerant degradation must survive:
-  an absent or malformed event log falls back to the file-only answer rather than raising (FR-006).
+- **Risks**: The annotation-blind read is the trap — a change that threads the *existing* snapshot
+  state into the verdict call type-checks and passes hand-built-dict unit tests while returning
+  `None` for every real override. Tests must be built from a **real event log containing an
+  `InnerStateChanged` review annotation**, not from synthetic state mappings, or they will prove
+  nothing. Tolerant degradation must survive (FR-006): an absent or malformed log falls back to the
+  file-only answer rather than raising.
 
 ### IC-02 — Tasks-status verdict becomes override-aware
 
@@ -104,12 +120,17 @@ tests/
   answer as IC-01 and as the merge gate.
 - **Relevant requirements**: FR-001, FR-002, FR-003, FR-004
 - **Affected surfaces**: `src/specify_cli/cli/commands/agent/tasks_parsing_validation.py`
-  (`_get_latest_review_cycle_verdict:301`, display call site `:371`)
+  (`_get_latest_review_cycle_verdict:301`, display call site `:371`) **and
+  `cli/commands/agent/tasks_status_cmd.py:279-283`** — the actual construction site that builds
+  `st.events`/`st.snapshot` and threads them into `_apply_review_status_flags:349`. The override
+  must be resolved where the stream is read, which is `tasks_status_cmd.py`, not
+  `tasks_parsing_validation.py`.
 - **Sequencing/depends-on**: none — independent of IC-01
 - **Risks**: This function is re-exported (`tasks.py:196`, `__all__` at `:1006`) and shared with
   IC-03, so its signature change has two consumers. It returns `(verdict, path)` where the path
   feeds error messages; the canonical read returns a richer object, so the adapter must preserve
-  the path-for-diagnostics contract.
+  the path-for-diagnostics contract. `tasks_status_cmd.py:283` also swallows read failures in a
+  bare `except` — the override path must degrade the same way rather than introducing a new raise.
 
 ### IC-03 — Transition guard receives the corrected verdict
 
@@ -125,6 +146,11 @@ tests/
   refusal arms must be proven intact (no override, incomplete override, unparseable verdict), and
   `_authorize_review_override` stops firing for an already-overridden WP, so the durability of the
   *original* override evidence must be proven separately from the first-override path.
+  **`tasks_move_task.py` has no snapshot or stream read today** (zero `reduce(` calls; its
+  `read_events_transactional` uses at `:1734`/`:2411` are lane determination, unrelated to
+  annotations). A stream read must be *added* here — unlike IC-01/IC-02 this is not a switch of an
+  existing read. Placement matters: it must sit inside the same transactional boundary as the lane
+  read so the guard cannot decide on a torn view of the log.
 
 ### IC-04 — Disposition is pinned so the class cannot silently return
 

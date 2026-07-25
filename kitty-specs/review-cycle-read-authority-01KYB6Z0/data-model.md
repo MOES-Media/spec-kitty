@@ -23,12 +23,20 @@ the resolution rule so the correctness conditions are explicit.
 
 | Property | Value |
 |----------|-------|
-| Physical form | The `review` slot of the reduced per-WP snapshot, from the append-only event log |
+| Physical form | The `review` slot of the reduced per-WP snapshot, populated from an off-axis `InnerStateChanged` annotation (`WPInnerStateDelta.review`) |
 | Home | Event log — the lifecycle authority |
 | Written when | An operator supplies the arbiter-override flags with a durable reason |
 | Required fields | `at`, `actor`, `wp_id`, `reason` — **all four** required for completeness |
 | Completeness | `ReviewOverride.complete`. An incomplete override is honoured **nowhere** (C-004) |
 | Legacy fallback | Artifact frontmatter (`has_complete_override`) retained only for the migration window; snapshot-first, not dual |
+| **Read via** | `status.wp_review.resolve_event_stream_review(event_stream, wp_id)` — the canonical seam, also used by the merge gate |
+
+> **Retrieval hazard.** The slot is populated **only** when the reducer is given annotations.
+> `read_events` partitions annotations out by design and `reduce(events)` defaults them to empty,
+> so a snapshot built that way has **no** `review` slot — reading it returns `None` for every work
+> package, always. The annotation-aware `read_event_stream` path is mandatory. A fix built on the
+> annotation-blind read is indistinguishable from a working one under unit tests that construct
+> state dicts by hand.
 
 ### Current review verdict (derived)
 
@@ -55,6 +63,22 @@ verdict  := (latest.verdict, has_override = override is present and complete)
 A consumer treats a work package as carrying a live rejection when
 `verdict == "rejected" AND NOT has_override`. Every in-scope consumer must apply exactly this
 predicate — that is the whole of the fix.
+
+### Effective verdict (the one-field projection)
+
+The display consumers can hold both fields. The transition guard cannot: it receives a single
+`str | None` (`MoveTaskRequest.review_verdict`). The projection is therefore part of the model:
+
+```
+effective_verdict :=
+    None          if no record exists or its verdict is unparseable
+    "approved"    if verdict == "rejected" and has_override
+    verdict       otherwise
+```
+
+`review_artifact_name` continues to name the underlying record regardless, so diagnostics do not
+lose the file reference. This projection is what lets the guard's arms stay byte-identical while
+receiving a truthful input (C-002).
 
 ## State transitions
 

@@ -66,28 +66,62 @@ under override); deleting it (rejected — the fix-mode path legitimately needs 
 
 ---
 
-## Decision 3 — The override is already in hand at every in-scope site
+## Decision 3 — Use the annotation-aware stream and the canonical `wp_review` seam
 
-**Decision**: reuse `_snapshot_review_override`'s pattern — read the reduced snapshot's `review`
-slot into a `ReviewOverride`, pass it as `snapshot_override=` to the canonical read.
+> **Corrected after the post-plan gate.** The first version of this decision claimed the override
+> was "already in hand" at all three sites because they call `reduce(events)`. That was **false**
+> and would have shipped a no-op. See Correction Note below.
 
-**Rationale**: this is the proven third-leg pattern
-(`post_merge/review_artifact_consistency.py:112-129`), already the single authority for override
-recognition per its FR-009. Critically, **no new I/O is required at the in-scope sites**:
+**Decision**: each in-scope site resolves the override via
+`specify_cli.status.wp_review.resolve_event_stream_review(event_stream, wp_id)`, backed by **one**
+`read_event_stream` per mission. Pass the result as `snapshot_override=` to the canonical verdict
+read.
 
-- `agent_utils/status.py:165-168` already does `events = read_events(feature_dir); snapshot =
-  reduce(events)` and iterates `snapshot.work_packages.items()` at `:171`. The per-WP `state`
-  mapping is exactly what `_snapshot_review_override` consumes. NFR-002 is satisfied by
-  construction — the snapshot is already reduced exactly once per mission.
-- `tasks_parsing_validation.py:371` sits in a loop that already holds per-WP state and already has
-  `events` in scope (`_latest_status_event_time(events, wp_id)` at `:383`).
-- `tasks_move_task.py:552` runs after the event-log read (the comment at `:545` says so
-  explicitly).
+**Rationale**:
 
-**Alternatives considered**: re-parsing artifact frontmatter for the override (rejected — the
-canonical read already keeps that only as a migration-window fallback, and adding a second
-frontmatter parse would reintroduce the dual-authority the FR-009 work retired); a fresh
-`read_events` per call site (rejected — violates NFR-002 and duplicates work already done).
+1. **`read_events` deliberately discards what we need.** Its docstring
+   (`status/store.py:717-722`): *"Backward-compatible transitions-only view (off-axis `annotation`
+   events are partitioned out). Use `read_event_stream` when the reducer needs the annotations
+   too."*
+2. **`reduce(events)` therefore never populates the slot.** `state["review"]` is assigned at
+   exactly one place — `reducer.py:201`, inside `_apply_annotation_delta` — which runs only over
+   the `annotations` argument. `reduce(events)` defaults it to empty, so the `review` slot is
+   *always absent*. Reading it would yield `None` unconditionally.
+3. **A canonical seam for exactly this already exists.** `specify_cli/status/wp_review.py`
+   (`dfe6b2ead`, 2026-07-21 — an ancestor of the `721165a22` this research verified against)
+   declares itself *"the single canonical interpretation of the snapshot `review` slot"*, created
+   precisely so the merge gate and the CLI could not diverge. C-003 mandates reusing it.
+4. **The merge gate — this mission's reference implementation — already uses it.**
+   `merge/done_bookkeeping.py:109-111` calls `resolve_event_stream_review(event_stream, wp_id)`.
+   Copying `post_merge`'s private `_snapshot_review_override` instead would author a *third*
+   implementation, which is the very drift C-003 and DIRECTIVE_044 forbid.
+
+**Stream-level, not snapshot-level (NFR-002).** `wp_review` exposes two entry points.
+`resolve_snapshot_review(feature_dir, wp_id)` re-reduces per call — using it inside a per-WP loop
+would reduce once per work package and breach NFR-002. Therefore: read the stream **once per
+mission**, then call `resolve_event_stream_review(event_stream, wp_id)` per work package.
+
+**Per-site consequences** (this is real work, not free):
+
+| Site | Today | Required change |
+|------|-------|-----------------|
+| `agent_utils/status.py:165-168` | `read_events` + `reduce(events)` | Switch to the annotation-aware stream read |
+| `tasks_status_cmd.py:279-283` | `_st_read_events` + `_st_reduce` — **the real construction site** feeding `_apply_review_status_flags:349` | Same switch; thread the override into the verdict call |
+| `tasks_move_task.py:552` | **No snapshot or stream read exists in this file at all** (zero `reduce(` calls) | Add a stream read + override lookup |
+
+**Alternatives considered**: re-parsing artifact frontmatter (rejected — the canonical read keeps
+that only as a migration-window fallback; a second parse reinstates the dual authority the FR-009
+work retired); copying `_snapshot_review_override` (rejected — a third implementation, violates
+C-003); `resolve_snapshot_review` per WP (rejected — breaches NFR-002).
+
+### Correction Note
+
+The original Decision 3 asserted "no new I/O is required" and cited `status.py:165-168` as already
+holding the override. The post-plan adversarial gate refuted it against live code. The failure mode
+mattered: the proposed change would have type-checked, passed unit tests using hand-built state
+mappings, and silently returned `None` for every override in production — shipping a fix that
+closes nothing. Recorded rather than quietly overwritten, because the *shape* of the error (reading
+a slot that a chosen primitive never fills) is the reusable lesson.
 
 ---
 
@@ -115,6 +149,35 @@ rewrites the guard's condition, violating C-002, and creates a second override-r
 
 ---
 
+## Decision 5 — The guard's one-field contract carries the *effective* verdict
+
+**Problem**: the resolution rule is two-valued (`verdict`, `has_override`), but
+`MoveTaskRequest.review_verdict` is a single `str | None`. The two do not compose without an
+explicit mapping, and getting it wrong hits a refusal arm:
+
+- passing `None` when an override exists trips the *"no parseable review verdict"* refusal
+  (`tasks_transition_core.py:372`) — worse than today;
+- passing `"rejected"` trips the rejected-verdict refusal — no change, defect persists.
+
+**Decision**: `MoveTaskRequest.review_verdict` carries the **effective** verdict — the record's
+verdict unless a complete override supersedes it, in which case it carries the override's resulting
+state (`approved`). `review_artifact_name` continues to carry the record's filename so diagnostics
+still name the underlying artifact.
+
+**Rationale**: this satisfies C-002 exactly. The guard's arms are untouched; the value handed to
+them stops being a half-truth. An override is a recorded approval decision, so reporting the
+effective verdict as approved is not fabrication — it is the decision the operator already made and
+that the merge gate already honours.
+
+**Rejected alternative**: adding a `review_has_override` field for the guard to consult. That
+rewrites the guard's condition, violating C-002, and creates a second override-recognition site —
+the drift DIRECTIVE_044 forbids.
+
+**Must be pinned by tests** (tasks to encode): the effective-verdict mapping is the load-bearing
+contract of IC-03. Required cases — override present ⇒ effective `approved`, guard permits; no
+override ⇒ effective `rejected`, guard refuses; incomplete override ⇒ effective `rejected`, guard
+refuses; unparseable record ⇒ `None`, existing refusal unchanged.
+
 ## Observation A — latent defect, deliberately not folded
 
 `review/arbiter.py:388-391` reads:
@@ -141,6 +204,16 @@ for an explicit operator decision rather than silently carried or silently dropp
 |---|---|
 | Which sites are in scope (FR-005) | Decision 1 — 3 consumers via 2 functions; 7 excluded |
 | `ReviewCycleArtifact.latest()` disposition | Decision 2 — excluded, reason recorded |
-| How callers obtain the override | Decision 3 — reduced-snapshot `review` slot, already in hand |
+| How callers obtain the override | Decision 3 — `wp_review.resolve_event_stream_review`, one `read_event_stream` per mission |
 | Whether the guard's rules change | Decision 4 — no; only its input |
 | Malformed cycle number semantics | Pinned in spec: ranks as cycle zero, stays a candidate |
+
+## Observation B — the annotation-blind read is a wider pattern
+
+Two independent surfaces (`agent_utils/status.py`, `tasks_status_cmd.py`) build a snapshot with
+`read_events` + `reduce(events)` and then consult per-WP state. Any off-axis
+`InnerStateChanged`-sourced slot — not only `review` — is invisible to both. This mission corrects
+only the `review` slot on its in-scope path.
+
+Whether other slots are being read the same blind way is **not investigated here** and is not
+claimed either way. Flagged so a future reader knows the question is open rather than answered.

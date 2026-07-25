@@ -76,9 +76,29 @@ non-vacuous by temporarily adding an unclassified reader and observing a red tes
 
 ## Performance check (NFR-002)
 
-No in-scope site may add an event-log read or snapshot reduction — the reduced snapshot is already
-in hand at all three. Verify by inspection: no new `read_events` or `reduce` call appears in the
-diff at `agent_utils/status.py`, `tasks_parsing_validation.py`, or `tasks_move_task.py`.
+Each surface reads and reduces the event log **once per invocation**, never once per work package.
+
+Verify by inspection of the diff:
+
+- `agent_utils/status.py` and `tasks_status_cmd.py` **do** change their event read — from
+  `read_events`/`reduce(events)` to the annotation-aware stream. That switch is required, not a
+  regression.
+- `tasks_move_task.py` **gains** a stream read; it has none today.
+- No call to `resolve_snapshot_review(feature_dir, wp_id)` appears inside a per-work-package loop —
+  it re-reduces on every call. Per-WP lookups use `resolve_event_stream_review(event_stream,
+  wp_id)` against a stream read once.
+
+## The trap this mission nearly fell into
+
+A change can thread the *existing* `reduce(events)` snapshot into the verdict call, type-check
+cleanly, and pass unit tests that build state mappings by hand — while returning `None` for every
+real override, because `read_events` partitions annotations out and `reduce(events)` leaves the
+`review` slot unpopulated.
+
+**Therefore**: every regression test for FR-001 and FR-007 must be built from a **real event log
+containing an `InnerStateChanged` review annotation**. A test that hand-constructs the snapshot
+state proves nothing about production behaviour. Reviewers should reject any override test whose
+fixture does not go through the event log.
 
 ## Boundaries — what must NOT change
 

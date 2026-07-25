@@ -148,7 +148,7 @@ assert every caller reports the same verdict for the same work package state.
 | ID | Title | Requirement | Category | Priority | Status |
 |----|-------|-------------|----------|----------|--------|
 | NFR-001 | Tolerant degradation preserved | Unreadable, absent, or malformed review evidence yields "no verdict" and never raises to the operator; zero new uncaught exception paths in the status read. | Reliability | High | Open |
-| NFR-002 | Override lookup does not scale per work package | The status read materializes the event-sourced snapshot at most once per mission, never once per work package; for a 20-work-package mission the snapshot is reduced exactly once. | Performance | Medium | Open |
+| NFR-002 | Override lookup does not scale per work package | Each surface reads the event log at most once per invocation and reduces it at most once, never once per work package; for a 20-work-package mission the log is read and reduced exactly once, not twenty times. | Performance | Medium | Open |
 | NFR-003 | Deterministic selection | Latest-cycle selection depends only on parsed cycle numbers, never on filesystem enumeration order; repeated reads over an unchanged directory return identical results across 100 consecutive runs. | Reliability | High | Open |
 | NFR-004 | Regression evidence precedes the fix | The reproduction for FR-001 is committed as a failing test before the corrective change, per the red-first discipline in ADR `2026-07-17-1`. | Maintainability | High | Open |
 
