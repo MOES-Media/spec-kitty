@@ -67,8 +67,8 @@ emits no stale-verdict warning.
 annotation-aware stream → resolve the override per WP and pass it to the canonical verdict read →
 prove degradation and the no-false-negative cases.
 
-**Dependencies**: none. **Risks**: the annotation-blind trap above; NFR-002 (read/reduce once per
-invocation, not per WP).
+**Dependencies**: **WP04** (its snapshot entry point). **Risks**: the annotation-blind trap above;
+NFR-002 — verify by spying on `reduce`, not by counting reads.
 
 ---
 
@@ -85,8 +85,8 @@ invocation, not per WP).
 annotation-aware stream → retire `_get_latest_review_cycle_verdict`'s body onto the canonical read
 while preserving its `(verdict, path)` contract → prove degradation and parity.
 
-**Dependencies**: none — parallel with WP01. **Risks**: the function is re-exported and shared with
-WP03, so its contract change has two consumers.
+**Dependencies**: **WP04** (its snapshot entry point). **Risks**: the function is re-exported and
+shared with WP03, so its contract change has two consumers.
 
 ---
 
@@ -124,7 +124,7 @@ duplicate deleted.
 **Implementation sketch**: add a snapshot-taking entry point to `wp_review` that the existing two
 delegate to → route `post_merge` onto it → delete `_snapshot_review_override` → prove parity.
 
-**Dependencies**: none — parallel with WP01/WP02.
+**Dependencies**: none — **this is wave 1; WP01 and WP02 depend on it**.
 **Risks**: the new entry point must be the *shared* implementation, not a fourth copy. Not a live
 defect today — this is drift and a false SC-004 claim, not broken output.
 
@@ -152,11 +152,24 @@ legitimately excluded sites) and too weak (passes a duplicate inside the canonic
 
 ## Parallelisation
 
-- **Wave 1** (parallel): WP01, WP02, WP04
-- **Wave 2**: WP03 (after WP02)
-- **Wave 3**: WP05 (after all)
+- **Wave 1**: **WP04** alone — it builds the snapshot entry point WP01 and WP02 both need.
+- **Wave 2** (parallel): WP01, WP02
+- **Wave 3**: WP03 (after WP02)
+- **Wave 4**: WP05 (after all)
+
+> **Why WP04 leads.** Both display surfaces iterate every work package, and **both** existing
+> `wp_review` entry points re-reduce the whole event stream on each call —
+> `resolve_event_stream_review`'s body is `reduce(...).work_packages.get(wp_id)`, with no
+> memoization. Calling either inside a per-WP loop costs N reductions and breaks NFR-002. Only
+> WP04's already-materialized-snapshot entry point is O(1) per work package. An earlier version of
+> this plan had WP01/WP02 calling `resolve_event_stream_review` per work package; the post-tasks
+> gate caught that it is the same anti-pattern the prompts explicitly forbid.
+
+**Verification note**: NFR-002 must be checked by **counting `reduce` calls** (spy asserting
+exactly one), not by counting reads or grepping for a forbidden function name. A per-WP
+`resolve_event_stream_review` passes every name-based check while reducing N times.
 
 ## MVP scope
 
-**WP01 + WP02** deliver the reported symptom fix (#2646) and are independently shippable. WP03 is
-the highest-value half but carries lifecycle risk; WP04 and WP05 are anti-drift work.
+**WP04 → WP01 + WP02** delivers the reported symptom fix (#2646). WP03 is the highest-value half
+but carries lifecycle risk; WP05 is anti-recurrence.

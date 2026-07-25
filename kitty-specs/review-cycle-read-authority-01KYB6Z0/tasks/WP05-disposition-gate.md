@@ -116,6 +116,13 @@ full disposition table and `../spec.md` "In-Scope Rule" for the classification r
 2. **Pass 1 — record readers**: enumerate sites globbing `review-cycle-*.md` under `src/`.
 3. **Pass 2 — override readers**: enumerate sites constructing a `ReviewOverride` from a `review`
    slot (`ReviewOverride.from_dict`, `.get("review")`).
+
+   > **Two different `review` keys exist — do not conflate them.** The *override* slot
+   > (`at`/`actor`/`wp_id`/`reason`) lives on the reduced per-WP snapshot. The *done-evidence*
+   > block (`reviewer`/`verdict`/`reference`) lives on a done transition's evidence payload;
+   > `status/validate.py:201` and `status/emit.py:287` read that one. Discriminate by **shape**,
+   > not by the key name, or the gate will flag done-evidence readers as unclassified override
+   > readers forever. See `../research.md` Decision 1 rows 15-16.
 4. Enumerate from source (AST preferred; a well-scoped textual scan is acceptable if the AST route
    proves disproportionate — but justify it in a comment).
 5. A single-pass gate is a defect: pass 1 cannot see override readers, pass 2 cannot see record

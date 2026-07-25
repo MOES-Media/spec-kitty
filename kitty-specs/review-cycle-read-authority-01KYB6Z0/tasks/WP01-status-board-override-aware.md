@@ -1,7 +1,8 @@
 ---
 work_package_id: WP01
 title: Status-board verdict honours the approval override
-dependencies: []
+dependencies:
+- WP04
 requirement_refs:
 - FR-001
 - FR-002
@@ -180,13 +181,18 @@ passes against the broken implementation and proves nothing.
 
 1. Retire `_get_wp_review_verdict` (`:41-63`) as an independent implementation. Its replacement
    must delegate to `latest_review_artifact_verdict(sub_artifact_dir, snapshot_override=...)`.
-2. Obtain the override with
-   `specify_cli.status.wp_review.resolve_event_stream_review(event_stream, wp_id)`, using the
-   stream read once in T002.
-   - **Do NOT** use `resolve_snapshot_review(feature_dir, wp_id)` here — it re-reduces on every
-     call and would breach NFR-002 inside the per-WP loop at `:266-273`.
+2. Obtain the override using **WP04's already-materialized-snapshot entry point** in
+   `specify_cli.status.wp_review`, indexing the single snapshot reduced in T002.
+   - **Do NOT** call `resolve_event_stream_review(event_stream, wp_id)` inside the per-WP loop at
+     `:266-273`. Its body is
+     `reduce(event_stream.transitions, event_stream.annotations).work_packages.get(wp_id)` — a
+     **full reduction on every call**, with no memoization. Calling it per work package reduces N
+     times and breaks NFR-002.
+   - **Do NOT** use `resolve_snapshot_review(feature_dir, wp_id)` — same re-reduction, plus disk
+     I/O.
    - **Do NOT** copy `post_merge`'s private `_snapshot_review_override`. That is a duplicate being
      retired by WP04; copying it authors a fourth (C-003, DIRECTIVE_044).
+   - Reduce once (T002), then index. That is the only shape that satisfies NFR-002.
 3. At the call site (`:273`), treat the work package as carrying a live rejection only when
    `verdict == "rejected" and not has_override`.
 
@@ -232,8 +238,12 @@ the predicate.
 - [ ] Every override test drives the override **through a real event log**; none hand-builds
       snapshot state.
 - [ ] `_get_wp_review_verdict` no longer independently selects a record or decides a verdict.
-- [ ] The event log is read and reduced **once per invocation**, not per work package.
-- [ ] `resolve_snapshot_review` does not appear inside a per-WP loop.
+- [ ] **A spy on `specify_cli.status.reducer.reduce` asserts exactly ONE call** for a mission with
+      several work packages. Counting reads or checking for absent function names is **not**
+      sufficient — a per-WP `resolve_event_stream_review` passes those checks while reducing N
+      times.
+- [ ] Neither `resolve_event_stream_review` nor `resolve_snapshot_review` appears inside a per-WP
+      loop.
 - [ ] All four degradation cases pass; no new raise reaches the operator.
 - [ ] No-override and all four incomplete-override cases still report the rejection.
 - [ ] `ruff` and `mypy` clean, with no new suppressions.

@@ -63,6 +63,14 @@ If no profile is specified, run `spec-kitty agent profile list` and select the b
 resolution. Route it onto the canonical `wp_review` seam so SC-004's "exactly one implementation
 remains" is true by construction rather than by omission.
 
+> **⚠️ This work package is now the mission's foundation — land it first.** WP01 and WP02 both
+> depend on it. Every display surface iterates all work packages, and both existing `wp_review`
+> entry points **re-reduce the entire event stream on every call**
+> (`resolve_event_stream_review`'s body is `reduce(...).work_packages.get(wp_id)`; no memoization
+> anywhere in `specify_cli/status/`). Only the already-materialized-snapshot entry point you build
+> in T017 is O(1) per work package, so it is the sole shape that satisfies NFR-002 inside a loop.
+> Design it as a general seam, not a post-merge-specific helper.
+
 ## Branch Strategy
 
 - **Planning base branch**: `fix/review-cycle-read-authority`

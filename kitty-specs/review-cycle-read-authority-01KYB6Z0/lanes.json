@@ -6,40 +6,6 @@
   "target_branch": "fix/review-cycle-read-authority",
   "lanes": [
     {
-      "lane_id": "lane-a",
-      "wp_ids": [
-        "WP01"
-      ],
-      "write_scope": [
-        "src/specify_cli/agent_utils/status.py",
-        "tests/specify_cli/agent_utils/test_status_review_override.py"
-      ],
-      "predicted_surfaces": [
-        "api",
-        "artifact-rendering",
-        "legacy-cleanup"
-      ],
-      "depends_on_lanes": [],
-      "parallel_group": 0
-    },
-    {
-      "lane_id": "lane-b",
-      "wp_ids": [
-        "WP02"
-      ],
-      "write_scope": [
-        "src/specify_cli/cli/commands/agent/tasks_parsing_validation.py",
-        "src/specify_cli/cli/commands/agent/tasks_status_cmd.py",
-        "tests/specify_cli/cli/commands/agent/test_tasks_status_review_override.py"
-      ],
-      "predicted_surfaces": [
-        "api",
-        "artifact-rendering"
-      ],
-      "depends_on_lanes": [],
-      "parallel_group": 0
-    },
-    {
       "lane_id": "lane-d",
       "wp_ids": [
         "WP04"
@@ -58,6 +24,44 @@
       "parallel_group": 0
     },
     {
+      "lane_id": "lane-a",
+      "wp_ids": [
+        "WP01"
+      ],
+      "write_scope": [
+        "src/specify_cli/agent_utils/status.py",
+        "tests/specify_cli/agent_utils/test_status_review_override.py"
+      ],
+      "predicted_surfaces": [
+        "api",
+        "artifact-rendering",
+        "legacy-cleanup"
+      ],
+      "depends_on_lanes": [
+        "lane-d"
+      ],
+      "parallel_group": 1
+    },
+    {
+      "lane_id": "lane-b",
+      "wp_ids": [
+        "WP02"
+      ],
+      "write_scope": [
+        "src/specify_cli/cli/commands/agent/tasks_parsing_validation.py",
+        "src/specify_cli/cli/commands/agent/tasks_status_cmd.py",
+        "tests/specify_cli/cli/commands/agent/test_tasks_status_review_override.py"
+      ],
+      "predicted_surfaces": [
+        "api",
+        "artifact-rendering"
+      ],
+      "depends_on_lanes": [
+        "lane-d"
+      ],
+      "parallel_group": 1
+    },
+    {
       "lane_id": "lane-c",
       "wp_ids": [
         "WP03"
@@ -73,7 +77,7 @@
       "depends_on_lanes": [
         "lane-b"
       ],
-      "parallel_group": 1
+      "parallel_group": 2
     },
     {
       "lane_id": "lane-e",
@@ -93,10 +97,10 @@
         "lane-c",
         "lane-d"
       ],
-      "parallel_group": 2
+      "parallel_group": 3
     }
   ],
-  "computed_at": "2026-07-25T00:59:59.866858+00:00",
+  "computed_at": "2026-07-25T01:14:04.436381+00:00",
   "computed_from": "dependency_graph+ownership",
   "planning_artifact_wps": []
 }

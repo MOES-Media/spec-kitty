@@ -1,7 +1,8 @@
 ---
 work_package_id: WP02
 title: Tasks-status verdict honours the approval override
-dependencies: []
+dependencies:
+- WP04
 requirement_refs:
 - FR-001
 - FR-002
@@ -153,8 +154,14 @@ Read `../research.md` Decisions 1 and 3, and `../data-model.md`. Key facts:
    do not leak it.
 3. Accept the override as an **optional** parameter so the existing `tasks_move_task.py` caller
    keeps compiling unchanged (WP03 adopts it separately).
-4. Obtain the override via `wp_review.resolve_event_stream_review(event_stream, wp_id)`. Do **not**
-   copy `post_merge`'s `_snapshot_review_override` — that duplicate is being retired by WP04.
+4. Obtain the override via **WP04's already-materialized-snapshot entry point**, indexing the
+   single snapshot reduced in T007.
+   - **Do NOT** call `resolve_event_stream_review(event_stream, wp_id)` inside
+     `_apply_review_status_flags`'s per-WP loop (`:362-380`). It re-reduces the whole stream on
+     every call (no memoization), so per-WP use costs N reductions and breaks NFR-002.
+   - **Do NOT** use `resolve_snapshot_review` — same cost plus disk I/O.
+   - **Do NOT** copy `post_merge`'s `_snapshot_review_override` — that duplicate is being retired
+     by WP04.
 5. Preserve the existing `_VALID_VERDICTS` warning behaviour for out-of-vocabulary verdicts.
 
 **Files**: `src/specify_cli/cli/commands/agent/tasks_parsing_validation.py`
@@ -203,7 +210,10 @@ breaks.
 - [ ] `_get_latest_review_cycle_verdict` no longer globs or parses frontmatter itself.
 - [ ] Its `(verdict, path)` contract is intact and both consumers still compile.
 - [ ] `tasks_move_task.py` is **untouched** (WP03 owns it).
-- [ ] Log read and reduced once per invocation; `resolve_snapshot_review` absent from per-WP loops.
+- [ ] **A spy on `specify_cli.status.reducer.reduce` asserts exactly ONE call** for a multi-work-package
+      mission. Absence of a function name is **not** sufficient evidence — a per-WP
+      `resolve_event_stream_review` reduces N times while passing any name-based check.
+- [ ] Neither `resolve_event_stream_review` nor `resolve_snapshot_review` appears in a per-WP loop.
 - [ ] All degradation cases pass; the bare-except posture is preserved.
 - [ ] Parity matrix green.
 - [ ] `ruff` and `mypy` clean, no new suppressions.
