@@ -84,9 +84,12 @@ Verify by inspection of the diff:
   `read_events`/`reduce(events)` to the annotation-aware stream. That switch is required, not a
   regression.
 - `tasks_move_task.py` **gains** a stream read; it has none today.
-- No call to `resolve_snapshot_review(feature_dir, wp_id)` appears inside a per-work-package loop —
-  it re-reduces on every call. Per-WP lookups use `resolve_event_stream_review(event_stream,
-  wp_id)` against a stream read once.
+- **Assert the reduction count, not the read count.** Spy on
+  `specify_cli.status.reducer.reduce` and require exactly **one** call for a multi-work-package
+  mission. Both `resolve_snapshot_review` *and* `resolve_event_stream_review` re-reduce the whole
+  stream on every call, so a per-WP lookup through either one reduces N times while passing any
+  check that merely counts reads or greps for a banned name. Per-WP lookups must index the single
+  already-reduced snapshot.
 
 ## The trap this mission nearly fell into
 

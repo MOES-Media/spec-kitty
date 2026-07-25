@@ -48,9 +48,18 @@ passes**, because a verdict has two inputs and each is found by a different quer
 | 13 | `status/wp_view.py:173` | Projects the raw slot mapping into a display group; no `ReviewOverride` construction, no completeness rule, no verdict | EXCLUDED — projection, not resolution |
 | 14 | `status/models.py:553-554` | `from_dict` on the model itself — the definition, not a reader | EXCLUDED |
 
+| 15 | `status/validate.py:201` | Validates the **done-evidence** `review` block (`reviewer`/`verdict`/`reference`) | EXCLUDED — different `review` key |
+| 16 | `status/emit.py:287` | Reads the same done-evidence `review` block when building done evidence | EXCLUDED — different `review` key |
+
 (`retrospective/generator.py:285`, `migration/mission_state.py:900`, and
 `tasks_move_task.py:871` also match the query but read unrelated `review` keys — evidence blocks,
 migration payloads, and a config section respectively. Not review overrides.)
+
+> **Two `review` keys exist and must not be conflated.** The *override* slot (`ReviewOverride`:
+> `at`/`actor`/`wp_id`/`reason`) lives on the reduced per-WP snapshot. The *done-evidence* block
+> (`reviewer`/`verdict`/`reference`) lives on a done transition's evidence payload. Rows 15-16 are
+> the latter. WP05's gate must distinguish them by shape, or it will flag done-evidence readers as
+> unclassified override readers forever.
 
 The three in-scope **consumer** sites, reached through functions 2 and 3:
 
@@ -118,10 +127,22 @@ read.
    Copying `post_merge`'s private `_snapshot_review_override` instead would author a *third*
    implementation, which is the very drift C-003 and DIRECTIVE_044 forbid.
 
-**Stream-level, not snapshot-level (NFR-002).** `wp_review` exposes two entry points.
-`resolve_snapshot_review(feature_dir, wp_id)` re-reduces per call — using it inside a per-WP loop
-would reduce once per work package and breach NFR-002. Therefore: read the stream **once per
-mission**, then call `resolve_event_stream_review(event_stream, wp_id)` per work package.
+**Reduce once, then index (NFR-002).**
+
+> **Corrected after the post-tasks gate.** An earlier version of this paragraph said "read the
+> stream once per mission, then call `resolve_event_stream_review(event_stream, wp_id)` per work
+> package". That is **also** a per-WP reduction. See Decision 8.
+
+`resolve_event_stream_review`'s body is
+`reduce(event_stream.transitions, event_stream.annotations).work_packages.get(wp_id)` — a full
+reduction **on every call**, with no memoization anywhere in `specify_cli/status/`.
+`resolve_snapshot_review` merely adds disk I/O on top of the same cost. Neither is safe inside a
+per-WP loop.
+
+**The rule**: reduce the annotation-aware stream **exactly once per invocation** into a snapshot,
+then look up each work package's `review` slot from that single snapshot. This is precisely the
+shape WP04/IC-05 builds for `post_merge` — so the display surfaces adopt that same entry point
+rather than inventing a parallel one.
 
 **Per-site consequences** (this is real work, not free):
 
@@ -240,6 +261,28 @@ behavioural reason it should read the slot differently from every other consumer
 boundary as the lane read, so the guard cannot decide on a torn view. Naming the existing primitive
 prevents an implementer from reaching for a plain `read_event_stream` and reintroducing the torn
 read the transactional variant exists to prevent, or from authoring a bespoke locking wrapper.
+
+## Decision 8 — Both display surfaces adopt IC-05's snapshot entry point
+
+**Decision**: WP01 and WP02 depend on WP04 and use its already-materialized-snapshot entry point.
+They do **not** call `resolve_event_stream_review` per work package.
+
+**Rationale**: both surfaces iterate every work package —
+`agent_utils/status.py:266-273` and `tasks_parsing_validation.py:362-380`. Calling a re-reducing
+helper inside those loops costs N reductions for an N-work-package mission, which NFR-002 forbids
+in as many words ("for a 20-work-package mission the log is read and reduced exactly once, not
+twenty times"). The distinction the earlier draft drew between the two `wp_review` entry points was
+false: `resolve_snapshot_review` re-reduces **and** re-reads; `resolve_event_stream_review`
+re-reduces. Only a snapshot-indexing lookup is O(1) per work package.
+
+**Consequence for sequencing**: IC-05 stops being an independent anti-drift chore and becomes the
+**foundation** for IC-01 and IC-02. Wave 1 is WP04 alone.
+
+**Consequence for verification**: the acceptance check must assert the **reduction count**, not the
+read count. The original quickstart check ("no `resolve_snapshot_review` inside a per-WP loop, one
+stream read") would have passed an implementation that reduced N times — a vacuous gate for the
+NFR it claimed to enforce. Both WP01 and WP02 now require a spy on `reduce` asserting exactly one
+call.
 
 ## Observation A — latent defect, deliberately not folded
 
