@@ -47,6 +47,39 @@ dependency on Story 2.
 
 ---
 
+### User Story 3 - An arbiter override is asserted once (Priority: P1)
+
+A work package is rejected. The operator judges the rejection superseded and approves it with an
+explicit arbiter override, supplying the reason that makes the override durable. The transition to
+`approved` is allowed and the override is recorded.
+
+The operator then moves the same work package to `done`. The guard runs again, reads the same
+rejection record, does not consult the override that was just recorded, and refuses — demanding the
+override flags a second time for the same decision. The operator must re-assert, with a fresh
+reason, an override that is already on record and that the merge gate already honours.
+
+**Why this priority**: This one costs the operator real work rather than merely displaying
+something wrong, and it makes the override mechanism look broken precisely when it is being used
+correctly.
+
+**Independent Test**: Record an override-approved work package, then move it toward `done` and
+assert the guard permits it without re-supplied override flags.
+
+**Acceptance Scenarios**:
+
+1. **Given** a work package with a rejection record **and** a complete recorded override, **When**
+   it is moved to `done` without override flags, **Then** the guard permits the transition.
+2. **Given** a work package with a rejection record and **no** override, **When** it is moved to
+   `approved` or `done` without override flags, **Then** the guard refuses exactly as it does
+   today — the refusal arm is unchanged.
+3. **Given** a work package whose recorded override is incomplete, **When** it is moved to
+   `approved` or `done`, **Then** the guard refuses, because an incomplete override is honoured
+   nowhere.
+4. **Given** a work package whose review record has no parseable verdict, **When** it is moved to
+   an approval lane, **Then** the existing "no parseable review verdict" refusal is unchanged.
+
+---
+
 ### User Story 2 - One definition of "the latest review verdict" (Priority: P2)
 
 The system already has a canonical way to answer "what is the current review verdict for this work
@@ -108,6 +141,7 @@ assert every caller reports the same verdict for the same work package state.
 | FR-004 | Override-blind verdict reads are retired | As a maintainer, I want every verdict-deriving read that ignores overrides routed through the canonical read — including any that already sits inside the canonical module — so that override-blindness cannot survive anywhere. | Medium | Open |
 | FR-005 | Every review-cycle site has a recorded disposition | As a maintainer, I want plan to enumerate every site that reaches for review-cycle records from the live tree and classify each as in-scope or excluded with a stated reason, so that no site's fate is decided by an ungoverned search. | Medium | Open |
 | FR-006 | Tolerant degradation is preserved | As an operator, I want an unreadable event log or malformed artifact to degrade to a partial answer rather than break the status view, so that diagnostics stay available when state is damaged. | High | Open |
+| FR-007 | An override is asserted once, not repeatedly | As an operator who already recorded an arbiter override to approve a work package, I want the transition guard to honour that recorded override on subsequent moves, so that I am not forced to re-assert it every time the work package advances. | High | Open |
 
 ### Non-Functional Requirements
 
@@ -123,7 +157,7 @@ assert every caller reports the same verdict for the same work package state.
 | ID | Title | Constraint | Category | Priority | Status |
 |----|-------|------------|----------|----------|--------|
 | C-001 | No artifact may change partition | The mission must NOT relocate review-cycle artifacts. Their PRIMARY home was decided, rationalized and operator-signed-off by the `coord-commit-integrity-01KY5JS8` mission (its C-001, "No other kind moves"), merged at `97f24d9bf`. Reversing it would reintroduce the write/read split that mission retired. | Technical | High | Open |
-| C-002 | Read-path only | The mission changes how the current verdict is READ. It must not change what is written, when it is written, or the review lifecycle itself. | Technical | High | Open |
+| C-002 | Correct the input, not the rules | The mission changes how the current verdict is READ. The lifecycle rules that consume that verdict — which lanes are guarded, what a rejection refuses, what an override authorizes — must stay exactly as they are. A guard may behave differently only because it is now given the correct verdict, never because its own condition was rewritten. | Technical | High | Open |
 | C-003 | Reuse the existing canonical read | The override-aware verdict read already exists and is proven in the merge and acceptance gates. The mission must route callers onto it, not author a second one. | Technical | High | Open |
 | C-004 | Override semantics are inherited, not redefined | Completeness rules for an override, and the snapshot-first/fallback precedence, are already established. The mission must adopt them unchanged so status and merge cannot diverge. | Technical | High | Open |
 | C-005 | Scope is set by the In-Scope Rule, not by file location | A site is in scope if and only if it derives a review *verdict* from the latest review-cycle record. Sites that only count cycles, probe existence, iterate every cycle, or resolve a path for diagnostics are out of scope and stay where they are — regardless of which module they live in. | Technical | High | Open |
@@ -152,6 +186,9 @@ assert every caller reports the same verdict for the same work package state.
   states exercised by the test matrix, including the incomplete-override case.
 - **SC-003**: An unoverridden rejection is still reported in 100% of cases — no false negative is
   introduced.
+- **SC-005**: An override-approved work package advances from `approved` to `done` with zero
+  re-supplied override flags, down from one re-assertion required today; and the refusal arms for
+  the no-override, incomplete-override, and unparseable-verdict cases each still fire.
 - **SC-004**: Exactly one implementation that *derives a review verdict* from selecting the latest
   review-cycle record remains. The check is **behavioural, not positional**: for every site that
   reaches for review-cycle records, plan classifies it against the In-Scope Rule below, and the
