@@ -68,8 +68,10 @@ assert every caller reports the same verdict for the same work package state.
 
 1. **Given** a work package in any review state, **When** any caller asks for its current verdict,
    **Then** every caller returns the same answer.
-2. **Given** a directory containing a file whose cycle number is malformed or absent, **When** any
-   caller asks for the current verdict, **Then** every caller ignores that file identically.
+2. **Given** a directory containing a file whose cycle number cannot be parsed, **When** any caller
+   asks for the current verdict, **Then** every caller ranks it as cycle zero — it stays a
+   candidate rather than being excluded, so it is selected only when no parseable record exists.
+   This pins today's canonical behaviour rather than changing it (C-004).
 3. **Given** cycle numbers that are not zero-padded and exceed nine (so that lexical and numeric
    ordering disagree), **When** any caller asks for the current verdict, **Then** the numerically
    highest cycle is the one whose verdict is reported.
@@ -87,6 +89,8 @@ assert every caller reports the same verdict for the same work package state.
 - Cycle numbering is sparse (cycle 1 and cycle 3 present, cycle 2 missing).
 - A review-cycle file is present but its frontmatter is unparseable — this must degrade to "no
   verdict", never to a crash, preserving today's tolerant behaviour.
+- The *only* record present has an unparseable cycle number — it ranks as cycle zero and is
+  therefore still selected; callers must not diverge on whether such a record is eligible.
 - The status event log is absent or unreadable — the verdict read must degrade to the file-only
   answer rather than failing the whole status view.
 - A legacy on-disk override that predates the event-sourced snapshot must continue to be honoured
