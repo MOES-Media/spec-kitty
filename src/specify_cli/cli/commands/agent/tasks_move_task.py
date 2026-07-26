@@ -86,6 +86,9 @@ from specify_cli.cli.commands.agent.tasks_transition_core import (
     build_transition_plan,
     override_persist_signal,
 )
+from specify_cli.coordination.status_transition import (
+    read_event_stream_transactional,
+)
 from specify_cli.core.commit_guard import GuardCapability
 from specify_cli.core.constants import KITTY_SPECS_DIR
 from specify_cli.core.env import first_set_sync_disable_env
@@ -124,6 +127,7 @@ from specify_cli.status import (
     WPInnerStateDelta,
     resolve_lane_alias,
 )
+from specify_cli.status import resolve_event_stream_review
 from specify_cli.task_utils import (
     WorkPackage,
     ensure_lane,
@@ -549,8 +553,19 @@ def _mt_gather_review_facts(st: _MoveTaskState) -> None:
     review_artifact_name: str | None = None
     if st.target_lane in (Lane.APPROVED, Lane.DONE):
         _verdict_wp_dir = st.wp.path.parent / st.wp.path.stem
+        # Same transactional boundary as the lane-determination read
+        # (``_mt_current_event_lane``, immediately preceding this phase in
+        # ``_do_move_task`` with no intervening write): the override must be
+        # decided from the same consistent view as the lane, never a torn
+        # read (research.md Decision 7 / T012).
+        event_stream = read_event_stream_transactional(
+            feature_dir=st.feature_dir,
+            mission_slug=st.mission_slug,
+            repo_root=st.main_repo_root,
+        )
+        override = resolve_event_stream_review(event_stream, st.task_id)
         review_verdict, st.verdict_artifact_path = _get_latest_review_cycle_verdict(
-            _verdict_wp_dir
+            _verdict_wp_dir, override=override
         )
         review_artifact_name = (
             st.verdict_artifact_path.name if st.verdict_artifact_path is not None else None

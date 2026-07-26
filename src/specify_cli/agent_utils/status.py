@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from mission_runtime import MissionArtifactKind, placement_seam
 from specify_cli.missions._read_path_resolver import resolve_planning_read_dir
-import re
 from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
@@ -24,7 +23,8 @@ from specify_cli.core.paths import (
     locate_project_root,
 )
 from specify_cli.mission_metadata import resolve_mission_identity
-from specify_cli.status import Lane, NON_DISPLAY_LANES, StatusEvent
+from specify_cli.review.artifacts import LatestReviewArtifactVerdict, latest_review_artifact_verdict
+from specify_cli.status import Lane, NON_DISPLAY_LANES, ReviewOverride, StatusEvent, resolve_materialized_review
 from specify_cli.status import PROGRESS_SEMANTICS, compute_done_percentage, compute_weighted_progress
 from specify_cli.status import wp_state_for
 from specify_cli.task_utils import extract_scalar, split_frontmatter
@@ -32,34 +32,31 @@ from specify_cli.task_utils import extract_scalar, split_frontmatter
 console = Console()
 
 
-def _review_cycle_number(path: Path) -> int:
-    """Return the numeric review-cycle suffix for sorting review artifacts."""
-    match = re.search(r"review-cycle-(\d+)\.md", path.name)
-    return int(match.group(1)) if match else 0
+def _resolve_wp_review_state(
+    wp_dir: Path, override: ReviewOverride | None
+) -> LatestReviewArtifactVerdict | None:
+    """Return the canonical, override-aware review-artifact verdict for wp_dir.
 
+    Delegates verdict *selection* entirely to
+    ``specify_cli.review.artifacts.latest_review_artifact_verdict`` (the
+    FR-009 canonical read) instead of independently globbing/parsing
+    review-cycle files — the retired ``_get_wp_review_verdict`` did exactly
+    that and could never see an approval override. ``override`` is the
+    event-sourced approval override already resolved from the
+    once-per-invocation snapshot (NFR-002 / Decision 3+8) and is passed
+    through as ``snapshot_override`` so a complete override suppresses the
+    stale-rejection warning the same way the merge gate honours it.
 
-def _get_wp_review_verdict(wp_dir: Path) -> str | None:
-    """Return the verdict from the latest review-cycle-N.md in wp_dir, or None.
-
-    Globs review-cycle-*.md files sorted by N (highest = latest), parses YAML
-    frontmatter, and returns the ``verdict`` field.  Returns None on any error
-    (file absent, malformed YAML, no frontmatter).
+    Returns ``None`` — never raises — for every condition the status board
+    must treat as "no verdict" rather than surface an exception (INV-5 /
+    NFR-001 / T004): no review-cycle-*.md files present at all, including a
+    missing work-package directory (``Path.glob`` tolerates that silently),
+    or a present-but-unparseable frontmatter (``ValueError``/``OSError``
+    raised by ``ReviewCycleArtifact.from_file``).
     """
-    cycles = sorted(
-        wp_dir.glob("review-cycle-*.md"),
-        key=_review_cycle_number,
-    )
-    if not cycles:
-        return None
     try:
-        text = cycles[-1].read_text(encoding="utf-8")
-        match = re.match(r"^---\n(.*?)\n---", text, re.DOTALL)
-        if not match:
-            return None
-        import yaml  # noqa: PLC0415 — lazy import to avoid top-level dep
-        fm = yaml.safe_load(match.group(1)) or {}
-        return fm.get("verdict")
-    except Exception:  # noqa: BLE001 — review artifact may be absent or malformed; fail-open
+        return latest_review_artifact_verdict(wp_dir, snapshot_override=override)
+    except (ValueError, OSError):
         return None
 
 
@@ -161,10 +158,24 @@ def show_kanban_status(mission_slug: str | None = None) -> dict:
             else 30
         )
 
-        # Build lane map from event log (canonical source of truth)
-        from specify_cli.status import reduce, read_events  # noqa: PLC0415
-        events = read_events(feature_dir)
-        snapshot = reduce(events)
+        # Build lane map from event log (canonical source of truth).
+        #
+        # NFR-002 / Decision 3+8: the annotation-aware stream is read and
+        # reduced exactly ONCE per invocation into `snapshot`. Every work
+        # package's approval override is then looked up from that single
+        # snapshot via `resolve_materialized_review` inside the stale-verdict
+        # loop below (O(1), no re-reduction) — never re-read or re-reduced
+        # per work package (that is the NFR-002 regression this WP guards
+        # against).
+        #
+        # `reduce` is imported directly from the `reducer` submodule — not
+        # via the `specify_cli.status` package re-export — so a test spy
+        # patched onto `specify_cli.status.reducer.reduce` observes every
+        # call this function makes.
+        from specify_cli.status import read_event_stream, reduce  # noqa: PLC0415
+        event_stream = read_event_stream(feature_dir)
+        events = event_stream.transitions
+        snapshot = reduce(event_stream.transitions, event_stream.annotations)
         # snapshot.work_packages: {wp_id: {"lane": ..., ...}}
         event_log_lanes: dict[str, Lane] = {
             wp_id: Lane(state.get("lane", Lane.GENESIS))
@@ -260,8 +271,12 @@ def show_kanban_status(mission_slug: str | None = None) -> dict:
         done_wp_ids = {wp["id"] for wp in work_packages if wp["lane"] == Lane.DONE}
         parallel_info = _analyze_parallelization(work_packages, done_wp_ids)
 
-        # --- Stale verdict detection (T023) ---
+        # --- Stale verdict detection (T023; override-aware per WP01/FR-001-003/006) ---
         # Warn if approved/done WPs have a review artifact with verdict=rejected
+        # AND no complete approval override supersedes it. This is exactly the
+        # data-model.md resolution rule: a WP carries a live rejection when
+        # `verdict == "rejected" AND NOT has_override` — never a re-implemented
+        # predicate.
         stale_verdicts: list[dict[str, str]] = []
         for wp in work_packages:
             if wp["lane"] not in (Lane.APPROVED, Lane.DONE):
@@ -270,8 +285,13 @@ def show_kanban_status(mission_slug: str | None = None) -> dict:
             if not wp_id:
                 continue
             wp_dir = tasks_dir / str(wp.get("artifact_dir") or wp_id)
-            verdict = _get_wp_review_verdict(wp_dir)
-            if verdict == "rejected":
+            override = resolve_materialized_review(snapshot, wp_id)
+            verdict_state = _resolve_wp_review_state(wp_dir, override)
+            if (
+                verdict_state is not None
+                and verdict_state.verdict == "rejected"
+                and not verdict_state.has_override
+            ):
                 stale_verdicts.append({"wp_id": wp_id, "artifact": "review artifact: verdict=rejected"})
                 wp["_stale_verdict"] = True
 

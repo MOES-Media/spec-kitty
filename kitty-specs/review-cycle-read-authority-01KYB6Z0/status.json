@@ -1,33 +1,161 @@
 {
-  "event_count": 0,
-  "last_event_id": null,
-  "materialized_at": "",
-  "mission_number": "",
-  "mission_slug": "",
+  "event_count": 44,
+  "last_event_id": "01KYFT766KDGGK9M5YGMAXNMWH",
+  "materialized_at": "2026-07-26T18:15:26.675593+00:00",
+  "mission_number": "186",
+  "mission_slug": "review-cycle-read-authority-01KYB6Z0",
   "mission_type": "software-dev",
   "summary": {
     "approved": 0,
     "blocked": 0,
     "canceled": 0,
     "claimed": 0,
-    "done": 0,
+    "done": 5,
     "for_review": 0,
     "in_progress": 0,
     "in_review": 0,
     "planned": 0
   },
   "work_packages": {
-    "WP02": {
-      "actor": "operator",
+    "WP01": {
+      "actor": "merge",
+      "agent": "claude",
+      "agent_profile": "__resolved_profile_absent__",
+      "agent_profile_version": "__resolved_profile_version_absent__",
       "force_count": 0,
-      "lane": "uninitialized",
-      "last_event_id": null,
-      "last_transition_at": null,
+      "lane": "done",
+      "last_event_id": "01KYFT71ZFTZM8XCBR7TXFW56Q",
+      "last_transition_at": "2026-07-26T18:15:22.351742+00:00",
+      "model": "__resolved_model_absent__",
+      "notes": [
+        "Gate skipped with evidence, not on faith: pre-review gate timed_out at 300s (issue #2573). Scoped suite run manually at head in lane-a: 'pytest tests/specify_cli/agent_utils/' -> 39 passed in 79.1s, 0 failed (baseline for this surface was green). Timeout cause is likely wall-clock contention — gate runs baseline+head (~158s) while WP02's implementer ran its suite concurrently. Implementation verified: annotation-aware read (status.py:177-179), single reduce, resolve_materialized_review per WP at :289, override tests driven through a real event log, reduce-call-count spy present, red-first ordering f22c83e3e -> 1fd41417a.",
+        "Review passed: annotation-aware stream read confirmed (status.py:175-179, read_event_stream + single reduce()); per-WP loop uses only resolve_materialized_review (O(1) index, verified body) at :289, never resolve_event_stream_review/resolve_snapshot_review; reduce-call-count spy test passes (exactly 1 call across 4 WPs); every override test drives InnerStateChanged through the real annotate()+append_annotations_atomic_verified production seam, none hand-builds snapshot state; red-first ordering independently reproduced (checked out f22c83e3e, T001 test fails exactly as documented, restored to HEAD); all 4 degradation cases + no-override + 4 incomplete-override cases pass; 39/0 on WP01's own test surface, 1540 passed/2 xfailed/1 failed on the broader agent_utils+cli/commands/agent baseline (the 1 failure is ModuleNotFoundError: coverage in an unrelated pre-existing file test_tasks_cli_contract_coord.py, not touched by this diff — environment gap, not a regression); ruff+mypy clean on changed files, no new suppression categories (net reduction: broad except Exception replaced with narrow except (ValueError, OSError)); scope confirmed limited to status.py + test_status.py (pre-existing suite, updated for retired _get_wp_review_verdict) + new test_status_review_override.py, no touches to tasks_status_cmd.py/tasks_parsing_validation.py/tasks_move_task.py/post_merge."
+      ],
+      "provider": "__resolved_provider_absent__",
+      "role": "reviewer",
+      "shell_pid": 185292,
+      "shell_pid_created_at": "1784969485.82",
+      "subtasks": {
+        "T001": "done",
+        "T002": "done",
+        "T003": "done",
+        "T004": "done",
+        "T005": "done"
+      }
+    },
+    "WP02": {
+      "actor": "merge",
+      "agent": "claude",
+      "agent_profile": "__resolved_profile_absent__",
+      "agent_profile_version": "__resolved_profile_version_absent__",
+      "force_count": 5,
+      "lane": "done",
+      "last_event_id": "01KYFT73C61BQTC09J7GS58AA8",
+      "last_transition_at": "2026-07-26T18:15:23.782324+00:00",
+      "model": "__resolved_model_absent__",
+      "notes": [
+        "T006-T010 done. tasks_status_cmd.py switched to annotation-aware read_event_stream+reduce (reduced once per invocation); _get_latest_review_cycle_verdict delegates to latest_review_artifact_verdict with optional override param, returns effective verdict, preserves (verdict,path) contract; tasks_move_task.py untouched (0 diff, verified). 15 new/updated tests (13 new in test_tasks_status_review_override.py incl NFR-002 reduce-count spy; +3 net in test_tasks_parsing_validation.py; +1 net in test_tasks.py). Full agent+agent_utils suite run directly: 1548 passed / 2 xfailed / 0 failed (baseline 1531/2/0 -> delta +17 = exactly net new tests, no losses). ruff clean on diff. mypy: 2 pre-existing unrelated errors (missing yaml/jsonschema stubs; no-any-return at test_tasks.py:1146) verified byte-identical on unmodified HEAD~1 files -- my changed files are mypy-clean standalone. --skip-pre-review-gate used after 3 consecutive automated-gate timeouts at the hardcoded 300s subprocess budget (serial run, no -n auto); the gate's derived scope spans this shared lane's full diff vs target (includes WP04's already-merged status/wp_review.py + post_merge changes on top of mine), which serially likely exceeds 300s independent of machine load (load avg ~4 on 16 cores, not saturated). Substituted with the direct verification above.",
+        "Fix cycle 1/3 complete. Gate skipped with evidence (3rd timeout, issue #2573). Orchestrator-verified independently: (1) real artifact auth-tranche-2-5.../WP05 verdict 'approved_after_orchestrator_fix' now returns the raw verdict, not None — regression closed; (2) legacy-field-name artifact (execution-context-unification.../WP08 review-cycle-1.md) isolated returns 'changes_requested' WITH the _VALID_VERDICTS warning restored — the broader regression class is covered, not just the enum instance; (3) scoped suite in lane-b: 1553 passed / 2 xfailed / 0 failed in 85s vs 1531 baseline. Zero diff on tasks_move_task.py and tasks_transition_core.py confirmed. Commit a06603e87.",
+        "Re-review passed (fix cycle 1): raw-frontmatter fallback (_raw_frontmatter_verdict, commit a06603e87) closes both regression classes named in the rejection - out-of-schema verdict (verified live: WP05 auth-tranche-2-5 -> approved_after_orchestrator_fix) and legacy field names (verified live, isolated copy: WP08 execution-context-unification -> changes_requested + _VALID_VERDICTS warning emitted). Override-awareness preserved in fallback: rejected-via-fallback still folds to approved through a real event-sourced override (verified by reverting the fix and rerunning test_legacy_field_name_schema_with_complete_override_resolves_approved: FAILED without fix path exercised). The two corrected tests (test_tasks.py TestUnknownVerdictWarning, test_tasks_parsing_validation.py) now assert the real restored raw-value+warning behavior, not a re-baseline. 5 new regression tests build overrides through real event log (append_annotations_atomic_verified/InnerStateChanged); reverting the fix flips 2 of them red (test_out_of_schema_verdict_falls_back_to_raw_parse, test_legacy_field_name_schema_falls_back_to_raw_parse). Minor non-blocking note: test_out_of_schema_verdict_with_complete_override_resolves_approved is mislabeled - its fixture verdict='rejected' is schema-valid so it exercises the pre-existing canonical-path override fold, not the raw-parse fallback; the sibling legacy-field-name override test does correctly exercise the fallback+override path, so the DoD claim (fallback preserves override-awareness) is still proven, just not by that one test. Zero diff on tasks_move_task.py/tasks_transition_core.py confirmed against pre-WP02 base (f8faa1b0c~1). ruff clean. mypy: one no-any-return at test_tasks.py:1156 confirmed pre-existing (present at f8faa1b0c~1:1104, same code shape). Scoped suite: 1552 passed/2 xfailed/1 environment-only fail (missing 'coverage' module, unrelated to this WP) in 74s.",
+        "Repair: restore agent attribution blanked by the post-rejection re-claim. The claim events for WP02 both carry policy_metadata agent='claude', but a subsequent resolved-binding annotation set agent='' which latest-wins-replaced it, leaving canonical runtime state with an empty agent and blocking accept. Upstream defect: the re-claim path after a review rejection emits a resolved-binding annotation with an empty agent.",
+        "Reopening to record a real arbiter override: the fix-cycle-1 approval never persisted a ReviewOverride, so WP02 sits approved with a rejected latest artifact and no override — the merge gate correctly blocks.",
+        "Arbiter override: fix cycle 1 was independently re-reviewed and passed. The rejection artifact review-cycle-1.md remains the latest because validate_review_artifact hard-requires verdict=='rejected' — an approval structurally cannot write an approved artifact, so an override is the only representable outcome. Evidence: raw-frontmatter fallback (a06603e87) closes both regression classes, verified live against auth-tranche-2-5 WP05 (approved_after_orchestrator_fix) and execution-context-unification WP08 (legacy field names, isolated); reviewer proved non-vacuity by reverting the fallback and watching two tests go red; 1553 passed / 2 xfailed / 0 failed.",
+        "Re-recording the arbiter override from the coord worktree: the override written from the primary checkout landed in the primary event log, which the merge gate (materialize on the canonical STATUS_STATE partition) does not read.",
+        "Restore approved: WP02 passed independent re-review at fix cycle 1."
+      ],
+      "provider": "__resolved_provider_absent__",
       "review": {
         "actor": "operator",
-        "at": "2026-07-26T17:49:27Z",
-        "reason": "Restore approved: WP02 passed independent re-review at fix cycle 1.",
+        "at": "2026-07-25T10:35:02Z",
+        "reason": "Re-review passed (fix cycle 1): raw-frontmatter fallback (_raw_frontmatter_verdict, commit a06603e87) closes both regression classes named in the rejection - out-of-schema verdict (verified live: WP05 auth-tranche-2-5 -> approved_after_orchestrator_fix) and legacy field names (verified live, isolated copy: WP08 execution-context-unification -> changes_requested + _VALID_VERDICTS warning emitted). Override-awareness preserved in fallback: rejected-via-fallback still folds to approved through a real event-sourced override (verified by reverting the fix and rerunning test_legacy_field_name_schema_with_complete_override_resolves_approved: FAILED without fix path exercised). The two corrected tests (test_tasks.py TestUnknownVerdictWarning, test_tasks_parsing_validation.py) now assert the real restored raw-value+warning behavior, not a re-baseline. 5 new regression tests build overrides through real event log (append_annotations_atomic_verified/InnerStateChanged); reverting the fix flips 2 of them red (test_out_of_schema_verdict_falls_back_to_raw_parse, test_legacy_field_name_schema_falls_back_to_raw_parse). Minor non-blocking note: test_out_of_schema_verdict_with_complete_override_resolves_approved is mislabeled - its fixture verdict='rejected' is schema-valid so it exercises the pre-existing canonical-path override fold, not the raw-parse fallback; the sibling legacy-field-name override test does correctly exercise the fallback+override path, so the DoD claim (fallback preserves override-awareness) is still proven, just not by that one test. Zero diff on tasks_move_task.py/tasks_transition_core.py confirmed against pre-WP02 base (f8faa1b0c~1). ruff clean. mypy: one no-any-return at test_tasks.py:1156 confirmed pre-existing (present at f8faa1b0c~1:1104, same code shape). Scoped suite: 1552 passed/2 xfailed/1 environment-only fail (missing 'coverage' module, unrelated to this WP) in 74s.",
         "wp_id": "WP02"
+      },
+      "role": "reviewer",
+      "shell_pid": 0,
+      "shell_pid_created_at": "1784969485.82",
+      "subtasks": {
+        "T006": "done",
+        "T007": "done",
+        "T008": "done",
+        "T009": "done",
+        "T010": "done"
+      }
+    },
+    "WP03": {
+      "actor": "merge",
+      "agent": "claude",
+      "agent_profile": "__resolved_profile_absent__",
+      "agent_profile_version": "__resolved_profile_version_absent__",
+      "force_count": 0,
+      "lane": "done",
+      "last_event_id": "01KYFT74RYS8B740YFGVWBFQ31",
+      "last_transition_at": "2026-07-26T18:15:25.214532+00:00",
+      "model": "__resolved_model_absent__",
+      "notes": [
+        "Gate skipped with evidence (8th timeout, issue #2573). Orchestrator-verified in lane-c: combined scope (cli/commands/agent/ + agent_utils/) = 1562 passed / 2 xfailed / 0 failed, exactly +9 vs the 1553 post-WP02 figure — WP03's 9 new tests. Single-dir scope = 1533/2/0. The 29-test gap the implementer flagged was an orchestrator scope-mismatch in the baseline I supplied, not a missing-test regression; resolved, agent_utils/ contributes the 29. Implementation: override wired via override= into WP02's shared function, no second projection; git diff empty on tasks_transition_core.py (C-002) and tasks_parsing_validation.py; red-first in two commits f393c0aa4 -> 403398f5c; three refusal arms assert exact message text; durability counts review-carrying annotations specifically.",
+        "Review passed (reviewer-renata). C-002 zero-diff on tasks_transition_core.py confirmed (git diff --stat HEAD~2 empty). WP02 ownership zero-diff on tasks_parsing_validation.py confirmed. No second effective-verdict projection added -- WP03 only wires override= into WP02's existing _get_latest_review_cycle_verdict at tasks_move_task.py:561-568. Override read uses read_event_stream_transactional (coordination/status_transition.py:1109), same primitive as merge/done_bookkeeping.py:290, placed in the same no-intervening-write boundary as _mt_current_event_lane (tasks_move_task.py:2266-2267). resolve_event_stream_review called once per invocation (NFR-002). Reverted fix commit 403398f5c locally and reran tests: 2 failures confirm genuine red-first (test_complete_override_permits_transition_without_reasserting_flags, test_prior_override_evidence_survives_second_move_without_duplication); restored clean. All 9 new tests pass. T015's three refusal arms assert exact existing message text (rejected-artifact and no-parseable-verdict messages verified byte-for-byte against tasks_transition_core.py:373-383). T016 durability uses precise review-carrying-annotation counting (a.delta.review is not None), correctly excluding the unrelated --done-override-reason activity note; fixture rollback uses datetime.now(UTC)+1s per reduce()'s (at,event_id) sort. Test scope cli/commands/agent/: 1533 passed/2 xfailed/0 failed. Combined with agent_utils/: 1562 passed/2 xfailed/0 failed (+9 = WP03's new tests). ruff clean; 1 pre-existing mypy no-any-return at _mt_shell_pid_baseline (unrelated function, confirmed present on merge-base too -- baseline red, not WP03's). test_from_harness_branch_coverage_ratchet does not exist in this worktree. Pre-review gate skipped per mission note (8/8 prior timeouts, #2573)."
+      ],
+      "provider": "__resolved_provider_absent__",
+      "role": "reviewer",
+      "shell_pid": 827455,
+      "shell_pid_created_at": "1784975862.31",
+      "subtasks": {
+        "T011": "done",
+        "T012": "done",
+        "T013": "done",
+        "T014": "done",
+        "T015": "done",
+        "T016": "done"
+      }
+    },
+    "WP04": {
+      "actor": "merge",
+      "agent": "claude",
+      "agent_profile": "reviewer-renata",
+      "agent_profile_version": "1.0",
+      "force_count": 0,
+      "lane": "done",
+      "last_event_id": "01KYFT70FNY86FGS1P6V5MQ7RY",
+      "last_transition_at": "2026-07-26T18:15:20.821155+00:00",
+      "model": "__resolved_model_absent__",
+      "notes": [
+        "T017-T020 done. Added resolve_materialized_review(snapshot, wp_id) to wp_review.py as single construction body; both existing entry points delegate. Deleted _snapshot_review_override; post_merge now uses resolve_materialized_review via status facade. 18 new tests + existing post_merge/regression suites pass unmodified (652+16 total). ruff clean; mypy clean on owned files (1 pre-existing unrelated error in tests/reliability/fixtures/review_prompt.py, reproduced identically on an untouched existing test file). Guard WARNING noted: status/__init__.py export addition is outside owned_files but required for integration.",
+        "Review passed (reviewer-renata): one construction body (_review_override_from_state) with real delegation proven by monkeypatch; _snapshot_review_override deleted; 510 passed (492 baseline + 18 new); NFR-002 proven by reduce/read_event_stream spies and a materialize call-count spy over 3 WPs; NFR-003 determinism + insertion-order independence real; ruff/mypy clean; out-of-map __init__.py export (2 lines) adjudicated justified — instructed by T017 step 3 and mechanically required."
+      ],
+      "provider": "__resolved_provider_absent__",
+      "role": "reviewer",
+      "shell_pid": 157623,
+      "shell_pid_created_at": "1784968935.21",
+      "subtasks": {
+        "T017": "done",
+        "T018": "done",
+        "T019": "done",
+        "T020": "done"
+      }
+    },
+    "WP05": {
+      "actor": "merge",
+      "agent": "claude",
+      "agent_profile": "__resolved_profile_absent__",
+      "agent_profile_version": "__resolved_profile_version_absent__",
+      "force_count": 0,
+      "lane": "done",
+      "last_event_id": "01KYFT766KDGGK9M5YGMAXNMWH",
+      "last_transition_at": "2026-07-26T18:15:26.675593+00:00",
+      "model": "__resolved_model_absent__",
+      "notes": [
+        "Gate skipped by construction: WP05's scoped suite is tests/architectural at ~26min vs the gate's 300s budget — it cannot pass (issue #2573, 8/8 timeouts this mission). Evidence: WP05's own gate 20 passed in 86s; golden_count_ban + status_module_boundary 14 passed after the integration fixes. Integration run in lane-e found 6 failures vs a 1092/4/0 baseline — 2 real and now fixed (status-module-boundary violations in WP01/WP03 routed through the package facade; 6 cardinality-is-contract golden-count sites annotated rather than growing the ratchet), 4 are ModuleNotFoundError: ruff, absent from the lane venv and present in main's — category-3 environment. Commit 7abe98cb8 + annotation commit.",
+        "Review passed. Both acceptance questions verified against live source (not vibes): (1) ReviewCycleArtifact.latest() IS found by Pass1 AST scan (test_pass1_finds_the_excluded_site_inside_the_canonical_module, L464-476) and carries an explicit EXCLUDED/Decision-2 disposition -- design does NOT regress to attempt-2's location grep, which would have waved it through silently. (2) _snapshot_review_override's shape IS reconstructed as a decoy with zero glob calls (duplicate_override_reader.py) and Pass2 catches it while Pass1 provably cannot (test_gate_is_red_for_a_decoy_unclassified_pass2_reader, L569-582) -- confirms the third blind spot is closed. Independently re-ran scan_glob_sites()/scan_override_sites() outside pytest: got exactly 9 and 13 sites matching PASS1_DISPOSITIONS/PASS2_DISPOSITIONS keys 1:1 -- table is not aspirational, it matches the live tree. Verified by reading source that the 2 done-evidence sites (validate.py:201, emit.py:287) read reviewer/verdict/reference shape (not at/actor/wp_id/reason) confirming shape-discrimination is real, and that all 5 _CONFIG_SECTION sites read config.get('review',...) i.e. .kittify/config.yaml, unrelated to the override slot. Confirmed CANONICAL_CALL_NAMES all exist in status/wp_review.py and review/artifacts.py, and that a real IN_SCOPE-shaped caller (tasks_parsing_validation._get_latest_review_cycle_verdict) genuinely calls latest_review_artifact_verdict, proving function_calls_any is not a stub (test_in_scope_routing_check_does_not_always_fail is a real symmetry check, not decoy-only). Broke the gate myself: appended a live override-blind glob reader to src/specify_cli/agent_utils/status.py -- test_pass1_disposition_table_is_exhaustive_and_correct_on_the_real_tree went red, named the exact site (agent_utils/status.py:623 _rogue_regression_reader) and said 'Classify each in research.md Decision 1 ... Do NOT resolve this by bumping a count' -- exact required failure-message shape; reverted the file after (git status clean). Floors PASS1_FLOOR=9/PASS2_FLOOR=13 are independently asserted (test_pass1_floor_holds_on_the_real_tree / test_pass2_floor_holds_on_the_real_tree) and test_a_collapsed_pass_turns_the_floor_check_red proves a combined-total floor would have stayed green with one pass at zero -- rationale comments cite the real 1-canonical+N-excluded breakdown, matching my independent recount. Decoys confirmed confined to tests/architectural/_fixtures/review_verdict_disposition_decoys/, never under src/ (test_decoys_do_not_leak_into_src + my own grep). Test evidence: 20 passed in 85.89s (own re-run, matches prompt's 86s claim). ruff (system ruff 0.15.20, lane venv lacks ruff per documented gap): All checks passed on test file + fixtures. mypy --python-executable=.venv/bin/python: Success, no issues. golden-count annotations at L236/240/538 verified against test_convert_sites_do_not_exceed_frozen_baseline (passed) -- registered, not silently exempted. Disposition table cross-checked 1:1 against research.md Decision 1 rows 1-16 including the 5 config-section sites AST found beyond research.md's literal-grep methodology (documented in-file, not silently added). Scope respected: WP05 touched only test_review_verdict_disposition.py + 2 decoy fixtures under tests/architectural/_fixtures/, no src/ changes (git show 7abe98cb8 --stat)."
+      ],
+      "provider": "__resolved_provider_absent__",
+      "role": "reviewer",
+      "shell_pid": 1054512,
+      "shell_pid_created_at": "1784978543.16",
+      "subtasks": {
+        "T021": "done",
+        "T022": "done",
+        "T023": "done",
+        "T024": "done"
       }
     }
   }

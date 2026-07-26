@@ -104,6 +104,7 @@ from .wp_metadata import (
 )
 from .wp_review import (
     resolve_event_stream_review,
+    resolve_materialized_review,
     resolve_snapshot_review,
 )
 from .lane_reader import (
@@ -265,6 +266,7 @@ __all__ = [
     "WPView",
     "reconstruct_wp_view",
     "resolve_event_stream_review",
+    "resolve_materialized_review",
     "read_event_stream",
     "read_event_stream_from_text",
     "read_authored_wp_frontmatter",

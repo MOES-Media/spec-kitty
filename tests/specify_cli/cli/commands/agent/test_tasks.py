@@ -438,17 +438,69 @@ class TestGetLatestReviewCycleVerdict:
 
 
 class TestUnknownVerdictWarning:
-    """Unknown verdict values produce a warning, not a block."""
+    """Unknown verdict values fall back to a raw-frontmatter read, never raise.
 
-    def test_unknown_verdict_emits_warning(
+    Mission ``review-cycle-read-authority-01KYB6Z0`` WP02/T008:
+    ``_get_latest_review_cycle_verdict`` delegates to the canonical
+    ``latest_review_artifact_verdict`` (``specify_cli.review.artifacts``),
+    which enforces ``verdict in {"approved", "rejected"}`` on read
+    (``ReviewCycleArtifact.from_dict``) — a strict SUBSET of this module's
+    wider, defensive ``_VALID_VERDICTS``. Fix-cycle-1 (review rejection item
+    #1): the first WP02 attempt let that schema ``ValueError`` collapse
+    straight to ``(None, path)``, which hard-blocked approval for real,
+    already-committed artifacts carrying a backward-compatible verdict like
+    ``approved_after_orchestrator_fix``. The ``except ValueError`` branch now
+    falls back to a raw-frontmatter scalar read (mirroring the pre-WP02
+    parser) before giving up, so an out-of-schema-but-recognized verdict like
+    "super_approved" still returns its raw string with a warning.
+    """
+
+    def test_schema_invalid_verdict_falls_back_to_raw_parse(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """A verdict not in _VALID_VERDICTS produces a logger.warning."""
+        """A verdict outside the canonical schema still yields its raw value."""
         wp_dir = tmp_path / "WP01-test"
-        _write_review_cycle(wp_dir, 1, "super_approved")  # not in _VALID_VERDICTS
-        with caplog.at_level(logging.WARNING, logger="specify_cli.cli.commands.agent.tasks"):
-            verdict, _ = _get_latest_review_cycle_verdict(wp_dir)
+        artifact = _write_review_cycle(wp_dir, 1, "super_approved")  # not in REVIEW_ARTIFACT_VERDICTS
+        with caplog.at_level(
+            logging.WARNING, logger="specify_cli.cli.commands.agent.tasks_parsing_validation"
+        ):
+            verdict, path = _get_latest_review_cycle_verdict(wp_dir)
         assert verdict == "super_approved"
+        assert path == artifact
+        assert any("unrecognized verdict" in r.message.lower() for r in caplog.records)
+
+    def test_unrecognized_but_schema_valid_verdict_still_warns(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """The ``_VALID_VERDICTS`` warning still fires when the canonical read
+        accepts a verdict this module's (wider, defensive) vocabulary does not
+        recognize.
+
+        Today ``REVIEW_ARTIFACT_VERDICTS`` (``{"approved", "rejected"}``) is a
+        subset of ``_VALID_VERDICTS``, so no real on-disk artifact can trigger
+        this branch — exercised against a mocked canonical-read result instead
+        so the warning behaviour stays covered even though it is currently
+        unreachable via ``latest_review_artifact_verdict``.
+        """
+        from specify_cli.review.artifacts import LatestReviewArtifactVerdict
+
+        fake_result = LatestReviewArtifactVerdict(
+            path=tmp_path / "review-cycle-1.md",
+            cycle_number=1,
+            verdict="approved_but_not_really",
+            has_override=False,
+        )
+        with (
+            patch(
+                "specify_cli.cli.commands.agent.tasks_parsing_validation.latest_review_artifact_verdict",
+                return_value=fake_result,
+            ),
+            caplog.at_level(
+                logging.WARNING, logger="specify_cli.cli.commands.agent.tasks_parsing_validation"
+            ),
+        ):
+            verdict, _ = _get_latest_review_cycle_verdict(tmp_path)
+        assert verdict == "approved_but_not_really"
         assert any("unrecognized verdict" in r.message.lower() for r in caplog.records)
 
 
