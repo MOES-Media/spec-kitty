@@ -13,6 +13,7 @@
   "accepted_at": "2026-07-26T01:41:58.797873+00:00",
   "accepted_by": "jeroennouws",
   "accepted_from_commit": "45069c5e3d1504f85faf311f62886bf2a6866c58",
+  "baseline_merge_commit": "dc6675527d5a4ffe28aa172dc74ff6ccaabf4423",
   "coordination_branch": "kitty/mission-review-cycle-read-authority-01KYB6Z0",
   "created_at": "2026-07-24T23:21:58.296505+00:00",
   "flattened": false,
