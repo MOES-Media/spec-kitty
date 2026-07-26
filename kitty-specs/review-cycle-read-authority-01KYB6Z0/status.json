@@ -24,9 +24,9 @@
       "last_event_id": null,
       "last_transition_at": null,
       "review": {
-        "actor": "claude",
-        "at": "2026-07-26T01:41:32Z",
-        "reason": "Repair: restore agent attribution blanked by the post-rejection re-claim. The claim events for WP02 both carry policy_metadata agent='claude', but a subsequent resolved-binding annotation set agent='' which latest-wins-replaced it, leaving canonical runtime state with an empty agent and blocking accept. Upstream defect: the re-claim path after a review rejection emits a resolved-binding annotation with an empty agent.",
+        "actor": "operator",
+        "at": "2026-07-26T17:47:06Z",
+        "reason": "Arbiter override: fix cycle 1 was independently re-reviewed and passed. The rejection artifact review-cycle-1.md remains the latest because validate_review_artifact hard-requires verdict=='rejected' — an approval structurally cannot write an approved artifact, so an override is the only representable outcome. Evidence: raw-frontmatter fallback (a06603e87) closes both regression classes, verified live against auth-tranche-2-5 WP05 (approved_after_orchestrator_fix) and execution-context-unification WP08 (legacy field names, isolated); reviewer proved non-vacuity by reverting the fallback and watching two tests go red; 1553 passed / 2 xfailed / 0 failed.",
         "wp_id": "WP02"
       }
     }
