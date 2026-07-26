@@ -77,9 +77,20 @@ M7, M8, M9), several of which this mission unblocks by establishing the
    `profile: base`, `expectations: {ok: true, violations: []}`, and a
    `skillDir` expressed relative to the manifest's own directory (no `../..`
    path segments), consistent with muster's manifest-relative path resolution.
-2. **Given** that manifest, **When** `npx @garrison-hq/muster skills run
-   conformance/skills/manifest.yaml` is run with network access disabled,
-   **Then** the process exits `0` and every case is reported conformant.
+
+   Clarification: "`../..`-free" means the path must not escape the
+   repository checkout (no segment resolving above the repo root), not that
+   the literal substring `../..` is forbidden. `skillDir` values necessarily
+   read `../../src/doctrine/skills/<name>`, satisfying manifest-relative
+   resolution without escaping the checkout.
+2. **Given** that manifest, **When** the muster CLI's package is first
+   cache-warmed — either `npm install --no-save @garrison-hq/muster@<pinned>`
+   with network access enabled, or by pinning `@garrison-hq/muster` as a
+   `devDependency` restored via `npm ci` — and then `npx @garrison-hq/muster
+   skills run conformance/skills/manifest.yaml` is run with network access
+   disabled, **Then** the process exits `0` and every case is reported
+   conformant. This two-step cache-warm-then-offline-run procedure is
+   documented in `conformance/README.md`.
 
 #### CI gating (FR-003)
 
@@ -88,9 +99,16 @@ M7, M8, M9), several of which this mission unblocks by establishing the
    **Then** it invokes `garrison-hq/muster-action@v1` with `command: skills
    run` against the manifest and the job succeeds only if the suite exits `0`.
 
+#### CI timing measurement (NFR-001)
+
+4. **Given** a real run of the `conformance.yml` workflow on GitHub Actions,
+   **When** the workflow completes, **Then** its actual wall-clock minutes for
+   that run's `run_id` are recorded in `conformance/README.md`, per this
+   project's measured-not-asserted CI-budget policy.
+
 #### Decision record (FR-004)
 
-4. **Given** the programme's D1–D5 design decisions (persona adapter vs.
+5. **Given** the programme's D1–D5 design decisions (persona adapter vs.
    projector; the behavioral-endpoint seam; rule-extraction authoring; mission
    placement across repos; the rubric surface), **When**
    `conformance/DECISIONS.md` is written, **Then** it records all five
@@ -99,14 +117,14 @@ M7, M8, M9), several of which this mission unblocks by establishing the
 
 #### Discrimination control (FR-005)
 
-5. **Given** a deliberately broken skill fixture under
+6. **Given** a deliberately broken skill fixture under
    `conformance/skills/control/` (its frontmatter `name` does not match its
    directory name), **When** the manifest declares that case with
    `expectations: {ok: false, ...}` and the suite runs, **Then** the case
    passes — because the harness's actual result (`ok: false`) matches the
    declared expectation, proving the suite can register a failure rather than
    trivially reporting success on everything.
-6. **Given** that same control case, **When** its declared expectation is
+7. **Given** that same control case, **When** its declared expectation is
    manually flipped to `ok: true` (a documented manual check, not part of CI),
    **Then** the suite run exits non-zero, because the harness's actual result
    no longer matches the (now wrong) expectation — this is the manual proof of
@@ -114,23 +132,27 @@ M7, M8, M9), several of which this mission unblocks by establishing the
 
 #### Documentation of local invocation and known gaps (FR-006)
 
-7. **Given** a developer who wants to run the suite locally before opening a
+8. **Given** a developer who wants to run the suite locally before opening a
    PR, **When** they read `conformance/README.md`, **Then** they find the
-   exact local invocation command, the pinned muster version in use, and a
-   plain statement of the two known muster limitations that affect this suite
-   (the manifest is parsed without schema validation; `expectations.violations`
-   is never compared, only `expectations.ok`).
+   exact local invocation command, the two-step cache-warm-then-offline-run
+   procedure (warm via `npm install --no-save @garrison-hq/muster@<pinned>`
+   with network enabled, or a pinned `devDependency` restored via `npm ci`,
+   before running the network-disabled `skills run` invocation), the pinned
+   muster version in use, and a plain statement of the two known muster
+   limitations that affect this suite (the manifest is parsed without schema
+   validation; `expectations.violations` is never compared, only
+   `expectations.ok`).
 
 #### Scope boundary (C-001, C-002, C-003)
 
-8. **Given** the completed mission diff, **When** it is reviewed, **Then** it
+9. **Given** the completed mission diff, **When** it is reviewed, **Then** it
    touches only paths under `conformance/**` and `.github/workflows/**` — no
    spec-kitty runtime source is changed.
-9. **Given** a pull request opened from a fork of spec-kitty (no repository
-   secrets available to the workflow), **When** the conformance workflow runs,
-   **Then** it completes successfully without requesting or requiring any
-   secret, because the static path is fully offline.
-10. **Given** the workflow's `muster` version input, **When** it is inspected,
+10. **Given** a pull request opened from a fork of spec-kitty (no repository
+    secrets available to the workflow), **When** the conformance workflow runs,
+    **Then** it completes successfully without requesting or requiring any
+    secret, because the static path is fully offline.
+11. **Given** the workflow's `muster` version input, **When** it is inspected,
     **Then** it is an exact version string (e.g. `1.1.0`), never a floating
     range (`^`, `~`, `latest`), so the same commit always resolves the same
     muster build.
@@ -151,9 +173,12 @@ M7, M8, M9), several of which this mission unblocks by establishing the
   not validate that the manifest's case count matches the skill directory's
   actual contents (this is one of the two documented latent muster gaps: the
   manifest is parsed with a bare cast, no schema validation). This mission
-  does not add a completeness check; it is recorded as a known limitation in
-  `conformance/README.md` per FR-006, not fixed (fixing it is explicitly out of
-  scope per the mission's scope guard).
+  does not add a completeness check (manifest case count vs.
+  `src/doctrine/skills/*` directory count, offset by the +1 FR-005 control
+  case). This is buildable entirely within `conformance/**` and is NOT
+  forbidden by the scope guard, which excludes only muster/muster-action
+  source changes. Deliberately deferred as candidate FR-007 for a follow-up
+  mission.
 - **`expectations.violations` is ignored**: muster's CLI only compares
   `expectations.ok`, never `expectations.violations`, so a case's declared
   `violations: []` list is documentation only and is not itself verified by
@@ -182,7 +207,7 @@ M7, M8, M9), several of which this mission unblocks by establishing the
 
 | ID | Requirement | Threshold | Status |
 |----|-------------|-----------|--------|
-| NFR-001 | The conformance CI job gives fast feedback on pull requests. | Workflow wall-clock time under 3 minutes on a standard GitHub-hosted runner. | Proposed |
+| NFR-001 | The conformance CI job gives fast feedback on pull requests. | No a-priori numeric ceiling asserted at spec time. At implement time, record the workflow's actual wall-clock minutes from a real GitHub Actions run_id in `conformance/README.md`, per this project's measured-not-asserted CI-budget policy (`docs/plans/testing/ci-job-timings.md`; `docs/development/testing-flakiness.md`). Any hard-failing gate on wall-clock must derive from that measured baseline. | Proposed |
 | NFR-002 | The static suite's result is deterministic given a pinned muster version. | Repeated runs of `npx @garrison-hq/muster@<pinned> skills run conformance/skills/manifest.yaml` against the same commit produce identical `ok`/exit-code results, with zero network calls in the run path. | Proposed |
 
 ### Constraints
@@ -255,6 +280,12 @@ M7, M8, M9), several of which this mission unblocks by establishing the
   `expectations.violations` is never compared, only `expectations.ok`
   (`src/cli/index.ts:1279,1319`) — both are documented as known limitations in
   `conformance/README.md`, not fixed in this mission.
+- **Citation drift**: All muster-repo file:line citations in this spec and the
+  seed issue were computed against muster HEAD (`v1.1.0-1-g8953ee8`), one
+  commit past the `v1.1.0` tag actually publishable/pinnable under C-003. WP02
+  must re-derive every `src/cli/index.ts` citation (FR-004's D1–D5 evidence,
+  and the correction-#4 note) against the exact version pinned in the CI
+  workflow before committing `DECISIONS.md`.
 - **Out of scope** (see Scope Guard below): behavioral/trigger conformance
   cases; profile or directive checks; any change to muster or
   `muster-action` source; any pull request to the upstream

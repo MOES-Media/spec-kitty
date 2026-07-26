@@ -6,7 +6,7 @@
 
 ## Content Quality
 
-- [x] No implementation details (languages, frameworks, APIs)
+- [x] No implementation details (languages, frameworks, APIs) — *exception, see Notes: infrastructure/tooling mission, CLI/file:line/exit-code detail retained deliberately for testability*
 - [x] Focused on user value and business needs
 - [x] Written for non-technical stakeholders
 - [x] All mandatory sections completed
@@ -40,9 +40,10 @@
   per explicit operator instruction. No discovery interview was run and no
   `[NEEDS CLARIFICATION]` markers were needed — the issue's requirement table,
   acceptance criteria, and scope guard left no ambiguity requiring deferral.
-- All six functional requirements (FR-001–FR-006) and all three constraints
-  (C-001–C-003) are carried verbatim (same IDs, same statements) from the
-  issue's requirement table into this spec.
+- Five of six FRs (001,002,003,005,006) and all three constraints are carried
+  character-for-character verbatim; FR-004 drops the issue's trailing
+  self-referential pointer ("...inlined in section 11 below"), which does not
+  resolve outside the issue and was judged non-substantive to drop.
 - Two Non-Functional Requirements (NFR-001, NFR-002) were authored by the spec
   author rather than sourced from the issue, which did not enumerate any
   NFR-### items — added to satisfy the house-style requirement that every
