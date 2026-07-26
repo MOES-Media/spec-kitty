@@ -256,6 +256,11 @@ grep -n "version:" .github/workflows/conformance.yml     # MUST show '1.1.0' exa
 - **Reject if** the work log has no real `run_id`/wall-clock-minutes entry
   from an actual GitHub Actions run — a workflow file that has never
   actually executed does not satisfy this WP's Definition of Done.
+- Before accepting, independently verify the cited run via
+  `gh run view <run_id> --repo MOES-Media/spec-kitty --json conclusion,headBranch,createdAt,updatedAt`
+  (or the Actions UI): confirm `conclusion=success`, `headBranch` matches
+  this mission's PR branch, and timestamps are consistent with the claimed
+  wall-clock minutes. Reject if the run cannot be independently confirmed.
 - Confirm `git diff --stat` shows exactly one file changed:
   `.github/workflows/conformance.yml`.
 - Confirm the completeness-check step's `run:` line matches the CLI

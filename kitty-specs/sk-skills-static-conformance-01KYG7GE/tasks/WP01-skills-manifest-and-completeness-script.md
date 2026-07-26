@@ -277,7 +277,7 @@ network calls in the run path) — if the offline run failed to reach the
 network at all and still produced a correct exit code, that is NFR-002
 holding, not incidental.
 
-**Steps** (`quickstart.md` §1–§3, verbatim procedure):
+**Steps** (follows quickstart §1–3 (see that section for the exact diff-check wording)):
 1. Cache-warm, then run fully offline (quickstart.md §1):
    ```sh
    npm install --no-save @garrison-hq/muster@1.1.0
@@ -290,6 +290,11 @@ holding, not incidental.
    only — verify by hand which single line changed), re-run, confirm the run
    now exits **non-zero**, then restore the file exactly (`git diff --exit-code
    conformance/skills/manifest.yaml` must show no diff afterward).
+   Paste into the work log the exact `git diff conformance/skills/manifest.yaml`
+   output captured immediately after the flip (before restoring), showing the
+   single `ok: false → ok: true` line change, alongside the post-restore
+   clean-diff confirmation. A restored-clean diff alone, with no mid-test diff
+   evidence, does not satisfy this gate.
 3. Manifest completeness check, both ways (quickstart.md §3): run
    `node conformance/scripts/check-manifest-completeness.mjs` against the true
    tree (expect exit `0`); induce a mismatch by creating a temporary probe
@@ -298,6 +303,9 @@ holding, not incidental.
    `__temp-completeness-probe` explicitly, not just a count mismatch), then
    delete the probe directory immediately and re-run once more to confirm the
    script reports `0` again. The probe directory must never be committed.
+   Additionally paste the literal terminal transcript (invocation line + full
+   stdout/stderr) for both the induced-mismatch run and the restored-clean
+   re-run, not just the message text.
 
 **Files**: none new — this subtask only exercises T002–T004's outputs.
 **Validation**: all six real exit codes (steps 1, and both directions of 2 and
@@ -337,7 +345,12 @@ present in the work log before requesting review.
 - [ ] Real muster CLI run against the real 54-case manifest exits `0`
       (recorded in work log)
 - [ ] Real control-case flip test: un-flipped exit `0`, flipped exit
-      non-zero, file restored with a clean `git diff` (recorded in work log)
+      non-zero, file restored with a clean `git diff` (recorded in work log).
+      The exact `git diff conformance/skills/manifest.yaml` output captured
+      immediately after the flip (before restoring), showing the single
+      `ok: false → ok: true` line change, is pasted into the work log
+      alongside the post-restore clean-diff confirmation. A restored-clean
+      diff alone, with no mid-test diff evidence, does not satisfy this gate.
 - [ ] Real completeness-check run: true tree exits `0`, induced mismatch
       exits non-zero and names the specific probe skill, restored tree exits
       `0` again (recorded in work log, failure message quoted verbatim)

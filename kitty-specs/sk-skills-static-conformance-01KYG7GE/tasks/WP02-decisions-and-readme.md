@@ -251,7 +251,9 @@ real.
    minutes in `conformance/README.md`'s timing table, replacing the `TBD`
    placeholder from T009 — mirroring the exact pattern in
    `docs/plans/testing/ci-job-timings.md` (a specific `run_id`, a specific
-   minutes figure, explicitly not an asserted ceiling).
+   minutes figure, explicitly not an asserted ceiling). The `run_id` and
+   minutes recorded here MUST be byte-identical to the values WP03's T013
+   recorded in its own work log — cross-reference before committing.
 3. If a fork-PR-shaped run is feasible to observe, confirm in the same README
    note that the job required no secret (C-002, AC-3).
 4. Commit this one-line/one-row update.
@@ -279,6 +281,8 @@ never an estimate.
       and real wall-clock minutes from an actual green `conformance.yml` run
       (T010) — a `TBD` placeholder blocks final approval, it does not
       satisfy it
+- [ ] run_id/minutes cross-checked against WP03's T013 work-log entry for
+      exact match
 - [ ] No file outside `owned_files` is modified
 
 ## Risks
