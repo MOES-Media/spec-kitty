@@ -238,6 +238,67 @@ HAND_AUTHORED_EDGES: tuple[DRGEdge, ...] = (
             "business rules."
         ),
     ),
+    # -----------------------------------------------------------------------
+    # The 4 requires edges wiring the common-docs artifacts to the shipped
+    # structural-lint asset (mission ship-structural-lint-as-asset). The lint
+    # is now the first built-in ASSET (asset:common-docs-structural-lint); the
+    # directive, styleguide, and both curation/scaffold tactics NAME it in
+    # prose as the gate that enforces them. The extractor has no frontmatter
+    # mechanism to mint an edge to an asset, so these are authored directly in
+    # the graph fragments. REQUIRES (not suggests): activating any of these
+    # artifacts pulls the shipped lint asset in as a mandatory prerequisite.
+    # Note: ASSET is not a charter-activatable kind, so this is not a
+    # charter-activate-cascade deployment hook -- `--cascade all` on these
+    # artifacts only emits a benign "could not cascade-activate
+    # asset/common-docs-structural-lint" warning. The edge's real job is DRG
+    # de-orphaning (an un-linked asset that everything references is the
+    # un-navigable state the asset kind exists to fix) plus transitive-ref
+    # resolution: it is what lets resolve_transitive_refs() return the asset
+    # with is_complete=True for consumers walking these artifacts' reference
+    # closure, i.e. deployment-manifest completeness rather than an
+    # activation trigger.
+    # -----------------------------------------------------------------------
+    DRGEdge(
+        source="directive:DIRECTIVE_042",
+        target="asset:common-docs-structural-lint",
+        relation=Relation.REQUIRES,
+        reason=(
+            "DIRECTIVE_042 names the common-docs structural lint as the live "
+            "mechanical gate that enforces it; activating the directive "
+            "requires the shipped lint asset to be present."
+        ),
+    ),
+    DRGEdge(
+        source="styleguide:common-docs",
+        target="asset:common-docs-structural-lint",
+        relation=Relation.REQUIRES,
+        reason=(
+            "The common-docs styleguide's tooling rows and quality_test name "
+            "the structural lint as their enforcing gate, and its "
+            "structural_lint_config: block is the policy the asset loads; "
+            "activating the styleguide requires the shipped lint asset."
+        ),
+    ),
+    DRGEdge(
+        source="tactic:common-docs-curation",
+        target="asset:common-docs-structural-lint",
+        relation=Relation.REQUIRES,
+        reason=(
+            "The common-docs curation tactic directs the agent to run the "
+            "structural lint as one of the live gates; activating the tactic "
+            "requires the shipped lint asset."
+        ),
+    ),
+    DRGEdge(
+        source="tactic:common-docs-scaffold",
+        target="asset:common-docs-structural-lint",
+        relation=Relation.REQUIRES,
+        reason=(
+            "The common-docs scaffold tactic relies on the structural lint's "
+            "index_completeness check to enforce section-index scaffolding; "
+            "activating the tactic requires the shipped lint asset."
+        ),
+    ),
 )
 
 

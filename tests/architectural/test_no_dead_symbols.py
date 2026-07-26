@@ -371,14 +371,12 @@ _CATEGORY_B_GRANDFATHERED_LEGACY: frozenset[SymbolKey] = frozenset(
         SymbolKey("SCHEMA_VERSION", "8fb29803d3d131301db2bbe72bbaab5314981664272c6a9d57f2a75684ae1811"),  # specify_cli.skills.manifest_store::SCHEMA_VERSION
         SymbolKey("load", "7689780b2e4a040cfc29e5b540406167217369b98795702cc6c496cb1c9a2b7c"),  # specify_cli.skills.manifest_store::load
         SymbolKey("save", "222fabd1e77c7d011d9fc0b583fd27d7c8a044cf0fe17fdce0a59c95583b1172"),  # specify_cli.skills.manifest_store::save
-        SymbolKey("MISSION_CREATED", "cee8959200ec2e6304a1ff8d59dd8eb356bf76108ecdf4ba8210ff4522fbebdc"),  # specify_cli.status.lifecycle_events::MISSION_CREATED
         # specify_cli.status.lifecycle_events::MISSION_EVENTS_FILENAME
         SymbolKey("MISSION_EVENTS_FILENAME", "725b94e955667ce901d7080717a134b4f0b6da5c5efc829f5fc9e98353d9afc9"),
         # specify_cli.status.lifecycle_events::PROJECT_EVENTS_FILENAME
         SymbolKey("PROJECT_EVENTS_FILENAME", "27f95adf27cd2fb348df3cd92afb8f6bd3c015697e237d232da23bfa900f74fe"),
         # specify_cli.status.lifecycle_events::PROJECT_INITIALIZED
         SymbolKey("PROJECT_INITIALIZED", "ee097bd3221c588159762747beceb7db48856f2f323d8551524f02e238770723"),
-        SymbolKey("WP_CREATED", "4f61af61cf1570deb1b34ef633f688e26483b680cc965d27f75415e188289732"),  # specify_cli.status.lifecycle_events::WP_CREATED
         # specify_cli.status.lifecycle_events::append_lifecycle_event
         SymbolKey("append_lifecycle_event", "44bbd8d10caea88cf4765a3952d39b9c790cb33de16111d5110aa3fb2d574659"),
         # specify_cli.status.lifecycle_events::has_lifecycle_event
@@ -655,7 +653,11 @@ _CATEGORY_C_MERGE_DECOMP_SHIM_REEXPORT_2057: frozenset[SymbolKey] = frozenset(
         # specify_cli.cli.commands.merge::BaselineMergeCommitError (escalated: live collision)
         SymbolKey("BaselineMergeCommitError", "f63bb04588cfd7df1144a1e646283b39e2bcc28ae152b07a0799b34f0f91c65b", module_path="specify_cli.cli.commands.merge"),
         # specify_cli.merge.bookkeeping_projection::_assert_status_surface_file_path_is_trusted
-        SymbolKey("_assert_status_surface_file_path_is_trusted", "d0447f87156c6860ac0a96338fe409aeda51ea18cf317fdc4430fd32945778cd"),
+        # (coord-write-placement-closure-01KYCF83 WP03 / FR-003 rehash: the
+        # filename-trust check now classifies via kind_for_mission_file instead
+        # of a hardcoded {filename1, filename2} membership test -- body changed,
+        # content-tier hash re-pinned.)
+        SymbolKey("_assert_status_surface_file_path_is_trusted", "4849bba669d427bc0cdb0a72f77dc821f821b979edd3293e9ea5f1d6e0fe6d62"),
         # specify_cli.merge.bookkeeping_projection::_read_optional_bytes
         SymbolKey("_read_optional_bytes", "ff9a424ce926fdeb80a67f95e6350ef8b4107a3fcf9a3192f57d6fed6db076a8"),
         # specify_cli.merge.bookkeeping_projection::_restore_optional_bytes
@@ -667,8 +669,12 @@ _CATEGORY_C_MERGE_DECOMP_SHIM_REEXPORT_2057: frozenset[SymbolKey] = frozenset(
         SymbolKey("_is_assigned_mission_number", "4da9f3fde4e20df83693697787af0a7ef0e4399b21c99bd102b9b3a899e34fe1"),
         # specify_cli.merge.ordering::_mark_mission_number_baked
         SymbolKey("_mark_mission_number_baked", "aa2e64b018e1d7ecc47f73211c291d16934d659b8f4b07b472e200225d99e72b"),
-        # specify_cli.merge.ordering::_write_mission_number_to_branch
-        SymbolKey("_write_mission_number_to_branch", "8b14e54dc72bee11b21227f863c1baf4017f1e174e429b0b2185c74a427cfc1a"),
+        # specify_cli.merge.ordering::_write_mission_number_to_branch (body_hash
+        # refreshed lifecycle-gate-execution-context: body edited, key is
+        # content-tier and body-sensitive by design -- see _symbol_key.py
+        # "Body-sensitivity" note; still a seam-internal helper, zero cross-file
+        # src/ caller)
+        SymbolKey("_write_mission_number_to_branch", "38e9704c5b132c12d81d3be921a257f0e340f58264fba5909703bb088b523fc2"),
         SymbolKey("check_push_safety", "893124ff3029dec30c538fd54577881f4afa05002067b4f1033ce550f52e0460"),  # specify_cli.merge.push_preflight::check_push_safety
         SymbolKey("_extract_mission_slug", "834a3e235860c64046504604c6f21d21f5a8c2e8443ef33b8c4ad6ad07c2e934"),  # specify_cli.merge.resolve::_extract_mission_slug
         # specify_cli.merge.resolve::_iter_merge_states_for_slug
@@ -733,9 +739,10 @@ _CATEGORY_C_EVENT_SYNC_RETENTION_DELIVERY: frozenset[SymbolKey] = frozenset(
         SymbolKey("TERMINAL_STATUSES", "39cfb0bb7ccf29fe7683659c8e5648022bc1fa98b30069fdee81822c103fe7bd"),  # specify_cli.delivery.ledger::TERMINAL_STATUSES
         SymbolKey("init_ledger", "95d75b9f2c0c5692072a02c2145128f9fe47e82e9a47120235d5c77bfae3f4ec"),  # specify_cli.delivery.ledger::init_ledger
         SymbolKey("BATCH_ENDPOINT_PATH", "ca95ace141f4fdf0e9b45beded0c05ad7eacbf89e4d6d3db6035fd7d17fcc644"),  # specify_cli.delivery.receivers::BATCH_ENDPOINT_PATH
-        # specify_cli.delivery.receivers::BATCH_TIMEOUT_SECONDS
-        SymbolKey("BATCH_TIMEOUT_SECONDS", "b369a7d782ba7ef5f063929fda2b130c0a53b2044621b8d19dd3afe495d3d226"),
-        SymbolKey("GateDecision", "63e6f6d31d87a0baa8128896db70bcd1a281aef33f9cdc64dc7a4fc1f825dd99"),  # specify_cli.delivery.receivers::GateDecision
+        # BATCH_TIMEOUT_SECONDS left the allowlist: sync.history_import.upload now
+        # imports it (reusing the canonical delivery timeout, #2884).
+        # GateDecision left the allowlist: cli.commands.sync now imports it for the
+        # shared _resolve_gated_receiver seam (#2884 landing fold).
         SymbolKey("GateKind", "5b6ccac48cf9723e99c997a1f70c7af1f481e819abb62e251d9b3814fd71d05e"),  # specify_cli.delivery.receivers::GateKind
         SymbolKey("HttpResponse", "424e7dd151b9e7abdea1693be40b486e5755f23c7a23fef775d06f3864217935"),  # specify_cli.delivery.receivers::HttpResponse
         SymbolKey("ReceiverGate", "222316c26a75df8f8d97c3423fa0d49fdbd2f6326362a53fd1cb8de155f30298"),  # specify_cli.delivery.receivers::ReceiverGate
@@ -977,6 +984,70 @@ _CATEGORY_C_SCOPE_SOURCE_FACTORY_CONSTRUCTED: frozenset[SymbolKey] = frozenset(
 )
 
 
+# ---------- C. lifecycle-gate-execution-context (#1834/#2885/#2795/#2882) forward seams ----------
+# Mission ``lifecycle-gate-execution-context`` (FR-303 dead-symbol case, no new
+# tracker ticket) landed some surfaces still awaiting a real cross-module caller:
+#
+# * ``acceptance/execution_context.py::SurfaceHeadResolver`` is a ``Callable[[Path],
+#   str]`` type alias used ONLY as the annotation on
+#   ``GateExecutionContext.assert_at_ref``'s ``head_of`` parameter -- the C5
+#   ref-agreement gate (``gates_core._assert_ref_agreement``, wired into the
+#   ACCEPT-phase acceptance-matrix gate) calls ``assert_at_ref()`` with the default
+#   resolver and never needs to inject a substitute in production, so this alias is
+#   exercised only by the direct unit tests that inject a fake ``head_of`` for
+#   ``tests/acceptance/test_gate_execution_context.py``'s isolated-method cases. A
+#   type alias consumed purely as a signature annotation is never a ``from ... import``
+#   site by construction.
+# * ``acceptance/execution_context.py::CannotEvaluateReason`` -- its
+#   ``SURFACE_CANNOT_HOLD_FACT`` member is produced by ``surface_cannot_hold`` (wired
+#   into the acceptance-matrix gate via ``gates_core._matrix_surface_cannot_hold``) and
+#   its ``BELOW_MINIMUM_PHASE`` member by ``not_applicable_below`` (still genuinely
+#   unwired -- no gate in this mission's scope declares a phase floor yet). Both
+#   producing methods return the enum member as an attribute of the ``CannotEvaluate``
+#   they build; ``gates_core.py`` reads ``cannot.reason.value`` structurally off that
+#   instance (mirrored by the C5 path, which reads ``exc.error_code`` off the raised
+#   ``GateSurfaceRefMismatch`` the same way) rather than importing the enum type by
+#   name, so the type itself has no cross-module import site even though its members
+#   are live.
+# * ``acceptance/post_consolidation.py`` (``verify_deferred_invariants`` /
+#   ``PostConsolidationResult`` / ``PostConsolidationViolation`` /
+#   ``InvariantViolation``) is WP06/T031's Op, dispatched ad hoc via
+#   ``spec-kitty dispatch`` -- by design "there is no new CLI verb and no
+#   call-in from merge/executor.py" (module docstring; zero ``merge/``
+#   coupling is a load-bearing contract constraint, C7) and
+#   ``scripts/ci/check_dangling_deferrals.py`` is deliberately "zero-coupled to
+#   src/specify_cli" (its own docstring) so it duplicates the wire value
+#   instead of importing this module. A plain library function with a real,
+#   documented caller (docs/guides/accept-and-merge.md
+#   #deferred-invariants-and-the-post-consolidation-gate) that is never a
+#   static ``src/`` import by design.
+# * ``cli/commands/archive.py`` (``create`` / ``list_archives``) are Typer
+#   command callbacks registered by the ``@app.command(...)`` decorator; the
+#   real runtime caller is Typer's own dispatch against ``archive_module.app``
+#   (wired in ``cli/commands/__init__.py``), never a ``from ... import create``
+#   site.
+_CATEGORY_C_LIFECYCLE_GATE_EXECUTION_CONTEXT_2841: frozenset[SymbolKey] = frozenset(
+    {
+        # specify_cli.acceptance.execution_context::CannotEvaluateReason
+        SymbolKey("CannotEvaluateReason", "169f6e0b84cc22cc54ed339999b26191c66ce24fb4b8c4f4d9e87ba82852c55d"),
+        # specify_cli.acceptance.execution_context::SurfaceHeadResolver
+        SymbolKey("SurfaceHeadResolver", "1b5124eac062ce4ebeec680cbd3d867d602747896eab7ae166162f65427653a2"),
+        # specify_cli.acceptance.post_consolidation::InvariantViolation
+        SymbolKey("InvariantViolation", "2ef6e1e24afd16c2e6d0ea942a09f82189f61f7c4e081d33e2bb7f4fcb513f2d"),
+        # specify_cli.acceptance.post_consolidation::PostConsolidationResult
+        SymbolKey("PostConsolidationResult", "d657817ba43238e2bbae83261e6acb8eb65a28de60a15496087166021594fb30"),
+        # specify_cli.acceptance.post_consolidation::PostConsolidationViolation
+        SymbolKey("PostConsolidationViolation", "6e97a633cce0f4ed58dcbc805cbf9ceb4aed0884f4b137e7362cf52f4d6f99cb"),
+        # specify_cli.acceptance.post_consolidation::verify_deferred_invariants
+        SymbolKey("verify_deferred_invariants", "e1c30bf407aa9a48fe5dfe0870f00f47cb0fb61367f2ad8f292f608ca2661c9d"),
+        # specify_cli.cli.commands.archive::create
+        SymbolKey("create", "758e16e495dc35a5a9338583a8a906a46d7e6b9ffcddc04b9d0b49f7f39227ba"),
+        # specify_cli.cli.commands.archive::list_archives
+        SymbolKey("list_archives", "1d7216238f988bfdd9f3a29fd315d89a48d0092b8b22c9ebdaf5c23c2308a886"),
+    }
+)
+
+
 # Aggregate. The gate consults this; the per-category frozensets are
 # the surface introspected by the ratchet-baseline meta-test
 # (``tests/architectural/test_ratchet_baselines.py``). Entries are
@@ -1006,12 +1077,33 @@ _SYMBOL_ALLOWLIST: frozenset[SymbolKey] = (
     | _CATEGORY_C_URN_RESOLUTION_LANE
     | _CATEGORY_C_WP_IN_FLIGHT_CHARTER_YAML_IO_WRITE_HELPER
     | _CATEGORY_C_SCOPE_SOURCE_FACTORY_CONSTRUCTED
+    | _CATEGORY_C_LIFECYCLE_GATE_EXECUTION_CONTEXT_2841
 )
 
 
+def _is_asset_blob(path: Path) -> bool:
+    """True if *path* is a shipped doctrine ``asset`` blob, not a module.
+
+    An ``ArtifactKind.ASSET`` blob is packaged data/logic shipped with a
+    doctrine pack and loaded by file path (never imported), identified by a
+    sibling ``<name>.asset.yaml`` sidecar manifest. Its public ``__all__``
+    symbols are consumed by the shipped script itself, not by ``src/`` callers,
+    so the dead-symbol gate must not treat them as unimported.
+    """
+    return (path.parent / f"{path.name}.asset.yaml").is_file()
+
+
 def _iter_src_python_files() -> list[Path]:
-    """Yield every ``*.py`` file under ``src/`` (sorted, deterministic)."""
-    return sorted(p for p in _SRC_ROOT.rglob("*.py") if "__pycache__" not in p.parts)
+    """Yield every importable ``*.py`` under ``src/`` (sorted, deterministic).
+
+    Excludes doctrine ``asset`` blobs (shipped, loaded by path — see
+    :func:`_is_asset_blob`).
+    """
+    return sorted(
+        p
+        for p in _SRC_ROOT.rglob("*.py")
+        if "__pycache__" not in p.parts and not _is_asset_blob(p)
+    )
 
 
 def _module_dotted(path: Path) -> str:

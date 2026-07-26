@@ -188,7 +188,11 @@ from .aggregate import (
     MissionStatus,
 )
 from .lifecycle_events import (
+    FOLLOW_UP_RECORDED,
     LIFECYCLE_EVENT_TYPES,
+    LOCAL_ONLY_LIFECYCLE_EVENT_TYPES,
+    MISSION_CREATED,
+    MISSION_REOPENED,
     PLAN_COMPLETED,
     PLAN_STARTED,
     REVIEWER_SELF_APPROVAL,
@@ -196,6 +200,7 @@ from .lifecycle_events import (
     SPECIFY_STARTED,
     TASKS_COMPLETED,
     TASKS_STARTED,
+    WP_CREATED,
     MissionNotCompletedError,
     build_saas_lifecycle_queue_event,
     emit_artifact_phase,
@@ -206,6 +211,8 @@ from .lifecycle_events import (
     emit_reviewer_self_approval,
     emit_wp_created_local,
     has_non_bootstrap_status_history,
+    mission_event_log_path,
+    read_lifecycle_events,
     repo_root_for_lifecycle_log,
 )
 from .views import (
@@ -236,12 +243,14 @@ def uninitialized_status_error(mission_slug: str, wp_id: str, feature_dir: Path)
 
     return str(_uninitialized_status_error(mission_slug, wp_id, feature_dir))
 
-# The canonical status artifacts (event log + snapshot). On coordination-topology
-# missions these are owned by the transactional status emitter on the coordination
-# branch; the primary checkout's copies are stale and must not clobber the seed
-# during finalize/implement (#1589). Single source for both commit paths
-# (finalize in agent/mission.py and implement.py) — review M7.
-COORD_OWNED_STATUS_FILES = frozenset({EVENTS_FILENAME, SNAPSHOT_FILENAME})
+# WP13 (IC-07c) retired ``COORD_OWNED_STATUS_FILES`` -- the canonical status
+# artifacts (event log + snapshot) frozenset -- onto the single canonical churn
+# owner (``coordination.coherence.is_toolchain_generated_churn`` /
+# ``mission_runtime.MissionArtifactKind.STATUS_STATE``, FR-012). Consumers that
+# used to import this frozenset now classify by kind/path through that owner
+# instead of a locally-duplicated basename set. ``EVENTS_FILENAME`` /
+# ``SNAPSHOT_FILENAME`` remain -- only the derived exemption frozenset (and its
+# 8 consumer call sites) was retired.
 
 __all__ = [
     "ActiveWPStatus",
@@ -270,7 +279,6 @@ __all__ = [
     "read_event_stream",
     "read_event_stream_from_text",
     "read_authored_wp_frontmatter",
-    "COORD_OWNED_STATUS_FILES",
     "CoordAuthorityUnavailable",
     "EventLogMergeError",
     "FeatureStatusLockTimeoutError",
@@ -279,6 +287,13 @@ __all__ = [
     "InvalidMissionSlug",
     "MissionMetadataUnavailable",
     "LIFECYCLE_EVENT_TYPES",
+    "LOCAL_ONLY_LIFECYCLE_EVENT_TYPES",
+    "FOLLOW_UP_RECORDED",
+    "MISSION_CREATED",
+    "MISSION_REOPENED",
+    "WP_CREATED",
+    "mission_event_log_path",
+    "read_lifecycle_events",
     "MissionStatus",
     "PLAN_COMPLETED",
     "PLAN_STARTED",

@@ -23,6 +23,7 @@ mission branch.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +33,7 @@ from specify_cli.acceptance import (
     ACCEPTANCE_HISTORY_FIELD,
     ACCEPTANCE_PROVENANCE_FIELDS,
 )
+from specify_cli.acceptance.matrix import SCAFFOLD_TODO_MARKER
 from specify_cli.status import EventLogMergeError, merge_event_log_files
 
 # meta.json serialization identical to ``mission_metadata.write_meta`` so the
@@ -213,3 +215,150 @@ def merge_driver_traces(
     theirs = Path(theirs_path)
     theirs_text = theirs.read_text(encoding="utf-8") if theirs.exists() else ""
     ours.write_text(union_trace_texts(ours_text, theirs_text), encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Coordination gate artifacts: keep the filled side (#2804)
+# ---------------------------------------------------------------------------
+#
+# ``acceptance-matrix.json`` and ``issue-matrix.md`` are filled on the TARGET at
+# accept time and left as placeholder scaffolds on the mission branch. Under
+# ``-X theirs`` the mission branch's scaffold wins, so the merged record loses
+# the very evidence the done-gate just consumed (#2804). These drivers pick the
+# more-filled side instead of a fixed side, which is also correct in the reverse
+# ordering (fill authored in a lane, target still scaffold). Ties resolve to
+# ``ours`` — the target, where accept happened.
+
+
+#: The scaffold's undecided verdict token, shared by ``overall_verdict`` and each
+#: criterion's ``pass_fail`` cell. Named rather than inlined so the fill score
+#: reads as verdict logic (and so ruff stops reading ``pass_fail != "..."`` as a
+#: hardcoded credential comparison).
+_UNDECIDED_VERDICT = "pending"
+
+
+def _acceptance_matrix_fill_score(text: str) -> int:
+    """Return how much real acceptance evidence ``text`` carries.
+
+    Counts a decided ``overall_verdict`` plus every criterion that has moved off
+    the scaffold (a non-pending verdict, real evidence, or ``notes`` carrying
+    real content beyond the scaffold TODO). Unparseable text scores -1 so a valid
+    document always beats a corrupt one.
+
+    The scaffold marker lives in ``notes`` for *both* scaffold shapes
+    (requirement-seeded and generic — see ``scaffold_acceptance_matrix``); the
+    requirement-seeded ``description`` ("Verify <req> is satisfied") is itself
+    scaffold, so scoring off ``notes`` (not ``description``) avoids crediting a
+    pure scaffold criterion (#2912).
+    """
+    try:
+        data = json.loads(text) if text.strip() else {}
+    except json.JSONDecodeError:
+        return -1
+    if not isinstance(data, dict):
+        return -1
+
+    score = 0
+    verdict = data.get("overall_verdict")
+    if isinstance(verdict, str) and verdict.strip() and verdict != _UNDECIDED_VERDICT:
+        score += 1
+
+    criteria = data.get("criteria")
+    if isinstance(criteria, list):
+        for criterion in criteria:
+            if not isinstance(criterion, dict):
+                continue
+            pass_fail = criterion.get("pass_fail")
+            if isinstance(pass_fail, str) and pass_fail.strip() and pass_fail != _UNDECIDED_VERDICT:
+                score += 1
+            if criterion.get("evidence"):
+                score += 1
+            notes = criterion.get("notes")
+            if isinstance(notes, str) and notes.strip() and SCAFFOLD_TODO_MARKER not in notes:
+                score += 1
+    return score
+
+
+def _issue_matrix_fill_score(text: str) -> int:
+    """Return how many decided issue-matrix rows ``text`` carries.
+
+    Columns are resolved by **header name** via the canonical ``COLUMN_ALIASES``
+    vocabulary (the issue-matrix SSOT), not by fixed position — so a legitimately
+    reordered or minimal matrix (e.g. one with no ``Title`` column) is scored
+    correctly instead of shifting the positional read (#2912). A row's verdict
+    counts when it is a real verdict other than the scaffold's ``unknown``; its
+    title, when the column exists, counts when it is no longer the ``<fill ...>``
+    placeholder. The header and separator rows are skipped.
+    """
+    from specify_cli.cli.commands.review._issue_matrix import COLUMN_ALIASES
+
+    def _cells(row: str) -> list[str]:
+        parts = row.split("|")
+        if parts and not parts[0].strip():
+            parts = parts[1:]
+        if parts and not parts[-1].strip():
+            parts = parts[:-1]
+        return [p.strip() for p in parts]
+
+    verdict_idx: int | None = None
+    title_idx: int | None = None
+    score = 0
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("|"):
+            continue
+        cells = _cells(stripped)
+        if verdict_idx is None:
+            # First table row is the header: resolve columns by canonical name.
+            headers = [COLUMN_ALIASES.get(c.lower(), c.lower()) for c in cells]
+            if "verdict" not in headers:
+                continue  # defensive: not a recognizable header row yet
+            verdict_idx = headers.index("verdict")
+            title_idx = headers.index("title") if "title" in headers else None
+            continue
+        # Skip the separator row (cells are all dashes / colons).
+        if cells and all(cell and set(cell) <= {"-", ":"} for cell in cells):
+            continue
+        if verdict_idx < len(cells):
+            verdict = cells[verdict_idx]
+            if verdict and verdict != "unknown" and not verdict.startswith("-"):
+                score += 1
+        if title_idx is not None and title_idx < len(cells):
+            title = cells[title_idx]
+            if title and not title.startswith("<"):
+                score += 1
+    return score
+
+
+def _write_more_filled_side(
+    ours_path: str,
+    theirs_path: str,
+    score: Callable[[str], int],
+) -> None:
+    """Write whichever of ours/theirs scores higher to the ``ours`` (``%A``) path."""
+    ours = Path(ours_path)
+    ours_text = ours.read_text(encoding="utf-8") if ours.exists() else ""
+    theirs = Path(theirs_path)
+    theirs_text = theirs.read_text(encoding="utf-8") if theirs.exists() else ""
+    if score(theirs_text) > score(ours_text):
+        ours.write_text(theirs_text, encoding="utf-8")
+
+
+def merge_driver_acceptance_matrix(
+    base_path: str = typer.Argument(..., metavar="BASE"),
+    ours_path: str = typer.Argument(..., metavar="OURS"),
+    theirs_path: str = typer.Argument(..., metavar="THEIRS"),
+) -> None:
+    """Keep the filled ``acceptance-matrix.json`` side; write result to ``ours`` (#2804)."""
+    _ = base_path  # %O ancestor: git always passes it, but the choice is 2-way.
+    _write_more_filled_side(ours_path, theirs_path, _acceptance_matrix_fill_score)
+
+
+def merge_driver_issue_matrix(
+    base_path: str = typer.Argument(..., metavar="BASE"),
+    ours_path: str = typer.Argument(..., metavar="OURS"),
+    theirs_path: str = typer.Argument(..., metavar="THEIRS"),
+) -> None:
+    """Keep the filled ``issue-matrix.md`` side; write result to ``ours`` (#2804)."""
+    _ = base_path  # %O ancestor: git always passes it, but the choice is 2-way.
+    _write_more_filled_side(ours_path, theirs_path, _issue_matrix_fill_score)

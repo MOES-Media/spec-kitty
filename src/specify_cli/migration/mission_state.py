@@ -23,6 +23,7 @@ from typing import Any, Literal, cast
 from urllib.parse import urlsplit
 
 from packaging.version import Version
+from pydantic import BaseModel, ConfigDict
 
 from specify_cli.core.atomic import atomic_write
 from specify_cli.core.paths import (
@@ -481,6 +482,18 @@ def deterministic_ulid(seed: bytes | str) -> str:
     return "".join(reversed(chars))
 
 
+def envelope_sha256(envelope: Mapping[str, Any]) -> str:
+    """Canonical-JSON SHA-256 of a TeamSpace envelope (single recipe owner).
+
+    Both the migration dry-run's ``TeamspaceDryRunRowMapping.envelope_sha256``
+    and the import-history provenance manifest (#2262, via
+    :mod:`specify_cli.migration.envelope_seam`) hash envelopes with this exact
+    shape; hoisted here so the two recipes cannot drift (#2884).
+    """
+    canonical = json.dumps(envelope, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()  # noqa: TID251 - production raw SHA-256 owner (canonical envelope body checksum)
+
+
 def _anchor_repair_root(repo_root: Path, *, scan_root: Path | None) -> Path:
     """Re-anchor the invocation root to the canonical PRIMARY main-checkout.
 
@@ -653,9 +666,7 @@ def teamspace_dry_run(
                         if row_location is not None
                         else None
                     ),
-                    envelope_sha256=hashlib.sha256(  # noqa: TID251 - production raw SHA-256 owner
-                        json.dumps(envelope, sort_keys=True, separators=(",", ":")).encode("utf-8")
-                    ).hexdigest(),
+                    envelope_sha256=envelope_sha256(envelope),
                 )
             )
             try:
@@ -825,6 +836,93 @@ def _load_events_contract() -> tuple[type[Any], Any, str]:
     return Event, validate_event, str(package_version)
 
 
+class _TeamspaceEnvelope(BaseModel):
+    """The SINGLE TeamSpace replay-envelope shape (#2891, CP001/CP002 #2884).
+
+    The migration ``WPStatusChanged`` builder and the history-import
+    creation-prefix builder (``sync.history_import.synthesize._envelope``, via
+    the ``envelope_seam`` re-export) both assemble the identical 15-key envelope.
+    This model is their one owner, so a new envelope-level field cannot be added
+    to one producer and silently forgotten in the other -- ``extra="forbid"``
+    turns a mismatched key set into a construction-time error instead of a
+    silent drift. Callers compute the field VALUES (``build_id`` /
+    ``correlation_id`` / ... differ per producer); the KEY SET and
+    ``schema_version`` live here.
+
+    Fields deliberately keep their raw wire types (``str`` for ``timestamp``
+    and ``project_uuid``, not ``datetime``/``UUID``): this is a structural
+    shape guard for the replay/synthesis producers, not the
+    ``spec_kitty_events.Event`` wire contract (that separate validation
+    already happens via ``event_cls.model_validate(envelope)`` in
+    ``teamspace_dry_run``). Constructing through ``Event`` here instead would
+    silently drop ``aggregate_type``/``repo_slug`` -- fields ``Event`` does not
+    declare -- and coerce ``timestamp``/``project_uuid`` to
+    ``datetime``/``UUID``, changing the on-wire envelope shape asserted by
+    ``tests/sync/test_history_import_synthesize.py``.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    event_id: str
+    event_type: str
+    aggregate_id: str
+    aggregate_type: str
+    payload: dict[str, Any]
+    timestamp: str
+    build_id: str
+    node_id: str
+    lamport_clock: int
+    causation_id: str | None = None
+    project_uuid: str
+    project_slug: str
+    repo_slug: str | None
+    correlation_id: str
+    schema_version: str = CANONICAL_ENVELOPE_SCHEMA_VERSION
+
+
+def _build_teamspace_envelope(
+    *,
+    event_id: str,
+    event_type: str,
+    aggregate_id: str,
+    aggregate_type: str,
+    payload: dict[str, Any],
+    timestamp: str,
+    build_id: str,
+    node_id: str,
+    lamport_clock: int,
+    project_uuid: str,
+    project_slug: str,
+    repo_slug: str | None,
+    correlation_id: str,
+    causation_id: str | None = None,
+) -> _TeamspaceEnvelope:
+    """Construct the SINGLE TeamSpace replay-envelope shell (#2891).
+
+    Callers that need the wire-format dict (JSONL rows, hashing, upload
+    payloads) call ``.model_dump()`` at their own serialization boundary --
+    this builder's job is only to close the "hand-rolled dict, key typo, or
+    forgotten key" defect class by construction.
+    """
+    return _TeamspaceEnvelope(
+        event_id=event_id,
+        event_type=event_type,
+        aggregate_id=aggregate_id,
+        aggregate_type=aggregate_type,
+        payload=payload,
+        timestamp=timestamp,
+        build_id=build_id,
+        node_id=node_id,
+        lamport_clock=lamport_clock,
+        causation_id=causation_id,
+        project_uuid=project_uuid,
+        project_slug=project_slug,
+        repo_slug=repo_slug,
+        correlation_id=correlation_id,
+        schema_version=CANONICAL_ENVELOPE_SCHEMA_VERSION,
+    )
+
+
 # canonical-producer-exempt: #1198 -- historical migration-replay envelope builder.
 def _status_event_to_teamspace_envelope(
     status_event: StatusEvent,
@@ -861,25 +959,23 @@ def _status_event_to_teamspace_envelope(
         "review_ref": status_event.review_ref,
         "evidence": evidence,
     }
-    return {  # canonical-producer-exempt: #1198 — see function-level comment
-        "event_id": status_event.event_id,
-        "event_type": "WPStatusChanged",
-        "aggregate_id": status_event.wp_id,
-        "aggregate_type": "WorkPackage",
-        "payload": payload,
-        "timestamp": status_event.at,
-        "build_id": "mission-state-dry-run",
-        "node_id": "mission-state-dry-run",
-        "lamport_clock": lamport_clock,
-        "causation_id": None,
-        "project_uuid": str(project_uuid),
-        "project_slug": project_slug,
-        "repo_slug": repo_slug,
-        "correlation_id": deterministic_ulid(
+    return _build_teamspace_envelope(
+        event_id=status_event.event_id,
+        event_type="WPStatusChanged",
+        aggregate_id=status_event.wp_id,
+        aggregate_type="WorkPackage",
+        payload=payload,
+        timestamp=status_event.at,
+        build_id="mission-state-dry-run",
+        node_id="mission-state-dry-run",
+        lamport_clock=lamport_clock,
+        project_uuid=str(project_uuid),
+        project_slug=project_slug,
+        repo_slug=repo_slug,
+        correlation_id=deterministic_ulid(
             f"teamspace-dry-run:{status_event.mission_slug}:{status_event.event_id}"
         ),
-        "schema_version": CANONICAL_ENVELOPE_SCHEMA_VERSION,
-    }
+    ).model_dump()
 
 
 def _historical_teamspace_evidence(
@@ -1973,6 +2069,12 @@ __all__ = [
     # MissionEventRebuildResult, RepairReport, TeamspaceDryRunRowMapping,
     # deterministic_ulid: demoted — migration-internal; no cross-module
     # src/ from-import callers (WP01 harden-dead-symbol-gate-01KW0RJR).
+    # The ONE sanctioned cross-module surface is migration/envelope_seam.py
+    # (#2262/#2884), which re-exports the shared subset (envelope constants,
+    # deterministic_ulid, envelope_sha256, the status-envelope builder, and the
+    # selection/audit seams) under public names for the import-history
+    # pipeline. Any new cross-module consumer must go through that seam, not
+    # import these internals directly.
     "MissionStateDryRunError",
     "MissionStateRepairError",
     "TeamspaceDryRunReport",

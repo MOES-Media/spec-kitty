@@ -106,6 +106,15 @@ _MISSION_RUNTIME_ALLOWED_SPECIFY_CLI: frozenset[str] = frozenset(
     {
         "coordination",      # resolution.py: CoordinationWorkspace, surface_resolver
         "core",              # artifacts.py + resolution.py: constants, paths, dependency_graph
+        # coord-trust-2841: the "lanes" allow-row (resolution.py's coord-state
+        # branch resolving the mid8 disambiguator via
+        # ``lanes.branch_naming.resolve_mid8``, GEC-3 / contract C3) is CLOSED.
+        # ``resolve_mid8`` (and its heuristic sibling ``mid8_from_slug``) was
+        # pure and is now relocated to ``mission_runtime.identity``;
+        # ``specify_cli.lanes.branch_naming`` re-exports both verbatim so
+        # existing importers are unaffected. resolution.py imports the
+        # resolver directly from its new in-layer home — no specify_cli.lanes
+        # crossing remains.
         "migration",         # resolution.py: backfill_topology.read_topology
         "mission",           # resolution.py: get_mission_type
         "mission_metadata",  # resolution.py: load_meta

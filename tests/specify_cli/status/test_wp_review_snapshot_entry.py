@@ -34,7 +34,7 @@ import pytest
 import specify_cli.status.wp_review as wp_review
 from specify_cli.post_merge import review_artifact_consistency as gate
 from specify_cli.review.artifacts import ReviewCycleArtifact
-from specify_cli.status import materialize
+from specify_cli.status import materialize_snapshot
 from specify_cli.status.models import EventStream, Lane, ReviewOverride, StatusSnapshot
 from specify_cli.status.wp_review import (
     resolve_event_stream_review,
@@ -291,9 +291,9 @@ def test_materialize_called_once_for_multi_work_package_mission(
 
     def _tracking(feature_dir: Path) -> Any:
         calls.append(feature_dir)
-        return materialize(feature_dir)
+        return materialize_snapshot(feature_dir)
 
-    monkeypatch.setattr(gate, "materialize", _tracking)
+    monkeypatch.setattr(gate, "materialize_snapshot", _tracking)
 
     for index, wp_id in enumerate(("WP01", "WP02", "WP03"), start=1):
         spec = WorkPackageSpec(work_package_id=wp_id, title=f"Regression Harness {index}")

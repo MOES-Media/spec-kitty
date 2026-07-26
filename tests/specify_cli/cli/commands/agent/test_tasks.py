@@ -54,7 +54,6 @@ def test_move_task_help_surfaces_review_artifact_override_audit_path() -> None:
     result = runner.invoke(app, ["move-task", "--help"], terminal_width=160)
 
     assert result.exit_code == 0, result.output
-    help_text = " ".join(result.output.split())
     group = get_command(app)
     assert isinstance(group, click.Group)
     click_command = group.commands["move-task"]
@@ -65,9 +64,9 @@ def test_move_task_help_surfaces_review_artifact_override_audit_path() -> None:
     )
     assert skip_review_help is not None
 
-    assert "rejected" in help_text
-    assert "review artifact" in help_text
-    assert "arbiter-approving" in help_text
+    assert "rejected" in skip_review_help
+    assert "review artifact" in skip_review_help
+    assert "arbiter-approving" in skip_review_help
     assert "requires --note" in skip_review_help
     assert "records override" in skip_review_help
     assert "evidence" in skip_review_help

@@ -17,6 +17,7 @@ infrastructure already used by charter.py.
 from __future__ import annotations
 
 from mission_runtime import MissionArtifactKind
+from specify_cli.core.env import is_interactive
 from specify_cli.mission_metadata import load_meta_or_empty
 from specify_cli.missions._read_path_resolver import resolve_planning_read_dir
 import contextlib
@@ -24,6 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from rich.console import Console
+from rich.markup import escape
 
 __all__ = ["run_specify_interview"]
 
@@ -94,8 +96,24 @@ def run_specify_interview(  # noqa: C901
     Returns:
         A dict mapping ``question_id`` to the owner's answer.  Empty string
         for questions that were widened (pending-external-input) or deferred.
+
+    Non-interactive contract (#2876): when :func:`is_interactive` is False --
+    ``SPEC_KITTY_NON_INTERACTIVE`` set, or stdin is not a TTY, which is how
+    agents and CI drive this tool -- the interview never prompts (a blocking
+    prompt hangs forever on an open-but-silent stdin pipe). Per the issue it
+    *takes the defaults*: every Decision Moment is still opened and recorded
+    (deferred / unanswered), so ``decisions/index.json`` is written exactly as
+    in the interactive path -- only the blocking ``typer.prompt`` (and the widen
+    affordance, which needs a keystroke) is skipped.
     """
     import typer
+
+    interactive = is_interactive()
+    if not interactive:
+        console.print(
+            "[dim]Non-interactive: taking defaults for the specify interview "
+            "(no prompts; questions recorded as deferred).[/dim]"
+        )
 
     from specify_cli.decisions import service as _dm_service
     from specify_cli.decisions.models import OriginFlow as _DmOriginFlow
@@ -116,26 +134,29 @@ def run_specify_interview(  # noqa: C901
     widen_store: Any = None
     saas_client: Any = None
 
-    try:
-        from specify_cli.saas_client import SaasClient
-        from specify_cli.widen import check_prereqs
-        from specify_cli.widen.flow import WidenFlow
-        from specify_cli.widen.state import WidenPendingStore
+    # Widen needs a keystroke ([w]); it is only reachable interactively. Skipping
+    # the setup non-interactively also avoids the SaaS prereq probe in CI (#2876).
+    if interactive:
+        try:
+            from specify_cli.saas_client import SaasClient
+            from specify_cli.widen import check_prereqs
+            from specify_cli.widen.flow import WidenFlow
+            from specify_cli.widen.state import WidenPendingStore
 
-        saas_client = SaasClient.from_env(repo_root)
-        _team_slug: str = ""
-        with contextlib.suppress(Exception):
-            from specify_cli.saas_client.auth import load_auth_context
+            saas_client = SaasClient.from_env(repo_root)
+            _team_slug: str = ""
+            with contextlib.suppress(Exception):
+                from specify_cli.saas_client.auth import load_auth_context
 
-            _auth_ctx = load_auth_context(repo_root)
-            _team_slug = _auth_ctx.team_slug or ""
+                _auth_ctx = load_auth_context(repo_root)
+                _team_slug = _auth_ctx.team_slug or ""
 
-        prereq_state = check_prereqs(saas_client, team_slug=_team_slug)
-        if prereq_state.all_satisfied:
-            widen_flow = WidenFlow(saas_client, repo_root, console)
-            widen_store = WidenPendingStore(repo_root, mission_slug)
-    except Exception:  # noqa: BLE001
-        pass  # non-fatal; [w] will be suppressed
+            prereq_state = check_prereqs(saas_client, team_slug=_team_slug)
+            if prereq_state.all_satisfied:
+                widen_flow = WidenFlow(saas_client, repo_root, console)
+                widen_store = WidenPendingStore(repo_root, mission_slug)
+        except Exception:  # noqa: BLE001
+            pass  # non-fatal; [w] will be suppressed
 
     mission_id = _get_mission_id(repo_root, mission_slug)
 
@@ -193,11 +214,18 @@ def run_specify_interview(  # noqa: C901
             f"[enter]=accept default | [text]=type answer{widen_suffix}"
             " | [d]efer | [!cancel]"
         )
-        console.print(f"[dim]{hint_line}[/dim]")
+        if interactive:
+            console.print(f"[dim]{escape(hint_line)}[/dim]")
 
         # Prompt
         user_answer = ""
         while True:
+            if not interactive:
+                # #2876: non-interactive -- take the default, never prompt (a
+                # blocking read hangs on a silent stdin pipe). The Decision
+                # Moment above is still recorded (deferred below).
+                user_answer = default_value
+                break
             try:
                 raw = typer.prompt(question_text, default=default_value)
             except (KeyboardInterrupt, EOFError):
@@ -222,7 +250,7 @@ def run_specify_interview(  # noqa: C901
                 )
 
                 if result.action == WidenAction.CANCEL:
-                    console.print(f"[dim]{hint_line}[/dim]")
+                    console.print(f"[dim]{escape(hint_line)}[/dim]")
                     continue  # re-prompt
 
                 if result.action == WidenAction.BLOCK:

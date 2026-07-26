@@ -21,7 +21,7 @@ from specify_cli.cli import StepTracker, multi_select_with_arrows
 from specify_cli.core import (
     AI_CHOICES,
 )
-from specify_cli.core.env import is_truthy
+from specify_cli.core.env import is_interactive
 from specify_cli.core.time_utils import now_utc_iso
 from specify_cli.core.vcs import (
     is_git_available,
@@ -54,10 +54,23 @@ _ensure_executable_scripts: Callable[[Path, StepTracker | None], None] | None = 
 
 _logger = logging.getLogger(__name__)
 _EVENT_LOG_GITATTRIBUTES_ENTRY = "kitty-specs/**/status.events.jsonl merge=spec-kitty-event-log"
+# coord-write-placement-closure-01KYCF83 WP06: decisions.events.jsonl reuses
+# the SAME event-log union driver (structurally identical append-only JSONL
+# envelope) -- see specify_cli/lanes/merge.py's _MERGE_DRIVERS comment.
+_DECISION_LOG_GITATTRIBUTES_ENTRY = (
+    "kitty-specs/**/decisions.events.jsonl merge=spec-kitty-event-log"
+)
 # C-006 (#2709): the meta.json field-merge and traces union drivers register on
 # the same surfaces as the event-log driver.
 _META_GITATTRIBUTES_ENTRY = "kitty-specs/**/meta.json merge=spec-kitty-meta"
 _TRACES_GITATTRIBUTES_ENTRY = "kitty-specs/**/traces/*.md merge=spec-kitty-traces"
+# C-006 (#2804): the coord gate artifacts are filled on the target at accept time
+# and scaffolded on the mission branch, so the squash integration needs a driver
+# to keep the filled side instead of letting `-X theirs` win.
+_ACCEPTANCE_MATRIX_GITATTRIBUTES_ENTRY = (
+    "kitty-specs/**/acceptance-matrix.json merge=spec-kitty-acceptance-matrix"
+)
+_ISSUE_MATRIX_GITATTRIBUTES_ENTRY = "kitty-specs/**/issue-matrix.md merge=spec-kitty-issue-matrix"
 _COMMAND_SKILL_AGENTS = {"codex", "vibe", "pi", "letta"}
 _GITHUB_DIFF_GITATTRIBUTES_ENTRIES = (
     "kitty-specs/**/status.json linguist-generated=true",
@@ -174,8 +187,11 @@ def _ensure_event_log_merge_attributes(project_path: Path) -> bool:
         lines = attributes_path.read_text(encoding="utf-8").splitlines()
     required_entries = (
         _EVENT_LOG_GITATTRIBUTES_ENTRY,
+        _DECISION_LOG_GITATTRIBUTES_ENTRY,
         _META_GITATTRIBUTES_ENTRY,
         _TRACES_GITATTRIBUTES_ENTRY,
+        _ACCEPTANCE_MATRIX_GITATTRIBUTES_ENTRY,
+        _ISSUE_MATRIX_GITATTRIBUTES_ENTRY,
         *_GITHUB_DIFF_GITATTRIBUTES_ENTRIES,
     )
     missing = [entry for entry in required_entries if entry not in lines]
@@ -388,11 +404,11 @@ class VCSNotFoundError(Exception):
 
 
 def _is_non_interactive_mode(flag: bool) -> bool:
-    if flag:
-        return True
-    if is_truthy(os.environ.get("SPEC_KITTY_NON_INTERACTIVE")):
-        return True
-    return not sys.stdin.isatty()
+    # The explicit ``--non-interactive`` flag forces non-interactive; otherwise
+    # defer to the single non-interactive authority. Routing through
+    # ``is_interactive`` adds the ``SPEC_KITTY_FORCE_INTERACTIVE`` escape hatch
+    # the old local matrix omitted (#2912).
+    return flag or not is_interactive()
 
 
 def _primary_next_step_agent(selected_agents: list[str]) -> str:

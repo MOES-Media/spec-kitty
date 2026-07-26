@@ -50,6 +50,11 @@ _SEMANTIC_CONSTRUCTOR_FILES = {
     Path("src/specify_cli/coordination/surface_resolver.py"),
     Path("src/specify_cli/coordination/status_transition.py"),
     Path("src/specify_cli/coordination/transaction.py"),
+    # WP08 campsite split (behaviour-free): transaction.py's legacy-mission
+    # meta reads (the `KITTY_SPECS_DIR / <slug>-<mid8>` feature-dir construction)
+    # moved verbatim into legacy_resolution.py. Code follows the move — same
+    # sanctioned constructor, new home.
+    Path("src/specify_cli/coordination/legacy_resolution.py"),
     Path("src/specify_cli/events/decision_log.py"),
     # missions/feature_dir_resolver.py retired in WP07 (FR-007); its raw-slug
     # primary anchor relocated into missions/_read_path_resolver.py, which is
@@ -66,6 +71,13 @@ _SEMANTIC_CONSTRUCTOR_FILES = {
     Path("src/specify_cli/cli/commands/agent/context.py"),
     Path("src/specify_cli/cli/commands/agent/mission.py"),
     Path("src/specify_cli/cli/commands/decision.py"),
+    # `agent mission repair` (coord split-brain repair) constructs the same
+    # `KITTY_SPECS_DIR / <handle>` primary dir as the WP10 entrypoints above, for
+    # the SOLE purpose of bootstrapping the mission's own content location before
+    # the forward-only repair -- a meta-read seed mirroring the sibling
+    # mission_feature_resolution.py pattern (see the in-file rationale at
+    # mission_repair.py), not an independent resolution path.
+    Path("src/specify_cli/cli/commands/agent/mission_repair.py"),
 }
 
 

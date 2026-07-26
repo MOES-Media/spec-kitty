@@ -2404,6 +2404,109 @@ pages:
     - {slug: "rejected-option-2-promote-a-gate-artifactkind", text: "Rejected: Option 2 (promote a `gate` `ArtifactKind`)", level: 3}
     - {slug: "consequences", text: "Consequences", level: 3}
     - {slug: "related-adrs", text: "Related ADRs", level: 2}
+  - path: "docs/adr/3.x/2026-07-23-1-surface-vocabulary-two-domains-and-topology-surface-rename.md"
+    title: "`surface` names two unrelated domains — split the vocabulary, rename to `ToolSurfaceKind` and `TopologySurface`"
+    divio_type: "none"
+    abstract: "**Status:** Accepted"
+    anchors:
+    - {slug: "context-and-problem-statement", text: "Context and Problem Statement", level: 2}
+    - {slug: "decision-drivers", text: "Decision Drivers", level: 2}
+    - {slug: "considered-options", text: "Considered Options", level: 2}
+    - {slug: "decision-outcome", text: "Decision Outcome", level: 2}
+    - {slug: "the-two-vocabulary-distinction", text: "The two-vocabulary distinction", level: 3}
+    - {slug: "the-rename-decisions", text: "The rename decisions", level: 3}
+    - {slug: "placement-coord", text: "`PLACEMENT` → `COORD`", level: 3}
+    - {slug: "consolidated-not-merged", text: "`CONSOLIDATED`, not `MERGED`", level: 3}
+    - {slug: "naming-a-surface-coord-is-not-conditioning-on-topology", text: "Naming a surface `COORD` is not conditioning on topology", level: 3}
+    - {slug: "consequences", text: "Consequences", level: 3}
+    - {slug: "confirmation", text: "Confirmation", level: 3}
+    - {slug: "pros-and-cons-of-the-options", text: "Pros and Cons of the Options", level: 2}
+    - {slug: "option-1-split-the-vocabulary-rename-both-sides", text: "Option 1 — split the vocabulary, rename both sides", level: 3}
+    - {slug: "option-2-leave-both-named-surface-disambiguate-by-import-path", text: "Option 2 — leave both named `Surface*`, disambiguate by import path", level: 3}
+    - {slug: "option-3-rename-only-the-topology-side", text: "Option 3 — rename only the topology side", level: 3}
+    - {slug: "more-information", text: "More Information", level: 2}
+  - path: "docs/adr/3.x/2026-07-23-2-post-consolidation-deferral-and-external-enforcement.md"
+    title: "Post-Consolidation Deferral and External Enforcement of Negative Invariants"
+    divio_type: "none"
+    abstract: "ADR [2026-04-03-3](./2026-04-03-3-feature-acceptance-runs-on-the-integrated-mission-branch.md) decided that *\"Feature QA and `accept` MUST happen on the mission integration branch\"*, and specified the negative-invariant verifier model down to its result vocabulary."
+    anchors:
+    - {slug: "context-and-problem-statement", text: "Context and Problem Statement", level: 2}
+    - {slug: "decision-drivers", text: "Decision Drivers", level: 2}
+    - {slug: "considered-options", text: "Considered Options", level: 2}
+    - {slug: "decision-outcome", text: "Decision Outcome", level: 2}
+    - {slug: "core-decision", text: "Core Decision", level: 3}
+    - {slug: "why-enforcement-cannot-live-in-the-loop-measured", text: "Why enforcement cannot live in the loop — measured", level: 3}
+    - {slug: "why-disclosure-is-a-requirement-not-a-courtesy", text: "Why disclosure is a requirement, not a courtesy", level: 3}
+    - {slug: "consequences", text: "Consequences", level: 2}
+    - {slug: "positive", text: "Positive", level: 3}
+    - {slug: "negative-accepted-trade-offs", text: "Negative / accepted trade-offs", level: 3}
+    - {slug: "neutral", text: "Neutral", level: 3}
+    - {slug: "more-information", text: "More Information", level: 2}
+  - path: "docs/adr/3.x/2026-07-26-1-drg-edges-are-the-canonical-relationship-authority.md"
+    title: "ADR: DRG edges are the canonical artefact-relationship authority; inline `references:` blocks are pre-DRG residue to be migrated and retired"
+    divio_type: "none"
+    abstract: "**Status:** Accepted"
+    anchors:
+    - {slug: "context-and-problem-statement", text: "Context and Problem Statement", level: 2}
+    - {slug: "decision-drivers", text: "Decision Drivers", level: 2}
+    - {slug: "considered-options", text: "Considered Options", level: 2}
+    - {slug: "decision-outcome", text: "Decision Outcome", level: 2}
+    - {slug: "scope-the-migration-happens-now-in-this-mission", text: "Scope: the migration happens now, in this mission", level: 3}
+    - {slug: "amendment-2026-07-26-three-decisions-taken-after-this-adr-was-first-accepted", text: "Amendment (2026-07-26) — three decisions taken after this ADR was first accepted", level: 3}
+    - {slug: "consequences", text: "Consequences", level: 3}
+    - {slug: "immediate-application-to-2935-the-mission-that-surfaced-this", text: "Immediate application to #2935 (the mission that surfaced this)", level: 3}
+    - {slug: "confirmation", text: "Confirmation", level: 3}
+    - {slug: "pros-and-cons-of-the-options", text: "Pros and Cons of the Options", level: 2}
+    - {slug: "option-1-pin-edges-as-canonical-and-complete-the-migration-now-chosen", text: "Option 1 — Pin edges as canonical and complete the migration now (chosen)", level: 3}
+    - {slug: "option-2-full-parity-for-the-inline-surface", text: "Option 2 — Full parity for the inline surface", level: 3}
+    - {slug: "option-3-pin-the-direction-defer-the-migration-initially-chosen-then-withdrawn", text: "Option 3 — Pin the direction, defer the migration (initially chosen, then withdrawn)", level: 3}
+    - {slug: "option-4-declare-inline-blocks-canonical-fragments-are-pure-build-output", text: "Option 4 — Declare inline blocks canonical; fragments are pure build output", level: 3}
+    - {slug: "more-information", text: "More Information", level: 2}
+  - path: "docs/adr/3.x/2026-07-26-2-doctrine-artefact-pack-layout-convention.md"
+    title: "ADR: doctrine artefacts live at `<type>/<pack>/[<category>/]<name>` — misplacement is an error, not invisibility"
+    divio_type: "none"
+    abstract: "**Status:** Accepted"
+    anchors:
+    - {slug: "context-and-problem-statement", text: "Context and Problem Statement", level: 2}
+    - {slug: "decision-drivers", text: "Decision Drivers", level: 2}
+    - {slug: "considered-options", text: "Considered Options", level: 2}
+    - {slug: "decision-outcome", text: "Decision Outcome", level: 2}
+    - {slug: "disposition-of-the-nine", text: "Disposition of the nine", level: 3}
+    - {slug: "consequences", text: "Consequences", level: 3}
+    - {slug: "confirmation", text: "Confirmation", level: 3}
+    - {slug: "pros-and-cons-of-the-options", text: "Pros and Cons of the Options", level: 2}
+    - {slug: "option-1-pin-the-layout-clear-the-litter-gate-it-chosen", text: "Option 1 — Pin the layout, clear the litter, gate it (chosen)", level: 3}
+    - {slug: "option-2-accept-both-layouts-in-the-resolvers", text: "Option 2 — Accept both layouts in the resolvers", level: 3}
+    - {slug: "option-3-document-only-no-gate", text: "Option 3 — Document only, no gate", level: 3}
+    - {slug: "option-4-gate-with-the-9-frozen-as-a-baseline", text: "Option 4 — Gate with the 9 frozen as a baseline", level: 3}
+    - {slug: "more-information", text: "More Information", level: 2}
+  - path: "docs/adr/3.x/2026-07-26-3-impacts-edge-subsumes-in-tension-with.md"
+    title: "ADR: a signed `impacts` edge subsumes `in_tension_with` — one relation, sign carries the direction of effect"
+    divio_type: "none"
+    abstract: "**Status:** Accepted"
+    anchors:
+    - {slug: "context-and-problem-statement", text: "Context and Problem Statement", level: 2}
+    - {slug: "measured-ground-verified-in-tree-not-inferred", text: "Measured ground (verified in-tree, not inferred)", level: 3}
+    - {slug: "decision-drivers", text: "Decision Drivers", level: 2}
+    - {slug: "considered-options", text: "Considered Options", level: 2}
+    - {slug: "decision-outcome", text: "Decision Outcome", level: 2}
+    - {slug: "the-decisions-this-adr-takes", text: "The decisions this ADR takes", level: 3}
+    - {slug: "adr-d11-is-symmetric-on-drgedge-shorthand-for-the-un-written-inverse", text: "ADR-D11 — `is_symmetric` on `DRGEdge`: shorthand for the un-written inverse", level: 3}
+    - {slug: "retires", text: "Retires", level: 3}
+    - {slug: "migrates-in-one-commit-each-per-surface", text: "Migrates (in one commit each, per surface)", level: 3}
+    - {slug: "amendment-2026-07-26-adr-d8-closed-the-asymmetric-pair-is-a-sign-error-repaired-by-symmetrising-to-0-75", text: "Amendment (2026-07-26) — ADR-D8 closed: the asymmetric pair is a sign error, repaired by symmetrising to `+0.75`", level: 3}
+    - {slug: "consequences", text: "Consequences", level: 2}
+    - {slug: "positive", text: "Positive", level: 3}
+    - {slug: "negative", text: "Negative", level: 3}
+    - {slug: "neutral", text: "Neutral", level: 3}
+    - {slug: "open-decisions", text: "Open Decisions", level: 2}
+    - {slug: "confirmation", text: "Confirmation", level: 2}
+    - {slug: "pros-and-cons-of-the-options", text: "Pros and Cons of the Options", level: 2}
+    - {slug: "option-a-new-relation-impacts-chosen", text: "Option A — new `Relation.IMPACTS` (chosen)", level: 3}
+    - {slug: "option-b-keep-in-tension-with-add-the-magnitude-to-it", text: "Option B — keep `in_tension_with`, add the magnitude to it", level: 3}
+    - {slug: "option-c-relation-impacts-but-symmetric", text: "Option C — `Relation.IMPACTS` but symmetric", level: 3}
+    - {slug: "option-d-keep-both-the-boolean-and-the-signed-field", text: "Option D — keep both the boolean and the signed field", level: 3}
+    - {slug: "more-information", text: "More Information", level: 2}
   - path: "docs/adr/3.x/README.md"
     title: "3.x ADRs"
     divio_type: "none"
@@ -2523,6 +2626,7 @@ pages:
     - {slug: "spec-kitty-agent-decision-verify", text: "spec-kitty agent decision verify", level: 2}
     - {slug: "spec-kitty-agent-mission", text: "spec-kitty agent mission", level: 2}
     - {slug: "spec-kitty-agent-mission-accept", text: "spec-kitty agent mission accept", level: 2}
+    - {slug: "spec-kitty-agent-mission-repair", text: "spec-kitty agent mission repair", level: 2}
     - {slug: "spec-kitty-agent-mission-branch-context", text: "spec-kitty agent mission branch-context", level: 2}
     - {slug: "spec-kitty-agent-mission-check-prerequisites", text: "spec-kitty agent mission check-prerequisites", level: 2}
     - {slug: "spec-kitty-agent-mission-create", text: "spec-kitty agent mission create", level: 2}
@@ -2594,6 +2698,9 @@ pages:
     - {slug: "command-internals", text: "Command Internals", level: 2}
     - {slug: "schema-references", text: "Schema references", level: 2}
     - {slug: "spec-kitty-accept", text: "spec-kitty accept", level: 2}
+    - {slug: "spec-kitty-archive", text: "spec-kitty archive", level: 2}
+    - {slug: "spec-kitty-archive-create", text: "spec-kitty archive create", level: 2}
+    - {slug: "spec-kitty-archive-list", text: "spec-kitty archive list", level: 2}
     - {slug: "spec-kitty-auth", text: "spec-kitty auth", level: 2}
     - {slug: "spec-kitty-auth-doctor", text: "spec-kitty auth doctor", level: 2}
     - {slug: "spec-kitty-auth-login", text: "spec-kitty auth login", level: 2}
@@ -2678,6 +2785,7 @@ pages:
     - {slug: "spec-kitty-merge", text: "spec-kitty merge", level: 2}
     - {slug: "spec-kitty-migrate", text: "spec-kitty migrate", level: 2}
     - {slug: "spec-kitty-migrate-backfill-identity", text: "spec-kitty migrate backfill-identity", level: 2}
+    - {slug: "spec-kitty-migrate-backfill-provenance", text: "spec-kitty migrate backfill-provenance", level: 2}
     - {slug: "spec-kitty-migrate-backfill-runtime-state", text: "spec-kitty migrate backfill-runtime-state", level: 2}
     - {slug: "spec-kitty-migrate-backfill-topology", text: "spec-kitty migrate backfill-topology", level: 2}
     - {slug: "spec-kitty-migrate-charter-encoding", text: "spec-kitty migrate charter-encoding", level: 2}
@@ -2746,6 +2854,7 @@ pages:
     - {slug: "spec-kitty-sync-diagnose", text: "spec-kitty sync diagnose", level: 2}
     - {slug: "spec-kitty-sync-doctor", text: "spec-kitty sync doctor", level: 2}
     - {slug: "spec-kitty-sync-gc", text: "spec-kitty sync gc", level: 2}
+    - {slug: "spec-kitty-sync-import-history", text: "spec-kitty sync import-history", level: 2}
     - {slug: "spec-kitty-sync-migrate", text: "spec-kitty sync migrate", level: 2}
     - {slug: "spec-kitty-sync-mode", text: "spec-kitty sync mode", level: 2}
     - {slug: "spec-kitty-sync-now", text: "spec-kitty sync now", level: 2}
@@ -3279,37 +3388,6 @@ pages:
     - {slug: "gitignore-policy-must-include-not-exclusive", text: "Gitignore policy: MUST-INCLUDE, not exclusive", level: 2}
     - {slug: "schema-versioning-policy", text: "Schema versioning policy", level: 2}
     - {slug: "related-contracts", text: "Related contracts", level: 2}
-  - path: "docs/architecture/883-mission-type-authority-brief.md"
-    title: "Mission #883 Brief: Doctrine as Mission-Type Authority"
-    divio_type: "explanation"
-    abstract: "Lead-architect debrief for mission #883 — intent, operator guidance, research, adversarial second opinion, and a conversation transcript for maintainer review."
-    anchors:
-    - {slug: "1-executive-lead-architect-debrief", text: "1. Executive / lead-architect debrief", level: 2}
-    - {slug: "2-mission-intent-and-north-star", text: "2. Mission intent and north star", level: 2}
-    - {slug: "3-operator-guidance-chronological", text: "3. Operator guidance (chronological)", level: 2}
-    - {slug: "4-pre-spec-research-synthesis-four-lens-squad", text: "4. Pre-spec research synthesis (four-lens squad)", level: 2}
-    - {slug: "5-adversarial-second-opinion-four-lens-squad-unanimous-refine", text: "5. Adversarial second opinion (four-lens squad) — unanimous REFINE", level: 2}
-    - {slug: "6-testing-posture-operator-mandated", text: "6. Testing posture (operator-mandated)", level: 2}
-    - {slug: "7-refined-work-package-spine", text: "7. Refined work-package spine", level: 2}
-    - {slug: "8-decisions-resolved-with-the-operator-spec-stage-interview", text: "8. Decisions resolved with the operator (spec-stage interview)", level: 2}
-    - {slug: "appendix-a-conversation-transcript-for-maintainer-review", text: "Appendix A — Conversation transcript (for maintainer review)", level: 2}
-  - path: "docs/architecture/883-research-synthesis.md"
-    title: "Mission #883 Research Dossier (pre-spec, 4-lens squad)"
-    divio_type: "explanation"
-    abstract: "Point-in-time pre-spec research synthesis for mission #883 with file:line evidence; superseded by the ADR and brief where they differ."
-    anchors:
-    - {slug: "0-operator-decisions-2026-07-14-authoritative-overrides-defaults-below", text: "0. OPERATOR DECISIONS (2026-07-14) — authoritative, overrides defaults below", level: 2}
-    - {slug: "1-the-one-line-truth", text: "1. The one-line truth", level: 2}
-    - {slug: "2-the-three-surfaces-converged-across-all-four-lenses", text: "2. The three surfaces (converged across all four lenses)", level: 2}
-    - {slug: "3-the-real-leak-architect-alphonso-corrects-the-already-prevented-reading", text: "3. The real leak (architect-alphonso — corrects the \"already prevented\" reading)", level: 2}
-    - {slug: "4-template-set-split-it-do-not-thread-governance-through-it", text: "4. `template_set` — split it (do NOT thread governance through it)", level: 2}
-    - {slug: "5-split-brain-paula-adjacent-do-not-fold-in", text: "5. Split-brain (paula) — ADJACENT, do NOT fold in", level: 2}
-    - {slug: "6-mission-type-key-canonicalization-paula", text: "6. Mission-type key canonicalization (paula)", level: 2}
-    - {slug: "7-mechanism-gaps-if-we-go-the-governance-refs-route-daphne", text: "7. Mechanism gaps if we go the `governance_refs` route (daphne)", level: 2}
-    - {slug: "8-enforcement-test-the-acs-demand-daphne-concrete", text: "8. Enforcement test the ACs demand (daphne — concrete)", level: 2}
-    - {slug: "9-prior-art-constraints", text: "9. Prior-art constraints", level: 2}
-    - {slug: "10-the-issue-s-4-layer-model-vs-reality-architect", text: "10. The issue's 4-layer model vs reality (architect)", level: 2}
-    - {slug: "11-genuine-content-gaps-robbie-author-new-vs-reference-existing", text: "11. Genuine content gaps (robbie) — `[author-new]` vs `[reference-existing]`", level: 2}
   - path: "docs/architecture/ARCHITECTURE_DOCS_GUIDE.md"
     title: "Architecture Documentation Guide"
     divio_type: "none"
@@ -3436,183 +3514,6 @@ pages:
     - {slug: "second-pass-full-corpus-src-tests-kitty-specs", text: "Second pass — full corpus (`src/` + `tests/` + `kitty-specs/`)", level: 3}
     - {slug: "what-the-second-pass-taught-about-the-technique-itself", text: "What the second pass taught about the technique itself", level: 3}
     - {slug: "11-further-reading", text: "11. Further reading", level: 2}
-  - path: "docs/architecture/audits/2026-05-11-findings-vs-issues-update.md"
-    title: "2026-05-11 — findings vs issues (#645, #822 refresh, open bugs)"
-    divio_type: "none"
-    abstract: "2026-05-11 refresh cross-checking the CaaCS audit findings against open issues (#645, #822) and adding two new slow-burn refactor candidates surfaced by the pass."
-    anchors:
-    - {slug: "inputs", text: "Inputs", level: 2}
-    - {slug: "section-1-issue-645", text: "Section 1: Issue #645", level: 2}
-    - {slug: "body-summary-200-words", text: "Body summary (≤200 words)", level: 3}
-    - {slug: "linked-work", text: "Linked work", level: 3}
-    - {slug: "specific-code-paths-referenced", text: "Specific code paths referenced", level: 3}
-    - {slug: "relationship-to-findings", text: "Relationship to findings", level: 3}
-    - {slug: "section-2-issue-822-delta-since-2026-05-08-crosscheck", text: "Section 2: Issue #822 — delta since 2026-05-08 crosscheck", level: 2}
-    - {slug: "new-comments-since-2026-05-08", text: "New comments since 2026-05-08", level: 3}
-    - {slug: "sub-issue-state-changes-since-2026-05-08", text: "Sub-issue state changes since 2026-05-08", level: 3}
-    - {slug: "release-tag-progression", text: "Release-tag progression", level: 3}
-    - {slug: "does-the-prior-picture-still-hold", text: "Does the prior picture still hold?", level: 3}
-    - {slug: "section-3-open-bug-labeled-issues-relating-table", text: "Section 3: Open \"bug\"-labeled issues — relating table", level: 2}
-    - {slug: "per-issue-notes-for-partial-strong-matches", text: "Per-issue notes for PARTIAL/STRONG matches", level: 3}
-    - {slug: "notes-on-the-weak-none-rows", text: "Notes on the WEAK/NONE rows", level: 3}
-    - {slug: "section-4-gap-analysis", text: "Section 4: Gap analysis", level: 2}
-    - {slug: "open-bug-tickets-that-strongly-match-the-new-audit-findings", text: "Open bug tickets that STRONGLY match the new audit findings", level: 3}
-    - {slug: "the-two-new-slow-burn-candidates-issue-tracker-status", text: "The two new slow-burn candidates — issue-tracker status", level: 3}
-    - {slug: "bug-tickets-without-forensic-backing", text: "Bug tickets without forensic backing", level: 3}
-    - {slug: "newly-opened-bug-cluster-post-prior-crosscheck-and-its-shape", text: "Newly-opened bug cluster (post-prior-crosscheck) and its shape", level: 3}
-    - {slug: "section-5-methodology-caveats", text: "Section 5: Methodology / caveats", level: 2}
-    - {slug: "issues-fetched-successfully", text: "Issues fetched successfully", level: 3}
-    - {slug: "issues-not-fetched", text: "Issues NOT fetched", level: 3}
-    - {slug: "state-changes-during-the-read", text: "State changes during the read", level: 3}
-    - {slug: "limits", text: "Limits", level: 3}
-  - path: "docs/architecture/audits/2026-05-11-issue-992-984-audit-comments.md"
-    title: "Audit relationship to #992 and #984 — deep read"
-    divio_type: "none"
-    abstract: "Deep read relating the 2026-05 CaaCS audit to issues #992 and #984, classifying their strength on the findings under the brownfield-investigation paradigm."
-    anchors:
-    - {slug: "inputs", text: "Inputs", level: 2}
-    - {slug: "issue-992-deep-read", text: "Issue #992 — deep read", level: 2}
-    - {slug: "body-summary", text: "Body summary", level: 3}
-    - {slug: "linked-work", text: "Linked work", level: 3}
-    - {slug: "code-paths-the-issue-names", text: "Code paths the issue names", level: 3}
-    - {slug: "audit-relationship-specific-evidence", text: "Audit relationship — specific evidence", level: 3}
-    - {slug: "useful-audit-comment-for-992-draft-do-not-post", text: "Useful audit comment for #992 (DRAFT — do not post)", level: 3}
-    - {slug: "issue-984-deep-read", text: "Issue #984 — deep read", level: 2}
-    - {slug: "body-summary-2", text: "Body summary", level: 3}
-    - {slug: "linked-work-2", text: "Linked work", level: 3}
-    - {slug: "code-paths-the-issue-names-2", text: "Code paths the issue names", level: 3}
-    - {slug: "audit-relationship-specific-evidence-2", text: "Audit relationship — specific evidence", level: 3}
-    - {slug: "useful-audit-comment-for-984-draft-do-not-post", text: "Useful audit comment for #984 (DRAFT — do not post)", level: 3}
-    - {slug: "cross-issue-observations", text: "Cross-issue observations", level: 2}
-    - {slug: "recommendation", text: "Recommendation", level: 2}
-    - {slug: "992", text: "#992", level: 3}
-    - {slug: "984", text: "#984", level: 3}
-    - {slug: "methodology-caveats", text: "Methodology / caveats", level: 2}
-  - path: "docs/architecture/audits/2026-05-822-crosscheck.md"
-    title: "CaaCS findings ↔ #822 open sub-issues cross-check"
-    divio_type: "none"
-    abstract: "Cross-check mapping the 2026-05 CaaCS audit findings onto the open sub-issues of epic #822 (3.2.0 stabilization and release readiness), with per-issue state."
-    anchors:
-    - {slug: "inputs", text: "Inputs", level: 2}
-    - {slug: "audit-findings-canonical-numbering-for-this-doc", text: "Audit findings (canonical numbering for this doc)", level: 2}
-    - {slug: "forward-map-finding-matching-822-sub-issues", text: "Forward map: Finding → matching #822 sub-issues", level: 2}
-    - {slug: "f1-bus-factor-1", text: "F1 — Bus factor = 1", level: 3}
-    - {slug: "f2-agent-tasks-workflow-mission-py-refactor-target", text: "F2 — `agent/{tasks,workflow,mission}.py` refactor target", level: 3}
-    - {slug: "f3-pipeline-trust-healthy", text: "F3 — Pipeline trust healthy", level: 3}
-    - {slug: "f4-project-alive-and-accelerating", text: "F4 — Project alive and accelerating", level: 3}
-    - {slug: "f5-three-empty-src-leftover-dirs", text: "F5 — Three empty src/ leftover dirs", level: 3}
-    - {slug: "f6-duplicate-task-prompt-template-md", text: "F6 — Duplicate `task-prompt-template.md`", level: 3}
-    - {slug: "f7-template-dispatcher-coupling-load-bearing", text: "F7 — Template ↔ dispatcher coupling load-bearing", level: 3}
-    - {slug: "f8-cli-commands-charter-py-decomposition", text: "F8 — `cli/commands/charter.py` decomposition", level: 3}
-    - {slug: "f9-cli-commands-init-py-decomposition", text: "F9 — `cli/commands/init.py` decomposition", level: 3}
-    - {slug: "f10-next-runtime-bridge-py-is-a-hub", text: "F10 — `next/runtime_bridge.py` is a hub", level: 3}
-    - {slug: "f11-d-rated-migrations-cleanup", text: "F11 — D-rated migrations cleanup", level: 3}
-    - {slug: "f12-sync-cluster-needs-a-second-maintainer", text: "F12 — `sync/` cluster needs a second maintainer", level: 3}
-    - {slug: "f13-no-tests-overlay-audit-blind-spot", text: "F13 — No tests/ overlay (audit blind spot)", level: 3}
-    - {slug: "f14-no-kitty-specs-overlay-audit-blind-spot", text: "F14 — No kitty-specs/ overlay (audit blind spot)", level: 3}
-    - {slug: "reverse-map-open-822-sub-issue-matching-audit-findings", text: "Reverse map: Open #822 sub-issue → matching audit findings", level: 2}
-    - {slug: "two-gap-lists", text: "Two gap lists", level: 2}
-    - {slug: "gap-list-1-audit-findings-without-an-open-822-issue", text: "Gap list 1 — Audit findings without an open #822 issue", level: 3}
-    - {slug: "gap-list-2-open-822-sub-issues-without-forensic-backing", text: "Gap list 2 — Open #822 sub-issues without forensic backing", level: 3}
-    - {slug: "methodology-caveats", text: "Methodology / caveats", level: 2}
-    - {slug: "closed-issue-note-informational-only", text: "Closed-issue note (informational only)", level: 2}
-  - path: "docs/architecture/audits/2026-05-caacs-meta-assessment.md"
-    title: "CaaCS Meta-Assessment & Input for #666 Spike"
-    divio_type: "none"
-    abstract: "Reflective meta-assessment of the 2026-05 ad-hoc CaaCS run on spec-kitty: synthesis for adoption stakeholders (DM-C) and input to the #666 skill-design spike."
-    anchors:
-    - {slug: "1-executive-summary", text: "1. Executive summary", level: 2}
-    - {slug: "2-methodology-phase-by-phase-reflection", text: "2. Methodology — phase-by-phase reflection", level: 2}
-    - {slug: "phase-0-priming", text: "Phase 0 — Priming", level: 3}
-    - {slug: "phase-1-doctrine-extraction", text: "Phase 1 — Doctrine extraction", level: 3}
-    - {slug: "phase-2-discovery-run", text: "Phase 2 — Discovery run", level: 3}
-    - {slug: "phase-3-synthesis", text: "Phase 3 — Synthesis", level: 3}
-    - {slug: "3-findings-recap-compact", text: "3. Findings recap (compact)", level: 2}
-    - {slug: "4-reflections-on-the-approach", text: "4. Reflections on the approach", level: 2}
-    - {slug: "5-recommendations-for-further-enhancement", text: "5. Recommendations for further enhancement", level: 2}
-    - {slug: "6-direct-input-for-the-666-design-spike", text: "6. Direct input for the #666 design spike", level: 2}
-    - {slug: "what-the-666-skill-should-include", text: "What the #666 skill SHOULD include", level: 3}
-    - {slug: "what-the-666-skill-should-not-do", text: "What the #666 skill SHOULD NOT do", level: 3}
-    - {slug: "a-concrete-test-for-the-design-spike", text: "A concrete test for the design spike", level: 3}
-    - {slug: "what-this-run-did-not-prove-about-665-666", text: "What this run did NOT prove about #665/#666", level: 3}
-    - {slug: "7-decision-moments-open-and-resolved", text: "7. Decision Moments — open and resolved", level: 2}
-    - {slug: "8-provenance", text: "8. Provenance", level: 2}
-  - path: "docs/architecture/audits/2026-05-phase3-f1-knowledge-capture-plan.md"
-    title: "F1 Knowledge-Capture Plan"
-    divio_type: "none"
-    abstract: "Proposed knowledge-capture plan anchored in CaaCS Finding F1 (bus factor of 1 across src/ hotspots), honoring DM-D: document and transfer before refactoring."
-    anchors:
-    - {slug: "1-problem-statement", text: "1. Problem statement", level: 2}
-    - {slug: "2-constraints-dm-d-applied", text: "2. Constraints (DM-D applied)", level: 2}
-    - {slug: "3-sequenced-work-packages", text: "3. Sequenced work packages", level: 2}
-    - {slug: "kc-wp1-living-architecture-brief-for-src-specify-cli-cli-commands-agent", text: "KC-WP1 — Living architecture brief for `src/specify_cli/cli/commands/agent/`", level: 3}
-    - {slug: "kc-wp2-pair-sessions-on-top-5-worst-complexity-functions", text: "KC-WP2 — Pair sessions on top-5 worst-complexity functions", level: 3}
-    - {slug: "kc-wp3-test-gap-audit-for-agent-hotspots", text: "KC-WP3 — Test-gap audit for agent/* hotspots", level: 3}
-    - {slug: "kc-wp4-f6-duplicate-template-investigation", text: "KC-WP4 — F6 duplicate-template investigation", level: 3}
-    - {slug: "out-of-scope-for-this-plan", text: "Out of scope for this plan", level: 3}
-    - {slug: "4-eisenhower-matrix", text: "4. Eisenhower matrix", level: 2}
-    - {slug: "5-risk-register", text: "5. Risk register", level: 2}
-    - {slug: "6-connection-to-665-666", text: "6. Connection to #665 / #666", level: 2}
-    - {slug: "7-open-follow-ups", text: "7. Open follow-ups", level: 2}
-  - path: "docs/architecture/audits/2026-05-phase3-issue-drafts-and-triage.md"
-    title: "Phase 3 — Issue drafts (unbacked findings) and triage (unbacked open issues)"
-    divio_type: "none"
-    abstract: "Planning aid drafting issues for unbacked CaaCS findings and triaging unbacked open issues under DM-D; a read-only synthesis that posts and edits nothing."
-    anchors:
-    - {slug: "methodology", text: "Methodology", level: 2}
-    - {slug: "part-1-github-issue-drafts-for-unbacked-findings", text: "Part 1 — GitHub issue drafts for unbacked findings", level: 2}
-    - {slug: "issue-draft-1-f1-bus-factor-knowledge-transfer-plan-for-src", text: "Issue draft 1 — F1 — Bus factor knowledge-transfer plan for src/", level: 3}
-    - {slug: "issue-draft-2-f2-refactor-agent-tasks-workflow-mission-py-cluster-gated-on-f1", text: "Issue draft 2 — F2 — Refactor agent/{tasks,workflow,mission}.py cluster (gated on F1)", level: 3}
-    - {slug: "issue-draft-3-f5-delete-empty-leftover-src-directories", text: "Issue draft 3 — F5 — Delete empty leftover src/ directories", level: 3}
-    - {slug: "issue-draft-4-f6-investigate-duplicated-task-prompt-template-md", text: "Issue draft 4 — F6 — Investigate duplicated task-prompt-template.md", level: 3}
-    - {slug: "issue-draft-5-f7-evaluate-template-loader-abstraction-for-command-template-dispatcher-coupling", text: "Issue draft 5 — F7 — Evaluate template-loader abstraction for command-template ↔ dispatcher coupling", level: 3}
-    - {slug: "issue-draft-6-f8-decompose-cli-commands-charter-py", text: "Issue draft 6 — F8 — Decompose cli/commands/charter.py", level: 3}
-    - {slug: "issue-draft-7-f9-decompose-cli-commands-init-py", text: "Issue draft 7 — F9 — Decompose cli/commands/init.py", level: 3}
-    - {slug: "issue-draft-8-f10-re-examine-next-runtime-bridge-py-bridge-or-hub", text: "Issue draft 8 — F10 — Re-examine next/runtime_bridge.py — bridge or hub?", level: 3}
-    - {slug: "issue-draft-9-f11-clean-up-d-f-rated-migrations", text: "Issue draft 9 — F11 — Clean up D/F-rated migrations", level: 3}
-    - {slug: "issue-draft-10-f12-onboard-a-second-maintainer-to-sync", text: "Issue draft 10 — F12 — Onboard a second maintainer to sync/", level: 3}
-    - {slug: "issue-draft-11-f13-re-run-forensic-audit-with-tests-in-scope", text: "Issue draft 11 — F13 — Re-run forensic audit with tests/ in scope", level: 3}
-    - {slug: "issue-draft-12-f14-re-run-forensic-audit-with-kitty-specs-in-scope", text: "Issue draft 12 — F14 — Re-run forensic audit with kitty-specs/ in scope", level: 3}
-    - {slug: "part-2-triage-recommendations-for-unbacked-open-issues", text: "Part 2 — Triage recommendations for unbacked open issues", level: 2}
-    - {slug: "follow-up-notes-for-keep-relabel-and-close-needs-repro", text: "Follow-up notes for KEEP-RELABEL and CLOSE-NEEDS-REPRO", level: 3}
-  - path: "docs/architecture/audits/2026-05-spec-kitty-caacs.md"
-    title: "spec-kitty CaaCS Audit — 2026-05"
-    divio_type: "none"
-    abstract: "The full 2026-05 Code-as-a-Crime-Scene forensic audit of the spec-kitty repository: metadata, hotspot findings, and the bus-factor and complexity observations."
-    anchors:
-    - {slug: "audit-metadata", text: "Audit metadata", level: 2}
-    - {slug: "methodology", text: "Methodology", level: 2}
-    - {slug: "inherited-biases-per-the-tactic-s-failure-modes", text: "Inherited biases (per the tactic's failure_modes)", level: 3}
-    - {slug: "scope-expansion-2026-05-09", text: "Scope expansion (2026-05-09)", level: 2}
-    - {slug: "top-findings-executive-summary", text: "Top findings (executive summary)", level: 2}
-    - {slug: "hotspot-table-top-30-vanity-filtered", text: "Hotspot table (top 30, vanity-filtered)", level: 2}
-    - {slug: "hotspots-src-only-original", text: "Hotspots — src/ only (original)", level: 3}
-    - {slug: "ddd-ratification-notes-architect", text: "DDD ratification notes (architect)", level: 3}
-    - {slug: "hotspots-full-corpus-src-tests-kitty-specs", text: "Hotspots — full corpus (src/ + tests/ + kitty-specs/)", level: 3}
-    - {slug: "temporal-coupling-top-30-pairs-both-files-non-vanity", text: "Temporal coupling (top 30 pairs, both files non-vanity)", level: 2}
-    - {slug: "cross-cutting-temporal-coupling-mission-src-tests-2026-05-09", text: "Cross-cutting temporal coupling (mission ↔ src/ ↔ tests/) (2026-05-09)", level: 2}
-    - {slug: "mission-directory-src-file-co-changes-top-20", text: "Mission-directory ↔ src-file co-changes (top 20)", level: 3}
-    - {slug: "src-file-test-file-co-changes-top-20", text: "src-file ↔ test-file co-changes (top 20)", level: 3}
-    - {slug: "f2-hotspots-change-with-tests-rate", text: "F2 hotspots: change-with-tests rate", level: 3}
-    - {slug: "test-coverage-proxy-2026-05-09", text: "Test coverage proxy (2026-05-09)", level: 2}
-    - {slug: "bus-factor-knowledge-map", text: "Bus factor / knowledge map", level: 2}
-    - {slug: "bus-factor-full-corpus-reassessment-2026-05-09", text: "Bus factor — full corpus reassessment (2026-05-09)", level: 3}
-    - {slug: "firefighting-signal", text: "Firefighting signal", level: 2}
-    - {slug: "velocity-trend-24-months-monthly-commit-count-on-src", text: "Velocity trend (24 months, monthly commit count on src/)", level: 2}
-    - {slug: "triage-matrix-eisenhower-per-procedure-exit-condition", text: "Triage matrix (Eisenhower, per procedure exit condition)", level: 2}
-    - {slug: "important-urgent-this-week", text: "Important + urgent (this week)", level: 3}
-    - {slug: "important-not-urgent-this-quarter", text: "Important + not urgent (this quarter)", level: 3}
-    - {slug: "not-important-not-urgent-don-t-worry", text: "Not important + not urgent (don't worry)", level: 3}
-    - {slug: "parallelisable-delegate-batch", text: "Parallelisable (delegate / batch)", level: 3}
-    - {slug: "cross-cutting-observations", text: "Cross-cutting observations", level: 2}
-    - {slug: "multi-window-refactor-candidate-synthesis-2026-05-11", text: "Multi-window refactor-candidate synthesis (2026-05-11)", level: 2}
-    - {slug: "window-selection-rationale", text: "Window selection rationale", level: 3}
-    - {slug: "full-history-pass-top-30-files-present-at-head", text: "Full-history pass (top 30, files present at HEAD)", level: 3}
-    - {slug: "velocity-adjusted-pass-top-30-since-4-months-ago", text: "Velocity-adjusted pass (top 30, `--since=\"4 months ago\"`)", level: 3}
-    - {slug: "intersection-inner-join-on-path", text: "Intersection (inner-join on path)", level: 3}
-    - {slug: "interpretation", text: "Interpretation", level: 3}
-    - {slug: "open-follow-ups-for-cross-check-phase-3", text: "Open follow-ups for cross-check (Phase 3)", level: 2}
-    - {slug: "scope-expansion-changelog-2026-05-09", text: "Scope-expansion changelog (2026-05-09)", level: 2}
   - path: "docs/architecture/branch-target-routing.md"
     title: "Branch-Target Routing"
     divio_type: "explanation"
@@ -4050,9 +3951,19 @@ pages:
   - path: "docs/architecture/index.md"
     title: "Architecture notes"
     divio_type: "none"
-    abstract: "Internal architecture notes covering Spec Kitty connector authentication, GitHub App installation authority, and project feature-detection design."
+    abstract: "Page index for docs/architecture/: living C4 model and vision, per-version (1.x/2.x/3.x) history, explanations, assessments, connector/installation notes, and reference templates."
     anchors:
-    - {slug: "in-this-section", text: "In this section", level: 2}
+    - {slug: "living-architecture-current-forward", text: "Living architecture (current + forward)", level: 2}
+    - {slug: "versioned-history-3-x", text: "Versioned history — 3.x", level: 2}
+    - {slug: "versioned-history-2-x", text: "Versioned history — 2.x", level: 2}
+    - {slug: "versioned-history-1-x", text: "Versioned history — 1.x", level: 2}
+    - {slug: "explanations", text: "Explanations", level: 2}
+    - {slug: "connector-installation-notes", text: "Connector & installation notes", level: 2}
+    - {slug: "assessments", text: "Assessments", level: 2}
+    - {slug: "calibration-reports", text: "Calibration reports", level: 2}
+    - {slug: "ownership-charter-models", text: "Ownership & charter models", level: 2}
+    - {slug: "templates-reference", text: "Templates & reference", level: 2}
+    - {slug: "retired-redirect-guides", text: "Retired / redirect guides", level: 2}
     - {slug: "see-also", text: "See also", level: 2}
   - path: "docs/architecture/kanban-workflow.md"
     title: "Kanban Workflow Explained"
@@ -5593,6 +5504,8 @@ pages:
     - {slug: "lane-consolidation", text: "Lane Consolidation", level: 3}
     - {slug: "branch-integration-git-merge", text: "Branch Integration / Git Merge", level: 3}
     - {slug: "publish-to-origin-main", text: "Publish to origin/main", level: 3}
+    - {slug: "coord-partition", text: "COORD partition", level: 3}
+    - {slug: "topology-surface", text: "Topology Surface", level: 3}
   - path: "docs/context/planning-and-tracking.md"
     title: "Context: Planning & Tracking"
     divio_type: "none"
@@ -5803,6 +5716,7 @@ pages:
     - {slug: "native-type-is-the-kind-carrier", text: "Native type is the kind carrier", level: 3}
     - {slug: "priority-and-what-makes-a-p0", text: "Priority, and what makes a P0", level: 3}
     - {slug: "a-p0-bug-should-carry-a-failing-reproduction-test", text: "A P0 bug should carry a failing reproduction test", level: 3}
+    - {slug: "what-good-first-issue-means-here", text: "What \"good first issue\" means here", level: 3}
     - {slug: "see-also", text: "See also", level: 2}
   - path: "docs/development/onboarding-run.md"
     title: "Onboarding Run: Priming a Co-Maintainer Mission Session"
@@ -5871,6 +5785,7 @@ pages:
     - {slug: "running-the-ci-residual-selection-locally", text: "Running the CI residual selection locally", level: 2}
     - {slug: "pre-review-regression-gate-move-task-to-for-review", text: "Pre-review regression gate (`move-task --to for_review`)", level: 2}
     - {slug: "pr-draft-and-wip-title-conventions", text: "PR draft and WIP-title conventions", level: 2}
+    - {slug: "shippable-doctrine-built-in-doctrine-must-work-in-a-consumer-repo", text: "Shippable doctrine: built-in doctrine must work in a consumer repo", level: 2}
     - {slug: "see-also", text: "See also", level: 2}
   - path: "docs/development/run-mutation-tests.md"
     title: "Run Mutation Tests Locally"
@@ -6024,6 +5939,7 @@ pages:
     - {slug: "accept-the-mission", text: "Accept the Mission", level: 2}
     - {slug: "what-accept-checks", text: "What Accept Checks", level: 3}
     - {slug: "negative-invariants-that-assert-the-merged-post-state", text: "Negative Invariants That Assert the Merged Post-State", level: 3}
+    - {slug: "deferred-invariants-and-the-post-consolidation-gate", text: "Deferred Invariants and the Post-Consolidation Gate", level: 3}
     - {slug: "merge-to-the-target-branch", text: "Merge to the target branch", level: 2}
     - {slug: "when-local-main-is-not-publishable", text: "When Local `main` Is Not Publishable", level: 3}
     - {slug: "after-merge", text: "After Merge", level: 2}
@@ -7850,6 +7766,10 @@ pages:
     - {slug: "intent-of-3-2-x", text: "Intent of 3.2.x", level: 2}
     - {slug: "the-dependency-spine", text: "The dependency spine", level: 2}
     - {slug: "the-g1-doctrine-charter-arc-off-spine", text: "The G1 doctrine & charter arc (off-spine)", level: 2}
+    - {slug: "doctrine-canonical-structure-remediation-programme-2026-07-26", text: "Doctrine canonical-structure remediation programme (2026-07-26)", level: 2}
+    - {slug: "why-the-order-is-fixed-not-a-preference", text: "Why the order is fixed, not a preference", level: 3}
+    - {slug: "two-scope-changes-since-the-spec-was-written", text: "Two scope changes since the spec was written", level: 3}
+    - {slug: "how-this-relates-to-existing-tracker-items", text: "How this relates to existing tracker items", level: 3}
     - {slug: "wave-status-board-degod-unshim-roadmap", text: "Wave status board (degod/unshim roadmap)", level: 2}
     - {slug: "milestone-census-2026-07-04", text: "Milestone census (2026-07-04)", level: 2}
     - {slug: "exit-criteria-for-3-2-x", text: "Exit criteria for 3.2.x", level: 2}
@@ -7887,6 +7807,54 @@ pages:
     - {slug: "5-remaining-hardcoded-kittify-missions-sites", text: "5. Remaining hardcoded `.kittify/missions/` sites", level: 3}
     - {slug: "6-config-driven-path-overrides", text: "6. Config-driven path overrides", level: 3}
     - {slug: "design-principles-from-hic", text: "Design Principles (from HiC)", level: 2}
+  - path: "docs/plans/doctrine/creed-and-values-design-as-proposed.md"
+    title: "Creed and FoundationalValues — design as proposed (operator input record)"
+    divio_type: "none"
+    abstract: "Verbatim record of the operator's creed/FoundationalValues design — value-impact deltas and a generalized impacts edge — plus the corpus evidence measured against it."
+    anchors:
+    - {slug: "core-problem-statement", text: "Core problem statement", level: 2}
+    - {slug: "1-part-1-creed-and-values", text: "1. Part 1 — Creed and Values", level: 2}
+    - {slug: "2-part-2-enhance-the-existing-drg-edge-relationship-model", text: "2. Part 2 — Enhance the existing DRG edge / relationship model", level: 2}
+    - {slug: "3-part-3-charter-creation", text: "3. Part 3 — Charter creation", level: 2}
+    - {slug: "4-counterpoints-raised-by-the-operator", text: "4. Counterpoints raised by the operator", level: 2}
+    - {slug: "5-verified-grounding-measured-against-this-design", text: "5. Verified grounding measured against this design", level: 2}
+    - {slug: "5-1-the-authored-shape-canonical-from-the-source-repository", text: "5.1 The authored shape (canonical, from the source repository)", level: 3}
+    - {slug: "5-2-corpus-size-and-completeness", text: "5.2 Corpus size and completeness", level: 3}
+    - {slug: "5-3-dimensionality-refutes-the-earlier-one-axis-collapse-finding", text: "5.3 Dimensionality — REFUTES the earlier \"one-axis collapse\" finding", level: 3}
+    - {slug: "5-4-per-axis-distribution-two-axes-carry-no-cost-information", text: "5.4 Per-axis distribution — two axes carry no cost information", level: 3}
+    - {slug: "5-5-granularity", text: "5.5 Granularity", level: 3}
+    - {slug: "5-6-the-mandatory-negative-component-rule-measured", text: "5.6 The mandatory-negative-component rule, measured", level: 3}
+    - {slug: "6-what-the-earlier-verdict-s-objections-look-like-against-this-design", text: "6. What the earlier verdict's objections look like against *this* design", level: 2}
+  - path: "docs/plans/doctrine/creed-and-values-design-hardened.md"
+    title: "Creed and FoundationalValues — hardened design"
+    divio_type: "none"
+    abstract: "Hardened design after a four-lens squad: the structure needs no new kind, relation, or node, but the numeric layer is gated because the sign channel is measurably noisy."
+    anchors:
+    - {slug: "headline", text: "Headline", level: 2}
+    - {slug: "0-the-operative-frame-and-what-it-changes", text: "0. The operative frame — and what it changes", level: 2}
+    - {slug: "0-1-what-this-reframing-retires", text: "0.1 What this reframing retires", level: 3}
+    - {slug: "0-2-the-lever-goal-split-a-free-improvement-from-the-in-repo-template", text: "0.2 The lever/goal split — a free improvement from the in-repo template", level: 3}
+    - {slug: "0-3-what-survives-the-reframing-three-items", text: "0.3 What survives the reframing — three items", level: 3}
+    - {slug: "0-4-the-experiment-re-scoped-to-the-stated-goal", text: "0.4 The experiment, re-scoped to the stated goal", level: 3}
+    - {slug: "0-5-the-cheapest-next-experiment-unchanged-by-all-of-this", text: "0.5 The cheapest next experiment, unchanged by all of this", level: 3}
+    - {slug: "1-corrections-to-the-input-design-s-own-evidence", text: "1. Corrections to the input design's own evidence", level: 2}
+    - {slug: "2-the-39-question-settled-and-the-answer-is-a-third-option", text: "2. The 39% question — settled, and the answer is a third option", level: 2}
+    - {slug: "3-hardened-structure-decisions", text: "3. Hardened structure — decisions", level: 2}
+    - {slug: "3-1-foundationalvalues-not-an-enum", text: "3.1 `FoundationalValues` — not an enum", level: 3}
+    - {slug: "3-2-two-fields-two-types-value-impact-vs-value-bias", text: "3.2 Two fields, two types — `value_impact` vs `value_bias`", level: 3}
+    - {slug: "3-3-the-value-bearing-kind-set-positive-declared-once-in-code", text: "3.3 The value-bearing kind set — positive, declared once, in code", level: 3}
+    - {slug: "3-4-impacts-a-field-on-edges-and-in-tension-with-survives", text: "3.4 `impacts` — a field on edges, and `in_tension_with` survives", level: 3}
+    - {slug: "3-5-delta-string-on-the-wire-decimal-in-memory", text: "3.5 `delta` — string on the wire, `Decimal` in memory", level: 3}
+    - {slug: "3-6-the-connascence-matrix-parked-and-the-composition-invariant-is-a-type", text: "3.6 The connascence matrix — parked, and the composition invariant is a *type*", level: 3}
+    - {slug: "3-7-creed-on-the-charter-and-the-validation-seam-is-not-where-you-think", text: "3.7 `creed` on the charter — and the validation seam is not where you think", level: 3}
+    - {slug: "3-8-accreditation", text: "3.8 Accreditation", level: 3}
+    - {slug: "4-the-interview-loop-the-sharpest-live-objection", text: "4. The interview loop — the sharpest live objection", level: 2}
+    - {slug: "5-prerequisites-that-must-land-first", text: "5. Prerequisites that must land first", level: 2}
+    - {slug: "6-sequencing", text: "6. Sequencing", level: 2}
+    - {slug: "7-the-experiment-one-day-pre-registered-can-kill-the-numeric-layer", text: "7. THE EXPERIMENT — one day, pre-registered, can kill the numeric layer", level: 2}
+    - {slug: "8-what-survives-every-lens-the-minimum-shippable-thing", text: "8. What survives every lens — the minimum shippable thing", level: 2}
+    - {slug: "9-open-operator-decisions", text: "9. Open operator decisions", level: 2}
+    - {slug: "10-method-limits", text: "10. Method limits", level: 2}
   - path: "docs/plans/doctrine/doctrine-artifact-selection-preflight.md"
     title: "Pre-flight investigation — user-authored doctrine artifact selection"
     divio_type: "none"
@@ -7948,11 +7916,48 @@ pages:
     - {slug: "kernel-dependency-graph-is-accurate", text: "Kernel Dependency Graph is Accurate", level: 3}
     - {slug: "pre-existing-test-failures-not-migration-caused", text: "Pre-Existing Test Failures (Not Migration-Caused)", level: 2}
     - {slug: "recommended-follow-on-tasks", text: "Recommended Follow-On Tasks", level: 2}
+  - path: "docs/plans/doctrine/foundational-values-and-creed.md"
+    title: "FoundationalValues and Creed — canonical design"
+    divio_type: "none"
+    abstract: "Single authority for the FoundationalValues/creed design: generic over N values, AMMERSE the default basis, and a signed impacts edge that subsumes in_tension_with."
+    anchors:
+    - {slug: "0-what-is-being-asked-of-a-reviewer", text: "0. What is being asked of a reviewer", level: 2}
+    - {slug: "1-problem-statement", text: "1. Problem statement", level: 2}
+    - {slug: "2-the-operative-frame-governs-everything-below", text: "2. The operative frame — governs everything below", level: 2}
+    - {slug: "3-provenance", text: "3. Provenance", level: 2}
+    - {slug: "4-generic-over-n-the-design-is-not-ammerse", text: "4. Generic over N — the design is not AMMERSE", level: 2}
+    - {slug: "5-the-three-planes-and-the-one-legal-composition", text: "5. The three planes — and the one legal composition", level: 2}
+    - {slug: "6-the-mathematics", text: "6. The mathematics", level: 2}
+    - {slug: "6-1-per-step-gain-and-the-adopted-truncation-s-residual", text: "6.1 Per-step gain and the adopted truncation's residual", level: 3}
+    - {slug: "6-2-the-generic-bound-bounded-always-sound-for-gain-1", text: "6.2 The generic bound — bounded always, sound for gain < 1", level: 3}
+    - {slug: "6-3-sensitivity-to-the-one-asymmetric-cell", text: "6.3 Sensitivity to the one asymmetric cell", level: 3}
+    - {slug: "6-4-do-not-renormalise-per-tier-that-is-what-causes-absolutism", text: "6.4 Do not renormalise per tier — that is what causes absolutism", level: 3}
+    - {slug: "6-5-second-order-is-not-adopted", text: "6.5 Second-order is not adopted", level: 3}
+    - {slug: "7-the-design", text: "7. The design", level: 2}
+    - {slug: "7-1-foundationalvalues-a-repository-backed-artefact-not-an-enum", text: "7.1 `FoundationalValues` — a repository-backed artefact, not an enum", level: 3}
+    - {slug: "7-2-type-the-axes-levers-vs-goals", text: "7.2 Type the axes — levers vs goals", level: 3}
+    - {slug: "7-3-two-fields-two-types", text: "7.3 Two fields, two types", level: 3}
+    - {slug: "7-4-which-kinds-carry-a-value-field", text: "7.4 Which kinds carry a value field", level: 3}
+    - {slug: "7-5-impacts-subsumes-in-tension-with", text: "7.5 `impacts` subsumes `in_tension_with`", level: 3}
+    - {slug: "7-6-the-composition-invariant-enforced-structurally", text: "7.6 The composition invariant, enforced structurally", level: 3}
+    - {slug: "7-7-the-creed-lives-on-the-charter", text: "7.7 The creed lives on the charter", level: 3}
+    - {slug: "8-the-prose-layer-the-do-less-option-ships-first-gates-on-nothing", text: "8. The prose layer — the do-less option, ships first, gates on nothing", level: 2}
+    - {slug: "9-the-feedback-gap", text: "9. The feedback gap", level: 2}
+    - {slug: "10-measured-grounding", text: "10. Measured grounding", level: 2}
+    - {slug: "10-1-what-failed-measurement-do-not-rebuild-these", text: "10.1 What failed measurement — do not rebuild these", level: 3}
+    - {slug: "10-2-what-the-corpus-shows", text: "10.2 What the corpus shows", level: 3}
+    - {slug: "10-3-divergences-from-the-published-article", text: "10.3 Divergences from the published article", level: 3}
+    - {slug: "11-contradiction-register-this-document-s-values-win", text: "11. Contradiction register — this document's values win", level: 2}
+    - {slug: "12-accreditation", text: "12. Accreditation", level: 2}
+    - {slug: "13-open-decisions", text: "13. Open decisions", level: 2}
+    - {slug: "14-sequence", text: "14. Sequence", level: 2}
+    - {slug: "15-method-and-limits", text: "15. Method and limits", level: 2}
   - path: "docs/plans/doctrine/index.md"
     title: "Doctrine"
     divio_type: "none"
     abstract: "Doctrine layering, charter boundary, and artifact-selection planning — architecture reviews, gap analyses, and mission scope notes."
     anchors:
+    - {slug: "programme-realization-2026-07-26-operator-ruling", text: "Programme realization (2026-07-26 operator ruling)", level: 2}
     - {slug: "see-also", text: "See also", level: 2}
   - path: "docs/plans/doctrine/layered-doctrine-resolution-design.md"
     title: "Layered Doctrine Resolution — Design Blueprint"
@@ -7978,6 +7983,67 @@ pages:
     - {slug: "mission-a-layered-doctrine-resolution-infrastructure", text: "Mission A — Layered Doctrine Resolution (infrastructure)", level: 3}
     - {slug: "mission-b-governance-aware-context-application-layer", text: "Mission B — Governance-Aware Context (application layer)", level: 3}
     - {slug: "non-goals", text: "Non-goals", level: 2}
+  - path: "docs/plans/doctrine/manifesto-program-delivery-sequence.md"
+    title: "FoundationalValues/creed program — delivery sequence"
+    divio_type: "none"
+    abstract: "Executable delivery sequence: critical path with gate positions, 22 increments ranked by evidence-per-cost, superseding-ADR scope, park register, and effort envelope."
+    anchors:
+    - {slug: "settled-inputs-do-not-re-litigate", text: "Settled inputs — do not re-litigate", level: 2}
+    - {slug: "what-the-matrix-measurement-changed", text: "What the matrix measurement changed", level: 2}
+    - {slug: "1-critical-path", text: "1. Critical path", level: 2}
+    - {slug: "2-ranked-increments-by-evidence-per-cost", text: "2. Ranked increments — by evidence-per-cost", level: 2}
+    - {slug: "3-what-the-superseding-adr-must-cover", text: "3. What the superseding ADR must cover", level: 2}
+    - {slug: "4-tracker-shape-report-only", text: "4. Tracker shape — report only", level: 2}
+    - {slug: "5-explicitly-parked", text: "5. Explicitly parked", level: 2}
+    - {slug: "6-upstream-report", text: "6. Upstream report", level: 2}
+    - {slug: "7-effort-envelope", text: "7. Effort envelope", level: 2}
+    - {slug: "8-concession", text: "8. Concession", level: 2}
+    - {slug: "9-verdict", text: "9. Verdict", level: 2}
+    - {slug: "10-realization-amendment-2026-07-26", text: "10. Realization & amendment — 2026-07-26", level: 2}
+    - {slug: "a-realization-into-five-sequenced-missions", text: "(a) Realization into five sequenced missions", level: 3}
+    - {slug: "b-two-measurements-taken-this-session", text: "(b) Two measurements taken this session", level: 3}
+    - {slug: "two-rulings-this-session", text: "Two rulings this session", level: 3}
+  - path: "docs/plans/doctrine/manifesto-tier-primary-drivers.md"
+    title: "The Manifesto Tier — doctrine's missing primary-driver layer"
+    divio_type: "none"
+    abstract: "Meta-analysis: doctrine implements only the middle tier of a three-tier sense-making model. AMMERSE is in-repo but mis-tiered as a tactic. Proposes a manifesto tier."
+    anchors:
+    - {slug: "summary", text: "Summary", level: 2}
+    - {slug: "1-the-slot-is-already-declared-and-it-is-empty", text: "1. The slot is already declared, and it is empty", level: 2}
+    - {slug: "three-mis-tierings-one-root-cause", text: "Three mis-tierings, one root cause", level: 3}
+    - {slug: "2-the-omission-is-inherited-and-was-deliberate", text: "2. The omission is inherited and was deliberate", level: 2}
+    - {slug: "doctrine-implements-only-the-middle-tier-both-ends-are-missing", text: "Doctrine implements only the middle tier — both ends are missing", level: 3}
+    - {slug: "3-ammerse-is-already-in-the-repository-mis-tiered-and-inert", text: "3. AMMERSE is already in the repository, mis-tiered and inert", level: 2}
+    - {slug: "4-why-a-manifesto-solves-precedence-and-better-than-a-ranked-list", text: "4. Why a manifesto solves precedence, and better than a ranked list", level: 2}
+    - {slug: "5-the-payoff-the-output-bias-gets-an-exact-name", text: "5. The payoff: the output-bias gets an exact name", level: 2}
+    - {slug: "6-the-three-scopes-have-precise-meaning", text: "6. The three scopes have precise meaning", level: 2}
+    - {slug: "7-proposal", text: "7. Proposal", level: 2}
+    - {slug: "8-risks-and-one-non-negotiable", text: "8. Risks, and one non-negotiable", level: 2}
+    - {slug: "9-framing-note-for-whoever-specs-this", text: "9. Framing note for whoever specs this", level: 2}
+    - {slug: "provenance", text: "Provenance", level: 2}
+    - {slug: "see-also", text: "See also", level: 2}
+  - path: "docs/plans/doctrine/manifesto-tier-verdict-and-handover.md"
+    title: "Manifesto tier — verdict, corrections, and handover"
+    divio_type: "none"
+    abstract: "Verdict of two adversarial squads on the proposed manifesto tier: the diagnosis survives, the mechanism is rejected by an experiment the proposal itself nominated."
+    anchors:
+    - {slug: "the-call", text: "THE CALL", level: 2}
+    - {slug: "what-killed-the-mechanism", text: "What killed the mechanism", level: 3}
+    - {slug: "three-more-independent-failures", text: "Three more independent failures", level: 3}
+    - {slug: "the-finding-that-decides-the-cost-question", text: "The finding that decides the cost question", level: 3}
+    - {slug: "the-re-frame-that-matters-most", text: "The re-frame that matters most", level: 3}
+    - {slug: "what-survives", text: "What survives", level: 2}
+    - {slug: "what-is-dead", text: "What is dead", level: 2}
+    - {slug: "corrections-to-the-original-document", text: "Corrections to the original document", level: 2}
+    - {slug: "the-sequence-what-to-actually-do", text: "THE SEQUENCE — what to actually do", level: 2}
+    - {slug: "file-unconditionally-regardless-of-the-manifesto-s-fate", text: "File unconditionally, regardless of the manifesto's fate", level: 3}
+    - {slug: "the-first-mission-make-the-thesis-falsifiable-build-no-new-tier", text: "The first mission — make the thesis falsifiable, build no new tier", level: 3}
+    - {slug: "the-decision-gate-2538-and-it-already-exists", text: "THE DECISION GATE — `#2538`, and it already exists", level: 3}
+    - {slug: "two-human-decisions-not-agent-tasks", text: "Two human decisions — not agent tasks", level: 3}
+    - {slug: "explicitly-parked-with-reasons", text: "Explicitly parked — with reasons", level: 3}
+    - {slug: "debt-tickets-worth-filing-now-independent-of-everything-above", text: "Debt tickets worth filing now (independent of everything above)", level: 3}
+    - {slug: "handover-note-to-the-parallel-session-fix-2934-demock-planning-closeout-test", text: "Handover note to the parallel session (`fix/2934-demock-planning-closeout-test`)", level: 2}
+    - {slug: "method-note-and-limits", text: "Method note and limits", level: 2}
   - path: "docs/plans/doctrine/mission-b-proposed-scope.md"
     title: "Mission B (proposed scope) — Charter-mediated doctrine selection"
     divio_type: "none"
@@ -8061,6 +8127,149 @@ pages:
     - {slug: "what-this-audit-does-not-cover", text: "What this audit does NOT cover", level: 2}
     - {slug: "recommendation-in-one-paragraph", text: "Recommendation in one paragraph", level: 2}
     - {slug: "appendix-raw-import-inventory-snapshot-2026-05-17", text: "Appendix — raw import inventory (snapshot 2026-05-17)", level: 2}
+  - path: "docs/plans/doctrine/squad-reports/architect.md"
+    title: "Architect lens — seams, types, and concrete shapes"
+    divio_type: "none"
+    abstract: "Structural hardening of the creed/FoundationalValues design: where each part plugs in, the concrete type shapes, and the composition invariant enforced as a type."
+    anchors:
+    - {slug: "findings", text: "FINDINGS", level: 2}
+    - {slug: "q1-foundationalvalues-as-a-half-open-enum", text: "Q1 — `FoundationalValues` as a \"half-open enum\"", level: 2}
+    - {slug: "q2-where-creed-lives-exactly", text: "Q2 — Where `creed` lives, exactly", level: 2}
+    - {slug: "q3-impacts-field-on-edges-not-a-relation-member-and-in-tension-with-survives", text: "Q3 — `impacts`: field on edges, not a Relation member — and `in_tension_with` survives", level: 2}
+    - {slug: "q4-per-artefact-field-exact-kinds-and-shape", text: "Q4 — Per-artefact field: exact kinds and shape", level: 2}
+    - {slug: "q5-valueconnascence-n-n-home-reader-and-the-composition-invariant", text: "Q5 — `ValueConnascence` N×N: home, reader, and the composition invariant", level: 2}
+    - {slug: "q6-what-breaks-and-do-foundationalvalues-become-drg-nodes", text: "Q6 — What breaks, and do `FoundationalValues` become DRG nodes?", level: 2}
+    - {slug: "concrete-shapes", text: "CONCRETE SHAPES", level: 2}
+    - {slug: "1-value-set-connascence-matrix-src-doctrine-values-built-in-ammerse-valueset-yaml", text: "1. Value set + connascence matrix — `src/doctrine/values/built-in/ammerse.valueset.yaml`", level: 3}
+    - {slug: "2-creed-charter-yaml-block-weights-only-no-value-definitions-no-matrix", text: "2. Creed — `charter.yaml` block (weights only; no value definitions, no matrix)", level: 3}
+    - {slug: "3-python-the-four-types-the-two-seams", text: "3. Python — the four types + the two seams", level: 3}
+    - {slug: "4-per-artefact-field-yaml-model-6-kinds", text: "4. Per-artefact field — YAML + model (×6 kinds)", level: 3}
+    - {slug: "5-edge-field-src-doctrine-drg-models-py-328-339", text: "5. Edge field — `src/doctrine/drg/models.py:328-339`", level: 3}
+    - {slug: "seam-change-inventory", text: "SEAM-CHANGE INVENTORY", level: 2}
+    - {slug: "part-1-creed-and-values", text: "Part 1 — Creed and Values", level: 3}
+    - {slug: "part-2-impacts-on-edges", text: "Part 2 — `impacts` on edges", level: 3}
+    - {slug: "part-3-charter-creation", text: "Part 3 — Charter creation", level: 3}
+    - {slug: "what-breaks", text: "WHAT BREAKS", level: 2}
+    - {slug: "concession", text: "CONCESSION", level: 2}
+    - {slug: "verdict", text: "VERDICT", level: 2}
+  - path: "docs/plans/doctrine/squad-reports/connascence-matrix-measurement.md"
+    title: "Connascence-matrix measurement"
+    divio_type: "none"
+    abstract: "Measured analysis of the AMMERSE first- and second-order impact matrices: spectral radius, truncation soundness, the false derivation claim, and the one asymmetric cell."
+    anchors:
+    - {slug: "1-the-truncation-is-sound-the-design-s-central-maths-question-is-answered-favourably", text: "1. The truncation is SOUND — the design's central maths question is answered favourably", level: 2}
+    - {slug: "2-the-second-order-matrix-is-not-derivable-from-the-first-order-one", text: "2. The second-order matrix is NOT derivable from the first-order one", level: 2}
+    - {slug: "3-one-probable-typo-in-the-published-first-order-matrix", text: "3. One probable typo in the published first-order matrix", level: 2}
+    - {slug: "4-the-matrix-is-symmetric-which-vindicates-the-correlation-framing-for-the-matrix", text: "4. The matrix is symmetric — which vindicates the \"correlation\" framing *for the matrix*", level: 2}
+    - {slug: "5-the-absolutism-problem-diagnosed-and-it-is-the-renormalisation", text: "5. The absolutism problem — diagnosed, and it is the renormalisation", level: 2}
+    - {slug: "5-1-with-per-tier-renormalisation-absolutism-is-provable-not-incidental", text: "5.1 With per-tier renormalisation: absolutism is provable, not incidental", level: 3}
+    - {slug: "5-2-without-renormalisation-the-dampening-already-solves-it-with-room-to-spare", text: "5.2 Without renormalisation, the dampening already solves it — with room to spare", level: 3}
+    - {slug: "5-3-the-fix-one-final-scaling-never-per-tier", text: "5.3 The fix: one final scaling, never per-tier", level: 3}
+    - {slug: "5-4-consequences-for-the-design", text: "5.4 Consequences for the design", level: 3}
+  - path: "docs/plans/doctrine/squad-reports/doctrine-curator.md"
+    title: "Doctrine-curator lens — exemptions, accreditation, provenance"
+    divio_type: "none"
+    abstract: "Doctrine integrity review of the creed design: the per-kind exemption table, the value_impact vs value_bias split, accreditation placement, and the gates it trips."
+    anchors:
+    - {slug: "findings", text: "Findings", level: 2}
+    - {slug: "exemption-table-all-12-artifactkind-members", text: "Exemption table — all 12 `ArtifactKind` members", level: 2}
+    - {slug: "value-impact-vs-value-bias-three-arguments", text: "`value_impact` vs `value_bias` — three arguments", level: 2}
+    - {slug: "accreditation-placement", text: "Accreditation placement", level: 2}
+    - {slug: "provenance-shape", text: "Provenance shape", level: 2}
+    - {slug: "composition-with-2216", text: "Composition with #2216", level: 2}
+    - {slug: "gates-tripped", text: "Gates tripped", level: 2}
+    - {slug: "concession", text: "Concession", level: 2}
+    - {slug: "verdict", text: "Verdict", level: 2}
+  - path: "docs/plans/doctrine/squad-reports/implementer.md"
+    title: "Implementer lens — feasibility and the prototype slice"
+    divio_type: "none"
+    abstract: "Buildability of the creed design here: real Pydantic models, the delta representation decision, the coverage gate, and a one-day pre-registered prototype."
+    anchors:
+    - {slug: "profile-adopted", text: "Profile adopted", level: 2}
+    - {slug: "models", text: "Models", level: 2}
+    - {slug: "src-doctrine-values-models-py-new", text: "`src/doctrine/values/models.py` (new)", level: 3}
+    - {slug: "src-charter-creed-py-new-the-charter-tier-weighting", text: "`src/charter/creed.py` (new) — the charter-tier weighting", level: 3}
+    - {slug: "delta-representation", text: "`delta` representation", level: 2}
+    - {slug: "half-open-set", text: "Half-open set", level: 2}
+    - {slug: "the-honest-trade-four-costs-stated-plainly", text: "The honest trade — four costs, stated plainly", level: 3}
+    - {slug: "coverage-gate", text: "Coverage gate", level: 2}
+    - {slug: "prototype-slice", text: "Prototype slice", level: 2}
+    - {slug: "reaction-to-the-proposed-slice", text: "Reaction to the proposed slice", level: 3}
+    - {slug: "wps", text: "WPs", level: 3}
+    - {slug: "success-signal-fixed-before-the-run", text: "Success signal — fixed before the run", level: 3}
+    - {slug: "import-path", text: "Import path", level: 2}
+    - {slug: "concession", text: "CONCESSION", level: 2}
+    - {slug: "verdict", text: "VERDICT", level: 2}
+  - path: "docs/plans/doctrine/squad-reports/index.md"
+    title: "Squad reports — creed and FoundationalValues hardening"
+    divio_type: "none"
+    abstract: "Raw four-lens squad reports behind the hardened creed/FoundationalValues design: architect, doctrine-curator, reviewer, and implementer."
+    anchors:
+    - {slug: "see-also", text: "See also", level: 2}
+  - path: "docs/plans/doctrine/squad-reports/review-round-2026-07-26.md"
+    title: "Verification round — three-lens review of the finalized authorities"
+    divio_type: "none"
+    abstract: "Final review squad before handover: sequence executability, fresh-eyes fix verification, and adversarial number-by-number reproduction. Verdict plus the applied fix list."
+    anchors:
+    - {slug: "aggregated-verdict", text: "Aggregated verdict", level: 2}
+    - {slug: "fix-ledger", text: "Fix ledger", level: 2}
+    - {slug: "what-the-lenses-could-not-verify-carried-forward-honestly", text: "What the lenses could not verify (carried forward honestly)", level: 2}
+    - {slug: "lens-verdicts-condensed", text: "Lens verdicts, condensed", level: 2}
+  - path: "docs/plans/doctrine/squad-reports/reviewer.md"
+    title: "Reviewer lens — adversarial pass and the 39% verdict"
+    divio_type: "none"
+    abstract: "Adversarial review of the creed design: the sign channel is measurably noisy, five of seven axes carry no cost signal, and creed-weighted ranking collapses to magnitude."
+    anchors:
+    - {slug: "findings", text: "Findings", level: 2}
+    - {slug: "the-39-verdict", text: "The 39% verdict", level: 2}
+    - {slug: "fakeable-success-register", text: "Fakeable-success register", level: 2}
+    - {slug: "the-interview-loop", text: "The interview loop", level: 2}
+    - {slug: "what-survives-me", text: "What survives me", level: 2}
+    - {slug: "concession", text: "Concession", level: 2}
+    - {slug: "verdict", text: "Verdict", level: 2}
+  - path: "docs/plans/doctrine/test_quality/doctrine-artefact-series-proposal.md"
+    title: "Test-Quality Doctrine — Artefact Series Proposal"
+    divio_type: "none"
+    abstract: "Curator proposal for the test-slicing/mocking-boundary doctrine series: a Tests-as-Scaffold paradigm, DIRECTIVE_041 disambiguation, exemplar assets, and the DRG edge map."
+    anchors:
+    - {slug: "binding-constraints-added-2026-07-26-after-the-proposal-was-first-written", text: "Binding constraints (added 2026-07-26, after the proposal was first written)", level: 2}
+    - {slug: "prior-art-found-and-removed-record-not-a-fold", text: "Prior art found and removed (record, not a fold)", level: 3}
+    - {slug: "guiding-correction-augment-heavy-not-create-heavy", text: "Guiding correction — augment-heavy, not create-heavy", level: 2}
+    - {slug: "the-operator-s-topology-refinements-applied", text: "The operator's topology refinements (applied)", level: 2}
+    - {slug: "proposed-series", text: "Proposed series", level: 2}
+    - {slug: "create", text: "Create", level: 3}
+    - {slug: "augment-edit-no-new-node", text: "Augment (edit, no new node)", level: 3}
+    - {slug: "directive-041-disambiguation-stays-vs-moves", text: "DIRECTIVE_041 disambiguation (stays vs moves)", level: 2}
+    - {slug: "drg-edge-map-source-relation-target", text: "DRG edge map (source --relation--> target)", level: 2}
+    - {slug: "capability-awareness-intent-dominates-revised-2026-07-26", text: "Capability-awareness (intent dominates) — REVISED 2026-07-26", level: 2}
+    - {slug: "load-time-validation-risks", text: "Load-time / validation risks", level: 2}
+    - {slug: "build-order-for-the-curator", text: "Build order for the curator", level: 2}
+  - path: "docs/plans/doctrine/test_quality/index.md"
+    title: "Test Quality Doctrine"
+    divio_type: "none"
+    abstract: "Research and planning notes for test-quality doctrine — test slicing/scoping and mocking-boundary discipline."
+    anchors:
+    - {slug: "see-also", text: "See also", level: 2}
+  - path: "docs/plans/doctrine/test_quality/mocking-boundary-and-test-slicing-research.md"
+    title: "Test Slicing & Mocking-Boundary Discipline — Research Findings"
+    divio_type: "none"
+    abstract: "Research for refining Spec Kitty's test-boundary doctrine after #2934, covering functional slicing, internal mocks, and outcome assertions."
+    anchors:
+    - {slug: "1-purpose-and-scope", text: "1. Purpose and scope", level: 2}
+    - {slug: "1-1-why-this-is-worth-doctrine-not-just-a-review-comment", text: "1.1 Why this is worth doctrine, not just a review comment", level: 3}
+    - {slug: "2-the-rule-synthesised", text: "2. The rule (synthesised)", level: 2}
+    - {slug: "3-source-by-source-synthesis", text: "3. Source-by-source synthesis", level: 2}
+    - {slug: "3-1-clear-test-boundaries-the-primary-operative-rule", text: "3.1 Clear Test Boundaries — the primary operative rule", level: 3}
+    - {slug: "3-2-the-testing-pyramid-why-level-choice-avoids-mocking-internals", text: "3.2 The Testing Pyramid — why level choice avoids mocking internals", level: 3}
+    - {slug: "3-3-connascence-the-theoretical-backbone", text: "3.3 Connascence — the theoretical backbone", level: 3}
+    - {slug: "3-4-test-desiderata-kent-beck-the-property-level-backing", text: "3.4 Test Desiderata (Kent Beck) — the property-level backing", level: 3}
+    - {slug: "3-5-clean-code-supporting-framing-by-extension-only", text: "3.5 Clean Code — supporting framing (by extension only)", level: 3}
+    - {slug: "4-the-remediation-recipe", text: "4. The remediation recipe", level: 2}
+    - {slug: "5-worked-example-2934-in-the-vocabulary-above", text: "5. Worked example — #2934, in the vocabulary above", level: 2}
+    - {slug: "6-existing-project-alignment", text: "6. Existing project alignment", level: 2}
+    - {slug: "7-tensions-and-counterpoints-stated-honestly", text: "7. Tensions and counterpoints (stated honestly)", level: 2}
+    - {slug: "8-recommendations-for-the-doctrine-artefact-2935", text: "8. Recommendations for the doctrine artefact (#2935)", level: 2}
+    - {slug: "9-references", text: "9. References", level: 2}
   - path: "docs/plans/doctrine/wp-prompt-governance-atdd-findings.md"
     title: "WP-Prompt Governance Contract — ATDD Findings"
     divio_type: "none"
@@ -8182,6 +8391,34 @@ pages:
     - {slug: "4-recommended-disposition-fr-004-sc-003", text: "4. Recommended disposition (FR-004 / SC-003)", level: 2}
     - {slug: "5-conditional-clean-fix-fr-005-sc-004", text: "5. Conditional clean fix (FR-005 / SC-004)", level: 2}
     - {slug: "evidence-index", text: "Evidence index", level: 2}
+  - path: "docs/plans/engineering-notes/2841-residual-2917-mission-scope.md"
+    title: "Coord-Trust Residual + Runtime-State Birth-Cutover — Mission Scope"
+    divio_type: "none"
+    abstract: "Pre-spec scope: close #2841's write-placement residual (Part A) so the split-brain write is unrepresentable, plus #2917's runtime-state birth-cutover as Part B on the settled port."
+    anchors:
+    - {slug: "what-2874-already-closed-so-we-don-t-re-spec-it", text: "What #2874 already closed (so we don't re-spec it)", level: 2}
+    - {slug: "the-residual-why-the-parallel-write-is-not-fully-closed", text: "The residual — why the parallel write is not *fully* closed", level: 2}
+    - {slug: "proposed-mission-part-a-close-the-parallel-write-part-b-2917", text: "Proposed mission — Part A (close the parallel write) → Part B (#2917)", level: 2}
+    - {slug: "part-a-coord-trust-write-placement-residual-closure", text: "Part A — coord-trust write-placement residual closure", level: 3}
+    - {slug: "part-b-2917-runtime-state-birth-cutover-option-c-rides-the-settled-port", text: "Part B — #2917 runtime-state birth-cutover (Option C), rides the settled port", level: 3}
+    - {slug: "scope-boundary-vs-1619-do-not-creep", text: "Scope boundary vs #1619 (do NOT creep)", level: 2}
+    - {slug: "operator-decision-2026-07-25-maximal-residual-closure", text: "Operator decision (2026-07-25): **maximal residual closure**", level: 2}
+    - {slug: "key-files", text: "Key files", level: 2}
+  - path: "docs/plans/engineering-notes/2917-runtime-state-birth-cutover-research.md"
+    title: "#2917 Runtime-State Birth-Cutover — Pre-Spec Research"
+    divio_type: "none"
+    abstract: "Grounded findings from a 4-lens research squad on the #2917 runtime-state cutover drift: the problem, its true (inert) impact, and the solution fork the spec must choose."
+    anchors:
+    - {slug: "tl-dr-the-decision-you-actually-have-to-make", text: "TL;DR — the decision you actually have to make", level: 2}
+    - {slug: "the-problem-converged-high-confidence", text: "The problem (converged, high confidence)", level: 2}
+    - {slug: "impact-grounding-the-drift-is-real-but-inert-scope-lens", text: "Impact grounding — the drift is REAL but INERT (scope lens)", level: 2}
+    - {slug: "why-just-stamp-at-birth-is-provably-wrong-failure-modes-lens", text: "Why \"just stamp at birth\" is provably wrong (failure-modes lens)", level: 2}
+    - {slug: "solution-seam-architecture-architecture-lens", text: "Solution seam architecture (architecture lens)", level: 2}
+    - {slug: "cross-mission-constraints-precedent-overlap-lens", text: "Cross-mission constraints (precedent/overlap lens)", level: 2}
+    - {slug: "edge-cases-the-spec-must-rule", text: "Edge cases the spec must rule", level: 2}
+    - {slug: "squad-recommendation-for-your-decision", text: "Squad recommendation (for your decision)", level: 2}
+    - {slug: "operator-decision-2026-07-25-option-c-close-the-authoring-drift-root", text: "Operator decision (2026-07-25): **Option C — close the authoring drift (root)**", level: 2}
+    - {slug: "key-files", text: "Key files", level: 2}
   - path: "docs/plans/engineering-notes/3-2-0-training-bugs-2007/SYNTHESIS-2007.md"
     title: "Research synthesis — #2007 (3.2.0 training bugs Robert witnessed)"
     divio_type: "none"
@@ -8521,6 +8758,24 @@ pages:
     - {slug: "runner-up-1827-merge-baseline-circular-failure", text: "Runner-up: **#1827 (merge baseline circular failure)**", level: 3}
     - {slug: "the-neutral-cycle-shape-lead-parallel-tracks-since-3-2-x-ships-emergent-patches", text: "The neutral cycle shape (lead + parallel tracks, since 3.2.x ships emergent patches)", level: 3}
     - {slug: "5-top-3-dependency-note-single-recommendation-the-message-back", text: "5. Top-3 + dependency note + single recommendation (the message back)", level: 2}
+  - path: "docs/plans/engineering-notes/3.2.6-maintenance-brief.md"
+    title: "3.2.6 Maintenance Brief"
+    divio_type: "none"
+    abstract: "Maintainer-facing status of the 3.2.6 development cycle — what shipped, where main@head stands, and the in-flight work lines."
+    anchors:
+    - {slug: "1-where-main-stands-right-now", text: "1. Where `main` stands right now", level: 2}
+    - {slug: "2-what-shipped-in-3-2-6-so-far", text: "2. What shipped in 3.2.6 so far", level: 2}
+    - {slug: "doctrine-is-now-shippable-and-forkable", text: "Doctrine is now shippable and forkable", level: 3}
+    - {slug: "lifecycle-gates-stopped-guessing", text: "Lifecycle gates stopped guessing", level: 3}
+    - {slug: "wp-state-is-a-single-event-sourced-authority", text: "WP state is a single event-sourced authority", level: 3}
+    - {slug: "automation-non-interactive-robustness", text: "Automation / non-interactive robustness", level: 3}
+    - {slug: "coordination-merge-integrity", text: "Coordination / merge integrity", level: 3}
+    - {slug: "docs-dashboard", text: "Docs & dashboard", level: 3}
+    - {slug: "3-work-in-flight", text: "3. Work in flight", level: 2}
+    - {slug: "ready-to-merge-open-prs-operator-merges", text: "Ready-to-merge / open PRs (operator merges)", level: 3}
+    - {slug: "internal-work-lines-roadmap-context-not-all-pr-backed-yet", text: "Internal work lines (roadmap context — not all PR-backed yet)", level: 3}
+    - {slug: "4-what-this-means-for-the-stabilization-partial-code-freeze", text: "4. What this means for the stabilization partial code freeze", level: 2}
+    - {slug: "5-what-a-maintainer-should-know", text: "5. What a maintainer should know", level: 2}
   - path: "docs/plans/engineering-notes/651-docs-consolidation/02-common-docs-standard.md"
     title: "Common Docs standard — full-adoption mechanics & the metadata-SSOT verdict"
     divio_type: "none"
@@ -8563,6 +8818,37 @@ pages:
     - {slug: "slicing", text: "Slicing", level: 2}
     - {slug: "open-questions-resolved-reconciliation-adr-2026-06-27-1-mission-a-wps", text: "Open questions — resolved (reconciliation ADR 2026-06-27-1 + Mission A WPs)", level: 2}
     - {slug: "references", text: "References", level: 2}
+  - path: "docs/plans/engineering-notes/883-mission-type-authority-brief.md"
+    title: "Mission #883 Brief: Doctrine as Mission-Type Authority"
+    divio_type: "explanation"
+    abstract: "Lead-architect debrief for mission #883 — intent, operator guidance, research, adversarial second opinion, and a conversation transcript for maintainer review."
+    anchors:
+    - {slug: "1-executive-lead-architect-debrief", text: "1. Executive / lead-architect debrief", level: 2}
+    - {slug: "2-mission-intent-and-north-star", text: "2. Mission intent and north star", level: 2}
+    - {slug: "3-operator-guidance-chronological", text: "3. Operator guidance (chronological)", level: 2}
+    - {slug: "4-pre-spec-research-synthesis-four-lens-squad", text: "4. Pre-spec research synthesis (four-lens squad)", level: 2}
+    - {slug: "5-adversarial-second-opinion-four-lens-squad-unanimous-refine", text: "5. Adversarial second opinion (four-lens squad) — unanimous REFINE", level: 2}
+    - {slug: "6-testing-posture-operator-mandated", text: "6. Testing posture (operator-mandated)", level: 2}
+    - {slug: "7-refined-work-package-spine", text: "7. Refined work-package spine", level: 2}
+    - {slug: "8-decisions-resolved-with-the-operator-spec-stage-interview", text: "8. Decisions resolved with the operator (spec-stage interview)", level: 2}
+    - {slug: "appendix-a-conversation-transcript-for-maintainer-review", text: "Appendix A — Conversation transcript (for maintainer review)", level: 2}
+  - path: "docs/plans/engineering-notes/883-research-synthesis.md"
+    title: "Mission #883 Research Dossier (pre-spec, 4-lens squad)"
+    divio_type: "explanation"
+    abstract: "Point-in-time pre-spec research synthesis for mission #883 with file:line evidence; superseded by the ADR and brief where they differ."
+    anchors:
+    - {slug: "0-operator-decisions-2026-07-14-authoritative-overrides-defaults-below", text: "0. OPERATOR DECISIONS (2026-07-14) — authoritative, overrides defaults below", level: 2}
+    - {slug: "1-the-one-line-truth", text: "1. The one-line truth", level: 2}
+    - {slug: "2-the-three-surfaces-converged-across-all-four-lenses", text: "2. The three surfaces (converged across all four lenses)", level: 2}
+    - {slug: "3-the-real-leak-architect-alphonso-corrects-the-already-prevented-reading", text: "3. The real leak (architect-alphonso — corrects the \"already prevented\" reading)", level: 2}
+    - {slug: "4-template-set-split-it-do-not-thread-governance-through-it", text: "4. `template_set` — split it (do NOT thread governance through it)", level: 2}
+    - {slug: "5-split-brain-paula-adjacent-do-not-fold-in", text: "5. Split-brain (paula) — ADJACENT, do NOT fold in", level: 2}
+    - {slug: "6-mission-type-key-canonicalization-paula", text: "6. Mission-type key canonicalization (paula)", level: 2}
+    - {slug: "7-mechanism-gaps-if-we-go-the-governance-refs-route-daphne", text: "7. Mechanism gaps if we go the `governance_refs` route (daphne)", level: 2}
+    - {slug: "8-enforcement-test-the-acs-demand-daphne-concrete", text: "8. Enforcement test the ACs demand (daphne — concrete)", level: 2}
+    - {slug: "9-prior-art-constraints", text: "9. Prior-art constraints", level: 2}
+    - {slug: "10-the-issue-s-4-layer-model-vs-reality-architect", text: "10. The issue's 4-layer model vs reality (architect)", level: 2}
+    - {slug: "11-genuine-content-gaps-robbie-author-new-vs-reference-existing", text: "11. Genuine content gaps (robbie) — `[author-new]` vs `[reference-existing]`", level: 2}
   - path: "docs/plans/engineering-notes/agent-knowledge-canonical-homes.md"
     title: "Agent knowledge: canonical homes for rules, practices, reference, and learned facts"
     divio_type: "none"
@@ -8604,6 +8890,200 @@ pages:
     - {slug: "what-does-not-belong-here", text: "What does NOT belong here", level: 2}
     - {slug: "file-format", text: "File format", level: 2}
     - {slug: "index", text: "Index", level: 2}
+  - path: "docs/plans/engineering-notes/architecture-audits/2026-05-11-findings-vs-issues-update.md"
+    title: "2026-05-11 — findings vs issues (#645, #822 refresh, open bugs)"
+    divio_type: "none"
+    abstract: "2026-05-11 refresh cross-checking the CaaCS audit findings against open issues (#645, #822) and adding two new slow-burn refactor candidates surfaced by the pass."
+    anchors:
+    - {slug: "inputs", text: "Inputs", level: 2}
+    - {slug: "section-1-issue-645", text: "Section 1: Issue #645", level: 2}
+    - {slug: "body-summary-200-words", text: "Body summary (≤200 words)", level: 3}
+    - {slug: "linked-work", text: "Linked work", level: 3}
+    - {slug: "specific-code-paths-referenced", text: "Specific code paths referenced", level: 3}
+    - {slug: "relationship-to-findings", text: "Relationship to findings", level: 3}
+    - {slug: "section-2-issue-822-delta-since-2026-05-08-crosscheck", text: "Section 2: Issue #822 — delta since 2026-05-08 crosscheck", level: 2}
+    - {slug: "new-comments-since-2026-05-08", text: "New comments since 2026-05-08", level: 3}
+    - {slug: "sub-issue-state-changes-since-2026-05-08", text: "Sub-issue state changes since 2026-05-08", level: 3}
+    - {slug: "release-tag-progression", text: "Release-tag progression", level: 3}
+    - {slug: "does-the-prior-picture-still-hold", text: "Does the prior picture still hold?", level: 3}
+    - {slug: "section-3-open-bug-labeled-issues-relating-table", text: "Section 3: Open \"bug\"-labeled issues — relating table", level: 2}
+    - {slug: "per-issue-notes-for-partial-strong-matches", text: "Per-issue notes for PARTIAL/STRONG matches", level: 3}
+    - {slug: "notes-on-the-weak-none-rows", text: "Notes on the WEAK/NONE rows", level: 3}
+    - {slug: "section-4-gap-analysis", text: "Section 4: Gap analysis", level: 2}
+    - {slug: "open-bug-tickets-that-strongly-match-the-new-audit-findings", text: "Open bug tickets that STRONGLY match the new audit findings", level: 3}
+    - {slug: "the-two-new-slow-burn-candidates-issue-tracker-status", text: "The two new slow-burn candidates — issue-tracker status", level: 3}
+    - {slug: "bug-tickets-without-forensic-backing", text: "Bug tickets without forensic backing", level: 3}
+    - {slug: "newly-opened-bug-cluster-post-prior-crosscheck-and-its-shape", text: "Newly-opened bug cluster (post-prior-crosscheck) and its shape", level: 3}
+    - {slug: "section-5-methodology-caveats", text: "Section 5: Methodology / caveats", level: 2}
+    - {slug: "issues-fetched-successfully", text: "Issues fetched successfully", level: 3}
+    - {slug: "issues-not-fetched", text: "Issues NOT fetched", level: 3}
+    - {slug: "state-changes-during-the-read", text: "State changes during the read", level: 3}
+    - {slug: "limits", text: "Limits", level: 3}
+  - path: "docs/plans/engineering-notes/architecture-audits/2026-05-11-issue-992-984-audit-comments.md"
+    title: "Audit relationship to #992 and #984 — deep read"
+    divio_type: "none"
+    abstract: "Deep read relating the 2026-05 CaaCS audit to issues #992 and #984, classifying their strength on the findings under the brownfield-investigation paradigm."
+    anchors:
+    - {slug: "inputs", text: "Inputs", level: 2}
+    - {slug: "issue-992-deep-read", text: "Issue #992 — deep read", level: 2}
+    - {slug: "body-summary", text: "Body summary", level: 3}
+    - {slug: "linked-work", text: "Linked work", level: 3}
+    - {slug: "code-paths-the-issue-names", text: "Code paths the issue names", level: 3}
+    - {slug: "audit-relationship-specific-evidence", text: "Audit relationship — specific evidence", level: 3}
+    - {slug: "useful-audit-comment-for-992-draft-do-not-post", text: "Useful audit comment for #992 (DRAFT — do not post)", level: 3}
+    - {slug: "issue-984-deep-read", text: "Issue #984 — deep read", level: 2}
+    - {slug: "body-summary-2", text: "Body summary", level: 3}
+    - {slug: "linked-work-2", text: "Linked work", level: 3}
+    - {slug: "code-paths-the-issue-names-2", text: "Code paths the issue names", level: 3}
+    - {slug: "audit-relationship-specific-evidence-2", text: "Audit relationship — specific evidence", level: 3}
+    - {slug: "useful-audit-comment-for-984-draft-do-not-post", text: "Useful audit comment for #984 (DRAFT — do not post)", level: 3}
+    - {slug: "cross-issue-observations", text: "Cross-issue observations", level: 2}
+    - {slug: "recommendation", text: "Recommendation", level: 2}
+    - {slug: "992", text: "#992", level: 3}
+    - {slug: "984", text: "#984", level: 3}
+    - {slug: "methodology-caveats", text: "Methodology / caveats", level: 2}
+  - path: "docs/plans/engineering-notes/architecture-audits/2026-05-822-crosscheck.md"
+    title: "CaaCS findings ↔ #822 open sub-issues cross-check"
+    divio_type: "none"
+    abstract: "Cross-check mapping the 2026-05 CaaCS audit findings onto the open sub-issues of epic #822 (3.2.0 stabilization and release readiness), with per-issue state."
+    anchors:
+    - {slug: "inputs", text: "Inputs", level: 2}
+    - {slug: "audit-findings-canonical-numbering-for-this-doc", text: "Audit findings (canonical numbering for this doc)", level: 2}
+    - {slug: "forward-map-finding-matching-822-sub-issues", text: "Forward map: Finding → matching #822 sub-issues", level: 2}
+    - {slug: "f1-bus-factor-1", text: "F1 — Bus factor = 1", level: 3}
+    - {slug: "f2-agent-tasks-workflow-mission-py-refactor-target", text: "F2 — `agent/{tasks,workflow,mission}.py` refactor target", level: 3}
+    - {slug: "f3-pipeline-trust-healthy", text: "F3 — Pipeline trust healthy", level: 3}
+    - {slug: "f4-project-alive-and-accelerating", text: "F4 — Project alive and accelerating", level: 3}
+    - {slug: "f5-three-empty-src-leftover-dirs", text: "F5 — Three empty src/ leftover dirs", level: 3}
+    - {slug: "f6-duplicate-task-prompt-template-md", text: "F6 — Duplicate `task-prompt-template.md`", level: 3}
+    - {slug: "f7-template-dispatcher-coupling-load-bearing", text: "F7 — Template ↔ dispatcher coupling load-bearing", level: 3}
+    - {slug: "f8-cli-commands-charter-py-decomposition", text: "F8 — `cli/commands/charter.py` decomposition", level: 3}
+    - {slug: "f9-cli-commands-init-py-decomposition", text: "F9 — `cli/commands/init.py` decomposition", level: 3}
+    - {slug: "f10-next-runtime-bridge-py-is-a-hub", text: "F10 — `next/runtime_bridge.py` is a hub", level: 3}
+    - {slug: "f11-d-rated-migrations-cleanup", text: "F11 — D-rated migrations cleanup", level: 3}
+    - {slug: "f12-sync-cluster-needs-a-second-maintainer", text: "F12 — `sync/` cluster needs a second maintainer", level: 3}
+    - {slug: "f13-no-tests-overlay-audit-blind-spot", text: "F13 — No tests/ overlay (audit blind spot)", level: 3}
+    - {slug: "f14-no-kitty-specs-overlay-audit-blind-spot", text: "F14 — No kitty-specs/ overlay (audit blind spot)", level: 3}
+    - {slug: "reverse-map-open-822-sub-issue-matching-audit-findings", text: "Reverse map: Open #822 sub-issue → matching audit findings", level: 2}
+    - {slug: "two-gap-lists", text: "Two gap lists", level: 2}
+    - {slug: "gap-list-1-audit-findings-without-an-open-822-issue", text: "Gap list 1 — Audit findings without an open #822 issue", level: 3}
+    - {slug: "gap-list-2-open-822-sub-issues-without-forensic-backing", text: "Gap list 2 — Open #822 sub-issues without forensic backing", level: 3}
+    - {slug: "methodology-caveats", text: "Methodology / caveats", level: 2}
+    - {slug: "closed-issue-note-informational-only", text: "Closed-issue note (informational only)", level: 2}
+  - path: "docs/plans/engineering-notes/architecture-audits/2026-05-caacs-meta-assessment.md"
+    title: "CaaCS Meta-Assessment & Input for #666 Spike"
+    divio_type: "none"
+    abstract: "Reflective meta-assessment of the 2026-05 ad-hoc CaaCS run on spec-kitty: synthesis for adoption stakeholders (DM-C) and input to the #666 skill-design spike."
+    anchors:
+    - {slug: "1-executive-summary", text: "1. Executive summary", level: 2}
+    - {slug: "2-methodology-phase-by-phase-reflection", text: "2. Methodology — phase-by-phase reflection", level: 2}
+    - {slug: "phase-0-priming", text: "Phase 0 — Priming", level: 3}
+    - {slug: "phase-1-doctrine-extraction", text: "Phase 1 — Doctrine extraction", level: 3}
+    - {slug: "phase-2-discovery-run", text: "Phase 2 — Discovery run", level: 3}
+    - {slug: "phase-3-synthesis", text: "Phase 3 — Synthesis", level: 3}
+    - {slug: "3-findings-recap-compact", text: "3. Findings recap (compact)", level: 2}
+    - {slug: "4-reflections-on-the-approach", text: "4. Reflections on the approach", level: 2}
+    - {slug: "5-recommendations-for-further-enhancement", text: "5. Recommendations for further enhancement", level: 2}
+    - {slug: "6-direct-input-for-the-666-design-spike", text: "6. Direct input for the #666 design spike", level: 2}
+    - {slug: "what-the-666-skill-should-include", text: "What the #666 skill SHOULD include", level: 3}
+    - {slug: "what-the-666-skill-should-not-do", text: "What the #666 skill SHOULD NOT do", level: 3}
+    - {slug: "a-concrete-test-for-the-design-spike", text: "A concrete test for the design spike", level: 3}
+    - {slug: "what-this-run-did-not-prove-about-665-666", text: "What this run did NOT prove about #665/#666", level: 3}
+    - {slug: "7-decision-moments-open-and-resolved", text: "7. Decision Moments — open and resolved", level: 2}
+    - {slug: "8-provenance", text: "8. Provenance", level: 2}
+  - path: "docs/plans/engineering-notes/architecture-audits/2026-05-phase3-f1-knowledge-capture-plan.md"
+    title: "F1 Knowledge-Capture Plan"
+    divio_type: "none"
+    abstract: "Proposed knowledge-capture plan anchored in CaaCS Finding F1 (bus factor of 1 across src/ hotspots), honoring DM-D: document and transfer before refactoring."
+    anchors:
+    - {slug: "1-problem-statement", text: "1. Problem statement", level: 2}
+    - {slug: "2-constraints-dm-d-applied", text: "2. Constraints (DM-D applied)", level: 2}
+    - {slug: "3-sequenced-work-packages", text: "3. Sequenced work packages", level: 2}
+    - {slug: "kc-wp1-living-architecture-brief-for-src-specify-cli-cli-commands-agent", text: "KC-WP1 — Living architecture brief for `src/specify_cli/cli/commands/agent/`", level: 3}
+    - {slug: "kc-wp2-pair-sessions-on-top-5-worst-complexity-functions", text: "KC-WP2 — Pair sessions on top-5 worst-complexity functions", level: 3}
+    - {slug: "kc-wp3-test-gap-audit-for-agent-hotspots", text: "KC-WP3 — Test-gap audit for agent/* hotspots", level: 3}
+    - {slug: "kc-wp4-f6-duplicate-template-investigation", text: "KC-WP4 — F6 duplicate-template investigation", level: 3}
+    - {slug: "out-of-scope-for-this-plan", text: "Out of scope for this plan", level: 3}
+    - {slug: "4-eisenhower-matrix", text: "4. Eisenhower matrix", level: 2}
+    - {slug: "5-risk-register", text: "5. Risk register", level: 2}
+    - {slug: "6-connection-to-665-666", text: "6. Connection to #665 / #666", level: 2}
+    - {slug: "7-open-follow-ups", text: "7. Open follow-ups", level: 2}
+  - path: "docs/plans/engineering-notes/architecture-audits/2026-05-phase3-issue-drafts-and-triage.md"
+    title: "Phase 3 — Issue drafts (unbacked findings) and triage (unbacked open issues)"
+    divio_type: "none"
+    abstract: "Planning aid drafting issues for unbacked CaaCS findings and triaging unbacked open issues under DM-D; a read-only synthesis that posts and edits nothing."
+    anchors:
+    - {slug: "methodology", text: "Methodology", level: 2}
+    - {slug: "part-1-github-issue-drafts-for-unbacked-findings", text: "Part 1 — GitHub issue drafts for unbacked findings", level: 2}
+    - {slug: "issue-draft-1-f1-bus-factor-knowledge-transfer-plan-for-src", text: "Issue draft 1 — F1 — Bus factor knowledge-transfer plan for src/", level: 3}
+    - {slug: "issue-draft-2-f2-refactor-agent-tasks-workflow-mission-py-cluster-gated-on-f1", text: "Issue draft 2 — F2 — Refactor agent/{tasks,workflow,mission}.py cluster (gated on F1)", level: 3}
+    - {slug: "issue-draft-3-f5-delete-empty-leftover-src-directories", text: "Issue draft 3 — F5 — Delete empty leftover src/ directories", level: 3}
+    - {slug: "issue-draft-4-f6-investigate-duplicated-task-prompt-template-md", text: "Issue draft 4 — F6 — Investigate duplicated task-prompt-template.md", level: 3}
+    - {slug: "issue-draft-5-f7-evaluate-template-loader-abstraction-for-command-template-dispatcher-coupling", text: "Issue draft 5 — F7 — Evaluate template-loader abstraction for command-template ↔ dispatcher coupling", level: 3}
+    - {slug: "issue-draft-6-f8-decompose-cli-commands-charter-py", text: "Issue draft 6 — F8 — Decompose cli/commands/charter.py", level: 3}
+    - {slug: "issue-draft-7-f9-decompose-cli-commands-init-py", text: "Issue draft 7 — F9 — Decompose cli/commands/init.py", level: 3}
+    - {slug: "issue-draft-8-f10-re-examine-next-runtime-bridge-py-bridge-or-hub", text: "Issue draft 8 — F10 — Re-examine next/runtime_bridge.py — bridge or hub?", level: 3}
+    - {slug: "issue-draft-9-f11-clean-up-d-f-rated-migrations", text: "Issue draft 9 — F11 — Clean up D/F-rated migrations", level: 3}
+    - {slug: "issue-draft-10-f12-onboard-a-second-maintainer-to-sync", text: "Issue draft 10 — F12 — Onboard a second maintainer to sync/", level: 3}
+    - {slug: "issue-draft-11-f13-re-run-forensic-audit-with-tests-in-scope", text: "Issue draft 11 — F13 — Re-run forensic audit with tests/ in scope", level: 3}
+    - {slug: "issue-draft-12-f14-re-run-forensic-audit-with-kitty-specs-in-scope", text: "Issue draft 12 — F14 — Re-run forensic audit with kitty-specs/ in scope", level: 3}
+    - {slug: "part-2-triage-recommendations-for-unbacked-open-issues", text: "Part 2 — Triage recommendations for unbacked open issues", level: 2}
+    - {slug: "follow-up-notes-for-keep-relabel-and-close-needs-repro", text: "Follow-up notes for KEEP-RELABEL and CLOSE-NEEDS-REPRO", level: 3}
+  - path: "docs/plans/engineering-notes/architecture-audits/2026-05-spec-kitty-caacs.md"
+    title: "spec-kitty CaaCS Audit — 2026-05"
+    divio_type: "none"
+    abstract: "The full 2026-05 Code-as-a-Crime-Scene forensic audit of the spec-kitty repository: metadata, hotspot findings, and the bus-factor and complexity observations."
+    anchors:
+    - {slug: "audit-metadata", text: "Audit metadata", level: 2}
+    - {slug: "methodology", text: "Methodology", level: 2}
+    - {slug: "inherited-biases-per-the-tactic-s-failure-modes", text: "Inherited biases (per the tactic's failure_modes)", level: 3}
+    - {slug: "scope-expansion-2026-05-09", text: "Scope expansion (2026-05-09)", level: 2}
+    - {slug: "top-findings-executive-summary", text: "Top findings (executive summary)", level: 2}
+    - {slug: "hotspot-table-top-30-vanity-filtered", text: "Hotspot table (top 30, vanity-filtered)", level: 2}
+    - {slug: "hotspots-src-only-original", text: "Hotspots — src/ only (original)", level: 3}
+    - {slug: "ddd-ratification-notes-architect", text: "DDD ratification notes (architect)", level: 3}
+    - {slug: "hotspots-full-corpus-src-tests-kitty-specs", text: "Hotspots — full corpus (src/ + tests/ + kitty-specs/)", level: 3}
+    - {slug: "temporal-coupling-top-30-pairs-both-files-non-vanity", text: "Temporal coupling (top 30 pairs, both files non-vanity)", level: 2}
+    - {slug: "cross-cutting-temporal-coupling-mission-src-tests-2026-05-09", text: "Cross-cutting temporal coupling (mission ↔ src/ ↔ tests/) (2026-05-09)", level: 2}
+    - {slug: "mission-directory-src-file-co-changes-top-20", text: "Mission-directory ↔ src-file co-changes (top 20)", level: 3}
+    - {slug: "src-file-test-file-co-changes-top-20", text: "src-file ↔ test-file co-changes (top 20)", level: 3}
+    - {slug: "f2-hotspots-change-with-tests-rate", text: "F2 hotspots: change-with-tests rate", level: 3}
+    - {slug: "test-coverage-proxy-2026-05-09", text: "Test coverage proxy (2026-05-09)", level: 2}
+    - {slug: "bus-factor-knowledge-map", text: "Bus factor / knowledge map", level: 2}
+    - {slug: "bus-factor-full-corpus-reassessment-2026-05-09", text: "Bus factor — full corpus reassessment (2026-05-09)", level: 3}
+    - {slug: "firefighting-signal", text: "Firefighting signal", level: 2}
+    - {slug: "velocity-trend-24-months-monthly-commit-count-on-src", text: "Velocity trend (24 months, monthly commit count on src/)", level: 2}
+    - {slug: "triage-matrix-eisenhower-per-procedure-exit-condition", text: "Triage matrix (Eisenhower, per procedure exit condition)", level: 2}
+    - {slug: "important-urgent-this-week", text: "Important + urgent (this week)", level: 3}
+    - {slug: "important-not-urgent-this-quarter", text: "Important + not urgent (this quarter)", level: 3}
+    - {slug: "not-important-not-urgent-don-t-worry", text: "Not important + not urgent (don't worry)", level: 3}
+    - {slug: "parallelisable-delegate-batch", text: "Parallelisable (delegate / batch)", level: 3}
+    - {slug: "cross-cutting-observations", text: "Cross-cutting observations", level: 2}
+    - {slug: "multi-window-refactor-candidate-synthesis-2026-05-11", text: "Multi-window refactor-candidate synthesis (2026-05-11)", level: 2}
+    - {slug: "window-selection-rationale", text: "Window selection rationale", level: 3}
+    - {slug: "full-history-pass-top-30-files-present-at-head", text: "Full-history pass (top 30, files present at HEAD)", level: 3}
+    - {slug: "velocity-adjusted-pass-top-30-since-4-months-ago", text: "Velocity-adjusted pass (top 30, `--since=\"4 months ago\"`)", level: 3}
+    - {slug: "intersection-inner-join-on-path", text: "Intersection (inner-join on path)", level: 3}
+    - {slug: "interpretation", text: "Interpretation", level: 3}
+    - {slug: "open-follow-ups-for-cross-check-phase-3", text: "Open follow-ups for cross-check (Phase 3)", level: 2}
+    - {slug: "scope-expansion-changelog-2026-05-09", text: "Scope-expansion changelog (2026-05-09)", level: 2}
+  - path: "docs/plans/engineering-notes/common-docs-section-audit.md"
+    title: "Common-Docs section audit (docs-wide structural concern baseline)"
+    divio_type: "none"
+    abstract: "Post-#2851 concern-bucket audit of every docs/ section: misfiled files, redistribution tally, follow-up proposals, and the durable ratchet-replacement recommendation (#2302)."
+    anchors:
+    - {slug: "purpose", text: "Purpose", level: 2}
+    - {slug: "headline-finding", text: "Headline finding", level: 2}
+    - {slug: "per-section-disposition", text: "Per-section disposition", level: 2}
+    - {slug: "architecture-needs-work-the-primary-offender", text: "`architecture/` — **NEEDS WORK** (the primary offender)", level: 3}
+    - {slug: "plans-mostly-clean-post-2402-one-stale-shadow-tree", text: "`plans/` — **MOSTLY CLEAN** (post-#2402), one stale shadow tree", level: 3}
+    - {slug: "migrations-mostly-clean-one-stray-closeout", text: "`migrations/` — **MOSTLY CLEAN**, one stray closeout", level: 3}
+    - {slug: "context-clean-with-a-content-consolidation-note", text: "`context/` — **CLEAN** (with a content-consolidation note)", level: 3}
+    - {slug: "compact-verdicts-remaining-sections", text: "Compact verdicts — remaining sections", level: 3}
+    - {slug: "redistribution-tally", text: "Redistribution tally", level: 2}
+    - {slug: "candidate-follow-up-tickets-proposals-under-2314-bucket-c-not-filed", text: "Candidate follow-up tickets (proposals under #2314 bucket C — NOT filed)", level: 2}
+    - {slug: "2302-recommendation-the-durable-ratchet-replacement", text: "#2302 recommendation — the durable ratchet replacement", level: 2}
+    - {slug: "cross-check-against-tracked-work-no-duplication", text: "Cross-check against tracked work (no duplication)", level: 2}
   - path: "docs/plans/engineering-notes/context-factory-readwrite-symmetry/00-SYNTHESIS.md"
     title: "Execution Context Factory — Read/Write Symmetry & Multi-Mission Approach"
     divio_type: "none"
@@ -8707,6 +9187,7 @@ pages:
     - {slug: "field-reports", text: "Field reports", level: 2}
     - {slug: "closing-reports", text: "Closing reports", level: 2}
     - {slug: "pre-spec-research", text: "Pre-spec research", level: 2}
+    - {slug: "docs-governance", text: "Docs governance", level: 2}
     - {slug: "design-notes", text: "Design notes", level: 2}
     - {slug: "see-also", text: "See also", level: 2}
   - path: "docs/plans/engineering-notes/mission-notes/index.md"
@@ -10145,112 +10626,6 @@ pages:
     - {slug: "problem", text: "Problem", level: 2}
     - {slug: "desired-behavior", text: "Desired Behavior", level: 2}
     - {slug: "acceptance-criteria", text: "Acceptance Criteria", level: 2}
-  - path: "docs/plans/notes/README.md"
-    title: "Architecture 1.x Notes"
-    divio_type: "none"
-    abstract: "Landing page for the 1.x architecture notes: deep-dives and notes that are not ADRs, retained as history beneath the living architecture."
-    anchors: []
-  - path: "docs/plans/notes/adr-connector-auth-binding-separation.md"
-    title: "ADR: Connector Installation, User Link, and Resource Mapping Separation"
-    divio_type: "none"
-    abstract: "Historical 1.x-notes copy of the accepted ADR separating connector installation, user link, and resource mapping from per-binding token storage."
-    anchors:
-    - {slug: "context", text: "Context", level: 2}
-    - {slug: "decision", text: "Decision", level: 2}
-    - {slug: "four-layer-model", text: "Four-layer model", level: 3}
-    - {slug: "service-specific-routing-model", text: "Service-specific routing model", level: 3}
-    - {slug: "git-native-mapping-is-an-auto-suggestion-not-the-sole-source-of-truth", text: "Git-native mapping is an auto-suggestion, not the sole source of truth", level: 3}
-    - {slug: "slack-is-not-a-special-case-that-avoids-mapping", text: "Slack is not a special case that avoids mapping", level: 3}
-    - {slug: "consequences", text: "Consequences", level: 2}
-    - {slug: "positive", text: "Positive", level: 3}
-    - {slug: "negative", text: "Negative", level: 3}
-    - {slug: "neutral", text: "Neutral", level: 3}
-    - {slug: "alternatives-considered", text: "Alternatives Considered", level: 2}
-    - {slug: "option-a-purely-user-service-no-routing-layer", text: "Option A: Purely user → service, no routing layer", level: 3}
-    - {slug: "option-b-user-level-auth-project-level-binding", text: "Option B: User-level auth, project-level binding", level: 3}
-    - {slug: "option-c-team-level-binding-only-no-user-links", text: "Option C: Team-level binding only, no user links", level: 3}
-    - {slug: "option-d-commit-graph-as-the-only-routing-authority-for-git-services", text: "Option D: Commit graph as the only routing authority for git services", level: 3}
-    - {slug: "industry-precedents", text: "Industry precedents", level: 2}
-    - {slug: "related", text: "Related", level: 2}
-    - {slug: "reference-links", text: "Reference links", level: 2}
-  - path: "docs/plans/notes/feature-detection.md"
-    title: "Architecture: Centralized Feature Detection"
-    divio_type: "none"
-    abstract: "Historical 1.x-notes copy of the centralized feature-detection architecture (v0.14.0), retained as a deep-dive beneath the living architecture."
-    anchors:
-    - {slug: "problem-statement", text: "Problem Statement", level: 2}
-    - {slug: "specific-bug-example", text: "Specific Bug Example", level: 3}
-    - {slug: "solution-centralized-feature-detection-module", text: "Solution: Centralized Feature Detection Module", level: 2}
-    - {slug: "design-principles", text: "Design Principles", level: 3}
-    - {slug: "priority-order", text: "Priority Order", level: 3}
-    - {slug: "architecture", text: "Architecture", level: 2}
-    - {slug: "core-types", text: "Core Types", level: 3}
-    - {slug: "core-functions", text: "Core Functions", level: 3}
-    - {slug: "error-types", text: "Error Types", level: 3}
-    - {slug: "migration-strategy", text: "Migration Strategy", level: 2}
-    - {slug: "phase-1-create-centralized-module-non-breaking", text: "Phase 1: Create Centralized Module (Non-Breaking)", level: 3}
-    - {slug: "phase-2-migrate-commands", text: "Phase 2: Migrate Commands", level: 3}
-    - {slug: "phase-3-cleanup", text: "Phase 3: Cleanup", level: 3}
-    - {slug: "phase-4-template-updates", text: "Phase 4: Template Updates", level: 3}
-    - {slug: "breaking-changes", text: "Breaking Changes", level: 2}
-    - {slug: "removed-highest-numbered-fallback", text: "Removed \"Highest Numbered\" Fallback", level: 3}
-    - {slug: "impact-assessment", text: "Impact Assessment", level: 3}
-    - {slug: "usage-patterns", text: "Usage Patterns", level: 2}
-    - {slug: "for-command-line-tools", text: "For Command-Line Tools", level: 3}
-    - {slug: "for-ui-dashboard-lenient-mode", text: "For UI/Dashboard (Lenient Mode)", level: 3}
-    - {slug: "for-backward-compatible-wrappers", text: "For Backward-Compatible Wrappers", level: 3}
-    - {slug: "testing-strategy", text: "Testing Strategy", level: 2}
-    - {slug: "unit-tests-32-tests", text: "Unit Tests (32 tests)", level: 3}
-    - {slug: "integration-tests-13-tests", text: "Integration Tests (13 tests)", level: 3}
-    - {slug: "performance", text: "Performance", level: 2}
-    - {slug: "benchmarks", text: "Benchmarks", level: 3}
-    - {slug: "future-enhancements", text: "Future Enhancements", level: 2}
-    - {slug: "potential-improvements", text: "Potential Improvements", level: 3}
-    - {slug: "references", text: "References", level: 2}
-    - {slug: "lessons-learned", text: "Lessons Learned", level: 2}
-    - {slug: "what-worked-well", text: "What Worked Well", level: 3}
-    - {slug: "challenges", text: "Challenges", level: 3}
-    - {slug: "best-practices", text: "Best Practices", level: 3}
-    - {slug: "related-adrs", text: "Related ADRs", level: 2}
-  - path: "docs/plans/notes/gap-analysis-connector-installation-model.md"
-    title: "Gap Analysis: Migrating Spec-Kitty to the Installation-Link-Mapping-Override Connector Model"
-    divio_type: "none"
-    abstract: "Historical 1.x-notes copy of the draft gap analysis for migrating to the installation-link-mapping-override connector model."
-    anchors:
-    - {slug: "executive-summary", text: "Executive Summary", level: 2}
-    - {slug: "target-model-recap", text: "Target Model Recap", level: 2}
-    - {slug: "current-software-snapshot", text: "Current Software Snapshot", level: 2}
-    - {slug: "1-tenancy-and-membership", text: "1. Tenancy and membership", level: 3}
-    - {slug: "2-connector-domain-model", text: "2. Connector domain model", level: 3}
-    - {slug: "3-url-and-endpoint-structure", text: "3. URL and endpoint structure", level: 3}
-    - {slug: "4-oauth-onboarding-flow", text: "4. OAuth onboarding flow", level: 3}
-    - {slug: "5-tracker-onboarding-flow", text: "5. Tracker onboarding flow", level: 3}
-    - {slug: "6-nango-control-plane-identity", text: "6. Nango control plane identity", level: 3}
-    - {slug: "7-webhook-routing-and-event-emission", text: "7. Webhook routing and event emission", level: 3}
-    - {slug: "8-tracker-ingest-and-egress-apis", text: "8. Tracker ingest and egress APIs", level: 3}
-    - {slug: "9-git-signal-persistence-and-repo-auto-suggestion", text: "9. Git signal persistence and repo auto-suggestion", level: 3}
-    - {slug: "10-ui-and-information-architecture", text: "10. UI and information architecture", level: 3}
-    - {slug: "11-tests-and-operational-assumptions", text: "11. Tests and operational assumptions", level: 3}
-    - {slug: "gap-matrix", text: "Gap Matrix", level: 2}
-    - {slug: "what-can-be-reused", text: "What Can Be Reused", level: 2}
-    - {slug: "reusable-with-minor-adaptation", text: "Reusable with minor adaptation", level: 3}
-    - {slug: "reusable-only-after-retargeting-foreign-keys", text: "Reusable only after retargeting foreign keys", level: 3}
-    - {slug: "not-reusable-as-the-long-term-root-abstraction", text: "Not reusable as the long-term root abstraction", level: 3}
-    - {slug: "recommended-migration-strategy", text: "Recommended Migration Strategy", level: 2}
-    - {slug: "wave-1-add-new-canonical-models-without-deleting-old-ones", text: "Wave 1: Add new canonical models without deleting old ones", level: 3}
-    - {slug: "wave-2-persist-git-provider-identity-in-saas-read-models", text: "Wave 2: Persist Git provider identity in SaaS read models", level: 3}
-    - {slug: "wave-3-introduce-installation-first-ui-and-auth-flows", text: "Wave 3: Introduce installation-first UI and auth flows", level: 3}
-    - {slug: "wave-4-move-tracker-sync-to-installation-mapping-resolution", text: "Wave 4: Move tracker sync to installation + mapping resolution", level: 3}
-    - {slug: "wave-5-replace-binding-specific-webhook-routing-for-git-providers", text: "Wave 5: Replace binding-specific webhook routing for Git providers", level: 3}
-    - {slug: "wave-6-retire-old-binding-first-surfaces", text: "Wave 6: Retire old binding-first surfaces", level: 3}
-    - {slug: "risks-and-blocking-questions", text: "Risks and Blocking Questions", level: 2}
-    - {slug: "1-github-provider-mode", text: "1. GitHub provider mode", level: 3}
-    - {slug: "2-multiple-installations-per-provider-per-workspace", text: "2. Multiple installations per provider per workspace", level: 3}
-    - {slug: "3-mapping-destination-types", text: "3. Mapping destination types", level: 3}
-    - {slug: "4-backward-compatibility-for-existing-webhook-urls", text: "4. Backward compatibility for existing webhook URLs", level: 3}
-    - {slug: "5-ownership-of-tracker-telemetry-objects", text: "5. Ownership of tracker telemetry objects", level: 3}
-    - {slug: "fastest-practical-path", text: "Fastest Practical Path", level: 2}
-    - {slug: "bottom-line", text: "Bottom Line", level: 2}
   - path: "docs/plans/refactor/degod-unshim-inventory.md"
     title: "Degod / Unshim — 3-Lens Inventory"
     divio_type: "none"

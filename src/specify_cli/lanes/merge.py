@@ -24,8 +24,8 @@ from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from specify_cli.coordination.coherence import is_toolchain_generated_churn
 from specify_cli.git.ref_advance import advance_branch_ref
-from specify_cli.status import COORD_OWNED_STATUS_FILES
 from specify_cli.lanes._git import branch_exists as _shared_branch_exists
 from specify_cli.lanes.branch_naming import lane_branch_name, worktree_path as _worktree_path
 from specify_cli.lanes.models import ExecutionLane, LanesManifest
@@ -64,6 +64,21 @@ _MERGE_DRIVERS: tuple[_MergeDriverSpec, ...] = (
         command="spec-kitty merge-driver-event-log %O %A %B",
         pattern="kitty-specs/**/status.events.jsonl",
     ),
+    # coord-write-placement-closure-01KYCF83 WP06 (out-of-owned-files leeway,
+    # documented in the move-task note): decisions.events.jsonl
+    # (events/decision_log.py's DecisionGitLog) is structurally identical to
+    # status.events.jsonl -- an append-only JSONL log with an `event_id` +
+    # `at` envelope (merge_event_payloads's only schema requirement) -- so it
+    # reuses the SAME driver command/config, just a second pattern, rather
+    # than a new dedicated driver. Surfaced by
+    # test_merge_reconciliation_class_guard.py's completeness check once WP02
+    # classified DECISION_LOG as a COORD-partition (both-sides-divergent) kind.
+    _MergeDriverSpec(
+        config_key="spec-kitty-event-log",
+        name="Spec Kitty event log union merge",
+        command="spec-kitty merge-driver-event-log %O %A %B",
+        pattern="kitty-specs/**/decisions.events.jsonl",
+    ),
     _MergeDriverSpec(
         config_key="spec-kitty-meta",
         name="Spec Kitty mission meta field merge",
@@ -75,6 +90,18 @@ _MERGE_DRIVERS: tuple[_MergeDriverSpec, ...] = (
         name="Spec Kitty mission traces union merge",
         command="spec-kitty merge-driver-traces %O %A %B",
         pattern="kitty-specs/**/traces/*.md",
+    ),
+    _MergeDriverSpec(
+        config_key="spec-kitty-acceptance-matrix",
+        name="Spec Kitty acceptance matrix filled-side merge",
+        command="spec-kitty merge-driver-acceptance-matrix %O %A %B",
+        pattern="kitty-specs/**/acceptance-matrix.json",
+    ),
+    _MergeDriverSpec(
+        config_key="spec-kitty-issue-matrix",
+        name="Spec Kitty issue matrix filled-side merge",
+        command="spec-kitty merge-driver-issue-matrix %O %A %B",
+        pattern="kitty-specs/**/issue-matrix.md",
     ),
 )
 
@@ -677,7 +704,7 @@ def _merge_branch_into(
                 target_branch,
                 rebased_sha,
                 env=_env,
-                coord_owned_filenames=COORD_OWNED_STATUS_FILES,
+                is_residue=is_toolchain_generated_churn,
             )
             return True  # early return — ref already updated
         else:
@@ -712,6 +739,6 @@ def _merge_branch_into(
             target_branch,
             merge_commit,
             env=_env,
-            coord_owned_filenames=COORD_OWNED_STATUS_FILES,
+            is_residue=is_toolchain_generated_churn,
         )
         return True

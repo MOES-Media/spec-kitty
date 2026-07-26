@@ -16,15 +16,18 @@ It pins, independently of the implementation source:
   (``skills``, ``restart-daemon``, ``sparse-checkout``) that ``compat`` safety
   predicates and ``__init__`` argv fast-paths key on (I-7).
 
-The help snapshots are normalized (box-drawing stripped, lines trimmed, blanks
-dropped) so they are deterministic across terminal widths while still failing
-on any usage/description/flag/help-text drift.
+The help snapshots are captured through :func:`force_wide_help_console`, which
+pins Typer's Rich help console to a fixed wide, colourless size so no line ever
+wraps, then normalized (box-drawing stripped, lines trimmed, blanks dropped,
+internal whitespace collapsed) so each option/usage entry is one logical line.
+That makes the snapshot genuinely deterministic across terminal widths — local
+wide terminals, CI's TTY-less 80-column fallback, ``COLUMNS`` set or unset —
+while still failing on any usage/description/flag/help-text drift.
 """
 
 from __future__ import annotations
 
 import os
-import re
 
 import click
 import pytest
@@ -32,8 +35,17 @@ from typer.main import get_command
 from typer.testing import CliRunner
 
 from specify_cli.cli.commands.doctor import app
+from specify_cli.cli.commands import _apply_short_help_options
+from tests.specify_cli.cli.commands._help_snapshot import (
+    force_wide_help_console,
+    normalize_help,
+)
 
 pytestmark = [pytest.mark.fast]
+
+# Match the root registration policy explicitly so this standalone singleton
+# is deterministic regardless of test import order.
+_apply_short_help_options(app)
 
 # --- Frozen contract: the 17 subcommand names (cli-surface-contract.md) -------
 # 16 de-godding names (#2059) + ``contracts`` (#2441, Contract Registry validator).
@@ -111,16 +123,16 @@ EXPECTED_HELP: dict[str, list[str]] = {
         'spec-kitty doctor command-files',
         'spec-kitty doctor command-files --json',
         'Options',
-        '--json          Machine-readable JSON output',
-        '--help          Show this message and exit.',
+        '--json Machine-readable JSON output',
+        '--help -h Show this message and exit.',
     ],
     'skills': [
         'Usage: doctor skills [OPTIONS]',
         'Check command-skill manifest drift for Codex, Vibe, Pi, and Letta.',
         'Options',
-        '--fix           Repair missing command-skill files',
-        '--json          Machine-readable JSON output',
-        '--help          Show this message and exit.',
+        '--fix Repair missing command-skill files',
+        '--json Machine-readable JSON output',
+        '--help -h Show this message and exit.',
     ],
     'tool-surfaces': [
         'Usage: doctor tool-surfaces [OPTIONS]',
@@ -130,11 +142,11 @@ EXPECTED_HELP: dict[str, list[str]] = {
         'spec-kitty doctor tool-surfaces --kind command-skill --json',
         'spec-kitty doctor tool-surfaces --tool codex --fix',
         'Options',
-        '--kind        TEXT  Filter to surface kind(s), e.g. command-skill',
-        '--tool        TEXT  Filter to a single configured tool key',
-        '--fix               Repair missing or stale surfaces',
-        '--json              Machine-readable JSON output',
-        '--help              Show this message and exit.',
+        '--kind TEXT Filter to surface kind(s), e.g. command-skill',
+        '--tool TEXT Filter to a single configured tool key',
+        '--fix Repair missing or stale surfaces',
+        '--json Machine-readable JSON output',
+        '--help -h Show this message and exit.',
     ],
     'state-roots': [
         'Usage: doctor state-roots [OPTIONS]',
@@ -146,8 +158,8 @@ EXPECTED_HELP: dict[str, list[str]] = {
         'spec-kitty doctor state-roots',
         'spec-kitty doctor state-roots --json',
         'Options',
-        '--json          Machine-readable JSON output',
-        '--help          Show this message and exit.',
+        '--json Machine-readable JSON output',
+        '--help -h Show this message and exit.',
     ],
     'workspaces': [
         'Usage: doctor workspaces [OPTIONS]',
@@ -160,10 +172,9 @@ EXPECTED_HELP: dict[str, list[str]] = {
         'spec-kitty doctor workspaces --fix',
         'spec-kitty doctor workspaces --json',
         'Options',
-        '--fix           Remove husks that are NOT registered in `git worktree list` (registered',
-        'worktrees are never removed)',
-        '--json          Machine-readable JSON output',
-        '--help          Show this message and exit.',
+        '--fix Remove husks that are NOT registered in `git worktree list` (registered worktrees are never removed)',
+        '--json Machine-readable JSON output',
+        '--help -h Show this message and exit.',
     ],
     'identity': [
         'Usage: doctor identity [OPTIONS]',
@@ -171,9 +182,9 @@ EXPECTED_HELP: dict[str, list[str]] = {
         'Classifies every mission into one of four states (FR-045):',
         '\\b',
         '- assigned: mission_id present AND mission_number non-null (fully migrated)',
-        '- pending:  mission_id present AND mission_number null (pre-merge)',
-        '- legacy:   mission_id missing AND mission_number present (needs backfill)',
-        '- orphan:   both fields missing or meta.json unreadable (needs triage)',
+        '- pending: mission_id present AND mission_number null (pre-merge)',
+        '- legacy: mission_id missing AND mission_number present (needs backfill)',
+        '- orphan: both fields missing or meta.json unreadable (needs triage)',
         'Also reports duplicate numeric prefixes (FR-011) and ambiguous selectors',
         'that would resolve to multiple missions (FR-012).',
         'Examples:',
@@ -182,11 +193,10 @@ EXPECTED_HELP: dict[str, list[str]] = {
         'spec-kitty doctor identity --mission 083-foo',
         'spec-kitty doctor identity --fail-on legacy,orphan',
         'Options',
-        '--json                 Emit structured JSON output (suitable for CI)',
-        '--mission        TEXT  Scope report to a single mission slug',
-        '--fail-on        TEXT  Exit non-zero if any mission is in the given state(s). Comma-separated',
-        'list of: assigned, pending, legacy, orphan.',
-        '--help                 Show this message and exit.',
+        '--json Emit structured JSON output (suitable for CI)',
+        '--mission TEXT Scope report to a single mission slug',
+        '--fail-on TEXT Exit non-zero if any mission is in the given state(s). Comma-separated list of: assigned, pending, legacy, orphan.',
+        '--help -h Show this message and exit.',
     ],
     'topology': [
         'Usage: doctor topology [OPTIONS]',
@@ -200,9 +210,9 @@ EXPECTED_HELP: dict[str, list[str]] = {
         'spec-kitty doctor topology --json',
         'spec-kitty doctor topology --mission 083-foo',
         'Options',
-        '--json                 Emit structured JSON output (suitable for CI)',
-        '--mission        TEXT  Scope report to a single mission slug',
-        '--help                 Show this message and exit.',
+        '--json Emit structured JSON output (suitable for CI)',
+        '--mission TEXT Scope report to a single mission slug',
+        '--help -h Show this message and exit.',
     ],
     'sparse-checkout': [
         'Usage: doctor sparse-checkout [OPTIONS]',
@@ -218,8 +228,8 @@ EXPECTED_HELP: dict[str, list[str]] = {
         'spec-kitty doctor sparse-checkout',
         'spec-kitty doctor sparse-checkout --fix',
         'Options',
-        '--fix           Apply remediation (disable sparse-checkout on primary + worktrees).',
-        '--help          Show this message and exit.',
+        '--fix Apply remediation (disable sparse-checkout on primary + worktrees).',
+        '--help -h Show this message and exit.',
     ],
     'shim-registry': [
         'Usage: doctor shim-registry [OPTIONS]',
@@ -229,15 +239,15 @@ EXPECTED_HELP: dict[str, list[str]] = {
         'exit code 1 if any shim is overdue (removal release has shipped but',
         'shim file still exists on disk).',
         'Exit codes:',
-        '0  All entries are pending, removed, or grandfathered.',
-        '1  At least one entry is overdue — shim must be deleted or window extended.',
-        '2  Configuration error (registry file or pyproject.toml missing/invalid).',
+        '0 All entries are pending, removed, or grandfathered.',
+        '1 At least one entry is overdue — shim must be deleted or window extended.',
+        '2 Configuration error (registry file or pyproject.toml missing/invalid).',
         'Examples:',
         'spec-kitty doctor shim-registry',
         'spec-kitty doctor shim-registry --json',
         'Options',
-        '--json          Machine-readable JSON output',
-        '--help          Show this message and exit.',
+        '--json Machine-readable JSON output',
+        '--help -h Show this message and exit.',
     ],
     'contracts': [
         'Usage: doctor contracts [OPTIONS]',
@@ -249,14 +259,14 @@ EXPECTED_HELP: dict[str, list[str]] = {
         'Structural validation is the only enforcing gate in v1; the retirement',
         'absence-sweep is advisory.',
         'Exit codes:',
-        '0  Registry is well-formed (or empty).',
-        '2  Configuration error (registry file missing) or a schema violation.',
+        '0 Registry is well-formed (or empty).',
+        '2 Configuration error (registry file missing) or a schema violation.',
         'Examples:',
         'spec-kitty doctor contracts',
         'spec-kitty doctor contracts --json',
         'Options',
-        '--json          Machine-readable JSON output',
-        '--help          Show this message and exit.',
+        '--json Machine-readable JSON output',
+        '--help -h Show this message and exit.',
     ],
     'invocation-pairing': [
         'Usage: doctor invocation-pairing [OPTIONS]',
@@ -266,25 +276,23 @@ EXPECTED_HELP: dict[str, list[str]] = {
         'records with no paired ``completed`` or ``failed`` partner. Mid-cycle',
         'agent crashes show up here. The check observes; it does not remediate.',
         'Exit codes:',
-        '0  No orphans observed.',
-        '1  At least one orphan found.',
+        '0 No orphans observed.',
+        '1 At least one orphan found.',
         'Examples:',
         'spec-kitty doctor invocation-pairing',
         'spec-kitty doctor invocation-pairing --json',
         'Options',
-        '--json          Machine-readable JSON output',
-        '--help          Show this message and exit.',
+        '--json Machine-readable JSON output',
+        '--help -h Show this message and exit.',
     ],
     'ops': [
         'Usage: doctor ops [OPTIONS]',
         'List orphan Op records; --close-stale sweeps stale ones closed as abandoned.',
         'Options',
-        '--json                      Machine-readable JSON output',
-        '--close-stale               Close open Ops older than --threshold as abandoned',
-        '(closed_by=doctor_sweep)',
-        '--threshold          FLOAT  Staleness threshold in hours (default 24; 0 closes all). Requires',
-        '--close-stale.',
-        '--help                      Show this message and exit.',
+        '--json Machine-readable JSON output',
+        '--close-stale Close open Ops older than --threshold as abandoned (closed_by=doctor_sweep)',
+        '--threshold FLOAT Staleness threshold in hours (default 24; 0 closes all). Requires --close-stale.',
+        '--help -h Show this message and exit.',
     ],
     'orphan-daemons': [
         'Usage: doctor orphan-daemons [OPTIONS]',
@@ -296,14 +304,14 @@ EXPECTED_HELP: dict[str, list[str]] = {
         'the on-disk ``owner.json`` so the next ``sync status --check``',
         'returns clean.',
         'Exit codes:',
-        '0  No orphan records.',
-        '1  At least one orphan record found.',
+        '0 No orphan records.',
+        '1 At least one orphan record found.',
         'Examples:',
         'spec-kitty doctor orphan-daemons',
         'spec-kitty doctor orphan-daemons --json',
         'Options',
-        '--json          Machine-readable JSON output',
-        '--help          Show this message and exit.',
+        '--json Machine-readable JSON output',
+        '--help -h Show this message and exit.',
     ],
     'restart-daemon': [
         'Usage: doctor restart-daemon [OPTIONS]',
@@ -313,35 +321,32 @@ EXPECTED_HELP: dict[str, list[str]] = {
         'daemon disagree on any of the six canonical D-3 fields (version,',
         'executable, source, server URL, team/user, or queue DB path).',
         'Exit codes:',
-        '0  Daemon restarted (or stale owner record cleaned and respawned).',
-        '1  No registered daemon — run ``spec-kitty sync now`` to launch one.',
-        '2  Daemon stop succeeded but respawn failed; system is stopped.',
-        '3  Daemon stop failed (unresponsive); owner record left intact.',
+        '0 Daemon restarted (or stale owner record cleaned and respawned).',
+        '1 No registered daemon — run ``spec-kitty sync now`` to launch one.',
+        '2 Daemon stop succeeded but respawn failed; system is stopped.',
+        '3 Daemon stop failed (unresponsive); owner record left intact.',
         'Examples:',
         'spec-kitty doctor restart-daemon',
         'spec-kitty doctor restart-daemon --json',
         'Options',
-        '--json          Emit a single JSON object instead of human-readable text.',
-        '--help          Show this message and exit.',
+        '--json Emit a single JSON object instead of human-readable text.',
+        '--help -h Show this message and exit.',
     ],
     'mission-state': [
         'Usage: doctor mission-state [OPTIONS]',
         'Audit, repair, or TeamSpace-validate mission-state shapes.',
         'Options',
-        '--audit                          Run mission-state audit (required to proceed)',
-        '--fix                            Repair mission-state artifacts in place and write a migration',
-        'manifest',
-        '--teamspace-dry-run              Synthesize canonical TeamSpace envelopes from local state and',
-        'validate them',
-        '--json                           Emit JSON report to stdout',
-        '--mission                  TEXT  Scope to a single mission handle',
-        '--fail-on                  TEXT  Exit 1 if findings meet a gate',
-        '(error|warning|info|teamspace-blocker)',
-        '--fixture-dir              PATH  Override scan root (for testing)',
-        '--include-fixtures               Audit the bundled mission-state survey fixtures',
-        '--manifest-path            PATH  Path for --fix migration manifest',
-        '--allow-dirty                    Allow --fix when relevant git paths are already dirty',
-        '--help                           Show this message and exit.',
+        '--audit Run mission-state audit (required to proceed)',
+        '--fix Repair mission-state artifacts in place and write a migration manifest',
+        '--teamspace-dry-run Synthesize canonical TeamSpace envelopes from local state and validate them',
+        '--json Emit JSON report to stdout',
+        '--mission TEXT Scope to a single mission handle',
+        '--fail-on TEXT Exit 1 if findings meet a gate (error|warning|info|teamspace-blocker)',
+        '--fixture-dir PATH Override scan root (for testing)',
+        '--include-fixtures Audit the bundled mission-state survey fixtures',
+        '--manifest-path PATH Path for --fix migration manifest',
+        '--allow-dirty Allow --fix when relevant git paths are already dirty',
+        '--help -h Show this message and exit.',
     ],
     'doctrine': [
         'Usage: doctor doctrine [OPTIONS]',
@@ -349,7 +354,7 @@ EXPECTED_HELP: dict[str, list[str]] = {
         'Exit code reflects health (WP01, operator directive: loud over hidden): the',
         'command exits **1 when the report is unhealthy** and 0 only when healthy',
         '(``report.healthy`` drives the code on every output path). A clear RC=1 with',
-        'a surfaced error is preferred over an RC=0 that hides a defect.  It',
+        'a surfaced error is preferred over an RC=0 that hides a defect. It',
         'enumerates each configured org pack (from ``.kittify/config.yaml``), prints',
         'its on-disk version (``git describe`` for git-managed packs, otherwise the',
         '``pack-manifest.yaml`` ``pack_version``), per-artifact YAML counts, and',
@@ -366,8 +371,8 @@ EXPECTED_HELP: dict[str, list[str]] = {
         'spec-kitty doctor doctrine',
         'spec-kitty doctor doctrine --json',
         'Options',
-        '--json          Machine-readable JSON output',
-        '--help          Show this message and exit.',
+        '--json Machine-readable JSON output',
+        '--help -h Show this message and exit.',
     ],
     'coordination': [
         'Usage: doctor coordination [OPTIONS]',
@@ -392,26 +397,16 @@ EXPECTED_HELP: dict[str, list[str]] = {
         'spec-kitty doctor coordination --json',
         'spec-kitty doctor coordination --check-staleness',
         'Options',
-        '--fix                      Remove stale coordination_branch keys from meta.json for missions',
-        'whose coord branch was never created, then re-derive topology via',
+        '--fix Remove stale coordination_branch keys from meta.json for missions '
+        'whose coord branch was never created, then re-derive topology via '
         '`migrate backfill-topology`.',
-        '--json                     Machine-readable JSON output',
-        '--check-staleness          Also report coord-branch-vs-target-branch staleness (Gap-1, FR-008):',
-        'non-blocking, whether the coord branch is behind or has diverged from',
-        "its mission's target_branch.",
-        '--help                     Show this message and exit.',
+        '--json Machine-readable JSON output',
+        '--check-staleness Also report coord-branch-vs-target-branch staleness '
+        '(Gap-1, FR-008): non-blocking, whether the coord branch is behind or has '
+        "diverged from its mission's target_branch.",
+        '--help -h Show this message and exit.',
     ],
 }
-
-
-def _normalize_help(text: str) -> list[str]:
-    """Strip box-drawing chars and blank lines so help is terminal-width robust."""
-    out: list[str] = []
-    for line in text.splitlines():
-        cleaned = re.sub(r"[│╭╮╰╯─]", "", line).strip()
-        if cleaned:
-            out.append(cleaned)
-    return out
 
 
 @pytest.fixture(scope="module")
@@ -421,10 +416,13 @@ def runner() -> CliRunner:
 
 @pytest.fixture(autouse=True)
 def _fixed_terminal_width(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Pin terminal width so ``--help`` wrapping is deterministic in the snapshot."""
-    monkeypatch.setenv("COLUMNS", "100")
-    monkeypatch.setenv("NO_COLOR", "1")
-    monkeypatch.setenv("TERM", "dumb")
+    """Force wrap-free, colourless ``--help`` rendering for deterministic snapshots.
+
+    Replaces the old ``COLUMNS=100`` pin, which CI ignored on the Rich help path
+    (no TTY → 80-column fallback), with a genuine width-invariant render so the
+    snapshot is identical on any machine regardless of the ambient terminal.
+    """
+    force_wide_help_console(monkeypatch)
 
 
 # --- T001: names + per-subcommand params ------------------------------------
@@ -482,7 +480,8 @@ def test_subcommand_option_contract(name: str) -> None:
 def test_subcommand_help_snapshot(name: str, runner: CliRunner) -> None:
     result = runner.invoke(app, [name, "--help"])
     assert result.exit_code == 0
-    assert _normalize_help(result.output) == EXPECTED_HELP[name]
+    expected = normalize_help("\n".join(EXPECTED_HELP[name]))
+    assert normalize_help(result.output) == expected
 
 
 # --- T003: exit-code contracts + load-bearing names --------------------------

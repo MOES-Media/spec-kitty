@@ -247,10 +247,15 @@ class HttpPoster(Protocol):
     ) -> HttpResponse: ...
 
 
-def _requests_post(
+def default_http_poster(
     url: str, *, data: bytes, headers: Mapping[str, str], timeout: float
 ) -> HttpResponse:
-    """Default poster: a thin, typed wrapper over ``requests.post`` (mirrors batch.py)."""
+    """Default poster: a thin, typed wrapper over ``requests.post`` (mirrors batch.py).
+
+    The single public name for the default poster (#2884) — cross-package
+    callers (e.g. ``sync.history_import``) and in-module default-arg sites
+    all bind this one name rather than an underscore-private alias.
+    """
     return requests.post(url, data=data, headers=dict(headers), timeout=timeout)
 
 
@@ -610,7 +615,7 @@ class TeamspaceReceiver(_HttpReceiver):
         *,
         resolved_server_url: str,
         auth_token: str,
-        poster: HttpPoster = _requests_post,
+        poster: HttpPoster = default_http_poster,
     ) -> None:
         self._server_url = resolved_server_url.rstrip("/")
         self._auth_token = auth_token
@@ -641,7 +646,7 @@ class ExternalReceiver(_HttpReceiver):
         *,
         endpoint_url: str,
         auth_headers: Mapping[str, str] | None = None,
-        poster: HttpPoster = _requests_post,
+        poster: HttpPoster = default_http_poster,
     ) -> None:
         self._endpoint_url = endpoint_url
         self._auth_headers = dict(auth_headers) if auth_headers else {}
@@ -724,6 +729,7 @@ __all__ = [
     "BATCH_ENDPOINT_PATH",
     "BATCH_TIMEOUT_SECONDS",
     "STUB_ENDPOINT_URL",
+    "default_http_poster",
     "DeliveryOutcome",
     "OutboundEvent",
     "DeliveryResult",

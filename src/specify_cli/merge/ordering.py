@@ -12,6 +12,7 @@ import: this module never imports the command shim.
 
 from __future__ import annotations
 
+import functools
 import logging
 from pathlib import Path
 
@@ -22,12 +23,12 @@ from specify_cli.core.dependency_graph import (
     detect_cycles,
     topological_sort,
 )
+from specify_cli.coordination.coherence import is_toolchain_generated_churn
 from specify_cli.git.ref_advance import advance_branch_ref
 from specify_cli.merge._constants import logger as _merge_logger
 from specify_cli.merge.git_probes import _has_branch_ref, _is_git_repo, path_is_under_worktrees
 from specify_cli.merge.state import MergeState
 from specify_cli.mission_metadata import load_meta, write_meta
-from specify_cli.status import COORD_OWNED_STATUS_FILES
 
 __all__ = [
     "get_merge_order",
@@ -461,14 +462,16 @@ def _write_mission_number_to_branch(
         ).stdout.strip()
         # Fast-forward the mission branch ref, resyncing any worktree (e.g.
         # the coordination worktree) that has it checked out (#1826 / AC-B2).
-        # Coordination status residue on the primary checkout is legitimate
-        # after a coord-branch write, so exclude it from the dirty gate
-        # (#1878 / FR-012) rather than abort the post-write ff-advance.
+        # Toolchain-generated churn (coordination status/matrix residue,
+        # spec-kitty's own bookkeeping) on the primary checkout is legitimate,
+        # so exclude it from the dirty gate via the single canonical churn
+        # owner (#1878 / #2795 / FR-012 / WP13-IC-07c) rather than abort the
+        # post-write ff-advance.
         advance_branch_ref(
             main_repo,
             mission_branch,
             new_sha,
-            coord_owned_filenames=COORD_OWNED_STATUS_FILES,
+            is_residue=functools.partial(is_toolchain_generated_churn, mission_slug=mission_slug),
         )
         return True
     finally:
@@ -514,6 +517,24 @@ def _bake_mission_number_into_mission_branch(
     OR a successful write. Operators who manually edit ``meta.json`` after a
     partial merge are responsible for clearing the flag (or running
     ``spec-kitty merge --abort``).
+
+    **coord-write-placement-closure-01KYCF83 WP09 (IC-08 / FR-009) design note:**
+    this function's detached-mission-branch-worktree mechanism was considered as
+    the wiring point for the birth-time runtime cutover (:func:`~specify_cli
+    .migration.runtime_state_cutover.cutover_mission`) — "the structural twin" —
+    but is deliberately NOT used for it. ``cutover_mission``'s sole ``status_phase``
+    writer (``_flip_phase``) resolves its write target via ``canonicalize_feature_dir``,
+    which follows ANY real worktree's ``.git`` pointer back to the canonical
+    main-repo root (confirmed via ``core.paths.resolve_canonical_root``). Because
+    planning artifacts (``meta.json``) already live on the target branch from
+    mission-creation time, that redirect would silently retarget the flip onto
+    ``main_repo``'s STALE pre-merge ``meta.json`` instead of the detached
+    mission-branch tip this function writes to — the exact same hazard this
+    function itself avoids by using ``compose_meta_json_path`` + direct
+    ``write_meta`` (never ``canonicalize_feature_dir``). The birth-cutover is
+    wired POST-target instead, in ``executor._run_birth_cutover`` (called from
+    ``_phase_record_done_and_project``); see ``tracers/design-decisions.md``
+    (IC-08) for the full analysis.
 
     **Retry safety**: the assignment always re-derives from the target tip.
     If a prior run assigned a number from a stale target and the push failed,

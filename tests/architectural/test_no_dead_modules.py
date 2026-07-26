@@ -258,7 +258,9 @@ _CATEGORY_1_AUTO_DISCOVERED_MIGRATIONS: frozenset[str] = frozenset(
         # @MigrationRegistry.register; never statically imported by runtime
         # code. Same sibling shape as the two backfills above.
         "specify_cli.upgrade.migrations.m_3_2_5_agents_skills_gitignore_backfill",
+        "specify_cli.upgrade.migrations.m_3_2_6_gate_artifact_merge_drivers",  # auto-discovered (#2804)
         "specify_cli.upgrade.migrations.m_3_2_6_meta_traces_merge_drivers",  # auto-discovered (#2709)
+        "specify_cli.upgrade.migrations.m_3_2_6_decisions_event_log_merge_driver",  # auto-discovered (#2709)
         # runtime-state-corpus-cutover-01KXZ0AX WP02 (FR-010, #2816): auto-discovered
         # corpus cutover migration for existing deployments. Auto-discovered via
         # pkgutil.iter_modules + @MigrationRegistry.register; never statically
@@ -388,6 +390,26 @@ _CATEGORY_7_GRANDFATHERED_ORPHANS: frozenset[str] = frozenset(
     }
 )
 
+# ---------- 8. Dispatched governed Ops (zero src/ coupling by design) ----------
+# ``acceptance.post_consolidation`` (mission lifecycle-gate-execution-context,
+# WP06/T031, FR-303 dead-symbol/module case, no new tracker ticket) is a plain
+# library module whose entry point (``verify_deferred_invariants``) is run as
+# an ordinary governed Op dispatched ad hoc via ``spec-kitty dispatch`` --
+# never imported from another ``src/`` module. This is a load-bearing design
+# constraint, not an oversight: the module docstring states "there is no new
+# CLI verb and no call-in from merge/executor.py" (zero `merge/` coupling,
+# contract C7), and the sibling CI enforcer
+# (``scripts/ci/check_dangling_deferrals.py``) is deliberately "zero-coupled
+# to src/specify_cli" (its own docstring) -- it duplicates the on-disk wire
+# value instead of importing this module. The real, documented caller is the
+# operator/agent following docs/guides/accept-and-merge.md
+# #deferred-invariants-and-the-post-consolidation-gate, not a static import.
+_CATEGORY_8_DISPATCHED_GOVERNED_OPS: frozenset[str] = frozenset(
+    {
+        "specify_cli.acceptance.post_consolidation",
+    }
+)
+
 
 # Aggregate of every per-category set. The existing
 # `test_no_new_dead_modules_under_src` check below treats this as the
@@ -402,6 +424,7 @@ _ALLOWLIST: frozenset[str] = (
     | _CATEGORY_5_WP_IN_FLIGHT_ADAPTERS
     | _CATEGORY_6_FROZEN_RUNTIME_REEXPORTS
     | _CATEGORY_7_GRANDFATHERED_ORPHANS
+    | _CATEGORY_8_DISPATCHED_GOVERNED_OPS
 )
 
 
@@ -465,9 +488,28 @@ def _collect_import_targets(
     return out
 
 
+def _is_asset_blob(path: Path) -> bool:
+    """True if *path* is a shipped doctrine ``asset`` blob, not a module.
+
+    An ``ArtifactKind.ASSET`` blob is packaged data/logic shipped with a
+    doctrine pack and loaded by file path (never imported), identified by a
+    sibling ``<name>.asset.yaml`` sidecar manifest. The dead-code gates must
+    not treat such a blob as an un-wired internal module.
+    """
+    return (path.parent / f"{path.name}.asset.yaml").is_file()
+
+
 def _iter_src_python_files() -> list[Path]:
-    """Yield every ``*.py`` file under ``src/`` (sorted, deterministic)."""
-    return sorted(p for p in _SRC_ROOT.rglob("*.py") if "__pycache__" not in p.parts)
+    """Yield every importable ``*.py`` under ``src/`` (sorted, deterministic).
+
+    Excludes doctrine ``asset`` blobs (shipped, loaded by path — see
+    :func:`_is_asset_blob`).
+    """
+    return sorted(
+        p
+        for p in _SRC_ROOT.rglob("*.py")
+        if "__pycache__" not in p.parts and not _is_asset_blob(p)
+    )
 
 
 def _has_caller(

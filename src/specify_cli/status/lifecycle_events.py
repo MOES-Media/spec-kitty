@@ -96,6 +96,16 @@ REVIEWER_SELF_APPROVAL = "ReviewerSelfApproval"
 MISSION_REOPENED = "MissionReopened"
 FOLLOW_UP_RECORDED = "FollowUpRecorded"
 
+# The lifecycle event types that are LOCAL-ONLY: emitted after a mission's active
+# lifecycle (reopen / follow-up) and deliberately kept OFF the SaaS strict-
+# validation delivery path. The SINGLE public owner of this membership (#2884),
+# consumed by the post-mission ordering in ``status/lifecycle.py`` and the import
+# scan in ``sync/history_import/scan.py`` — replacing two hand-mirrored frozenset
+# copies. NOTE: this is NOT the installed ``spec_kitty_events.LOCAL_ONLY_EVENT_TYPES``,
+# which is empty in the package while both types ARE in its model map, so trusting
+# it would let these reach strict validation and reject the whole batch.
+LOCAL_ONLY_LIFECYCLE_EVENT_TYPES = frozenset({MISSION_REOPENED, FOLLOW_UP_RECORDED})
+
 LIFECYCLE_EVENT_TYPES = frozenset({
     PROJECT_INITIALIZED,
     MISSION_CREATED,
@@ -256,7 +266,12 @@ def _validate_lifecycle_payload(event_type: str, payload: Mapping[str, Any]) -> 
 
     Local-only event types (``spec_kitty_events.LOCAL_ONLY_EVENT_TYPES``)
     skip strict validation by design — the set is currently empty but
-    reserved for future internal-only event types.
+    reserved for future internal-only event types. The local
+    :data:`LOCAL_ONLY_LIFECYCLE_EVENT_TYPES` SSOT is also consulted here
+    (#2884): it is the actual enforcement point for the "kept OFF the SaaS
+    strict-validation path" invariant its own docstring claims, since the
+    external set does not yet cover ``MissionReopened`` / ``FollowUpRecorded``
+    even though both are present in ``_EVENT_TYPE_TO_MODEL``.
 
     Unknown event types (event_type not in ``_EVENT_TYPE_TO_MODEL``) pass
     through quietly so unrecognised types don't become sudden hard
@@ -267,7 +282,7 @@ def _validate_lifecycle_payload(event_type: str, payload: Mapping[str, Any]) -> 
     from spec_kitty_events.conformance import validate_event
     from spec_kitty_events.conformance.validators import _EVENT_TYPE_TO_MODEL
 
-    if event_type in LOCAL_ONLY_EVENT_TYPES:
+    if event_type in LOCAL_ONLY_EVENT_TYPES or event_type in LOCAL_ONLY_LIFECYCLE_EVENT_TYPES:
         return
 
     if event_type not in _EVENT_TYPE_TO_MODEL:
