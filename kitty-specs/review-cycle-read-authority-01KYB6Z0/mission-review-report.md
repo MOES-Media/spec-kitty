@@ -42,14 +42,15 @@
 
 | Scenario | Attribution | Evidence |
 |----------|-------------|----------|
-| `dependent_wp_planning_lane` (FR-001/005/038) | **PRE-EXISTING** | Fails identically against pristine `721165a22` (pre-mission worktree). Baseline run confirmed valid — the log shows `spec_kitty_repo` resolved to the baseline path, so this is a real comparison, not a skipped fixture. |
-| `contract_drift_caught` (FR-041) | **ENVIRONMENTAL** | Fails on the assertion *"contract gate failed but the diagnostic did not name the drifted surface"* — because `test_wheel_does_not_contain_vendored_spec_kitty_events` **errors at setup** inside the scenario's temporary `pip install -e` venv, making the embedded contract run fail for an unrelated reason. That test **passes** in a normal run (verified: `1 passed`), and this mission's diff touches **no** packaging surface (`pyproject.toml` / `MANIFEST.in` / `setup.py` all absent from the diff). |
+| `dependent_wp_planning_lane` (FR-001/005/038) | **ENVIRONMENTAL — auth** | Fails with `SAAS_SYNC_UNAUTHENTICATED`; `spec-kitty auth status` → "Not authenticated". Fails identically at `721165a22`, but for the same environmental reason — that proves *not this mission's*, **not** *defect on main*. See RISK-5. |
+| `contract_drift_caught` (FR-041) | **ENVIRONMENTAL — packaging** | Nested `python -m build --wheel` returns exit 1 in its ephemeral Python-3.14 venv, so the nested contract run errors on a packaging test before any drift diagnostic exists. The mission's diff touches **no** packaging surface (`pyproject.toml` / `MANIFEST.in` / `setup.py` absent from the diff). |
 
 **Scoping judgement, retained but now tested**: the earlier assessment was that this gate is N/A —
 ADR `2026-04-26-3-e2e-hard-gate.md` scopes it to missions touching cross-repo behaviour, and this
 one changes a local read path. Running it confirmed that judgement (nothing mission-related failed)
-**and produced information the assessment could not have**: a floor scenario is red on `main`.
-Running the gate was the right call over waiving it.
+**and produced information the assessment could not have** — though the first reading of that
+information was wrong (see RISK-5: the scenario is auth-blocked on this machine, not red on main).
+Running the gate was still the right call over waiving it: it surfaced a real e2e harness defect.
 
 **No `mission-exception.md` authored** — the exception path is for environmental blockers on
 in-scope missions. Neither failure is this mission's, and one is a genuine pre-existing defect that
@@ -245,20 +246,52 @@ before treating them as a convention.**
 following them sees "missing" and runs `spec-kitty retrospect create`, authoring a **duplicate**
 record. Filed as part of #2961.
 
-### RISK-5: `dependent_wp_planning_lane` floor scenario is red on main
+### RISK-5: e2e floor scenario blocks on unguarded SaaS auth (WITHDRAWN AND REFRAMED)
 
-**Type**: PRE-EXISTING DEFECT (upstream) · **Severity**: MEDIUM
-**Location**: `spec-kitty-end-to-end-testing/scenarios/dependent_wp_planning_lane.py::test_dependent_wp_planning_lane_lifecycle_smoke`
+> **CORRECTED.** The original RISK-5 claimed this floor scenario is *red on main*. **That claim was
+> wrong and is withdrawn.** It is red **on this machine because it is not authenticated to the
+> SaaS**. Verified: `spec-kitty auth status` → "Not authenticated"; the failure in both logs is
+> `SAAS_SYNC_UNAUTHENTICATED` with remediation "Run `spec-kitty auth login` or unset
+> `SPEC_KITTY_ENABLE_SAAS_SYNC`".
 
-**Analysis**: One of the four **floor** scenarios named by ADR `2026-04-26-3-e2e-hard-gate.md`
-(FR-001, FR-005, FR-038) fails against pristine `721165a22`, i.e. on `main` before this mission
-existed. Since the ADR makes these scenarios a hard merge gate, a red floor scenario means every
-in-scope mission is either blocked or waived through — the same corrosive dynamic as the pre-review
-gate's 8/8 timeouts (#2573).
+**Type**: TEST-HARNESS DEFECT (e2e repo, not spec-kitty) · **Severity**: LOW/MEDIUM
+**Location**: `spec-kitty-end-to-end-testing/scenarios/dependent_wp_planning_lane.py:114,129,142`
 
-Not investigated further here: attributing and fixing it is outside this mission's scope, and the
-e2e repo is a separate checkout. Reported so it is not rediscovered by the next reviewer who clones
-the repo. Worth confirming against upstream CI, which may already be red.
+**The reasoning error, recorded because it is reusable.** Reproducing a failure at the fork point
+proves *"not caused by this mission"*. It does **not** prove *"product defect on main"*. Both runs
+failed for the same environmental reason — the machine was logged out in both. The baseline
+comparison was methodologically sound; the inference drawn from it was not. This is **category 2**
+of `CLAUDE.md`'s baseline-red gotcha ("CI-environment failures — auth … config, not your diff"),
+which this report applied correctly to other findings and missed here.
+
+**What actually survives, verified**: the scenario forces `enable_saas_sync=True` at three call
+sites with **no endpoint/auth guard**, while its sibling `saas_sync_enabled.py` handles the
+identical precondition correctly — emitting a structured `pytest.xfail` that reads "This is NOT a
+code defect; it is an infra dependency". Same guard style (`skipif(not _spec_kitty_available())`),
+different outcome: one xfails legibly, the other emits a bare `FAILED`.
+
+Two supporting findings: the scenario's docstring lists three "Blocking dependencies" (binary, git,
+time budget) and **omits SaaS auth**, which the code requires — so an operator reading it concludes
+their environment is fine. And it asserts **nothing** about sync (`grep "sync\|saas\|event_id"`
+matches only the docstring and the three kwargs), so the cleanest fix is to drop
+`enable_saas_sync=True` rather than add a guard.
+
+Under the ADR hard gate this is still corrosive — but the mechanism is **"environmental block
+masquerading as regression"**, not "floor scenario broken".
+
+**Filed**: [spec-kitty-end-to-end-testing#404](https://github.com/Priivacy-ai/spec-kitty-end-to-end-testing/issues/404)
+— in the **e2e repo**, since the defect is in that repo's scenario harness. Nothing filed in
+`Priivacy-ai/spec-kitty`, and nothing claiming a floor scenario is red on main.
+
+**Also corrected**: `contract_drift_caught` fails because the nested `python -m build --wheel`
+returns exit 1 in its ephemeral Python-3.14 venv, so the nested contract run errors on a packaging
+test before any drift diagnostic exists. The earlier description of this report — "a wheel test
+errors at setup under `pip install -e`" — was imprecise about the mechanism though right that it is
+environmental.
+
+**Not relevant, checked**: the e2e repo's `cron-canary` badge is 40/40 red, but that job runs
+`run-sync-identity-boundary-canary.sh` against deployed Upsun, not this pytest suite. Its 400+ open
+issues are auto-filed `[canary-cron-failure]` records from that arm.
 
 ---
 
