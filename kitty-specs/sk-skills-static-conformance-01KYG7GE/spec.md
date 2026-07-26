@@ -130,9 +130,26 @@ M7, M8, M9), several of which this mission unblocks by establishing the
    no longer matches the (now wrong) expectation — this is the manual proof of
    discrimination described in AC-2.
 
+#### Manifest completeness (FR-007)
+
+8. **Given** the true, unmodified `src/doctrine/skills/*` tree (53 directories)
+   and a `conformance/skills/manifest.yaml` that correctly enumerates all 53
+   skill cases plus the one FR-005 control case (54 `type: static` cases
+   total), **When** the FR-007 completeness check runs in CI, **Then** it
+   exits `0` because the manifest's static-case count equals the skill
+   directory count plus one.
+9. **Given** a deliberately induced mismatch — either a skill directory added
+   or removed from `src/doctrine/skills/*` without a matching manifest edit,
+   or the check pointed at a manifest with a case deliberately deleted —
+   **When** the completeness check runs, **Then** it exits non-zero and its
+   failure message names the specific missing or extra skill(s) by directory
+   name, not just a bare count mismatch. This is the manual/CI-observed proof
+   that the check discriminates rather than trivially passing (mirrors the
+   FR-005 control's proof obligation).
+
 #### Documentation of local invocation and known gaps (FR-006)
 
-8. **Given** a developer who wants to run the suite locally before opening a
+10. **Given** a developer who wants to run the suite locally before opening a
    PR, **When** they read `conformance/README.md`, **Then** they find the
    exact local invocation command, the two-step cache-warm-then-offline-run
    procedure (warm via `npm install --no-save @garrison-hq/muster@<pinned>`
@@ -145,14 +162,14 @@ M7, M8, M9), several of which this mission unblocks by establishing the
 
 #### Scope boundary (C-001, C-002, C-003)
 
-9. **Given** the completed mission diff, **When** it is reviewed, **Then** it
+11. **Given** the completed mission diff, **When** it is reviewed, **Then** it
    touches only paths under `conformance/**` and `.github/workflows/**` — no
    spec-kitty runtime source is changed.
-10. **Given** a pull request opened from a fork of spec-kitty (no repository
+12. **Given** a pull request opened from a fork of spec-kitty (no repository
     secrets available to the workflow), **When** the conformance workflow runs,
     **Then** it completes successfully without requesting or requiring any
     secret, because the static path is fully offline.
-11. **Given** the workflow's `muster` version input, **When** it is inspected,
+13. **Given** the workflow's `muster` version input, **When** it is inspected,
     **Then** it is an exact version string (e.g. `1.1.0`), never a floating
     range (`^`, `~`, `latest`), so the same commit always resolves the same
     muster build.
@@ -169,16 +186,21 @@ M7, M8, M9), several of which this mission unblocks by establishing the
   required.
 - **Manifest/skill-set drift**: if a new built-in skill is added upstream (or
   an existing one removed/renamed) without a corresponding manifest edit, the
-  manifest silently under- or over-counts the built-in skill set — muster does
-  not validate that the manifest's case count matches the skill directory's
-  actual contents (this is one of the two documented latent muster gaps: the
-  manifest is parsed with a bare cast, no schema validation). This mission
-  does not add a completeness check (manifest case count vs.
+  manifest would silently under- or over-count the built-in skill set — muster
+  itself still does not validate that the manifest's case count matches the
+  skill directory's actual contents (this remains one of the two documented
+  latent muster gaps: the manifest is parsed with a bare cast, no schema
+  validation, and this mission does not fix muster). This mission does,
+  however, close the drift vector on the spec-kitty side: **FR-007** adds a
+  completeness check (manifest `type: static` case count vs.
   `src/doctrine/skills/*` directory count, offset by the +1 FR-005 control
-  case). This is buildable entirely within `conformance/**` and is NOT
-  forbidden by the scope guard, which excludes only muster/muster-action
-  source changes. Deliberately deferred as candidate FR-007 for a follow-up
-  mission.
+  case) that names the specific missing/extra skill(s) on mismatch. It is
+  buildable entirely within `conformance/**` plus one wiring line in
+  `.github/workflows/conformance.yml`, and is NOT forbidden by the scope
+  guard, which excludes only muster/muster-action source changes. (This was
+  originally deferred as candidate FR-007 for a follow-up mission; the
+  operator reversed that deferral after the spec gate — see FR-007's
+  provenance note in the Requirements table above.)
 - **`expectations.violations` is ignored**: muster's CLI only compares
   `expectations.ok`, never `expectations.violations`, so a case's declared
   `violations: []` list is documentation only and is not itself verified by
@@ -202,6 +224,7 @@ M7, M8, M9), several of which this mission unblocks by establishing the
 | FR-004 | `conformance/DECISIONS.md` records D1–D5 verbatim from the programme plan, with the file:line evidence, as the programme decision record. | Proposed |
 | FR-005 | One rigged-broken control case ships under `conformance/skills/control/` (e.g. frontmatter name ≠ dirname) with `expectations: {ok: false, ...}` — the static discrimination analogue, proving the suite can fail (case passes because expectation matches actual, per `passed = ok === expectations.ok`, `src/cli/index.ts:1279`). | Proposed |
 | FR-006 | `conformance/README.md` documents local invocation, the known muster gaps that affect this suite (manifest unvalidated; `expectations.violations` ignored), and the pinned muster version. | Proposed |
+| FR-007 | **[Added post-spec-gate by explicit operator decision, reversing this document's original deferral; not sourced from seed issue `MOES-Media/spec-kitty#22` §5, whose FR table enumerates only FR-001–FR-006 — same as this spec's NFR-001/NFR-002, which the issue also does not contain.]** A CI step verifies manifest completeness: the count of `type: static` cases in `conformance/skills/manifest.yaml` equals the count of skill directories matching `src/doctrine/skills/*/SKILL.md`, plus one for the FR-005 rigged control case under `conformance/skills/control/`. A mismatch fails the job with a message naming the missing or extra skills. | Proposed |
 
 ### Non-Functional Requirements
 
@@ -238,6 +261,12 @@ M7, M8, M9), several of which this mission unblocks by establishing the
 - **README** (`conformance/README.md`): local-invocation instructions, the two
   documented latent muster gaps affecting this suite, and the pinned muster
   version.
+- **Completeness check** (FR-007): a CI-native check, independent of the
+  muster CLI itself, that asserts `conformance/skills/manifest.yaml`'s
+  `type: static` case count equals `src/doctrine/skills/*` directory count + 1
+  (the FR-005 control case) and names the specific skill(s) responsible when
+  the two diverge. Lives entirely under `conformance/**`; wired into
+  `.github/workflows/conformance.yml` as one additional step.
 
 ## Success Criteria
 
@@ -248,6 +277,7 @@ M7, M8, M9), several of which this mission unblocks by establishing the
 | SC-003 | The suite provably discriminates: a deliberately broken skill fixture is reported non-conformant, and manually flipping its declared expectation to "conformant" reliably flips the suite's exit code to failure. |
 | SC-004 | The programme's five foundational design decisions (D1–D5) are durably recorded in a reviewable, versioned document rather than living only in issue or conversation history. |
 | SC-005 | The exact conformance-tool version used in CI is pinned and documented, so the suite's result is reproducible on the same commit regardless of when or where it is run. |
+| SC-006 | The manifest's case count is checked against the actual `src/doctrine/skills/*` tree on every CI run; a manifest/skill-set mismatch is caught and named by directory, never silently ignored (FR-007). |
 
 ## Dependencies & Assumptions
 

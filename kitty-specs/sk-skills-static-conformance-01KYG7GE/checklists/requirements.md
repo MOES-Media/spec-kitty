@@ -51,6 +51,12 @@
   non-functional thresholds where the mission has any (CI latency,
   determinism). These are additions, not requirements carried from the issue,
   and are flagged as such in the mission report.
+- FR-007 (manifest completeness check against `src/doctrine/skills/*`) was
+  added post-spec-gate by explicit operator decision during the plan phase,
+  reversing this spec's original deferral of that check to a follow-up
+  mission. It is not sourced from issue `MOES-Media/spec-kitty#22` §5 (whose
+  FR table stops at FR-006) — flagged in the FR-007 row itself and in the
+  mission report, the same treatment given NFR-001/NFR-002 above.
 - Some acceptance-scenario prose (e.g. Given/When/Then framing, some technical
   path/exit-code references) is more implementation-adjacent than a pure
   business-stakeholder spec would normally carry. This mission is
