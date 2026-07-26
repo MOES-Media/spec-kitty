@@ -27,6 +27,11 @@ node conformance/scripts/check-manifest-completeness.mjs
 - **Environment variables**: none required. No network access, no
   credentials (matches C-002's offline-and-secret-free posture even though
   C-002 is written about the muster step specifically).
+- **Directory scan**: `src/doctrine/skills/` entries are filtered by type —
+  `fs.readdirSync(dir, {withFileTypes:true}).filter(e=>e.isDirectory())` —
+  mirroring `src/specify_cli/skills/registry.py`'s `discover_skills()` —
+  never by excluding known filenames such as `README.md`, which would
+  silently regress if a second non-skill file is later added.
 
 ## Output
 

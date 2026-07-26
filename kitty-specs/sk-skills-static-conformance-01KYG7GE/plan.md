@@ -218,9 +218,11 @@ verification before the mission is proposed for merge.
   convention — case/skillDir line shape — settled first).
 - **Risks**: line-based parsing depends on a documented manifest-authoring
   convention rather than a real YAML parser (research.md §6) — mitigated by
-  writing that convention down in `contracts/skills-manifest-case.schema.json`
-  and exercising the script against the real manifest both ways
-  (Verification Strategy step 3) before merge.
+  writing that convention down in the `"$comment"` clause of
+  `contracts/skills-manifest-case.schema.json` (the schema's structural
+  fields alone say nothing about line order, key order, or indentation) and
+  exercising the script against the real manifest both ways (Verification
+  Strategy step 3) before merge.
 
 ### IC-04 — Decision record (D1–D5, citations re-derived)
 
@@ -274,7 +276,10 @@ verification before the mission is proposed for merge.
   input names are inferred from a design briefing, not verified against the
   live repository (research.md §5) — **the implementing agent must verify
   the real input schema before finalizing this file** and adjust field
-  names if the shipped Action differs from `command`/`args`/`version`.
+  names if the shipped Action differs from `command`/`args`/`version`, and
+  confirm the runner has a working `node` on `PATH` after the muster-action
+  step completes, without relying on a `setup-node` step this plan does not
+  add.
 
 ## Work-Package Outline (preview for `/spec-kitty.tasks` — not tasks.md)
 
@@ -301,12 +306,24 @@ lane-collision the coordinator flagged (research.md §6):
 ```
 
 - **WP01** (lane-a): IC-01 + IC-02 + IC-03 — manifest, control fixture, and
-  the FR-007 completeness script. All three live under `conformance/skills/**`
-  and `conformance/scripts/**`, so grouping them in one WP avoids a
-  same-file edit race within lane-a itself.
+  the FR-007 completeness script. IC-01+IC-02 share `manifest.yaml` and are
+  grouped to avoid a same-file edit race; IC-03 is grouped with them because
+  it depends on IC-01's manifest-authoring convention being settled first
+  (plan.md IC-03 Sequencing), not because it shares a file.
+  Before starting IC-01, the implementing agent must confirm
+  `MOES-Media/spec-kitty#22` is assigned to the Human-in-Charge (DIR-012).
+  `/spec-kitty.tasks` MUST render WP01's task list with IC-01 authored and
+  committed before IC-03 begins; IC-02 may be authored alongside IC-01 or
+  after.
 - **WP02** (lane-a): IC-04 + IC-05 — decision record and README. Naturally
   sequenced after WP01 (documents WP01's outputs) though both are lane-a, so
   no cross-lane dependency is needed — a single lane can order its own WPs.
+  Intra-WP02 order: IC-04 (DECISIONS.md) must be committed before IC-05
+  (README.md) is authored — the README documents facts IC-04 establishes.
+  Hold-open condition: WP02's prose may be authored early, but final
+  review/approval must wait for Verification Strategy step 4 (a real
+  `conformance.yml` run) to supply the CI `run_id` and wall-clock minutes
+  before the README's timing entry is considered complete.
 - **WP03** (lane-b): IC-06 — the workflow file, including the FR-007 wiring
   step. Depends only on `contracts/completeness-check-cli-contract.md` (this
   plan's artifact, already committed) for the script's interface — **not**

@@ -47,13 +47,16 @@ echo "baseline exit code: $?"   # MUST print 0
 
 # Manual proof step (documented in README as a manual check, NOT part of CI):
 # temporarily flip the control case's declared expectation.
+trap 'mv -f conformance/skills/manifest.yaml.bak conformance/skills/manifest.yaml 2>/dev/null' EXIT
 sed -i.bak 's/ok: false/ok: true/' conformance/skills/manifest.yaml   # control case only — verify by hand which line changed
+[ "$(diff conformance/skills/manifest.yaml.bak conformance/skills/manifest.yaml | grep -c '^<')" = "1" ] || { echo "sed touched an unexpected number of lines" >&2; exit 1; }
 
 npx --offline @garrison-hq/muster@1.1.0 skills run conformance/skills/manifest.yaml
 echo "flipped exit code: $?"   # MUST print non-zero (1)
 
 # Restore:
 mv conformance/skills/manifest.yaml.bak conformance/skills/manifest.yaml
+git diff --exit-code conformance/skills/manifest.yaml
 ```
 
 **This step must be run for real** during implementation (both directions:
@@ -64,6 +67,9 @@ control case behaves as specified" requirement, not a design assertion.
 ---
 
 ## 3. Manifest completeness check, both ways (FR-007, SC-006)
+
+Do not run this step concurrently with any other `spec-kitty` command in
+this checkout.
 
 ```sh
 # Baseline: the true tree — 53 skill directories, 54 manifest cases.

@@ -40,10 +40,11 @@ cases:
   `anthropic` profile (out of scope; the Anthropic profile is a
   skills-adapter concept unrelated to this suite's purpose).
 - Manifest authoring convention the FR-007 completeness check depends on
-  (documented here and in `contracts/skills-manifest-case.schema.json`):
-  each case's `- id:` line and its `skillDir:` line appear as siblings inside
-  one list item, at consistent indentation, so a line-based scan can recover
-  `(id, skillDir)` pairs without a YAML parser.
+  (documented here and in the `"$comment"` clause of
+  `contracts/skills-manifest-case.schema.json`, not the schema's structural
+  fields): each case's `- id:` line and its `skillDir:` line appear as
+  siblings inside one list item, at consistent indentation, so a line-based
+  scan can recover `(id, skillDir)` pairs without a YAML parser.
 
 ---
 

@@ -200,7 +200,11 @@ Overview, user story 2) is exercising the shipped Action, not bypassing it.
 after the muster `skills run` step (and available for local pre-PR use). It:
 
 1. Reads `src/doctrine/skills/` and lists directory basenames (the actual
-   skill set).
+   skill set). Filter directory entries by type:
+   `fs.readdirSync(dir, {withFileTypes:true}).filter(e=>e.isDirectory())` —
+   mirroring `src/specify_cli/skills/registry.py`'s `discover_skills()` —
+   never by excluding known filenames such as `README.md`, which would
+   silently regress if a second non-skill file is later added.
 2. Reads `conformance/skills/manifest.yaml` as plain text and extracts, per
    case, the `id:` and `skillDir:` values using the manifest-authoring
    invariant this mission itself establishes (every case is a `- id: ...`
@@ -233,11 +237,13 @@ input. A regex/line-based extraction keyed to a documented authoring
 convention is sufficient, avoids a `js-yaml` (or similar) npm dependency, and
 mirrors muster's own pragmatism (muster itself parses the manifest with a
 bare cast and no schema validation — FR-006's first known gap). The
-convention this check relies on is written down in
-`contracts/skills-manifest-case.schema.json` so a future manifest edit that
-violates it fails loudly in the completeness check itself (a malformed or
-reformatted manifest either miscounts, which fails obviously, or the script's
-own unit-level smoke test in `quickstart.md` step 3 catches it before merge).
+convention this check relies on is written down in the `"$comment"` clause
+of `contracts/skills-manifest-case.schema.json` (the schema's structural
+fields alone say nothing about line order, key order, or indentation) so a
+future manifest edit that violates it fails loudly in the completeness check
+itself (a malformed or reformatted manifest either miscounts, which fails
+obviously, or the script's own unit-level smoke test in `quickstart.md` step
+3 catches it before merge).
 
 **Alternatives considered**:
 - A Python script using `pyyaml` (already a spec-kitty runtime dependency) —
