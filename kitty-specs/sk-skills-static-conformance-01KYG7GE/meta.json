@@ -12,5 +12,7 @@
   "purpose_tldr": "Wire spec-kitty's 53 built-in SKILL.md files through muster's static skills adapter and gate every PR on the result.",
   "slug": "sk-skills-static-conformance-01KYG7GE",
   "target_branch": "kitty/mission-sk-skills-static-conformance",
-  "topology": "coord"
+  "topology": "coord",
+  "vcs": "git",
+  "vcs_locked_at": "2026-07-26T23:45:43.701776+00:00"
 }
