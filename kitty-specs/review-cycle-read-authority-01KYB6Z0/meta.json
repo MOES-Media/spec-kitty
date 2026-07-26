@@ -1,0 +1,33 @@
+{
+  "accept_commit": "3e06a85de4c24c1bbe9cfdb521b741dac9f28e0b",
+  "acceptance_history": [
+    {
+      "accept_commit": "3e06a85de4c24c1bbe9cfdb521b741dac9f28e0b",
+      "acceptance_mode": "pr",
+      "accepted_at": "2026-07-26T01:41:58.797873+00:00",
+      "accepted_by": "jeroennouws",
+      "accepted_from_commit": "45069c5e3d1504f85faf311f62886bf2a6866c58"
+    }
+  ],
+  "acceptance_mode": "pr",
+  "accepted_at": "2026-07-26T01:41:58.797873+00:00",
+  "accepted_by": "jeroennouws",
+  "accepted_from_commit": "45069c5e3d1504f85faf311f62886bf2a6866c58",
+  "baseline_merge_commit": "dc6675527d5a4ffe28aa172dc74ff6ccaabf4423",
+  "coordination_branch": "kitty/mission-review-cycle-read-authority-01KYB6Z0",
+  "created_at": "2026-07-24T23:21:58.296505+00:00",
+  "flattened": false,
+  "friendly_name": "Review-Cycle Read Authority",
+  "mission_id": "01KYB6Z0RQ4DK02AE0B6Y59DDJ",
+  "mission_number": null,
+  "mission_slug": "review-cycle-read-authority-01KYB6Z0",
+  "mission_type": "software-dev",
+  "pr_bound": true,
+  "purpose_context": "A rejection is stored as a file; an approval that supersedes it is recorded as an override in the status event log. The merge and acceptance gates combine the two and get the right answer. The status view reads only the file, so it keeps reporting a work package as rejected after it was approved, contradicting the merge gate with no way for the operator to clear it. This mission routes the status read onto the existing override-aware verdict read and retires the override-blind copies, so every surface reports one verdict.",
+  "purpose_tldr": "Approved work packages stop appearing rejected, because the status view now honours the recorded approval override the merge gate already trusts.",
+  "slug": "review-cycle-read-authority-01KYB6Z0",
+  "target_branch": "fix/review-cycle-read-authority",
+  "topology": "coord",
+  "vcs": "git",
+  "vcs_locked_at": "2026-07-25T08:16:11.092813+00:00"
+}
