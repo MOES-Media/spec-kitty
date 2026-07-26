@@ -196,6 +196,29 @@ timestamp and payload — from the primary log into coord, with a duplicate-guar
 backup. This repairs a partition split; it does not author evidence. Commit `20fad557a` carries
 the full analysis.
 
+### RISK-4: Retrospective written outside the canonical mission home
+
+**Type**: TOOLING-DEFECT (upstream) · **Severity**: MEDIUM
+**Location**: retrospective generator path resolution
+
+**Analysis**: The terminus facilitator wrote the record to
+`kitty-specs/review-cycle-read-authority-01KYB6Z0/retrospective.yaml` instead of the canonical
+`.kittify/missions/01KYB6Z0RQ4DK02AE0B6Y59DDJ/retrospective.yaml`. Three other missions on this
+machine (`01KT6HVH3QND4Q3KCGH2419N4J`, `01KTDVHZKGCHCW6HQ4V577PNES`,
+`01KTSJ2H8E5YF2EGJYGAE5Z5Q2`) all use the canonical path, so this mission is the outlier — the
+convention is not merely undocumented drift.
+
+**Why it matters more than a misplaced file**: the prescribed verification command
+(`cat .kittify/missions/<mission_id>/retrospective.yaml`) reports the record **missing**. The
+documented response to a missing record is `spec-kitty retrospect create`, which would author a
+**second** retrospective while the first sits unread in the mission directory. Cross-mission
+aggregation (`spec-kitty retrospect summary`) reads the canonical home, so this mission's
+retrospective is invisible to it.
+
+**Same family as RISK-3**: artifact path resolution diverging for this mission's topology.
+Worth investigating whether coord-topology missions systematically resolve artifacts to the
+mission dir rather than the canonical home — if so, RISK-3 and RISK-4 share a root cause.
+
 ---
 
 ## Silent Failure Candidates
@@ -251,6 +274,9 @@ it does not affect the shipped implementation.
    exception path is for environmental blockers, not out-of-scope gates.
 2. **File RISK-3** — any coord-topology mission with a review rejection cannot merge. Highest-value
    report from this mission.
+2b. **File RISK-4** — retrospective written outside the canonical home; the prescribed check
+   reports it missing and the documented remedy would duplicate it. Investigate shared root cause
+   with RISK-3 (artifact path resolution under coord topology).
 3. **File RISK-2** — `if agent is not None` should be `if agent:` at `reducer.py:148`.
 4. **File DRIFT-3** — `baseline_merge_commit` populated with an in-merge commit, breaking the
    prescribed mission-review diff workflow.
@@ -274,12 +300,17 @@ it does not affect the shipped implementation.
 The canonical post-merge sequence is **mission review → author or verify retrospective →
 surface findings**.
 
-The retrospective was captured at terminus (commit `d8613bd79`,
-`chore(review-cycle-read-authority-01KYB6Z0): capture mission retrospective`). Verify it:
+The retrospective **was** captured at terminus (commit `d8613bd79`) — but **not at the canonical
+path**. See RISK-4. It lives at:
 
 ```bash
-cat .kittify/missions/01KYB6Z0RQ4DK02AE0B6Y59DDJ/retrospective.yaml
+cat kitty-specs/review-cycle-read-authority-01KYB6Z0/retrospective.yaml   # actual
+# NOT: .kittify/missions/01KYB6Z0RQ4DK02AE0B6Y59DDJ/retrospective.yaml    # canonical, absent
 ```
+
+**Do not run `spec-kitty retrospect create`** on the strength of the canonical path being empty —
+the record exists and re-authoring would duplicate it. `findings_status` is populated;
+`proposals` is empty (0), so `synthesize` has nothing to apply for this mission.
 
 Then surface findings:
 
