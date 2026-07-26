@@ -157,11 +157,17 @@ known relocation/re-export false-positive class.
 ### RISK-2: Review rejection silently blanks agent attribution
 
 **Type**: TOOLING-DEFECT (upstream, not this mission's code) · **Severity**: MEDIUM
-**Location**: `src/specify_cli/status/reducer.py:148-150`
+**Location**: `src/specify_cli/status/reducer.py:179-181` (`_apply_annotation_delta` → `_REPLACE_SLOTS`)
 
-**Analysis**: `agent` is written only on `planned → claimed`, guarded by `if agent is not None`.
-A post-rejection re-claim emitted a resolved-binding annotation carrying `agent=""`; the empty
-string is not `None`, so it latest-wins-overwrote the correct `'claude'`. Canonical runtime
+> **CORRECTED**: an earlier version of this finding cited the claim arm at `:148-150`. The
+> demonstrated blanking is event `01KYCC4Y1AQHK25RJS513HFJ63` (`delta` keys `agent`/`shell_pid`/
+> `subtasks`, `agent=""`), which folds through the **annotation** arm at `:179-181`. Both arms
+> carry the same `is not None` guard, but only the annotation arm is evidenced here. The emit site
+> that produced the empty value is **not verified** — the resolved-binding annotation originally
+> blamed carries no `agent` key at all.
+
+**Analysis**: `agent` is a latest-wins replace slot; a value of `""` is not `None`, so it
+overwrote the correct `'claude'`. Canonical runtime
 state ended with an empty agent, which blocked `spec-kitty accept`. `spec-kitty agent status
 doctor` reported the mission **Healthy** throughout — the defect is silent until acceptance.
 Only WP02 was affected: it is the only WP that took a rejection cycle. A `if agent:` guard
@@ -196,28 +202,34 @@ timestamp and payload — from the primary log into coord, with a duplicate-guar
 backup. This repairs a partition split; it does not author evidence. Commit `20fad557a` carries
 the full analysis.
 
-### RISK-4: Retrospective written outside the canonical mission home
+### RISK-4: Doctrine skills prescribe the retired retrospective path
 
-**Type**: TOOLING-DEFECT (upstream) · **Severity**: MEDIUM
-**Location**: retrospective generator path resolution
+> **CORRECTED 2026-07-26 after tracker triage.** The original RISK-4 claimed the retrospective was
+> written to the *wrong* path. **That finding was inverted and is withdrawn.** The generator behaved
+> correctly; the defect is in the documentation that verifies it — including the skill this report
+> was produced under.
 
-**Analysis**: The terminus facilitator wrote the record to
-`kitty-specs/review-cycle-read-authority-01KYB6Z0/retrospective.yaml` instead of the canonical
-`.kittify/missions/01KYB6Z0RQ4DK02AE0B6Y59DDJ/retrospective.yaml`. Three other missions on this
-machine (`01KT6HVH3QND4Q3KCGH2419N4J`, `01KTDVHZKGCHCW6HQ4V577PNES`,
-`01KTSJ2H8E5YF2EGJYGAE5Z5Q2`) all use the canonical path, so this mission is the outlier — the
-convention is not merely undocumented drift.
+**Type**: DOCTRINE-DRIFT · **Severity**: LOW
+**Location**: `spec-kitty-mission-review` SKILL.md and three sibling doctrine skills
 
-**Why it matters more than a misplaced file**: the prescribed verification command
-(`cat .kittify/missions/<mission_id>/retrospective.yaml`) reports the record **missing**. The
-documented response to a missing record is `spec-kitty retrospect create`, which would author a
-**second** retrospective while the first sits unread in the mission directory. Cross-mission
-aggregation (`spec-kitty retrospect summary`) reads the canonical home, so this mission's
-retrospective is invisible to it.
+**Analysis**: `retrospective/writer.py:89-98` (`canonical_record_path`) resolves the record to
+`kitty-specs/<slug>/retrospective.yaml` per **FR-001/003 (#2119)**, explicitly "never the ephemeral
+coordination worktree (the #1771 coord-leak)". `_legacy_record_path` at `:102-110` documents
+`.kittify/missions/<mission_id>/` as "the pre-#1771 (gitignored) record path for back-compat reads
+only… **New writes never target this path.**" The terminus facilitator wrote to the canonical
+location. Nothing was misplaced.
 
-**Same family as RISK-3**: artifact path resolution diverging for this mission's topology.
-Worth investigating whether coord-topology missions systematically resolve artifacts to the
-mission dir rather than the canonical home — if so, RISK-3 and RISK-4 share a root cause.
+**How the original finding went wrong — worth recording, because it is a reusable trap.** The
+verification command prescribed by this skill points at the *retired* path, so it reported the
+record missing. I then "corroborated" that by observing three other missions using
+`.kittify/missions/<id>/` and concluded this mission was the outlier. Those three records are all
+dated **2026-06-20** — authored before the FR-006 relocation. I compared current behaviour against
+legacy artifacts and concluded the correct behaviour was the deviation. **Age-check comparators
+before treating them as a convention.**
+
+**The real defect**: four doctrine `SKILL.md` files still prescribe the retired path. An operator
+following them sees "missing" and runs `spec-kitty retrospect create`, authoring a **duplicate**
+record. Filed as part of #2961.
 
 ---
 
@@ -274,9 +286,9 @@ it does not affect the shipped implementation.
    exception path is for environmental blockers, not out-of-scope gates.
 2. **File RISK-3** — any coord-topology mission with a review rejection cannot merge. Highest-value
    report from this mission.
-2b. **File RISK-4** — retrospective written outside the canonical home; the prescribed check
-   reports it missing and the documented remedy would duplicate it. Investigate shared root cause
-   with RISK-3 (artifact path resolution under coord topology).
+2b. **RISK-4 corrected and filed** — the original finding was inverted and is withdrawn; the
+   generator was right. Real defect is four doctrine skills prescribing the retired path. Filed in
+   #2961. **RISK-3 and RISK-4 do NOT share a root cause** — that hypothesis is dead.
 3. **File RISK-2** — `if agent is not None` should be `if agent:` at `reducer.py:148`.
 4. **File DRIFT-3** — `baseline_merge_commit` populated with an in-merge commit, breaking the
    prescribed mission-review diff workflow.
@@ -295,22 +307,48 @@ it does not affect the shipped implementation.
 
 ---
 
+## Tracker Disposition (planner-priti, 2026-07-26)
+
+9 defects → **3 new issues, 6 comments**. Deliberately not over-filed.
+
+| Issue | Covers | Notes |
+|-------|--------|-------|
+| [#2959](https://github.com/Priivacy-ai/spec-kitty/issues/2959) | RISK-3 + no merge escape flag | Sub-issue of epic #2160. Distinct from #1817 — that mechanism is fixed, and fixing it does not help because the override is absent from the log the gate reads. P0-vs-P1 flagged for operator decision. |
+| [#2960](https://github.com/Priivacy-ai/spec-kitty/issues/2960) | RISK-2 + doctor blind to corrupt state | Corruption and missing detection are one coherent fix. |
+| [#2961](https://github.com/Priivacy-ai/spec-kitty/issues/2961) | RISK-4 (corrected) + DRIFT-3 | Both are broken prescribed steps of this same post-merge workflow. |
+
+Comments added to **#2573** (gate evidence + its "no skip flag" body is stale —
+`--skip-pre-review-gate` exists at `tasks.py:668-671`), **#2329** (path conventions — *not* #2744,
+which is research-mission-scoped), **#2743** (context only), **#1817** and **#2275** (cross-links),
+and **#2646** (keep-open note so a maintainer does not close it before the cross-fork PR lands).
+
+**Recommendation: do not open a mission for these.** RISK-3 is not independently scopable — it
+clusters with #1817, #2275 and #2646 under one root (review-verdict write/read authority under
+coord topology), all homed under epic #2160. The right mission is over that cluster, folding
+#2959 + #2275 + #1817 and retiring the un-followable remediation text. The remaining defects are
+small, unrelated, and are fold-ins for whatever mission next touches `status/`, doctrine skills,
+and `merge/`.
+
+---
+
 ## Retrospective Reminder
 
 The canonical post-merge sequence is **mission review → author or verify retrospective →
 surface findings**.
 
-The retrospective **was** captured at terminus (commit `d8613bd79`) — but **not at the canonical
-path**. See RISK-4. It lives at:
+The retrospective was captured at terminus (commit `d8613bd79`) at its **canonical** location:
 
 ```bash
-cat kitty-specs/review-cycle-read-authority-01KYB6Z0/retrospective.yaml   # actual
-# NOT: .kittify/missions/01KYB6Z0RQ4DK02AE0B6Y59DDJ/retrospective.yaml    # canonical, absent
+cat kitty-specs/review-cycle-read-authority-01KYB6Z0/retrospective.yaml
 ```
 
-**Do not run `spec-kitty retrospect create`** on the strength of the canonical path being empty —
-the record exists and re-authoring would duplicate it. `findings_status` is populated;
-`proposals` is empty (0), so `synthesize` has nothing to apply for this mission.
+> **Do not use** `.kittify/missions/<mission_id>/retrospective.yaml` — that is the retired
+> pre-#1771 path (`writer.py:102-110`, "back-compat reads only… New writes never target this
+> path"). Several doctrine skills, including the one that produced this report, still prescribe it;
+> following them reports the record missing and leads to authoring a duplicate. See RISK-4 / #2961.
+
+`findings_status` is populated; `proposals` is empty (0), so `synthesize` has nothing to apply for
+this mission — and `retrospect create` must **not** be run.
 
 Then surface findings:
 
