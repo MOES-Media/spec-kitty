@@ -30,7 +30,8 @@ from specify_cli.cli.commands.agent.tasks_parsing_validation import (
     _validate_research_artifacts,
     _validate_worktree_state,
 )
-from specify_cli.status.models import Lane, StatusEvent
+from specify_cli.review.artifacts import LatestReviewArtifactVerdict, ReviewCycleArtifact
+from specify_cli.status.models import Lane, ReviewOverride, StatusEvent
 
 pytestmark = pytest.mark.fast
 
@@ -78,17 +79,26 @@ def _write_malformed_issue_matrix(feature_dir: Path) -> None:
 
 
 def _write_review_cycle(wp_dir: Path, cycle_n: int, verdict: str) -> Path:
-    wp_dir.mkdir(parents=True, exist_ok=True)
-    artifact = wp_dir / f"review-cycle-{cycle_n}.md"
-    artifact.write_text(
-        f"---\n"
-        f"cycle_number: {cycle_n}\n"
-        f"verdict: {verdict}\n"
-        f"wp_id: WP01\n"
-        f"---\n\nReview body.\n",
-        encoding="utf-8",
-    )
-    return artifact
+    """Write a review-cycle artifact.
+
+    Constructs :class:`ReviewCycleArtifact` directly (bypassing ``from_dict``'s
+    schema validation) so *verdict* can be any string, including one outside
+    the canonical ``{"approved", "rejected"}`` vocabulary — needed to exercise
+    the degrade-on-read path in ``_get_latest_review_cycle_verdict`` (T008).
+    All other required fields are populated so a schema-*valid* verdict
+    ("approved"/"rejected") round-trips through the canonical read cleanly.
+    """
+    path = wp_dir / f"review-cycle-{cycle_n}.md"
+    ReviewCycleArtifact(
+        cycle_number=cycle_n,
+        wp_id="WP01",
+        mission_slug="demo-mission",
+        reviewer_agent="reviewer-renata",
+        verdict=verdict,
+        reviewed_at="2026-07-19T11:00:00+00:00",
+        body="Review body.\n",
+    ).write(path)
+    return path
 
 
 def _make_subproc(returncode: int = 0, stdout: str = "") -> MagicMock:
@@ -306,12 +316,96 @@ def test_get_latest_review_cycle_verdict_picks_highest(tmp_path: Path) -> None:
     assert artifact == cycle2
 
 
-def test_get_latest_review_cycle_verdict_unknown_warns(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
-    _write_review_cycle(tmp_path, 1, "super_approved")
+def test_get_latest_review_cycle_verdict_schema_invalid_verdict_falls_back_to_raw_parse(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A verdict outside the canonical schema falls back to a raw-frontmatter
+    read rather than collapsing to ``(None, path)``.
+
+    Fix-cycle-1 regression (review rejection item #1): the canonical
+    ``latest_review_artifact_verdict`` enforces ``verdict in {"approved",
+    "rejected"}`` (``REVIEW_ARTIFACT_VERDICTS`` is a strict subset of this
+    module's more permissive ``_VALID_VERDICTS``), so an out-of-schema
+    verdict like "super_approved" fails schema validation on read and raises
+    ``ValueError``. The pre-WP02 raw-scalar parser never validated the
+    verdict's vocabulary — it just extracted the frontmatter scalar and
+    warned if unrecognized — and real, already-committed artifacts rely on
+    exactly this tolerance (e.g. ``verdict: approved_after_orchestrator_fix``
+    in ``auth-tranche-2-5-cli-contract-consumption-01KQEJZK`` WP05). The
+    ``except ValueError`` branch must reproduce that raw-parse fallback
+    instead of letting the canonical schema's failure alone decide the
+    return value (T008/INV-5: tolerant degradation, but degradation means
+    "still returns the verdict it can find," not "always None").
+    """
+    artifact = _write_review_cycle(tmp_path, 1, "super_approved")
     with caplog.at_level("WARNING"):
-        verdict, _ = _get_latest_review_cycle_verdict(tmp_path)
+        verdict, path = _get_latest_review_cycle_verdict(tmp_path)
     assert verdict == "super_approved"
+    assert path == artifact
     assert any("unrecognized verdict" in r.message for r in caplog.records)
+
+
+def test_get_latest_review_cycle_verdict_warns_on_unrecognized_but_schema_valid_verdict(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The ``_VALID_VERDICTS`` warning still fires for a verdict the canonical
+    read accepts but this module's (wider, defensive) vocabulary does not
+    recognize.
+
+    Today ``REVIEW_ARTIFACT_VERDICTS`` (``{"approved", "rejected"}``) is a
+    subset of ``_VALID_VERDICTS``, so no real on-disk artifact can trigger
+    this branch — verified directly against the canonical read's result
+    instead of a file, so the warning behaviour (T008 DoD) stays covered even
+    though it is currently unreachable via ``latest_review_artifact_verdict``.
+    """
+    fake_result = LatestReviewArtifactVerdict(
+        path=Path("review-cycle-1.md"),
+        cycle_number=1,
+        verdict="approved_but_not_really",
+        has_override=False,
+    )
+    with (
+        patch(
+            "specify_cli.cli.commands.agent.tasks_parsing_validation.latest_review_artifact_verdict",
+            return_value=fake_result,
+        ),
+        caplog.at_level("WARNING"),
+    ):
+        verdict, path = _get_latest_review_cycle_verdict(Path("/unused"))
+    assert verdict == "approved_but_not_really"
+    assert path == fake_result.path
+    assert any("unrecognized verdict" in r.message for r in caplog.records)
+
+
+def test_get_latest_review_cycle_verdict_folds_complete_override_to_approved(
+    tmp_path: Path,
+) -> None:
+    """A rejected record with a complete override reports the EFFECTIVE verdict.
+
+    data-model.md's "Effective verdict" projection: this is what lets both
+    consumers' plain ``verdict == "rejected"`` checks stay correct without a
+    separate ``has_override`` field in this function's 2-tuple contract.
+    """
+    _write_review_cycle(tmp_path, 1, "rejected")
+    override = ReviewOverride(
+        at="2026-07-20T12:00:00+00:00",
+        actor="reviewer-renata",
+        wp_id="WP01",
+        reason="approved after fix",
+    )
+    verdict, artifact = _get_latest_review_cycle_verdict(tmp_path, override=override)
+    assert verdict == "approved"
+    assert artifact is not None
+
+
+def test_get_latest_review_cycle_verdict_incomplete_override_stays_rejected(
+    tmp_path: Path,
+) -> None:
+    """An incomplete override (missing a required field) is honoured nowhere (INV-3)."""
+    _write_review_cycle(tmp_path, 1, "rejected")
+    incomplete = ReviewOverride(at="", actor="reviewer-renata", wp_id="WP01", reason="why")
+    verdict, _ = _get_latest_review_cycle_verdict(tmp_path, override=incomplete)
+    assert verdict == "rejected"
 
 
 def test_get_latest_review_cycle_verdict_missing_frontmatter(tmp_path: Path) -> None:
