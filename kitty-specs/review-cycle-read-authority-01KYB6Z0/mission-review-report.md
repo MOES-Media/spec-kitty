@@ -29,19 +29,33 @@
   WP05's new disposition gate. Arithmetic reconciles with no unexplained movement.
 
 ### Gate 3 — Cross-repo E2E
-- Command: `SPEC_KITTY_ENABLE_SAAS_SYNC=1 pytest spec-kitty-end-to-end-testing/scenarios/ -q`
-- **NOT RUN** — `Priivacy-ai/spec-kitty-end-to-end-testing` is a separate private repo, never
-  cloned locally. It exists and is accessible (`gh repo view` succeeds, last push 2026-07-16);
-  CI fetches it via `.github/workflows/release.yml:303`.
-- **Assessed as N/A rather than EXCEPTION.** ADR `2026-04-26-3-e2e-hard-gate.md` scopes the
-  hard gate to missions touching cross-repo behaviour (events / tracker / SaaS / sync / merge /
-  intake / runtime). This mission changes a **local review-verdict read path** with no
-  cross-repo surface: the diff touches no events schema, no tracker, no SaaS client, no sync,
-  and no intake. No `mission-exception.md` was authored because the exception path is for
-  environmental blockers on in-scope missions, and claiming one here would misrepresent an
-  out-of-scope gate as a waived one.
-- **Operator decision required** — see Open Items. If the operator judges the gate in-scope,
-  the repo should be cloned and the gate run rather than waived.
+- Command: `SPEC_KITTY_ENABLE_SAAS_SYNC=1 SPEC_KITTY_REPO=/home/jeroennouws/dev/spec-kitty pytest scenarios/ -v`
+- Exit code: non-zero — **2 failed, 3 passed, 1 xfailed** · **PASS for this mission** (no failure attributable to it)
+- `Priivacy-ai/spec-kitty-end-to-end-testing` was cloned for this review. `conftest.py:22-41` resolves
+  `SPEC_KITTY_REPO` to the checkout under test, so the run exercised the **merged branch**, not the
+  installed 3.2.5.
+
+**Passing (3 + 1 xfail)**: `uninitialized_repo_fail_loud` × 3 params (FR-032, FR-039), plus
+`saas_sync_enabled` (FR-040) — notable, since no dev SaaS endpoint was configured.
+
+**Both failures attributed to causes outside this mission:**
+
+| Scenario | Attribution | Evidence |
+|----------|-------------|----------|
+| `dependent_wp_planning_lane` (FR-001/005/038) | **PRE-EXISTING** | Fails identically against pristine `721165a22` (pre-mission worktree). Baseline run confirmed valid — the log shows `spec_kitty_repo` resolved to the baseline path, so this is a real comparison, not a skipped fixture. |
+| `contract_drift_caught` (FR-041) | **ENVIRONMENTAL** | Fails on the assertion *"contract gate failed but the diagnostic did not name the drifted surface"* — because `test_wheel_does_not_contain_vendored_spec_kitty_events` **errors at setup** inside the scenario's temporary `pip install -e` venv, making the embedded contract run fail for an unrelated reason. That test **passes** in a normal run (verified: `1 passed`), and this mission's diff touches **no** packaging surface (`pyproject.toml` / `MANIFEST.in` / `setup.py` all absent from the diff). |
+
+**Scoping judgement, retained but now tested**: the earlier assessment was that this gate is N/A —
+ADR `2026-04-26-3-e2e-hard-gate.md` scopes it to missions touching cross-repo behaviour, and this
+one changes a local read path. Running it confirmed that judgement (nothing mission-related failed)
+**and produced information the assessment could not have**: a floor scenario is red on `main`.
+Running the gate was the right call over waiving it.
+
+**No `mission-exception.md` authored** — the exception path is for environmental blockers on
+in-scope missions. Neither failure is this mission's, and one is a genuine pre-existing defect that
+deserves an issue, not a waiver.
+
+**New finding → RISK-5.**
 
 ### Gate 4 — Issue Matrix
 - File: `kitty-specs/review-cycle-read-authority-01KYB6Z0/issue-matrix.md`
@@ -230,6 +244,21 @@ before treating them as a convention.**
 **The real defect**: four doctrine `SKILL.md` files still prescribe the retired path. An operator
 following them sees "missing" and runs `spec-kitty retrospect create`, authoring a **duplicate**
 record. Filed as part of #2961.
+
+### RISK-5: `dependent_wp_planning_lane` floor scenario is red on main
+
+**Type**: PRE-EXISTING DEFECT (upstream) · **Severity**: MEDIUM
+**Location**: `spec-kitty-end-to-end-testing/scenarios/dependent_wp_planning_lane.py::test_dependent_wp_planning_lane_lifecycle_smoke`
+
+**Analysis**: One of the four **floor** scenarios named by ADR `2026-04-26-3-e2e-hard-gate.md`
+(FR-001, FR-005, FR-038) fails against pristine `721165a22`, i.e. on `main` before this mission
+existed. Since the ADR makes these scenarios a hard merge gate, a red floor scenario means every
+in-scope mission is either blocked or waived through — the same corrosive dynamic as the pre-review
+gate's 8/8 timeouts (#2573).
+
+Not investigated further here: attributing and fixing it is outside this mission's scope, and the
+e2e repo is a separate checkout. Reported so it is not rediscovered by the next reviewer who clones
+the repo. Worth confirming against upstream CI, which may already be red.
 
 ---
 
