@@ -5,8 +5,10 @@ dependencies: []
 requirement_refs:
 - FR-003
 - FR-007
+- C-001
 - C-002
 - C-003
+- NFR-002
 planning_base_branch: kitty/mission-sk-skills-static-conformance
 merge_target_branch: kitty/mission-sk-skills-static-conformance
 branch_strategy: Planning artifacts for this mission were generated on kitty/mission-sk-skills-static-conformance. During /spec-kitty.implement this WP may branch from a dependency-specific base, but completed changes must merge back into kitty/mission-sk-skills-static-conformance unless the human explicitly redirects the landing branch.
@@ -85,13 +87,17 @@ mission's lane split has zero file overlap by design.
 
 **Hard rules for the whole WP**:
 
-1. Touch ONLY `.github/workflows/conformance.yml`.
+1. Touch ONLY `.github/workflows/conformance.yml` — this WP's share of
+   **C-001** (no spec-kitty runtime code changes).
 2. No `secrets:` reference anywhere in the file (C-002) — the whole workflow
    is fully offline/static and must pass on a fork PR with zero repository
    secrets available.
 3. The `version:` input to `muster-action@v1` must be an exact, quoted string
    (`'1.1.0'`) — never `^1.1.0`, `~1.1.0`, or `latest` (C-003, Acceptance
-   Scenario 13).
+   Scenario 13). This exact pin is also the structural precondition for
+   **NFR-002** (deterministic given a pinned version) — a floating range
+   would make CI's result depend on when it runs, not just what commit it
+   runs against.
 4. **Before finalizing this file**, verify the actual shipped input schema of
    `garrison-hq/muster-action@v1` — research.md §5 explicitly flags that the
    `command`/`args`/`version` input names below are inferred from a design

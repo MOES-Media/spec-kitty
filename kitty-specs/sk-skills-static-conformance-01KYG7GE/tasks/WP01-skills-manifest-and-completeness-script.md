@@ -7,6 +7,8 @@ requirement_refs:
 - FR-002
 - FR-005
 - FR-007
+- C-001
+- NFR-002
 planning_base_branch: kitty/mission-sk-skills-static-conformance
 merge_target_branch: kitty/mission-sk-skills-static-conformance
 branch_strategy: Planning artifacts for this mission were generated on kitty/mission-sk-skills-static-conformance. During /spec-kitty.implement this WP may branch from a dependency-specific base, but completed changes must merge back into kitty/mission-sk-skills-static-conformance unless the human explicitly redirects the landing branch.
@@ -95,6 +97,9 @@ muster or muster-action source is touched.
 
 1. Touch ONLY the three files in `owned_files`. If something outside them
    seems necessary, record it as a blocker in the work log — do not edit it.
+   This is the enforcement mechanism for **C-001** (no spec-kitty runtime
+   code changes) — T006's `git diff --stat` checks are its verification
+   gate.
 2. `conformance/skills/manifest.yaml` must be **block-style YAML, one key per
    line, `id:` immediately preceding `skillDir:` inside the same list item, at
    a fixed 4-space indent** — the exact convention in the schema's
@@ -265,7 +270,12 @@ exact message text) in this WP's work log.
 
 **Purpose**: Prove FR-002, FR-005's discrimination, and FR-007's completeness
 check all behave as specified, using the actual built muster CLI and the
-actual repository tree — not by asserting from the file contents.
+actual repository tree — not by asserting from the file contents. Running
+step 1 for real (network disabled after the one-time cache-warm) is also this
+WP's evidence for **NFR-002** (deterministic given a pinned version, zero
+network calls in the run path) — if the offline run failed to reach the
+network at all and still produced a correct exit code, that is NFR-002
+holding, not incidental.
 
 **Steps** (`quickstart.md` §1–§3, verbatim procedure):
 1. Cache-warm, then run fully offline (quickstart.md §1):

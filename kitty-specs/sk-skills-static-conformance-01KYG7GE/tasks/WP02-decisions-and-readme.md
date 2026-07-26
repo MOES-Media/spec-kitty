@@ -7,6 +7,7 @@ requirement_refs:
 - FR-004
 - FR-006
 - NFR-001
+- C-001
 planning_base_branch: kitty/mission-sk-skills-static-conformance
 merge_target_branch: kitty/mission-sk-skills-static-conformance
 branch_strategy: Planning artifacts for this mission were generated on kitty/mission-sk-skills-static-conformance. During /spec-kitty.implement this WP may branch from a dependency-specific base, but completed changes must merge back into kitty/mission-sk-skills-static-conformance unless the human explicitly redirects the landing branch.
@@ -90,7 +91,8 @@ oversight — do not invent or estimate a number to close it early.
 
 **Hard rules for the whole WP**:
 
-1. Touch ONLY the two files in `owned_files`.
+1. Touch ONLY the two files in `owned_files` — this WP's share of **C-001**
+   (no spec-kitty runtime code changes).
 2. **Intra-WP order is binding**: `conformance/DECISIONS.md` must be
    committed before `conformance/README.md` is authored — the README
    documents facts DECISIONS.md establishes (the pinned version, the
