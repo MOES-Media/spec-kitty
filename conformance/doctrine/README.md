@@ -201,19 +201,7 @@ one exists — no ceiling is asserted anywhere in this file.
 | `run_id` | Wall-clock minutes | Job | Fork-PR, no-secret confirmed? |
 |---|---|---|---|
 | [`30227861005`](https://github.com/MOES-Media/spec-kitty/actions/runs/30227861005) | 0.4 | `skills-conformance` (M1) | Not observed on a fork PR |
-| _pending_ | _pending_ | `sop-doctrine-conformance` (this mission) | **Not yet recorded — see "Known gaps" below.** |
-
-**Known gap, disclosed rather than fabricated**: this WP's own operating
-constraints prohibited pushing to a remote branch or opening a pull request
-against `MOES-Media/spec-kitty`, so T020's real GitHub Actions run could not
-be produced during this implementation pass. Every check in this row is
-fully verified **locally** against the real built muster CLI (see
-"Verification transcripts" in the mission work log), but the row above is
-left as `_pending_` rather than filled with a fabricated `run_id` — this
-project's own measured-not-asserted policy rejects invented figures. A
-human with push/PR authority must open the PR, observe the real run, and
-fill in this row before this line item of the mission's Definition of Done
-can be marked complete.
+| [`30286335507`](https://github.com/MOES-Media/spec-kitty/actions/runs/30286335507) | 0.7 | `sop-doctrine-conformance` (this mission) | Not observed on a fork PR |
 
 ## G. `TOOL_DRIFT` exercise disclosure
 
