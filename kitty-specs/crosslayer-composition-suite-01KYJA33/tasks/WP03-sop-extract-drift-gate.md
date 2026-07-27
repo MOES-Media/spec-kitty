@@ -199,4 +199,79 @@ Implementation command: `spec-kitty agent action implement WP03 --agent claude`
 
 ## Activity Log
 
-(none yet — populated during implementation)
+- **MEDIUM-1 remediation (`--write`'s `mv` was cross-device, so neither
+  atomic nor mode-preserving)**: the `mktemp` scratch file `--write` builds
+  its replacement in was created under `${TMPDIR:-/tmp}` (tmpfs, st_dev 44
+  in this environment) while `EXTRACT_FILE` lives on the repo's filesystem
+  (btrfs, st_dev 43) — a different device, so the closing `mv` always took
+  coreutils' cross-device copy-then-unlink fallback instead of a real
+  `rename(2)`. Two consequences, both confirmed for real before fixing:
+  - **(a) Mode regression on every successful `--write`.** Verified this
+    lane's on-disk `conformance/crosslayer/sop-extract.md` was already at
+    mode `600` (`git ls-files -s` reports `100644`; `stat` reported `600`;
+    `git status` reported clean throughout — git tracks only the
+    executable bit, never the full mode, so the regression was invisible
+    to git). Restored it to `644` in the fix commit.
+  - **(b) Non-atomicity.** Reproduced the exact class of failure the
+    reviewer described: ran a bigfile-instrumented copy of the pre-fix
+    script's `--write` in the background, polled the destination path at
+    high frequency, and `SIGKILL`ed it the instant the destination's size
+    changed — left a 3141-byte extract as a ~227MB truncated partial file,
+    mode `600`. Confirmed the fixed script cannot reproduce this: the same
+    kill-on-first-size-change technique against the fixed script only ever
+    observes the destination at its pristine original size or the full
+    regenerated size, never partial, across three attempts.
+  - **Fix**: `mktemp "${EXTRACT_FILE}.XXXXXX"` (scratch file beside the
+    destination, guaranteeing same filesystem, so `mv` is always a true
+    same-device `rename(2)` — atomic regardless of file size) plus
+    `chmod --reference="${EXTRACT_FILE}" "${WRITE_TMP_FILE}"` before the
+    move (needed regardless of filesystem, since even a same-device
+    `rename(2)` hands the moved inode's `mktemp`-assigned `0600` straight
+    to the destination path). Corrected the adjacent comment, which
+    claimed "a failure here leaves EXTRACT_FILE completely untouched" in a
+    way that was true for a `regenerate()`/`extract_section` failure but
+    previously false for a kill during the `mv` itself; the comment now
+    explains the `mv`'s atomicity explicitly rather than leaving it an
+    unproven, implicit claim.
+  - **Test**: extended `test_write_flag_regenerates_and_default_is_then_clean`
+    (`tests/cross_cutting/test_check_sop_extract_drift.py`) to pin the
+    extract's mode across a successful `--write`. Watched it fail against
+    the pre-fix script first (`AssertionError ... got 0o600`), then pass
+    after the fix. Full suite: 8 passed (count unchanged — an existing
+    test was extended, not a new one added).
+  - Re-ran the T016-style mutation sweep (first-line, last-line,
+    single-byte mutations) against the fixed script in a fresh sandbox:
+    exit 1 each time, mutation surviving on disk, hash-verified restore
+    after each.
+  - Ran 20 parallel default-invocation + 20 parallel `--write` invocations
+    against a shared sandbox: no stray `sop-extract.md.XXXXXX` scratch
+    files survive. Confirmed the `trap ... EXIT` cleanup also fires
+    correctly on a normal (non-`SIGKILL`) failure path (a renamed pinned
+    heading causing `extract_section` to fail): extract untouched, no
+    stray scratch file left. Separately confirmed `SIGKILL` itself bypasses
+    the `EXIT` trap (universal bash/OS behavior, not a regression from
+    this fix, and consistent with how the truncation bug above was
+    demonstrated) — a `kill -9` landing mid-`regenerate()` (before `mv` is
+    even reached) can leave one stray scratch file on disk; this is an
+    inherent limitation of `SIGKILL` semantics, not something this fix (or
+    any trap-based cleanup) can address.
+- **LOW-1 (fixed)**: swapped the `AGENTS_FILE` existence guard from `-f` to
+  `-r` (`conformance/scripts/check-sop-extract-drift.sh` line ~87), so an
+  unreadable-but-present source file (`chmod 000 AGENTS.md`, reproduced and
+  confirmed) is now reported as "source file not found or not readable"
+  instead of silently falling through to `awk`'s raw permission-denied
+  error plus `extract_section`'s misleading "heading not found" fallback
+  message. Trade-off accepted: `-r` no longer distinguishes "missing" from
+  "present but a directory/unreadable", but the prior `-f` guard didn't
+  either for the permission case, and this script's own real-awk-error
+  printed immediately above the misdiagnosis already made the defect
+  cosmetic — the fix is a clean-message improvement, not a new safety
+  property.
+- **LOW-2 (recorded, not changed)**: a duplicate `## Branch Protection and
+  CI` heading further down `AGENTS.md` is silently ignored by
+  `extract_section`'s "first match through the next `---`" rule — policy
+  text placed under a second copy of a pinned heading would be invisible
+  to both the extract and its drift check. This is an accepted property of
+  the settled, mechanical extraction rule (first-occurrence, not
+  last-occurrence or all-occurrences), not a defect this WP's scope covers;
+  the rule itself is intentionally unchanged.
