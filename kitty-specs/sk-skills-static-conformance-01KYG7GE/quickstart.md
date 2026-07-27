@@ -19,8 +19,10 @@ implementation, not asserted from a unit test or agent judgment alone.
 # One-time, network enabled: warms npm's local cache for the pinned version.
 npm install --no-save @garrison-hq/muster@1.1.0
 
-# From here on, disable network (illustrative — CI enforces this via a
-# network-disabled runner step; locally, unplugging/airplane-mode or an
+# From here on, disable network (illustrative — this offline property is a
+# LOCAL verification mechanism, not a CI one: CI runs muster via
+# garrison-hq/muster-action@v1, whose run.sh calls `npx -y` and requires
+# registry access. Locally, unplugging/airplane-mode or an
 # npm/npx offline flag both demonstrate the same property):
 npx --offline @garrison-hq/muster@1.1.0 skills run conformance/skills/manifest.yaml
 echo "exit code: $?"   # MUST print 0
