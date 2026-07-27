@@ -442,6 +442,122 @@ lane's final state — the closest honest substitute for a red-then-green
   committed against; its pre-existing uncommitted bookkeeping
   (`meta.json`, `WP01`/`WP03` frontmatter reformatting) was left untouched.
 
+### Post-review remediation — MEDIUM-1 (`--write` silently deletes a
+### section on a heading rename) + LOW-1/LOW-2/LOW-4
+
+**Bug, reproduced against the live lane checkout before any fix (AGENTS.md
+hash `ba065f47...` restored after):** renamed
+`## Branch Protection and CI` → `## Branch Protection and CI Policy` in
+`AGENTS.md`.
+
+```
+default check (before rename)          exit=0
+default check (after rename)           exit=1   drift correctly reported
+--write (buggy, pre-fix)               exit=0
+  extract: 3141 -> 2241 bytes, 48 -> 38 lines (10 lines deleted, the
+  "Branch Protection and CI" section silently gone)
+default check (re-run, post-write)     exit=0   GATE NOW REPORTED CLEAN
+```
+
+Root cause: `extract_section()`'s `awk` only sets `inside=1` when
+`$0 == heading` fires; if it never fires (heading renamed), the function
+prints nothing and returns 0. `regenerate()` had no way to distinguish
+"heading matched, section legitimately short" from "heading never
+matched" and `--write` wrote the truncated result straight over the
+committed extract.
+
+**Fix** (`conformance/scripts/check-sop-extract-drift.sh`):
+`extract_section()` now tracks a `found` flag inside the `awk` program and
+`exit`s 1 in its `END` block when the heading never matched, wrapped in
+`if ! awk ...; then echo ... "heading not found" ...; return 1; fi` so the
+failure is caught (not tripped by `set -e` mid-condition) and then
+propagates loudly with `return 1`. Also hardened `--write` itself: it now
+builds `regenerate()`'s output into a `mktemp` scratch file first and only
+`mv`s it over `EXTRACT_FILE` on success (previously `regenerate >
+"${EXTRACT_FILE}"` truncated the committed file the instant the
+redirection opened, before a single byte was produced — so a mid-`
+regenerate` failure would have left the committed extract half-overwritten
+instead of merely erroring). This mirrors the read-only branch's existing
+mktemp+trap pattern.
+
+**Bug reproduced again post-fix, same rename:**
+
+```
+default check (after rename)           exit=1   "heading not found in
+                                                  .../AGENTS.md: ## Branch
+                                                  Protection and CI"
+--write (fixed)                        exit=1   same message; extract
+                                                  file byte-for-byte
+                                                  untouched (size 3141,
+                                                  sha256 28db7b20...,
+                                                  unchanged before/after)
+default check (re-run, post-write attempt) exit=1  same message — never
+                                                     reports clean
+```
+
+Both the default check and `--write` now fail closed on the same renamed
+heading, and a failed `--write` leaves the committed extract completely
+untouched rather than half-overwritten.
+
+**Four `--write` states re-verified** on the live checkout after the fix
+(unrelated to the rename bug — ordinary drift/repair cycle):
+clean/no-args `0`; drifted (`sed`-mutated first line)/no-args `1` with the
+mutation still present on disk; drifted/`--write` `0`; post-write/no-args
+`0`; `git diff --exit-code` on the regenerated file against the git-tracked
+committed content `0` (byte-identical).
+
+**Mutation sweep re-run** (first line, last line, single byte at offset
+800) against the real committed `sop-extract.md`, each time from baseline
+hash `28db7b207b9c1e1a8bda09ef66fdcfa097d21c39072960ea53f9bad54d77aedc`:
+all three exit `1`, mutation present on disk (hash differs — first-line
+`676338c9...` matches the T016 record exactly; single-byte `5412fd06...`
+matches the WP03 sweep record exactly; last-line uses a different literal
+edit than the original sweep so its hash differs from the recorded
+`d1793369...` but the mutated-then-restored-then-clean-diff sequence is
+identical), restored hash `28db7b20...` (matches baseline) every time,
+`git diff --exit-code` clean after each restore.
+
+**LOW-2** — added two tests to
+`tests/cross_cutting/test_check_sop_extract_drift.py`:
+`test_write_never_modifies_agents_md` (hashes `AGENTS.md` before/after a
+`--write` run against a drifted sandbox extract, asserts equality — pins
+the property the script's header comment asserts twice) and
+`test_write_on_renamed_heading_fails_and_extract_is_untouched` (renames a
+pinned heading in the sandbox `AGENTS.md` copy, runs `--write`, asserts
+nonzero exit + "heading not found" on stderr + the extract file
+byte-for-byte untouched, and that the default no-arg check on the same
+renamed heading also fails). Confirmed the heading-rename test fails
+(`assert 0 != 0`) against the pre-fix script and passes against the fixed
+script; the AGENTS.md-hash test passes against both (it pins an
+already-sound neighbouring property, not the defect itself — expected).
+
+**LOW-1** — `test_unknown_argument_is_rejected` now also asserts
+`"unknown argument" in result.stderr`, not just `returncode == 1`.
+
+**LOW-4** — left `--help` exiting 1 (fail-closed, prints usage to
+stderr) rather than adding a 0-exit help path. One-line reason recorded
+inline in the script next to the argument parser: this is a one-flag
+internal remediation script, not a general CLI, and `--help` failing
+closed is one of the twelve accidental-invocation guards this WP's review
+already verified and accepted — making it a documented success path would
+be a new, untested behavior change with no required benefit.
+
+**Test suite:** `pytest tests/cross_cutting/test_check_sop_extract_drift.py -v`
+→ 8 passed (was 6), exit 0.
+
+**Clean-tree confirmation:** `git status --porcelain` in this lane shows
+only the two intentionally-changed files
+(`conformance/scripts/check-sop-extract-drift.sh`,
+`tests/cross_cutting/test_check_sop_extract_drift.py`); `AGENTS.md` and
+`conformance/crosslayer/sop-extract.md` hash-verified restored to their
+pre-remediation values throughout. Primary checkout
+(`/home/jeroennouws/dev/spec-kitty-conformance`, branch
+`kitty/mission-crosslayer-composition-suite`) was not touched.
+
+No state transition performed — WP03 is already `for_review` and this
+review round runs out-of-band; recorded here per instruction instead of
+attempting `--to for_review` (which would error `Illegal transition`).
+
 - **MEDIUM-1 remediation (`--write`'s `mv` was cross-device, so neither
   atomic nor mode-preserving)**: the `mktemp` scratch file `--write` builds
   its replacement in was created under `${TMPDIR:-/tmp}` (tmpfs, st_dev 44
