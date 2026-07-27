@@ -149,17 +149,25 @@ record of what one real run took, not a target other runs must meet.
 
 | `run_id` | Wall-clock minutes | Fork-PR, no-secret confirmed? |
 |---|---|---|
-| TBD — pending first real `conformance.yml` run | TBD | TBD |
+| [`30227861005`](https://github.com/MOES-Media/spec-kitty/actions/runs/30227861005) | 0.4 | Not observed on a fork PR (this run was on branch `kitty/mission-sk-skills-static-conformance` in `MOES-Media/spec-kitty` directly, not a forked repository) |
 
-**Status as of this writing: unmet.** `.github/workflows/conformance.yml`
-exists (WP03's deliverable) but has not yet triggered a real GitHub Actions
-run: WP03's own work log records `T013` (the real-CI-run subtask) as
-explicitly blocked — `conformance/` (this suite's manifest and script) and
-the workflow file do not yet coexist on any branch pushed to
-`MOES-Media/spec-kitty`, and no PR carrying both exists yet. This row will
-be replaced with a real `run_id` and minutes figure, byte-identical to what
-WP03 records in its own work log, once that run exists and shows green —
-not estimated, not guessed, not left blank.
+**Status as of this writing: met.** A real GitHub Actions run of
+`.github/workflows/conformance.yml` completed successfully: `run_id`
+`30227861005`, `conclusion: success`, `headBranch`
+`kitty/mission-sk-skills-static-conformance`, `createdAt`
+`2026-07-27T00:37:15Z`, `updatedAt` `2026-07-27T00:37:39Z` — 24 seconds
+(0.4 minutes) wall-clock. Both steps were green: `Run muster skills
+conformance (FR-002)` logged `----- muster skills run
+conformance/skills/manifest.yaml (exit 0) -----` then `skills: PASS —
+54/54 cases passed, 0 failed`; `Verify manifest completeness (FR-007)`
+logged `manifest completeness: OK (53 skills + 1 control = 54 cases)`.
+Independently reproduce this via `gh run view 30227861005 --repo
+MOES-Media/spec-kitty --json conclusion,headBranch,createdAt,updatedAt`.
+This figure is byte-identical to the one recorded in WP03's Activity Log
+(`kitty-specs/sk-skills-static-conformance-01KYG7GE/tasks/WP03-ci-conformance-workflow.md`)
+per WP02's Definition of Done cross-check. No ceiling is asserted here —
+this is a record of what one real run took, not a target other runs must
+meet.
 
 ## Known muster gaps this suite runs on top of
 

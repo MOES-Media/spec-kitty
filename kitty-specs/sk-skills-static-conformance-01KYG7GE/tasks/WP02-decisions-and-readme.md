@@ -281,7 +281,7 @@ never an estimate.
       and real wall-clock minutes from an actual green `conformance.yml` run
       (T010) — a `TBD` placeholder blocks final approval, it does not
       satisfy it
-- [ ] run_id/minutes cross-checked against WP03's T013 work-log entry for
+- [x] run_id/minutes cross-checked against WP03's T013 work-log entry for
       exact match
 - [ ] No file outside `owned_files` is modified
 

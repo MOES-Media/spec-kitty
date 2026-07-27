@@ -223,7 +223,7 @@ grep -n "version:" .github/workflows/conformance.yml     # MUST show '1.1.0' exa
 - [ ] No `secrets:` reference anywhere in the file
 - [ ] No `setup-node` step added without recording why it was needed (or
       confirmed unnecessary)
-- [ ] Real GitHub Actions run recorded: `run_id`, wall-clock minutes, both
+- [x] Real GitHub Actions run recorded: `run_id`, wall-clock minutes, both
       steps green (T013) — handed off for WP02's T010
 - [ ] No file outside `owned_files` is modified; `conformance/**` untouched
       by this WP
@@ -353,3 +353,26 @@ Implementation command: `spec-kitty agent action implement WP03 --agent claude`
   actionlint/yamllint pre-installed in this environment) and ran it against
   the new file: `actionlint .github/workflows/conformance.yml` exits `0`
   with zero findings.
+- 2026-07-27T00:40Z – claude – T013: **UNBLOCKED — real green CI run recorded.**
+  Once WP01's manifest/script and this WP's workflow file coexisted on
+  `kitty/mission-sk-skills-static-conformance` and that branch was pushed to
+  `origin` (`MOES-Media/spec-kitty`), GitHub Actions triggered a real run.
+  `run_id`: `30227861005`
+  (`https://github.com/MOES-Media/spec-kitty/actions/runs/30227861005`).
+  `conclusion`: `success`. `headBranch`:
+  `kitty/mission-sk-skills-static-conformance`. `createdAt`:
+  `2026-07-27T00:37:15Z`. `updatedAt`: `2026-07-27T00:37:39Z` — wall-clock
+  **24 seconds (0.4 minutes)**. Independently verified via `gh run view
+  30227861005 --repo MOES-Media/spec-kitty --json
+  conclusion,headBranch,createdAt,updatedAt` — all fields confirmed as
+  above. Both steps green: `Run muster skills conformance (FR-002)` logged
+  `----- muster skills run conformance/skills/manifest.yaml (exit 0) -----`
+  then `skills: PASS — 54/54 cases passed, 0 failed`; `Verify manifest
+  completeness (FR-007)` logged `manifest completeness: OK (53 skills + 1
+  control = 54 cases)`. This run was on `kitty/mission-sk-skills-static-conformance`
+  directly in `MOES-Media/spec-kitty` (not from a forked repository), so the
+  fork-PR-no-secrets scenario (T013 step 4) was not observed by this run;
+  the workflow itself still contains no `secrets:` reference (T014). This
+  `run_id` (`30227861005`) and minutes figure (`0.4`) are handed off
+  byte-identical to WP02's T010 in `conformance/README.md`'s CI timing
+  table.
