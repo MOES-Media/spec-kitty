@@ -80,8 +80,52 @@ reverse. Neither lane's `write_scope` includes a file the other lane writes
   `skills-manifest-case.schema.json` — that is a distinct, deferred concern
   (a real schema-validation step would be a muster-side fix per FR-006's
   scope guard, not this script's job).
-- This script does not inspect `expectations.ok`/`violations` values, skill
-  frontmatter content, or anything muster's own `skills run` already checks
-  — it checks exactly one thing: does the manifest's case *count and name
-  set* match the actual skill directory tree, offset by the one known
-  control case.
+- ~~This script does not inspect `expectations.ok`/`violations` values, skill
+  frontmatter content, or anything muster's own `skills run` already
+  checks~~ — **superseded by the addendum below.** As of the discrimination-
+  control redesign, this script *does* inspect muster's own `--json`
+  `violations[]` output for the control case and every real skill case; the
+  claim above was accurate for the original FR-007-only implementation and
+  is struck through, not deleted, so this contract's history stays legible.
+  What remains true unchanged: this script does not validate manifest YAML
+  shape against a schema, and does not re-implement any static rule muster
+  itself already enforces (e.g. the `^[a-z0-9-]+$` charset check) — it only
+  *observes* muster's own conclusion for the two properties described in the
+  addendum.
+
+## Addendum: discrimination-control redesign (post-merge, PR #29)
+
+The original contract above described an FR-007-only script: pure Node
+stdlib, no network, no process exec, checking manifest/tree *completeness*
+only. Three rounds of property-based patching to that script's control-
+discrimination logic (added post-merge, outside this contract's original
+FR-007 scope) found seven distinct bypasses that left the script at exit
+`0` against a control fixture that no longer discriminated anything (see
+`conformance/README.md`'s "Proving the suite discriminates" §History for
+the full list). The property-based approach was replaced, not patched
+further:
+
+- **Environment/network** (supersedes "Environment variables: none
+  required. No network access" above): the script now execs
+  `npx --offline @garrison-hq/muster@1.1.0 skills run <manifest> --json`
+  as a child process. This requires no *credentials* (still true — no
+  C-002 regression) but does require the pinned muster package to already
+  be warm in the local npm cache; see `conformance/README.md`'s "Local
+  prerequisite" note. If the CLI cannot be run, the script exits `1` with
+  an actionable message (the cache-warm command to run) rather than
+  propagating a raw `child_process` stack trace.
+- **New behavior**: the script asserts (a) the control case's muster
+  `--json` `violations[]` contains `{ path: "name", message: /must equal
+  the parent directory name/ }`, and (b) every real skill case's
+  `violations[]` contains zero `severity === "error"` entries. Both are
+  read from a single muster invocation per script run, keyed by case `id`.
+- **Exit codes**: unchanged in meaning (`0` = fully conforming, `1` =
+  problem found, named explicitly) but the set of conditions that can
+  produce `1` now also includes "muster CLI unavailable" and "control/skill
+  case's observed violations don't match the expected shape," in addition
+  to the original count/name-set mismatch conditions.
+- **CI wiring**: unchanged — `.github/workflows/conformance.yml` still adds
+  exactly the one step named in "CI wiring" above, with no new step
+  required, because the preceding `garrison-hq/muster-action@v1` step
+  already warms the same npm cache this script's own `npx --offline` call
+  reads from.
