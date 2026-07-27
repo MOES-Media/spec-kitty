@@ -145,62 +145,62 @@ allow-list exactly.
 > convention (see M3's `WP01`/`WP02`/`WP03` precedent) — not committed task
 > IDs.
 
-### IC-00 — Reference-computation pre-step (tasks-phase prerequisite, not a lane)
+### IC-00 — Reference-computation pre-step: considered and dissolved (post-plan architectural review)
 
-- **Purpose**: Resolve a real circularity before task files can be
-  authored. FR-001's "frozen defaults table" does not exist anywhere yet —
-  not in spec.md, not in D1/`DECISIONS.md`, not in issue #26 — it is a
-  deliverable this mission authors, not a pre-existing citation. But the
-  spec's own Dependencies section requires lane-b's task file to carry
-  lane-a's *literal* projected `Soul.md` bytes as inline fixture content
-  (hazard 2: isolated worktrees, content must be duplicated, not
-  referenced). Lane-a and lane-b run in parallel — that parallelism is the
-  entire reason duplication is needed — so lane-b's task file cannot embed
-  content that only lane-a's (not-yet-started) implementation will produce.
-  **This is the plan-phase finding to flag explicitly, not silently work
-  around**: the spec assumes duplicated content is available at
-  tasks-authoring time, but the content's source (the defaults table +
-  the projector) does not exist until a lane runs.
-- **Where this happens, stated explicitly (post-plan review finding)**:
-  "outside any lane's worktree" is ambiguous — an implementer could
-  reasonably (and unsafely) read it as "on `main` or the primary checkout."
-  It is neither. Per `src/specify_cli/lanes/merge.py`, this fork's merge
-  engine has two distinct merge steps with different risk profiles:
-  `consolidate_lane_into_mission` (`:247`) folds a lane branch into the
-  mission branch with a plain `git merge --no-ff` — no squash, no
-  `-X theirs` — so content committed on the mission's own coordination
-  branch is not at risk from a lane merge. Only
-  `integrate_mission_into_target` (`:259`) defaults to
-  `MergeStrategy.SQUASH`, and only that one path, at the final
-  mission→target step, runs `git merge --squash -X theirs`
-  (`:612-618`) once. IC-00's defaults-table choice and the pinned
-  `Soul.md` bytes must therefore be authored on the mission's own
-  coordination branch, before either lane's worktree is allocated —
-  never on `main` or the primary checkout.
-- **Resolution**: before `/spec-kitty.tasks` materializes lane-a's and
-  lane-b's task files, whoever authors those files must, once, outside any
-  lane's worktree: (1) choose and freeze the actual defaults-table values
-  (arbitrary but fixed — C-003 already guarantees they are never graded,
-  so any concrete choice is fine as long as it is fixed and documented);
-  (2) hand-compute or prototype-run the projector against
-  `architect-alphonso.agent.yaml` and `reviewer-renata.agent.yaml` under
-  that table to get the exact literal `Soul.md` bytes; (3) pin those bytes
-  into lane-a's task file as the required byte-exact acceptance fixture
-  (removing lane-a's freedom to invent its own table, which is the price of
-  removing the circularity); (4) pin the *same* bytes into lane-b's task
-  file as inline sandbox fixture content for FR-004's two real cases only.
-- **Relevant requirements**: FR-001, FR-002, FR-004.
-- **Affected surfaces**: none directly — this is an authoring-time action,
-  not a code change.
-- **Sequencing/depends-on**: must happen before lane-a and lane-b's task
-  files are finalized; blocks nothing once done.
-- **Risks**: if skipped, lane-a and lane-b will independently produce
-  divergent persona content that happens to match by file *path* but not by
-  *bytes* until lane-a's real merge lands — masking a real problem behind
-  an apparent (but untested) pass. Also: lane-b must never commit its
-  sandbox copy of the `Soul.md` files to `conformance/crosslayer/personas/`
-  — that path is lane-a's write scope; a double-write there is exactly
-  hazard-1's silent-overwrite shape.
+- **Original concern**: FR-001's "frozen defaults table" does not exist
+  anywhere yet — not in spec.md, not in D1/`DECISIONS.md`, not in issue
+  #26 — it is a deliverable this mission authors, not a pre-existing
+  citation. The spec's Dependencies section (prior form) read this as
+  requiring lane-b's task file to carry lane-a's *literal* projected
+  `Soul.md` bytes as inline fixture content (isolated worktrees, content
+  must be duplicated, not referenced), and this IC originally proposed a
+  tasks-authoring pre-step to freeze the defaults table and hand-compute
+  both personas' exact bytes on the mission's coordination branch, before
+  either lane's worktree is allocated, so that byte-identical content
+  could be pinned into both lane-a's and lane-b's task files.
+- **Why it dissolves — checked against muster's actual source, not just
+  spec inference** (`composition.ts:281-333`, `contradiction-lint.ts`,
+  pinned `624edd6d`): `resolvePersonaLayer` returns only
+  `personaDoc.body.trim()` into `layerTexts` — the map
+  `contradiction-lint.ts`'s `extractClauses`/`analyseLayerPair` actually
+  scans for contradictions. RFC-1 front-matter (`voice`, `interaction`,
+  `locale`, the fabricated empty lists) never reaches the lint; it is only
+  ever consulted, structurally (presence/shape, not specific values), by
+  RFC-1 strict-mode resolution. C-003 independently forbids grading any
+  fabricated field as evidence. **FR-004's graded surface is therefore
+  body text and composed behavior only**, and that body text is
+  deterministically derivable by *either* lane directly from the same
+  shared, read-only `*.agent.yaml` source per FR-001's mapping — lane-b
+  never needs lane-a's output, byte-exact or otherwise.
+- **What lane-b actually needs**: (a) `fixturePath` values in its case
+  files that agree with lane-a's committed filenames — already fixed by
+  this plan's own Project Structure section
+  (`conformance/crosslayer/personas/architect-alphonso.Soul.md`,
+  `.../reviewer-renata.Soul.md`), requiring no advance computation; and
+  (b) a self-authored, RFC-1-valid sandbox persona (never committed to
+  lane-a's path) to exercise its own manifest/CI wiring locally — its
+  exact bytes are irrelevant, since they are never graded (C-003) and
+  never seen by the lint (above). The real content is verified for real,
+  automatically, once both lanes are merged: IC-04's static CI job runs on
+  every PR against whatever is actually committed at that path, and the
+  spec's own mission-level Real-CLI verification requirement re-runs the
+  shipped manifest against the shipped personas before acceptance. No
+  lane, at any point, needs to hand-compute or pre-guess the other lane's
+  byte output.
+- **Serialization considered and rejected**: forcing lane-a to merge
+  before lane-b's task file is authored (trading away their parallelism)
+  would only be justified if lane-b's own implementation-time acceptance
+  depended on lane-a's real byte-exact content. It does not (above), so
+  serialization buys nothing here and is not adopted — lane-a and lane-b
+  remain independently parallel, per the Dependency Graph below.
+- **What changed as a result**: spec.md's "Lane isolation" bullet
+  (Dependencies & Assumptions) is corrected in place (post-plan review) to
+  require path agreement only, not byte duplication. IC-02's
+  Sequencing/depends-on note below is updated to match. This entry is
+  retained (not deleted) as the auditable record of the concern and its
+  resolution, matching this mission's own established convention for
+  documenting post-spec/post-plan corrections rather than silently
+  overwriting them.
 
 ### IC-01 — Profile→Soul.md projector, mapping doc, committed personas (proposed lane-a)
 
@@ -262,12 +262,17 @@ allow-list exactly.
   `conformance/crosslayer/cases/reviewer-run-skill.yaml`,
   `conformance/crosslayer/control.yaml`,
   `conformance/crosslayer/fixtures/invalid-persona-missing-key.Soul.md`.
-- **Sequencing/depends-on**: none structurally; needs IC-00's pinned
-  `Soul.md` bytes as sandbox-only local fixtures for FR-004's two real
-  cases (control.yaml and the C-001 fixture are self-contained synthetic
-  text per the spec's own pinned fixture — they do **not** need lane-a's
-  real projector output at all, which narrows the actual duplication need
-  to FR-004 only).
+- **Sequencing/depends-on**: none. IC-00 (above) is dissolved: lane-b
+  authors its own self-contained, RFC-1-valid sandbox persona fixture(s)
+  for FR-004's two real cases (never committed to
+  `conformance/crosslayer/personas/`, lane-a's exclusive write scope) and
+  does not need lane-a's real projector output, byte-exact or otherwise —
+  only the `fixturePath` values need to agree with lane-a's committed
+  filenames (already fixed by Project Structure above). The real
+  body-text content is verified for real post-merge by IC-04's CI job and
+  the mission's Real-CLI verification requirement. `control.yaml` and the
+  C-001 fixture were already self-contained synthetic text per the spec's
+  own pinned fixture and are unaffected by this change.
 - **Acceptance evidence**:
   - FR-004: `npx --offline @garrison-hq/muster@1.1.0 crosslayer run
     conformance/crosslayer/manifest.yaml --static-only --json`, expect exit
@@ -454,19 +459,19 @@ allow-list exactly.
 ## Dependency Graph
 
 ```
-IC-00 (reference computation, tasks-authoring pre-step)
-   │  produces: frozen defaults table + pinned Soul.md bytes
-   ├──────────────┬───────────────────────────────┐
-   ▼              ▼                               │
-IC-01 (lane-a)   IC-02+IC-03+IC-04 (lane-b)        │
-projector,       manifests, control, C-001         │
-personas,        fixture, sop-extract, CI          │
-persona-drift    workflow (static job + cadence     │
-script           scaffold, zero cases initially)    │
-   │  \_________________  runs in PARALLEL  _______/│
-   │                                                 │
-   └──────────────┬──────────────────────────────────┘
-                   ▼ (both merge to mission coordination branch)
+IC-01 (lane-a)                    IC-02+IC-03+IC-04 (lane-b)
+projector, personas,               manifests, control, C-001
+persona-drift script               fixture, sop-extract, CI workflow
+                                    (static job + cadence scaffold,
+                                     zero cases initially)
+
+     ── runs in PARALLEL, no shared pre-step ──
+     (IC-00 dissolved, above — lane-b authors its own sandbox persona
+     fixture; path agreement is already fixed by Project Structure
+     above, needing no advance computation)
+
+                       │
+                       ▼ (both merge to mission coordination branch)
         C-002 + C-003 (cross-lane, pre-merge review gate)
                    │
                    ▼
@@ -484,9 +489,11 @@ script           scaffold, zero cases initially)    │
         (FR-005 acceptance-complete only after this)
 ```
 
-**Parallel**: lane-a (IC-01) and lane-b (IC-02/03/04) — this is the whole
-reason the spec requires content duplication (hazard 2) rather than a
-read-after-merge assumption.
+**Parallel**: lane-a (IC-01) and lane-b (IC-02/03/04) — genuinely
+independent from the start now that IC-00 is dissolved: lane-b needs no
+advance-computed content from lane-a, only `fixturePath` agreement
+(already fixed by Project Structure above), so there is no shared
+pre-step gating either lane's start.
 
 **Serial**: lane-c (IC-05) after lane-b merges AND after M3 merges
 (whichever lands later — in practice M3, since it is blocked on CI
@@ -521,16 +528,27 @@ during this plan pass:
 
 ## Spec-Level Findings from This Planning Pass
 
-1. **Real circularity in the lane-a/lane-b duplication requirement**
-   (documented fully as IC-00 above): the spec's Dependencies section
-   requires lane-b's task file to embed lane-a's literal projector output,
-   but the "frozen defaults table" that output depends on is not specified
-   anywhere in spec.md, D1, or issue #26 — it is itself a deliverable this
-   mission authors. Resolved with an explicit tasks-authoring pre-step
-   (IC-00), not silently worked around. This is a genuine tension between
-   the spec's parallel-lane framing and the lane-isolation hazard, not a
-   contradiction in the spec's substance — flagging it here so the tasks
-   phase does not skip it.
+1. **Apparent circularity in the lane-a/lane-b duplication requirement —
+   dissolved, not resolved by a hand-computation pre-step** (documented
+   fully as IC-00 above). The spec's Dependencies section (prior form)
+   required lane-b's task file to embed lane-a's literal projector output,
+   and the "frozen defaults table" that output would have depended on is
+   not specified anywhere in spec.md, D1, or issue #26. Checked directly
+   against muster's source (`composition.ts:281-333`): the persona layer
+   contributes only its RFC-1 body text to `layerTexts`, which is the only
+   thing `contradiction-lint.ts` scans; front-matter fields (the fabricated
+   defaults table's own output) never reach the lint, and C-003
+   independently forbids grading them. So the byte-exact duplication the
+   original Dependencies bullet asked for was an over-reading of what
+   FR-004 actually needs: `fixturePath` agreement (free, already fixed by
+   Project Structure) plus a self-authored, RFC-1-valid sandbox persona
+   for lane-b's own local testing. Real content is verified for real,
+   automatically, post-merge (IC-04's CI job; the mission's Real-CLI
+   verification requirement) — no hand-computed reference bytes are
+   needed at any point, and lane-a/lane-b's parallelism is undisturbed.
+   spec.md's "Lane isolation" bullet is corrected in place to match; IC-00
+   is retained above as a dissolved/superseded entry so the reasoning
+   stays auditable rather than silently removed.
 2. **C-002's lane assignment was left implicit** (only C-001 and C-003 got
    explicit lane notes in the post-spec remediation). Closed above by
    treating it the same as C-003: cross-lane, pre-merge review gate.

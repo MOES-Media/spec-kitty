@@ -402,13 +402,49 @@ for the same reason).
     way it applies to lane-a/lane-b's own deliverables.
 
   **lane-b's manifests reference lane-a's projected `Soul.md` files by
-  path** (`layers: [{layerType: "persona", fixturePath: ...}]`). Because
-  lane isolation means lane-b's worktree will not see lane-a's WP output
-  during implementation, **lane-b's own task file must carry the specific
-  projected `Soul.md` content it needs as inline fixture text**, not a
-  reference to `conformance/crosslayer/personas/`. This mirrors a defect
-  this programme has hit twice already (a lane assuming a sibling lane's
-  output was already on disk); the tasks phase must not repeat it.
+  path** (`layers: [{layerType: "persona", fixturePath: ...}]`).
+
+  **Post-plan review correction (architectural review, IC-00 dissolved):**
+  the paragraph originally here required lane-b's task file to carry
+  lane-a's *literal* projected `Soul.md` bytes as inline fixture content,
+  reasoning that lane isolation leaves lane-b's worktree unable to see
+  lane-a's not-yet-produced output. Verified directly against muster's
+  source (`composition.ts:281-320,321-333`, pinned `624edd6d`): the
+  persona layer contributes only `personaDoc.body.trim()` to `layerTexts`
+  — the map `contradiction-lint.ts` (`extractClauses`, `analyseLayerPair`)
+  actually scans. RFC-1 front-matter (`voice`, `interaction`, `locale`,
+  the fabricated empty lists) never reaches the lint at all; it is only
+  ever consulted, structurally, by `resolvePersonaLayer`'s RFC-1 strict-mode
+  check (shape/presence, not specific values). C-003 independently forbids
+  any check from citing those fabricated fields as evidence. FR-004's
+  graded surface is therefore body text and composed behavior only, and
+  that body text is deterministically derivable by **either** lane
+  directly from the same shared, read-only
+  `src/doctrine/agent_profiles/built-in/*.agent.yaml` source per FR-001's
+  mapping — lane-b does not need lane-a's output, byte-exact or otherwise,
+  to construct a persona whose graded content is correct.
+
+  **What lane-b actually needs, corrected:** (1) `fixturePath` values in
+  its committed case files that agree with lane-a's committed filenames
+  (`conformance/crosslayer/personas/architect-alphonso.Soul.md`,
+  `.../reviewer-renata.Soul.md` — already fixed by the plan's own Project
+  Structure section, no advance computation required); and (2) for its
+  own local implementation-time testing of the manifest/CI wiring, any
+  self-authored, RFC-1-valid sandbox persona fixture (never committed to
+  lane-a's path) — its exact bytes, including any fabricated front-matter
+  values it invents, are irrelevant, since they are never graded (C-003)
+  and never seen by the lint (composition.ts, above). The real content is
+  verified for real, automatically, once both lanes are merged: the
+  static CI job (FR-004) runs on every PR against whatever is actually
+  committed at that path, and this mission's own Real-CLI verification
+  requirement (below) re-runs the shipped manifest against the shipped
+  personas before acceptance. **No hand-computed reference bytes are
+  required at any point, and lane-a/lane-b remain independently
+  parallel** — only the file *paths* need to agree between the two
+  lanes, never the bytes. This mirrors a defect this programme has hit
+  twice already (a lane assuming a sibling lane's output was already on
+  disk) in the opposite direction: the original fix over-corrected by
+  requiring byte duplication where path agreement already sufficed.
 - **Citation-correction to the seed issue** (verified against the actual
   repositories, not smoothed over):
   1. Issue §11/D1 cites RFC-1 as `` `.kittify/reference/soul-spec.md` ``
