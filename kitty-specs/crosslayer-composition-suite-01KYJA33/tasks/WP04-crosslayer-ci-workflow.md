@@ -326,12 +326,13 @@ Implementation command: `spec-kitty agent action implement WP04 --agent claude`
   omission, secrets injection into the static job, `--write` reintroduction
   on the sop-extract-drift call site, zero-real-cases comment removal) —
   each reverted, confirmed the corresponding test(s) failed, then restored.
-- **ci-quality.yml path-gap — FIXED (M7 WP04 review, MEDIUM-2)**: originally
-  recorded below as "out of WP04 scope" and left for an unnamed maintainer.
-  The review correctly rejected that: this mission's own C-003 remediation
-  already says "unassigned-to-a-lane is not the same as unowned — leaving it
-  as free-floating prose degrades into nobody running it." A separate,
-  narrower gap than first described was confirmed: `ci-quality.yml`'s
+- **ci-quality.yml path-gap — FIXED (M7 WP04 review, MEDIUM-2)** — **PARTIAL;
+  see the follow-up entry below for the corrected, complete picture.**
+  Originally recorded below as "out of WP04 scope" and left for an unnamed
+  maintainer. The review correctly rejected that: this mission's own C-003
+  remediation already says "unassigned-to-a-lane is not the same as unowned —
+  leaving it as free-floating prose degrades into nobody running it." A
+  separate, narrower gap than first described was confirmed: `ci-quality.yml`'s
   `on.pull_request.paths`/`on.push.paths` enumerate six workflow files by
   name (`ci-quality.yml`, `ci-windows.yml`, `drift-detector.yml`,
   `release.yml`, `release-readiness.yml`,
@@ -348,7 +349,64 @@ Implementation command: `spec-kitty agent action implement WP04 --agent claude`
   `test_suite_jobs_gate_blocking`, `test_workflow_dist_lint`,
   `test_plugin_validate_workflow`, `test_release_ci_ownership`) re-run
   green. (Earlier text below, describing this as out-of-scope, is retained
-  for the record but is superseded by this entry.)
+  for the record but is superseded by this entry.) **This entry's own "FIXED"
+  claim was itself incomplete — it closed only the outer admission gate, not
+  the inner job-level gate. Corrected below.**
+- **ci-quality.yml path-gap — the entry above closed only HALF the gap (M7
+  WP04 review, MEDIUM-2, second remediation pass)**: the entry above added
+  `.github/workflows/crosslayer.yml` to `ci-quality.yml`'s top-level
+  `on.pull_request.paths`/`on.push.paths`. That is necessary but not
+  sufficient, and claiming "Fixed by adding `.github/workflows/crosslayer.yml`
+  to both lists" was not true for the PR path — it only described what the
+  outer paths change does, not what actually gates test execution.
+  `ci-quality.yml` has a second, inner filter layer: the `changes` job
+  (dorny/paths-filter, lines ~144-500) computes named groups from the
+  changed-file set, and the `e2e-cross-cutting` job's own `if` only runs
+  when `needs.changes.outputs.e2e == 'true' || core_misc == 'true' ||
+  execution_context == 'true'` (plus the `push` short-circuit). Traced by
+  walking a PR whose only changed file is `.github/workflows/crosslayer.yml`
+  through both layers, not by re-parsing YAML or re-running the (green but
+  blind-to-this-gap) guard suite: (1) outer `on.pull_request.paths` admits
+  the PR — `.github/workflows/crosslayer.yml` was already listed there by the
+  first remediation. (2) The `changes` job's `dorny/paths-filter` step
+  evaluates every named group against that one changed file: `e2e`
+  (`.github/workflows/ci-quality.yml`, `tests/e2e/**`,
+  `tests/cross_cutting/**`) — false; `core_misc` (`ci-quality.yml`,
+  `ci-windows.yml`, `drift-detector.yml`, `release.yml`, plus src/tests
+  cones) — false; `execution_context` (four `src/` cones + one test file) —
+  false; the `unmatched` fail-closed catch-all requires `ANY_SRC == 'true'`
+  (a `src/**` change), which a workflow-only diff never produces — false. So
+  every output `e2e-cross-cutting`'s `if` reads is false. (3) With
+  `needs.changes.outputs.e2e`, `.core_misc`, and `.execution_context` all
+  false and `github.event_name == 'pull_request'` (not `push`), the `if`
+  short-circuits to false and the job — and the 14 tests it runs — is
+  **skipped**. So the PR-side (merge-blocking) half of the gap was never
+  closed by the first remediation; only the `push` half was, because the
+  job's `if` also has an unconditional `github.event_name == 'push'` branch
+  that does not depend on any `changes` output. **Real fix**: add
+  `.github/workflows/crosslayer.yml` to the `e2e:` filter group at
+  `ci-quality.yml`'s `changes` job (the dorny filter block, `e2e:` key),
+  alongside `core_misc`'s existing pattern for the same problem — its own
+  inline comment documents it: *"The other suite-running workflows route to
+  the architectural guard shard via this group (FR-012 two-layer, second
+  layer)."* `crosslayer.yml` is exactly such a sibling suite-running
+  workflow; it needed to appear in **both** layers, and only the outer one
+  had been done. Re-traced the same PR-only-changes-crosslayer.yml path
+  after the fix: `e2e` now evaluates true (literal path-list membership,
+  no wildcard needed), so `needs.changes.outputs.e2e == 'true'` is true,
+  the job's `if` is true, and `e2e-cross-cutting` **runs** on the PR path.
+  Guard suite (`test_ci_quality_path_filters`, `test_gate_coverage_parse_model`,
+  `test_suite_jobs_gate_blocking`, `test_workflow_dist_lint`,
+  `test_plugin_validate_workflow`, `test_release_ci_ownership`, run via
+  `uv run pytest` since the system interpreter lacks `respx`): 65 passed,
+  same count as the mission's recorded baseline. Also regenerated this
+  mission's `wps.yaml` WP04 `owned_files`/`create_intent` and `lanes.json`
+  lane-d `write_scope` (previously still listing only `crosslayer.yml` and
+  `conformance/crosslayer/README.md`, disagreeing with this file's own
+  frontmatter and the T022 gate) — `lanes.json` regenerated through the real
+  `compute_lanes` + `write_lanes_json` path (not hand-edited), matching how
+  the sibling `status.json` fix used the canonical reducer instead of a
+  hand-edited snapshot.
 - **ci-quality.yml path-gap (out of WP04 scope) — superseded, see entry
   above**: confirmed by reading
   `.github/workflows/ci-quality.yml`'s top-level `on.pull_request.paths`/

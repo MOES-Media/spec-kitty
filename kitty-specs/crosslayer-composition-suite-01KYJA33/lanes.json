@@ -15,7 +15,9 @@
         "conformance/crosslayer/personas/reviewer-renata.Soul.md",
         "conformance/scripts/check-persona-drift.sh",
         "conformance/tools/PROJECTION.md",
-        "conformance/tools/profile2soul.py"
+        "conformance/tools/profile2soul.py",
+        "tests/conformance/__init__.py",
+        "tests/conformance/test_profile2soul.py"
       ],
       "predicted_surfaces": [
         "api",
@@ -34,12 +36,19 @@
         "conformance/crosslayer/cases/architect-run-skill.yaml",
         "conformance/crosslayer/cases/reviewer-run-skill.yaml",
         "conformance/crosslayer/control.yaml",
+        "conformance/crosslayer/fixtures/control-persona.Soul.md",
+        "conformance/crosslayer/fixtures/control-skill.SKILL.md",
+        "conformance/crosslayer/fixtures/control-sop.md",
         "conformance/crosslayer/fixtures/invalid-persona-missing-key.Soul.md",
-        "conformance/crosslayer/manifest.yaml"
+        "conformance/crosslayer/fixtures/spk-run-next.SKILL.md",
+        "conformance/crosslayer/manifest.yaml",
+        "tests/cross_cutting/test_crosslayer_wp02_manifests_control_c001.py"
       ],
       "predicted_surfaces": [
         "api",
-        "legacy-cleanup"
+        "artifact-rendering",
+        "legacy-cleanup",
+        "tracker-integration"
       ],
       "depends_on_lanes": [],
       "parallel_group": 0
@@ -51,10 +60,13 @@
       ],
       "write_scope": [
         "conformance/crosslayer/sop-extract.md",
-        "conformance/scripts/check-sop-extract-drift.sh"
+        "conformance/scripts/check-sop-extract-drift.sh",
+        "tests/cross_cutting/test_check_sop_extract_drift.py"
       ],
       "predicted_surfaces": [
-        "api"
+        "api",
+        "legacy-cleanup",
+        "tests"
       ],
       "depends_on_lanes": [],
       "parallel_group": 0
@@ -65,13 +77,17 @@
         "WP04"
       ],
       "write_scope": [
+        ".github/workflows/ci-quality.yml",
         ".github/workflows/crosslayer.yml",
-        "conformance/crosslayer/README.md"
+        "conformance/crosslayer/README.md",
+        "tests/cross_cutting/misc/test_crosslayer_workflow.py"
       ],
       "predicted_surfaces": [
         "api",
         "app-shell",
-        "artifact-rendering"
+        "artifact-rendering",
+        "legacy-cleanup",
+        "tests"
       ],
       "depends_on_lanes": [],
       "parallel_group": 0
@@ -99,7 +115,7 @@
       "parallel_group": 1
     }
   ],
-  "computed_at": "2026-07-27T20:19:26.694668+00:00",
+  "computed_at": "2026-07-27T23:39:50.010334+00:00",
   "computed_from": "dependency_graph+ownership",
   "planning_artifact_wps": []
 }
