@@ -60,7 +60,8 @@
         "conformance/doctrine/README.md",
         "conformance/doctrine/control/045-drifted.yaml",
         "conformance/scripts/check-doctrine-drift-gate.sh",
-        "conformance/scripts/check-doctrine-manifest-completeness.mjs"
+        "conformance/scripts/check-doctrine-manifest-completeness.mjs",
+        "kitty-specs/doctrine-rule-manifests-01KYH7AM/issue-matrix.md"
       ],
       "predicted_surfaces": [
         "api",

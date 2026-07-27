@@ -12,5 +12,7 @@
   "purpose_tldr": "Turn spec-kitty's built-in directives into machine-checkable SOP rule manifests that muster's RULE_DRIFT lint gates on every PR.",
   "slug": "doctrine-rule-manifests-01KYH7AM",
   "target_branch": "kitty/mission-doctrine-rule-manifests",
-  "topology": "coord"
+  "topology": "coord",
+  "vcs": "git",
+  "vcs_locked_at": "2026-07-27T15:34:13.099947+00:00"
 }

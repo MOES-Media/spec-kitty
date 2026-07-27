@@ -200,10 +200,10 @@ comment discipline, code stewardship, adversarial-QA readiness).
 
 `source.normative` (all 11): `docs/rubric/sop-rule-taxonomy.md#judge-required-rule-classes` · `gradingClass: judge`, `aggregation: k-of-n` for all 11.
 
-**Note on apostrophes**: rules 5, 7, 8, and 9's source text uses a Unicode
-right single quotation mark (`'`, U+2019), not ASCII `'` — `ruleText` must
-reproduce this byte-for-byte (copy from the file, never retype) or
-`checkRuleTextPresence`'s substring match fails on a silent
+**Note on apostrophes**: rules 5, 7, 8, 9, and 11's source text uses a
+Unicode right single quotation mark (`'`, U+2019), not ASCII `'` —
+`ruleText` must reproduce this byte-for-byte (copy from the file, never
+retype) or `checkRuleTextPresence`'s substring match fails on a silent
 character-encoding mismatch, which would look identical to real drift.
 
 ---

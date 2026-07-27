@@ -11,6 +11,9 @@ requirement_refs:
 planning_base_branch: kitty/mission-doctrine-rule-manifests
 merge_target_branch: kitty/mission-doctrine-rule-manifests
 branch_strategy: Planning artifacts for this mission were generated on kitty/mission-doctrine-rule-manifests. During /spec-kitty.implement this WP may branch from a dependency-specific base, but completed changes must merge back into kitty/mission-doctrine-rule-manifests unless the human explicitly redirects the landing branch.
+base_branch: kitty/mission-doctrine-rule-manifests-01KYH7AM
+base_commit: abe912f01a9ed75ae8102e018eba0ad7905499e4
+created_at: '2026-07-27T15:34:17.877074+00:00'
 subtasks:
 - T008
 - T009
@@ -232,10 +235,10 @@ comment discipline, code stewardship, adversarial-QA readiness).
 `gradingClass: judge`, `aggregation: k-of-n`, `k: 5`, `passThreshold: 3` for all 11.
 
 **Unicode apostrophe warning (load-bearing, not stylistic)**: rules 5, 7, 8,
-and 9's source text uses a Unicode right single quotation mark (`'`,
-U+2019) — for example "you're", "Don't", "isn't" — **not** the ASCII
+9, and 11's source text uses a Unicode right single quotation mark (`'`,
+U+2019) — for example "you're", "Don't", "isn't", "QA's" — **not** the ASCII
 apostrophe (`'`, U+0027). `ruleText` must reproduce this byte-for-byte.
-**Copy these four rules directly from the directive file with a tool (`cat`,
+**Copy these five rules directly from the directive file with a tool (`cat`,
 your editor's copy, or a script) — never retype them by hand.** If you
 retype and your keyboard/editor auto-substitutes a straight ASCII quote, the
 manifest will report `RULE_DRIFT` permanently — a silent
@@ -317,29 +320,48 @@ judge-fallback — a reconciled `output-format` classification.
 ### T010 — Author 039 (11 rules, all UNMAPPED, Unicode apostrophes)
 
 **Purpose**: Author the largest single manifest in this mission, with the
-sharpest transcription risk (Unicode apostrophes in 4 of 11 rules).
+sharpest transcription risk (Unicode apostrophes in 5 of 11 rules).
 
 **Steps**:
 1. Create `conformance/doctrine/039-lynn-cole-engineering-culture.yaml` per
    the 039 table above. All 11 rules are full-line, all UNMAPPED.
 2. `sopFile: "../../src/doctrine/directives/built-in/039-lynn-cole-engineering-culture.directive.yaml"`.
-3. **Copy rules 5, 7, 8, and 9 directly from the real directive file** (not
-   from this table, not retyped) — they contain Unicode right single
+3. **Copy rules 5, 7, 8, 9, and 11 directly from the real directive file**
+   (not from this table, not retyped) — they contain Unicode right single
    quotation marks (U+2019) that a straight ASCII-quote retype would corrupt
    silently. Use `sed`/`awk`/a script to extract these lines from the source
    file rather than typing them by hand.
 4. All 11 entries: `gradingClass: judge`, `aggregation: k-of-n`, `k: 5`,
    `passThreshold: 3`.
-5. After authoring, spot-check the apostrophe encoding:
+5. After authoring, verify byte-exact fidelity — **not** a Unicode
+   line-count heuristic. A line-count check (e.g. "at least N lines contain
+   U+2019") only counts how many lines carry *a* right single quote
+   somewhere; it does not verify *which* rule the mark landed in, and a
+   count calibrated to the wrong number (4 instead of the true 5) would pass
+   even with one rule's apostrophe silently corrupted to ASCII. The
+   assertion that actually catches that: **each of 039's 11 `ruleText`
+   values, UTF-8 encoded, must be a byte-exact substring of the raw
+   directive file, occurring exactly once.**
    ```sh
-   grep -P "\x{2019}" conformance/doctrine/039-lynn-cole-engineering-culture.yaml | wc -l
-   # Expect at least 4 matching lines (rules 5, 7, 8, 9 each contain one or more U+2019)
+   # For each of the 11 ruleText values in the manifest, assert it occurs
+   # byte-for-byte, exactly once, in the raw directive file:
+   directive="src/doctrine/directives/built-in/039-lynn-cole-engineering-culture.directive.yaml"
+   # <extract each ruleText value from the manifest as $rule_text, e.g. via yq/jq>
+   for i in 1 2 3 4 5 6 7 8 9 10 11; do
+     rule_text="$(yq -r ".rules[$((i-1))].ruleText" conformance/doctrine/039-lynn-cole-engineering-culture.yaml)"
+     count="$(grep -F -c -- "$rule_text" "$directive")"
+     # count MUST be exactly 1 for every i in 1..11 — not >=1, not "at least N"
+     echo "039-r$i: count=$count"
+   done
    ```
-   Record this count in the work log.
+   Record all 11 counts in the work log verbatim; every one must equal
+   exactly `1`. This is the exact assertion form the reviewer actually used
+   to verify fidelity, not a proxy for it.
 
 **Files**: `conformance/doctrine/039-lynn-cole-engineering-culture.yaml` (new, 11 rules).
-**Validation**: exactly 11 rule entries, all `judge`/`k-of-n`; the Unicode
-apostrophe spot-check count is recorded in the work log and is >= 4.
+**Validation**: exactly 11 rule entries, all `judge`/`k-of-n`; all 11
+byte-exact substring checks recorded in the work log, each equal to exactly
+`1` occurrence — not a Unicode-character-count proxy.
 
 ---
 
@@ -449,8 +471,9 @@ are present in the work log before requesting review.
       `pass-k`/`k: 3`/`passThreshold: 3`, NOT UNMAPPED**
 - [ ] 044's 3 rules remain UNMAPPED/judge — not reclassified to
       `never-call-tool` or any binary class
-- [ ] 039's rules 5, 7, 8, 9 use the Unicode U+2019 apostrophe, verified by
-      the `grep -P "\x{2019}"` spot-check recorded in the work log
+- [ ] 039's rules 5, 7, 8, 9, and 11 use the Unicode U+2019 apostrophe,
+      verified by the byte-exact `ruleText`-substring check (T010 step 5,
+      all 11 counts == 1) recorded in the work log — not a line-count proxy
 - [ ] No entry anywhere sets an `assertionKind` field
 - [ ] `source.normative`/`source.supporting` match the per-rule table exactly
       for every entry, including the `#<anchor>` suffix
@@ -485,10 +508,14 @@ are present in the work log before requesting review.
   (this is the one non-judge directive in this WP).
 - **Reject if** 044's 3 rules are anything other than `judge`/`k-of-n`
   UNMAPPED (this was a binding operator reversal, not an open question).
-- **Reject if** any of 039's rules 5/7/8/9 use an ASCII apostrophe where the
-  source file uses U+2019 — check by eye against the directive file, not
-  just by the manifest loading without error (a wrong-but-consistent
-  apostrophe would still load, but would misreport `RULE_DRIFT`).
+- **Reject if** any of 039's rules 5/7/8/9/11 use an ASCII apostrophe where
+  the source file uses U+2019 — verify via the byte-exact `ruleText`
+  substring check (T010 step 5: each of the 11 `ruleText` values occurs
+  exactly once in the raw directive file), not just by the manifest loading
+  without error (a wrong-but-consistent apostrophe would still load, but
+  would misreport `RULE_DRIFT`) and not by a Unicode line-count heuristic
+  (a count calibrated to 4 instead of the true 5 would pass even with one
+  rule's apostrophe silently corrupted to ASCII).
 - **Reject if** the work log does not contain literal `grep -F -c` output
   for all 3 of 044's fragments.
 - **Reject if** the work log does not contain real, observed exit codes and

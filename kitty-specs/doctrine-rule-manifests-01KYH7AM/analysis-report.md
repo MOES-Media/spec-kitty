@@ -69,3 +69,49 @@ findings:
 ## Next Actions
 
 No CRITICAL or HIGH issues found. The one MEDIUM finding (I1) is a documentation-only per-WP rule-count transcription drift in plan.md that does not affect the authoritative task files WP01/WP02/WP03 implementers actually follow, and does not block proceeding to /spec-kitty.implement. Recommend an optional later editorial pass to correct plan.md:384 and plan.md:388, but this is not a gating action.
+
+## Notes
+
+**2026-07-27 — recorded post-hoc, planning-branch cleanup.** This file was
+overwritten by a concurrent lane before its first, genuine verdict was ever
+recorded here:
+
+- At `e970c58e3` (2026-07-27T17:33:59+02:00), WP02's lane wrote this file
+  with `verdict: blocked` and finding `D1` (HIGH): a **live** check
+  (`gh issue view 23 --repo MOES-Media/spec-kitty --json assignees,state`)
+  found seed issue `MOES-Media/spec-kitty#23` open with zero assignees,
+  which is a genuine DIR-012 violation — the charter gate requiring the
+  tracker issue be assigned to the Human-in-Charge before implementation
+  starts.
+- Seven seconds later, at `9f63829c0` (2026-07-27T17:34:06+02:00), WP01's
+  parallel lane wrote `verdict: ready` (the version this file now carries)
+  to the same mission-scoped `analysis-report.md`, with no awareness of and
+  no merge against WP02's `blocked` write. Both lanes' worktrees, and the
+  planning branch tip, now carry only the `ready` version — the `blocked`
+  verdict and its D1 finding are recoverable only from git history
+  (`e970c58e3`), not from the file's current content.
+- The finding was real, not stale: `status.json` at analysis time showed
+  zero WPs claimed, and issue #23 genuinely had no assignees at
+  `2026-07-27T15:33:59Z`. It was resolved shortly after — WP01's task file
+  activity log records `gh issue edit 23 --repo MOES-Media/spec-kitty
+  --add-assignee @me` and independent verification of
+  `assignee login=MOES-Media (Jeroen Nouws, databaseId 34285209)` at
+  `2026-07-27T15:35:44Z`. DIR-012 is genuinely satisfied as of that
+  timestamp, so nothing is wrong on the merits today.
+- **This file is not being restored to the `blocked` version** — that
+  would misrepresent a superseded, already-resolved state as current.
+  This note exists so the audit trail shows the gate was in fact tripped
+  and how it cleared, instead of silently disappearing under a
+  last-writer-wins overwrite.
+- **Structural hazard worth a follow-up**: two concurrent lanes writing
+  one mission-scoped `analysis-report.md` have no merge or last-writer-wins
+  protection. In this instance the overwritten verdict happened to be the
+  more conservative one and the underlying issue really was resolved, so no
+  harm resulted — but the same race could just as easily overwrite a
+  `blocked` verdict that was *never* independently re-checked, or silently
+  drop a HIGH/CRITICAL finding a later reader has no way to know ever
+  existed. This mission-scoped, multi-writer artifact should either be
+  lane-scoped (one file per lane, merged/reconciled explicitly) or written
+  through the same coordination-worktree/BookkeepingTransaction seam that
+  already protects `status.json`/`status.events.jsonl` from this exact
+  class of race.

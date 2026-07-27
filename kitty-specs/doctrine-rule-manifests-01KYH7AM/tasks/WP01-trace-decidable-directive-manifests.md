@@ -11,6 +11,9 @@ requirement_refs:
 planning_base_branch: kitty/mission-doctrine-rule-manifests
 merge_target_branch: kitty/mission-doctrine-rule-manifests
 branch_strategy: Planning artifacts for this mission were generated on kitty/mission-doctrine-rule-manifests. During /spec-kitty.implement this WP may branch from a dependency-specific base, but completed changes must merge back into kitty/mission-doctrine-rule-manifests unless the human explicitly redirects the landing branch.
+base_branch: kitty/mission-doctrine-rule-manifests-01KYH7AM
+base_commit: abe912f01a9ed75ae8102e018eba0ad7905499e4
+created_at: '2026-07-27T15:34:19.450371+00:00'
 subtasks:
 - T001
 - T002
@@ -656,3 +659,10 @@ before requesting review.
   entries and nothing under `src/doctrine/**` or `.github/**`.
 
 Implementation command: `spec-kitty agent action implement WP01 --agent claude`
+
+## Activity Log
+
+- 2026-07-27T15:35:46Z – claude – shell_pid=1094726 – DIR-012 confirmed: gh issue view 23 --repo MOES-Media/spec-kitty had zero assignees; assigned via 'gh issue edit 23 --repo MOES-Media/spec-kitty --add-assignee @me'; verified assignee login=MOES-Media (Jeroen Nouws, databaseId 34285209) at 2026-07-27T15:35:44Z.
+- 2026-07-27T15:37:20Z – claude – shell_pid=1094726 – T004 fragment re-verification (grep -F -c against src/doctrine/directives/built-in/042-common-docs.directive.yaml): 042-r1='There is exactly one documentation root; a second root or a per-version' -> 1; 042-r2='In-file frontmatter is the single source of truth for per-page metadata; any' -> 1; 042-r3='No documentation frontmatter may use a bare `status` key for the doc' -> 1; 042-r4 full-line 'Every `related:` entry must resolve to an existing repo-relative `.md` path.' -> 1. All as expected.
+- 2026-07-27T15:37:44Z – claude – shell_pid=1094726 – T005 fragment re-verification (grep -F -c against src/doctrine/directives/built-in/045-prs-only-and-read-intent.directive.yaml): 045-r1='Agents must not run `git push origin main`, `git push --force`, or `gh pr' -> 1; 045-r2='`spec-kitty merge` is permitted — it operates on local main only. The' -> 1; 045-r3='Every high-risk git operation must be preceded by a documented intent' -> 1; 045-r4='PR branches and mission branches are the correct terms for non-main' -> 1. Control-text check 'Agents must never run `git push origin main`, `git push --force`, or `gh pr' -> 0 (confirms the control manifest's mutation is absent from this file). All as expected.
+- 2026-07-27T15:38:44Z – claude – shell_pid=1094726 – T006 real-CLI verification (npx @garrison-hq/muster@1.1.0 sop run <manifest> --json, muster --version confirmed 1.1.0). All 9 manifests: exit code 0, jq filter for RULE_DRIFT/MISSING_SOURCE/MANIFEST_ERROR/STRUCTURAL_ABSENCE = [] (018,028,029,030,033,034,035,042,045-*.yaml). Fragment real-execution proof (042, 045): exit 0, full lintFindings=[] for both. One-word-flip demonstration on 034-test-first-development.yaml (sed 's/must not be written ahead/must never be written ahead/'): exit code still 0, lintFindings contained one RULE_DRIFT entry (location 034-r1, severity warning, message 'ruleText not found verbatim in SOP content'), proving RULE_DRIFT is a non-gating warning. File restored via mv from .bak; git diff --exit-code returned 0 (clean, no residual diff).

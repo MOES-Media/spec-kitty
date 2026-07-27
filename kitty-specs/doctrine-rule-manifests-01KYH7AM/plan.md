@@ -381,11 +381,11 @@ tree + README"), consistent with this plan's Implementation Concern Map:
 ```
 
 - **WP01** (IC-01, the 9 trace-decidable directives: 018, 028, 029, 030,
-  033, 034, 035, 042, 045 — 27 rule entries): before starting, confirm
+  033, 034, 035, 042, 045 — 26 rule entries): before starting, confirm
   issue `MOES-Media/spec-kitty#23` is assigned to the Human-in-Charge
   (DIR-012).
 - **WP02** (IC-01, the 4 proposed judge directives: 001, 010, 039, 044 —
-  18 rule entries — including the headline finding, **corrected
+  19 rule entries — including the headline finding, **corrected
   post-plan-gate**, that 001/039/044 are entirely `UNMAPPED` (044 reverted
   from a prior, since-withdrawn `never-call-tool` reclassification —
   binding operator decision) while 010 is better modeled as `output-format`

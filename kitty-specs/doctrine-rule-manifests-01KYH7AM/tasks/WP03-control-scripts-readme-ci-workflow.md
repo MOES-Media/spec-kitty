@@ -40,6 +40,7 @@ owned_files:
 - conformance/scripts/check-doctrine-drift-gate.sh
 - conformance/scripts/check-doctrine-manifest-completeness.mjs
 - .github/workflows/conformance.yml
+- kitty-specs/doctrine-rule-manifests-01KYH7AM/issue-matrix.md
 role: implementer
 tags: []
 tracker_refs: []
@@ -519,6 +520,27 @@ wall-clock minutes, record them in this README's timing table alongside
 M1's existing `skills-conformance` job entry — measured, never asserted as
 a ceiling.
 
+**G. `TOOL_DRIFT` exercise disclosure (state this explicitly, do not omit)**:
+`detectToolDrift` (`index.ts:128-144` in the muster package) is skipped
+entirely unless the invocation passes `--env-tools`; none of this mission's
+`sop run` invocations (WP01, WP02, or this WP's own T019/`check-doctrine-
+drift-gate.sh`) pass it. That means every "zero `TOOL_DRIFT`" result recorded
+anywhere in this mission proves nothing — the detector never ran, it wasn't
+clean. Rules `033-r1`, `042-r3`, `042-r4`, `045-r1`, `045-r2` contain
+backticked identifiers that would be genuine `TOOL_DRIFT` candidates if the
+detector were exercised. This WP must do one of the two:
+1. Pass `--env-tools` in the drift-gate script (or a dedicated verification
+   step) and evaluate `TOOL_DRIFT` for real against the shipped manifests, or
+2. If that is out of scope for this WP, state plainly in this README section
+   that `TOOL_DRIFT` is unexercised across the mission — an unexercised
+   detector silently reported as "clean" is the same failure shape as an
+   unfired control (see FR-005's discrimination requirement above), and this
+   mission has already spent significant effort guarding against exactly that
+   class of false-clean signal (see `STRUCTURAL_ABSENCE` in item 2 above).
+`checkRuleTextPresence` (the source of the `RULE_DRIFT` results) always
+runs regardless of `--env-tools`, so the zero-`RULE_DRIFT` results elsewhere
+in this mission remain genuine and are not affected by this disclosure.
+
 ### 5. `.github/workflows/conformance.yml` modification (FR-004 wiring, IC-06)
 
 **Read the current file before editing** — as of this WP's authoring, PR #29
@@ -662,21 +684,25 @@ failure modes).
 
 **Purpose**: Render the complete directive→class mapping table, summary
 counts, cross-repo note, citation-anchor deviation note, coverage roadmap,
-and local-invocation instructions — all specified verbatim in the "4."
-section above.
+local-invocation instructions, and the `TOOL_DRIFT` exercise disclosure —
+all specified verbatim in the "4." section above.
 
 **Steps**:
 1. Create `conformance/doctrine/README.md` containing, at minimum, sections
-   A through F from the "4." section above (you may reformat/reorganize,
+   A through G from the "4." section above (you may reformat/reorganize,
    but every fact listed must appear somewhere in the file).
 2. Leave a placeholder for section F's CI timing entry (`run_id`, wall-clock
    minutes) — fill it in during T020, once a real run exists. Do not
    fabricate a number here.
+3. Section G (`TOOL_DRIFT` disclosure): decide and state which of the two
+   options in section G above this WP takes — do not leave it ambiguous or
+   silently omit it.
 
 **Files**: `conformance/doctrine/README.md` (new).
-**Validation**: manual read-through confirms sections A–F are all present;
+**Validation**: manual read-through confirms sections A–G are all present;
 the mapping table's 45-row content and the 24-mapped/21-UNMAPPED summary
-counts match the numbers given in the "4." section above exactly.
+counts match the numbers given in the "4." section above exactly; section G
+explicitly states whether `TOOL_DRIFT` was exercised in this mission.
 
 ---
 
@@ -738,10 +764,24 @@ built muster CLI and the actual repository tree.
    for manifest in conformance/doctrine/*.yaml; do
      echo "=== $manifest ==="
      npx --yes @garrison-hq/muster@1.1.0 sop run "$manifest" --json | tee /tmp/out.json
-     echo "exit code: $?"
+     echo "exit code: ${PIPESTATUS[0]}"
      jq '[.lintFindings[] | select(.kind=="RULE_DRIFT" or .kind=="MISSING_SOURCE" or .kind=="MANIFEST_ERROR" or .kind=="STRUCTURAL_ABSENCE")]' /tmp/out.json
    done
    ```
+   **Do not write `echo "exit code: $?"` immediately after a `| tee` pipe** —
+   `$?` there is `tee`'s exit status, not muster's, so the line prints `0`
+   unconditionally regardless of what muster did (this exact defect was
+   found and fixed in WP01's equivalent snippet during WP02 review; it never
+   shipped here only because the values happened to come out right). Use
+   `${PIPESTATUS[0]}` (as corrected above) or avoid the pipe entirely (e.g.
+   `out=$(... --json)`, as the actual `check-doctrine-drift-gate.sh` script
+   pseudocode above already does correctly) — never trust `$?` after any
+   pipeline. This applies with equal force to `check-doctrine-drift-gate.sh`
+   itself (item 2 above): the script's Phase 1/2 `set +e; out=$(...);
+   muster_exit=$?; set -e` pattern is correct because it is a command
+   substitution, not a pipe — do not "simplify" it into a `| tee` +
+   `echo $?` form, which would silently make the exit-code half of the gate
+   always read `0`.
    Record all 13 pairs (exit code, filter result) verbatim — an exact count
    of 13 clean results, not "all passed."
 2. **The control's inverted discrimination proof (AC-3)** — must be
@@ -848,7 +888,7 @@ view`, not merely asserted.
 
 **Steps** (run in order):
 ```bash
-git diff --stat                              # ONLY the 5 owned_files changed
+git diff --stat                              # ONLY the 6 owned_files changed (incl. issue-matrix.md, added for the mission gate fix — spec-kitty#11 ownership assignment)
 git diff --stat conformance/doctrine/018-doctrine-versioning-requirement.yaml  # empty — WP01/WP02's files untouched by this WP
 git diff --stat src/doctrine/                # MUST show no changes
 grep -n "secrets:" .github/workflows/conformance.yml   # MUST return nothing
@@ -871,8 +911,11 @@ before requesting review.
       table, the 24-mapped/21-UNMAPPED summary counts, the cross-repo
       taxonomy note, the citation-anchor deviation note, the 13-directive
       coverage roadmap (with 038 and `reconcile-change-scope-tensions`
-      flagged as excluded-by-construction, not merely "not covered"), and
-      local-invocation instructions
+      flagged as excluded-by-construction, not merely "not covered"),
+      local-invocation instructions, and an explicit `TOOL_DRIFT`
+      exercise disclosure (section G — either `--env-tools` was run and
+      evaluated for real, or the README states plainly that the detector
+      is unexercised)
 - [ ] `.github/workflows/conformance.yml` has exactly one `permissions:` key
       (not duplicated), both pre-existing actions left exactly as found
       (not re-pinned or unpinned), the new job's `actions/checkout` matches
