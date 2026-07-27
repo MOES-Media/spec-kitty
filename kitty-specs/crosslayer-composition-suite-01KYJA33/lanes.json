@@ -92,13 +92,14 @@
         "legacy-cleanup"
       ],
       "depends_on_lanes": [
+        "lane-a",
         "lane-b",
         "lane-d"
       ],
       "parallel_group": 1
     }
   ],
-  "computed_at": "2026-07-27T19:52:22.724084+00:00",
+  "computed_at": "2026-07-27T20:19:26.694668+00:00",
   "computed_from": "dependency_graph+ownership",
   "planning_artifact_wps": []
 }

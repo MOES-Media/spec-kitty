@@ -1,7 +1,8 @@
 ---
 work_package_id: "WP05"
-title: "FR-005 rule-survival case authoring (lane-c, blocked on M3 + WP02/WP04 merge)"
+title: "FR-005 rule-survival case authoring (lane-c, blocked on M3 + WP01/WP02/WP04 merge)"
 dependencies:
+  - WP01
   - WP02
   - WP04
 requirement_refs:
@@ -66,9 +67,16 @@ citing M3's manifest `ruleId`s, plus the engineered `erosion-control-045`
 adversarial case, and wire all three into WP02's `manifest.yaml` via new
 `$ref:` lines. **This WP is hard-blocked, in this exact order**: (1) M3
 (`MOES-Media/spec-kitty#30`) must merge to this fork's `main` first — the
-`ruleId`s these cases cite do not exist until then; (2) WP02 and WP04 (lane-b)
+`ruleId`s these cases cite do not exist until then; (2) WP01, WP02, and WP04
 must have already **merged** to this mission's coordination/target branch
-before this WP's worktree is even created.
+before this WP's worktree is even created. **(M-1 post-tasks-review
+addition, WP01 was previously omitted here**: T027's live-endpoint run
+(below) executes `manifest.yaml` in full, without `--static-only` — that
+includes WP02's two FR-004 static cases, which reference WP01's committed
+personas by `fixturePath`. Without WP01 merged first, those cases hit the
+same sibling-lane-file ENOENT this mission's H-2 finding already documents
+for the static path, except here against live-model evidence instead of a
+static run — a strictly worse place for it to surface.)
 
 ## Context (read first)
 
@@ -82,25 +90,26 @@ before this WP's worktree is even created.
   procedure" section this task file's frontmatter `dependencies` field
   exists to satisfy — read it in full before starting).
 
-### Why this WP's `dependencies: [WP02, WP04]` frontmatter is load-bearing, not cosmetic
+### Why this WP's `dependencies: [WP01, WP02, WP04]` frontmatter is load-bearing, not cosmetic
 
 This is not a documentation nicety. `dependencies` feeds
 `dependency_graph` → `compute_lanes`'s `depends_on_lanes`, which drives two
 real mechanisms:
 
 1. `worktree_allocator._merge_dependency_lane_tips`
-   (`lanes/worktree_allocator.py:300`) auto-merges WP02's and WP04's lane
-   branch tips into this WP's worktree when it is allocated — **failing
-   closed on conflict**. This is what actually gets WP02's real, merged
-   `manifest.yaml` (and WP04's real, merged `crosslayer.yml` cadence job)
-   into this WP's own tree, without this WP ever needing to hand-copy or
-   re-derive their content.
+   (`lanes/worktree_allocator.py:300`) auto-merges WP01's, WP02's, and
+   WP04's lane branch tips into this WP's worktree when it is allocated —
+   **failing closed on conflict**. This is what actually gets WP01's real,
+   merged personas (`architect-alphonso.Soul.md`, `reviewer-renata.Soul.md`),
+   WP02's real, merged `manifest.yaml`, and WP04's real, merged
+   `crosslayer.yml` cadence job into this WP's own tree, without this WP
+   ever needing to hand-copy or re-derive their content.
 2. `merge/ordering.get_merge_order` (`merge/ordering.py:69-110`)
-   topologically sorts this WP strictly after WP02 and WP04 at merge time.
-   **Without this frontmatter, that sort falls back silently to bare
+   topologically sorts this WP strictly after WP01, WP02, and WP04 at merge
+   time. **Without this frontmatter, that sort falls back silently to bare
    numerical WP order** (`logger.warning` only, `ordering.py:104-110`) —
-   a fallback that would happily merge this WP before WP02/WP04 if it were
-   ever numbered lower, with no error, just a warning easy to miss.
+   a fallback that would happily merge this WP before WP01/WP02/WP04 if it
+   were ever numbered lower, with no error, just a warning easy to miss.
 
 **This repo's dependency gate is `warn`, not `block` — checked directly, not
 assumed**: `policy/merge_gates._evaluate_dependency_gate`
@@ -114,8 +123,8 @@ merge is not hard-blocked by this gate.** The frontmatter dependency above
 still drives the auto-merge and topological-sort mechanisms (both of which
 engage regardless of gate mode), but the gate itself will not refuse a
 wrongly-sequenced merge — task authoring and accept-time review must
-independently verify this WP was actually sequenced after WP02 and WP04's
-merges. Do not rely on the gate alone.
+independently verify this WP was actually sequenced after WP01, WP02, and
+WP04's merges. Do not rely on the gate alone.
 
 ## Subtasks
 
@@ -132,8 +141,8 @@ work anyway).
    authoring, PR #30 is still `OPEN` (checked directly), blocked on a CI
    infrastructure failure the operator is separately resolving — **do not
    start T024 before this changes.**
-2. Confirm WP02 and WP04 both show `done`/`approved` status and their lane
-   branches are merged into this mission's coordination/target branch (not
+2. Confirm WP01, WP02, and WP04 all show `done`/`approved` status and their
+   lane branches are merged into this mission's coordination/target branch (not
    merely "for_review") — `spec-kitty agent tasks status --mission
    crosslayer-composition-suite-01KYJA33` or equivalent.
 3. Record both confirmations (or the specific still-blocking condition) in
@@ -155,8 +164,9 @@ not an assumption.
    for the no-direct-push (045) and signing (029) rules — cite these
    `ruleId`s directly in each case file, do not re-derive or paraphrase the
    rule text.
-2. Each case composes WP02's real committed personas (via WP02's already-
-   merged `manifest.yaml`/case structure) against WP03's `sop-extract.md`
+2. Each case composes WP01's real committed personas (referenced via WP02's
+   already-merged `manifest.yaml`/case structure, per WP02's own `fixturePath`
+   values) against WP03's `sop-extract.md`
    (assumed present via the SOP-extract path) and a rule-survival
    `testClass: "behavioral"` measurement.
 3. `expected: {verdict: "survived"}` for both (the healthy-path expectation;
@@ -290,8 +300,8 @@ assembled-diff run happens again at mission review as the backstop.
 
 ## Definition of Done
 
-- [ ] T023's two blocks (M3 merged; WP02+WP04 merged) confirmed in the work
-      log with real, checked status before T024 began
+- [ ] T023's two blocks (M3 merged; WP01+WP02+WP04 merged) confirmed in the
+      work log with real, checked status before T024 began
 - [ ] `rule-survival-045.yaml`/`029.yaml` cite M3's real `ruleId`s, not
       re-authored rule text
 - [ ] `erosion-control-045.yaml` uses the spec's pinned adversarial persona
@@ -309,8 +319,8 @@ assembled-diff run happens again at mission review as the backstop.
 ## Risks
 
 - **Starting before both blocks clear**: creating this WP's worktree before
-  M3 merges and before WP02/WP04 merge reproduces the lane-isolation bite
-  this mission's plan explicitly warns about, for no benefit — M3 blocks
+  M3 merges and before WP01/WP02/WP04 merge reproduces the lane-isolation
+  bite this mission's plan explicitly warns about, for no benefit — M3 blocks
   the real work regardless.
 - **Trusting the gate instead of verifying**: this repo's merge-gate mode is
   `warn`, not `block` — a wrongly-sequenced merge will not be refused
@@ -326,7 +336,7 @@ assembled-diff run happens again at mission review as the backstop.
 ## Reviewer guidance
 
 - **Reject if** T023's block-confirmation is missing or dated before M3's
-  actual merge / WP02+WP04's actual merge.
+  actual merge / WP01+WP02+WP04's actual merge.
 - **Reject if** `erosion-control-045`'s `eroded` verdict is asserted without
   a real, observed live-run result in the work log.
 - **Reject if** any credential value (not just the env var name) appears
@@ -336,10 +346,10 @@ assembled-diff run happens again at mission review as the backstop.
 - **Reject if** `rule-survival-045`/`029` re-author rule text instead of
   citing M3's `ruleId`s.
 - Independently verify the sequencing claim: confirm via `git log` that
-  WP02's and WP04's merge commits predate this WP's own lane branch's base
-  commit — do not rely on the frontmatter `dependencies` field alone, since
-  this repo's merge-gate mode is `warn` and would not itself have blocked an
-  out-of-order merge.
+  WP01's, WP02's, and WP04's merge commits predate this WP's own lane
+  branch's base commit — do not rely on the frontmatter `dependencies` field
+  alone, since this repo's merge-gate mode is `warn` and would not itself
+  have blocked an out-of-order merge.
 
 Implementation command: `spec-kitty agent action implement WP05 --agent claude`
 

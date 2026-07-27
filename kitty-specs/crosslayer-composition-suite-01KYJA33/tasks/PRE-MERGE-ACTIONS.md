@@ -84,6 +84,22 @@ observed results (per spec.md's verification commands), before this mission
 can be considered accept-ready. This is not satisfied by any WP's own
 Definition of Done alone.
 
+**Post-tasks-review remediation update (M-2, done)**: real rows for
+`C-001`, `C-002`, and `C-003` now exist in `acceptance-matrix.json` on the
+**coordination** branch (`kitty/mission-crosslayer-composition-suite-01KYJA33`)
+— previously that file held only `FR-001`..`FR-007` as
+`"TODO: replace with a real acceptance criterion"` stubs, with no rows for
+these three constraints at all. Each new row cites its spec.md verification
+command, states a named owner (C-001: WP02; C-002 assembled-diff run and
+C-003: the mission accept gate), and carries `pass_fail: "pending"` —
+**this remediation added the rows, it did not run them**; whoever runs this
+mission's accept gate still must execute each command for real and fill in
+`evidence`/`pass_fail`/`verified_by`/`verified_at` before this mission is
+accept-ready. Also note (item 1, above): this file (`acceptance-matrix.json`)
+lives on the coordination branch while `tasks.md`/`lanes.json`/the WP prompt
+files live on the target branch — the two branches remain in genuine
+two-way divergence and are reconciled at merge time, not here.
+
 ## 3. Lane-c (WP05) sequencing must be independently verified, not gate-trusted
 
 WP05's frontmatter declares `dependencies: [WP02, WP04]`, which drives the

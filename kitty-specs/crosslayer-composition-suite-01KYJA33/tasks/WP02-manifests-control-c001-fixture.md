@@ -257,13 +257,52 @@ specified) exact stderr/stdout text in the work log.
 
 **Steps** (cache-warm once per environment first: `npm install --no-save
 @garrison-hq/muster@1.1.0`):
-1. **FR-004**:
+1. **FR-004 — split into a local-mechanism proof and an honest blocked-status
+   entry (H-2 post-tasks-review remediation; mirrors WP04's T021 pattern for
+   the identical cross-lane-file shape).** The real committed
+   `conformance/crosslayer/manifest.yaml` and its two case files reference
+   `conformance/crosslayer/personas/*.Soul.md` (WP01's exclusive scope,
+   lane-a) and `conformance/crosslayer/sop-extract.md` (WP03's, lane-c) —
+   files this lane's isolated worktree cannot open until those lanes merge.
+   Running the real committed manifest from lane-b alone therefore cannot
+   honestly report `failed: 0`; it must instead be split into two runs:
+
+   **1a. Local-mechanism proof (runnable today, from lane-b alone, a real
+   exit code)**: point a **local-only, uncommitted** copy of
+   `manifest.yaml` and the two case files at T008's self-authored sandbox
+   persona(s) plus a self-authored sandbox SOP-extract file (never at the
+   real committed paths, which do not exist in this lane's worktree yet).
+   Run:
    ```sh
-   npx --offline @garrison-hq/muster@1.1.0 crosslayer run conformance/crosslayer/manifest.yaml --static-only --json
+   npx --offline @garrison-hq/muster@1.1.0 crosslayer run <local-only manifest copy> --static-only --json
    ```
-   Expect exit **0**, JSON `failed: 0`. **Falsification**: run the identical
-   command against a manifest containing T010's rigged case in place of the
-   benign fixtures — expect exit **1**, JSON `failed > 0`.
+   Expect exit **0**, JSON `failed: 0` — this proves the manifest/CLI
+   mechanism itself (path resolution, `$ref` case includes, static lint
+   dispatch) actually works, using only content this lane controls end to
+   end. Record the real observed exit code and JSON summary in the work
+   log. **Falsification** (same local-only copy): swap in T010's rigged
+   case in place of the sandbox fixtures — expect exit **1**, JSON
+   `failed > 0`. Discard the local-only manifest/case copies before
+   finalizing this WP's commit (T008 step 3 already requires this; do not
+   commit them).
+
+   **1b. Honest blocked-status entry for the real committed manifest (never
+   a fabricated pass)**: running
+   `npx --offline @garrison-hq/muster@1.1.0 crosslayer run conformance/crosslayer/manifest.yaml --static-only --json`
+   against the **real committed** manifest from this lane, before WP01 and
+   WP03 have merged, fails honestly — the persona/sop-extract fixturePaths
+   resolve to files that do not exist yet in this worktree. Record this
+   verbatim in the work log as a **blocked** status, not a pass or a
+   falsification result, e.g.: "blocked — real committed manifest run
+   requires WP01 (personas) and WP03 (sop-extract.md) merged onto the same
+   branch as this lane; per-case ENOENT is the expected, honest result of a
+   sibling lane's file being absent, not a FR-004 defect; re-verify at
+   mission level once WP01/WP03 have merged (spec.md's Real-CLI
+   verification requirement; `tasks/PRE-MERGE-ACTIONS.md` item 1)." **Do
+   not report a fabricated `failed: 0`/exit-`0` result for this direction**
+   — this mirrors WP04's T021 step 3 honest-blocked pattern for the
+   identical cross-lane-file shape, applied here to the static path instead
+   of the CI-run path.
 2. **FR-006, flip direction**:
    ```sh
    npx --offline @garrison-hq/muster@1.1.0 crosslayer run conformance/crosslayer/control.yaml --static-only --json > /tmp/control.json
@@ -290,8 +329,10 @@ specified) exact stderr/stdout text in the work log.
    different failure mode than a contradiction finding.
 
 **Files**: none new.
-**Validation**: all exit codes (FR-004 pass + fail, FR-006 flip + neutralize,
-C-001) recorded verbatim; C-001's stderr line quoted exactly.
+**Validation**: FR-004's 1a (local-mechanism proof, both pass and
+falsification exit codes) and 1b (honest blocked-status entry, not a
+fabricated pass) both recorded verbatim; FR-006 flip + neutralize exit
+codes recorded verbatim; C-001's exit code and stderr line quoted exactly.
 
 ---
 
@@ -314,6 +355,12 @@ mission review as the backstop, per spec.md's C-002 verification cell.
 
 - [ ] Two real FR-004 cases committed, referencing WP01's committed persona
       paths by `fixturePath`, not byte content
+- [ ] T012 step 1a's local-mechanism proof actually run against a local-only
+      manifest copy, with the real pass and falsification exit codes
+      recorded (not just designed/asserted)
+- [ ] T012 step 1b's honest blocked-status entry recorded for the real
+      committed manifest — never a fabricated passing exit code reported in
+      its place
 - [ ] No file written under `conformance/crosslayer/personas/` (WP01's
       exclusive scope) — no scratch/sandbox fixture ever committed there
 - [ ] FR-006 control proven **both directions**, real observed exit codes and
@@ -353,6 +400,13 @@ mission review as the backstop, per spec.md's C-002 verification cell.
   instead of the pinned substitute sentence.
 - **Reject if** the work log is missing any of T012's real exit codes, or if
   C-001's stderr substring is paraphrased rather than quoted exactly.
+- **Reject if** step 1b reports a passing or `failed: 0` result for the real
+  committed manifest instead of an honest blocked-status entry — the
+  personas/sop-extract sibling-lane files genuinely do not exist in this
+  lane's worktree yet, so a reported pass here is fabricated, not observed.
+- **Reject if** step 1a's local-mechanism proof is missing or was run only
+  against the real committed manifest (which cannot honestly pass from this
+  lane alone) instead of the required local-only sandbox copy.
 - **Reject if** anything is committed under `conformance/crosslayer/personas/`.
 - Confirm the per-lane C-002 check (T013) was actually run against this WP's
   own lane diff, not skipped in favor of only the later cross-lane run.

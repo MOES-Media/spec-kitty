@@ -362,11 +362,13 @@ actual base commit and lane branch name once the lane worktree is allocated.
 
 ## Risks
 
-- **Filename mismatch with WP02**: this is the one residual coupling IC-00's
-  dissolution leaves behind. If either persona filename changes after WP02
-  has already authored its case files against the original names, WP02's
-  manifest silently breaks only once both lanes are merged. Communicate any
-  filename change immediately if WP02 is concurrently in progress.
+- **Filename mismatch with WP02**: this is one of five path-only couplings
+  across this mission's task files (M-3 post-tasks-review finding, spec.md
+  Dependencies & Assumptions — this pair is no longer the only one named).
+  If either persona filename changes after WP02 has already authored its
+  case files against the original names, WP02's manifest silently breaks
+  only once both lanes are merged. Communicate any filename change
+  immediately if WP02 is concurrently in progress.
 - **Fabricated-field leakage (C-003)**: it is tempting to describe *why* a
   fabricated `voice`/`interaction` value was chosen in `PROJECTION.md`'s
   prose in a way that reads as grading justification. C-003 forbids citing

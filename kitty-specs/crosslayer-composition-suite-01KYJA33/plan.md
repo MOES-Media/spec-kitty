@@ -287,6 +287,13 @@ allow-list exactly.
 - **Risk**: do not write anything under `conformance/crosslayer/personas/`
   — that is lane-a's exclusive write scope even though it is nested inside
   lane-b's broader `conformance/crosslayer/` tree.
+- **Coupling-surface note (M-3 post-tasks-review correction)**: the
+  `fixturePath` agreement with lane-a described above is one of **five**
+  path-only couplings across this mission's task files, not the only one —
+  spec.md's Dependencies & Assumptions section now names all five explicitly
+  (WP01↔WP02, WP02↔WP03, WP04↔WP01, WP04↔WP02, WP04↔WP03). This plan
+  previously implied singularity by only ever discussing this one pair;
+  treat spec.md's list as authoritative going forward.
 
 ### IC-03 — SOP policy extract + its own drift gate (proposed lane-b, part 2)
 
