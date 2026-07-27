@@ -242,13 +242,20 @@ nor `validation_criteria`) or the advisory, non-numbered
   checks for finding kind `MISSING_SOURCE` (carried verbatim from issue
   `MOES-Media/spec-kitty#23`), but that kind does not appear to be emitted
   anywhere in muster's `openclaw-sop` adapter — only `RULE_DRIFT`,
-  `UNDEFINED_PRECEDENCE`, `TOOL_DRIFT`, and `MANIFEST_ERROR` are actually
-  emitted (`src/adapters/openclaw-sop/manifest.ts`); a missing
+  `UNDEFINED_PRECEDENCE`, `TOOL_DRIFT`, `MANIFEST_ERROR`, and
+  `STRUCTURAL_ABSENCE` are actually emitted
+  (`src/adapters/openclaw-sop/manifest.ts`); a missing
   `source.normative` throws and is caught into a `MANIFEST_ERROR` finding
   instead (FR-009 in that file). The gate checking for a kind that may never
   fire is harmless, and FR-004's text is kept as-is — this note exists so
   nobody later mistakes that kind's permanent silence for evidence the check
-  works.
+  works. **[Added post-plan by binding operator decision: `STRUCTURAL_ABSENCE`
+  is not a theoretical addition to this enumeration — the post-plan
+  adversarial gate reproduced a real `severity: error` finding of this kind
+  against a dangling `sopFile:` target, using the real CLI. Do not cite this
+  note's "may be inert" framing as grounds to strip `STRUCTURAL_ABSENCE`
+  back out of FR-004's filter or out of this enumeration; that would reopen
+  the exact false-clean gate pass this addition closed.]**
 
 ## Requirements
 
@@ -259,7 +266,7 @@ nor `validation_criteria`) or the advisory, non-numbered
 | FR-001 | **[Corrected post-spec-gate by explicit operator decision: this row's original text asserted an unqualified "RULE_DRIFT-clean by construction" claim; the post-spec adversarial gate proved by execution that this does not hold for every rule — see the Edge Cases entry on multi-line YAML folding for the measured exception and the adopted fragment-convention mitigation. Not sourced from seed issue `MOES-Media/spec-kitty#23` §5, whose FR table carries the unqualified claim — flagged using the same bracket-annotation convention M1's spec used for its post-spec-gate FR-007 addition.]** Manifests cover the 9 trace-decidable directives (018, 028, 029, 030, 033, 034, 035, 042, 045) plus ≥4 high-value judge directives (proposed: 001, 010, 039, 044); each rule's `ruleText` is a verbatim `integrity_rules` line for the 35 of 45 target rules whose rule text lies entirely on one physical line of the directive file, or — for the 10 of 45 rules that wrap across a physical line break (042 ×3, 044 ×3, 045 ×4) — a single-line fragment per the fragment convention (Edge Cases). RULE_DRIFT-clean by construction holds directly for the 35 unwrapped rules, and via the fragment convention for the 10 wrapped rules. | Proposed |
 | FR-002 | `gradingClass`/`aggregation` per the sop-rule-taxonomy classes: pass-k with `passThreshold == k` for safety-critical rules (045 no-direct-push, 029 signing), k-of-n for stylistic; the loader's own semantic checks must pass (`manifest.ts:283-321`). | Proposed |
 | FR-003 | Every entry: `source.normative` = `docs/rubric/sop-rule-taxonomy.md` §class; `source.supporting` = `https://github.com/Priivacy-ai/spec-kitty/blob/<SHA>/src/doctrine/directives/built-in/<file>` — the C-002 pattern with the directive as the pinned upstream doc. | Proposed |
-| FR-004 | CI job: for each manifest, `muster sop run <manifest> --json` must exit 0 **and** contain zero findings of kind `RULE_DRIFT`/`MISSING_SOURCE`/`MANIFEST_ERROR` (jq gate — required because drift findings are warnings and do not flip the exit code, correction #11). `UNDEFINED_PRECEDENCE`/`TOOL_DRIFT` warnings are reported, not gating, in v1. | Proposed |
+| FR-004 | CI job: for each manifest, `muster sop run <manifest> --json` must exit 0 **and** contain zero findings of kind `RULE_DRIFT`/`MISSING_SOURCE`/`MANIFEST_ERROR`/`STRUCTURAL_ABSENCE` **[Added post-plan by binding operator decision: `STRUCTURAL_ABSENCE` was added to the gate filter after the post-plan adversarial gate reproduced a dangling `sopFile:` target against the real CLI — see `contracts/doctrine-drift-gate-contract.md`.]** (jq gate — required because drift findings are warnings and do not flip the exit code, correction #11). `UNDEFINED_PRECEDENCE`/`TOOL_DRIFT` warnings are reported, not gating, in v1. | Proposed |
 | FR-005 | One control manifest under `conformance/doctrine/control/` with deliberately drifted `ruleText`; CI asserts its `--json` output **does** contain `RULE_DRIFT` (discrimination for the drift detector itself). | Proposed |
 | FR-006 | `conformance/doctrine/README.md` records the directive→class mapping table (mirroring the M2 (`garrison-hq/muster#58`) appendix) and the coverage roadmap for the remaining directives. | Proposed |
 

@@ -1,0 +1,33 @@
+version: 1.0.0
+sopFile: ../../src/doctrine/directives/built-in/044-canonical-sources-and-unification.directive.yaml
+rules:
+  - ruleId: 044-r1
+    ruleText: No agent may copy a spec, plan, or tasks artifact from kitty-specs/ and use it as a
+    probeIds: []
+    gradingClass: judge
+    aggregation: k-of-n
+    k: 5
+    passThreshold: 3
+    source:
+      normative: docs/rubric/sop-rule-taxonomy.md#judge-required-rule-classes
+      supporting: https://github.com/Priivacy-ai/spec-kitty/blob/45a451a163e89046a3ee079077d4cfab57fa2444/src/doctrine/directives/built-in/044-canonical-sources-and-unification.directive.yaml
+  - ruleId: 044-r2
+    ruleText: Consolidating to a single canonical surface is the only acceptable resolution for a
+    probeIds: []
+    gradingClass: judge
+    aggregation: k-of-n
+    k: 5
+    passThreshold: 3
+    source:
+      normative: docs/rubric/sop-rule-taxonomy.md#judge-required-rule-classes
+      supporting: https://github.com/Priivacy-ai/spec-kitty/blob/45a451a163e89046a3ee079077d4cfab57fa2444/src/doctrine/directives/built-in/044-canonical-sources-and-unification.directive.yaml
+  - ruleId: 044-r3
+    ruleText: A missing CLI command that is documented must produce a gap report and upstream issue,
+    probeIds: []
+    gradingClass: judge
+    aggregation: k-of-n
+    k: 5
+    passThreshold: 3
+    source:
+      normative: docs/rubric/sop-rule-taxonomy.md#judge-required-rule-classes
+      supporting: https://github.com/Priivacy-ai/spec-kitty/blob/45a451a163e89046a3ee079077d4cfab57fa2444/src/doctrine/directives/built-in/044-canonical-sources-and-unification.directive.yaml

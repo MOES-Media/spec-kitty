@@ -40,7 +40,6 @@ owned_files:
 - conformance/scripts/check-doctrine-drift-gate.sh
 - conformance/scripts/check-doctrine-manifest-completeness.mjs
 - .github/workflows/conformance.yml
-- kitty-specs/doctrine-rule-manifests-01KYH7AM/issue-matrix.md
 role: implementer
 tags: []
 tracker_refs: []
@@ -888,7 +887,7 @@ view`, not merely asserted.
 
 **Steps** (run in order):
 ```bash
-git diff --stat                              # ONLY the 6 owned_files changed (incl. issue-matrix.md, added for the mission gate fix — spec-kitty#11 ownership assignment)
+git diff --stat                              # ONLY the owned_files changed (issue-matrix.md only if its #11 row actually needs an edit — it did not)
 git diff --stat conformance/doctrine/018-doctrine-versioning-requirement.yaml  # empty — WP01/WP02's files untouched by this WP
 git diff --stat src/doctrine/                # MUST show no changes
 grep -n "secrets:" .github/workflows/conformance.yml   # MUST return nothing
