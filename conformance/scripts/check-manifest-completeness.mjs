@@ -36,13 +36,30 @@
 //   a SKILL.md to be present, coherent with (not duplicating) HIGH-1's
 //   per-case SKILL.md assertion above.
 //
+// Independent verification of the above M1 fix found six further findings
+// (PR #29 review round 2), three fixed here:
+// - F-1 [BLOCKING]: checkControlCasesDiscriminate()'s HIGH-1 fix above only
+//   compared frontmatterName === actualBasename. Since readFrontmatterName()
+//   returns null for a hollowed-out control (no frontmatter, no `name:`
+//   key, or an empty value), `null === actualBasename` was false, so a
+//   control with NO name at all was scored the same as a control whose
+//   name still genuinely differs -- the same failure class the HIGH-1 fix
+//   exists to remediate. Null/empty is now its own error, checked first.
+// - F-5: readFrontmatterName()'s regex captured a quoted value's quotes
+//   along with the text, so a quoted-and-aligned name (`name:
+//   "name-mismatch"`) did not trip the alignment check. Quotes are now
+//   stripped before comparison.
+// - F-6 [cosmetic]: checkSkillDirsResolve() never confirmed a resolved
+//   skillDir was actually a directory; a skillDir pointing at a file was
+//   misreported as "has no SKILL.md". Now reported accurately.
+//
 // Muster itself is out of scope for this fix (C-001, no muster change):
 // this script cannot and does not change how `npx @garrison-hq/muster
 // skills run` scores a missing/corrupt fixture -- it only adds an
 // independent, fork-side assertion that catches what muster's own harness
 // cannot distinguish.
 
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -105,12 +122,22 @@ function readManifestCases() {
 // text parse (same house style as readManifestCases above) -- no YAML
 // parser, no npm dependency. Returns null if the file has no frontmatter or
 // no `name:` key.
+//
+// F-5 (independent verification of this mission's own M1 fix): the previous
+// version of this regex captured a quoted value's quotes along with the
+// text, so `name: "name-mismatch"` was read as the literal string
+// `"name-mismatch"` (quotes included), which never equals the bare
+// directory basename `name-mismatch` -- the alignment check in
+// checkControlCasesDiscriminate() would silently fail to fire for a quoted,
+// aligned name. Strip one layer of matching surrounding single or double
+// quotes before returning, same as real YAML scalar parsing would.
 function readFrontmatterName(skillMdPath) {
   const text = readFileSync(skillMdPath, "utf8");
   const frontmatterMatch = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   if (!frontmatterMatch) return null;
   const nameMatch = frontmatterMatch[1].match(/^name:\s*(\S+)\s*$/m);
-  return nameMatch ? nameMatch[1] : null;
+  if (!nameMatch) return null;
+  return nameMatch[1].replace(/^(['"])(.*)\1$/, "$2");
 }
 
 // Resolves every manifest case's skillDir to an absolute path and classifies
@@ -154,6 +181,18 @@ function checkSkillDirsResolve(allCases) {
       );
       continue;
     }
+    // F-6 (independent verification of this mission's own M1 fix): this
+    // check never confirmed c.resolved was actually a directory. A skillDir
+    // pointing at a file was previously caught by the SKILL.md-existence
+    // check below and misreported as "has no SKILL.md" -- true in a
+    // vacuous sense (a file has no children at all) but misleading about
+    // the actual fault. Report the real problem directly.
+    if (!statSync(c.resolved).isDirectory()) {
+      errors.push(
+        `case '${c.id}': skillDir '${c.skillDir}' resolves to a file, not a directory`,
+      );
+      continue;
+    }
     const skillMdPath = join(c.resolved, "SKILL.md");
     if (!existsSync(skillMdPath)) {
       errors.push(`case '${c.id}': skillDir '${c.skillDir}' has no SKILL.md`);
@@ -187,6 +226,19 @@ function checkSkillCaseIdsMatchBasename(skillCases) {
 // case outside the skill tree -- the frontmatter `name` must still differ
 // from the directory basename. If it doesn't, the control has been "fixed"
 // (aligned) and no longer discriminates a genuine failure from "not there".
+//
+// F-1 (independent verification of this mission's own HIGH-1 fix -- the
+// same failure class the fix exists to remediate): readFrontmatterName()
+// returns null when the fixture has no frontmatter, no `name:` key, or an
+// empty `name:` value. The equality test below is `frontmatterName ===
+// actualBasename`; `null === 'name-mismatch'` is false, so a control that
+// has been HOLLOWED OUT (frontmatter deleted, name key removed, or emptied)
+// was previously scored as "still discriminating" -- i.e. treated exactly
+// like a genuine, intact name mismatch, when in fact it can no longer
+// discriminate anything at all. A null/empty frontmatter name is a strictly
+// worse failure than a mismatched-but-present one: it must be reported as
+// its own, explicit error, and reported BEFORE the equality test runs so
+// the vacuous `null === basename` comparison is never reached.
 function checkControlCasesDiscriminate(controlCases, structurallyOk) {
   const errors = [];
   if (controlCases.length !== CONTROL_CASE_COUNT) {
@@ -200,6 +252,15 @@ function checkControlCasesDiscriminate(controlCases, structurallyOk) {
     const actualBasename = basename(c.resolved);
     const skillMdPath = join(c.resolved, "SKILL.md");
     const frontmatterName = readFrontmatterName(skillMdPath);
+    if (frontmatterName === null || frontmatterName.trim() === "") {
+      errors.push(
+        `control case '${c.id}': SKILL.md at '${skillMdPath}' has no parseable frontmatter ` +
+          `'name:' value (missing frontmatter, missing 'name:' key, or an empty value) -- ` +
+          `a control with no name cannot discriminate a genuine name-mismatch failure from ` +
+          `a missing/corrupt fixture, which is a worse failure than a mismatched-but-present name`,
+      );
+      continue;
+    }
     if (frontmatterName === actualBasename) {
       errors.push(
         `control case '${c.id}': frontmatter name '${frontmatterName}' now matches ` +

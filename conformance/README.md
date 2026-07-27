@@ -96,24 +96,37 @@ broken fixture (frontmatter `name` does not match its directory name) with
 case "passes" today because the harness's actual result (`ok: false`)
 matches the declared expectation.
 
-**What enforces this is `check-manifest-completeness.mjs`, not
-`muster skills run`.** muster's own `skills run` catch block scores *any*
-parse/read failure — a missing directory, a missing `SKILL.md`, a corrupt
-fixture — the same way it scores a correctly-detected name mismatch: both
-register as `ok: false`, which matches this control case's declared
-`expectations.ok: false` either way (this is a muster-side limitation,
-out of scope per C-001 — see "Known muster gaps" below). Deleting
-`conformance/skills/control/name-mismatch/` entirely, or "fixing" its
-name/directory mismatch, therefore both leave `muster skills run` at exit
-`0`. `check-manifest-completeness.mjs` is the check that actually
-discriminates these cases: it independently asserts (fork-side, no muster
-change) that every case's `skillDir` resolves to an existing directory
-containing a `SKILL.md`, and, for this control case specifically, that its
-frontmatter `name` still differs from its directory basename. If a future
-change "fixes" the mismatch by aligning `name` with the directory, **or**
-deletes the fixture outright, `check-manifest-completeness.mjs` — not
-`muster skills run` — will start failing, naming the control case
-explicitly.
+**What enforces this depends on which way the fixture breaks.** muster's own
+`skills run` catch block scores *any* parse/read failure — a missing
+directory, a missing `SKILL.md`, a corrupt or hollowed-out fixture with no
+parseable frontmatter `name` — the same way it scores a correctly-detected
+name mismatch: both register as `ok: false`, which matches this control
+case's declared `expectations.ok: false` either way (this is a muster-side
+limitation, out of scope per C-001 — see "Known muster gaps" below).
+Deleting `conformance/skills/control/name-mismatch/` entirely, or hollowing
+its frontmatter (removing the fixture's `name:` key, or its frontmatter
+block, or emptying the value) so it no longer has a parseable `name` at
+all, therefore both leave `muster skills run` at exit `0` — invisible to
+muster, caught only by `check-manifest-completeness.mjs`.
+
+Aligning the fixture's frontmatter `name` with its directory basename is a
+different failure mode, and is **not** invisible to muster: muster's own
+static gate directly compares `name` to the directory basename, so
+`muster skills run` genuinely flips to `ok: true` against this case's
+declared `ok: false`, and the run exits `1` (`skills: FAIL — 53/54 cases
+passed, 1 failed`). Alignment is caught by **both** checks.
+
+`check-manifest-completeness.mjs` independently asserts (fork-side, no
+muster change) that every case's `skillDir` resolves to an existing
+directory containing a `SKILL.md`, and, for this control case specifically,
+that its frontmatter carries a parseable `name` which still differs from
+its directory basename. If a future change deletes the fixture outright or
+hollows its frontmatter to remove the `name`, `check-manifest-completeness.mjs`
+— not `muster skills run` — will start failing, naming the control case
+explicitly. If a future change instead aligns `name` with the directory,
+both checks start failing: `muster skills run` reports `53/54 cases
+passed`, and `check-manifest-completeness.mjs` names the control case
+explicitly as no longer discriminating.
 
 To manually prove `muster skills run` alone can also *fail* (documented
 here, not part of CI, since it requires temporarily corrupting the

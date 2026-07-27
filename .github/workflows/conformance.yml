@@ -43,10 +43,24 @@ jobs:
       # that executes scripts/run.sh in-job with GITHUB_TOKEN in scope, so
       # retagging `v1` would change what runs at an unchanged workflow
       # commit. muster-action already pins its own actions/setup-node to a
-      # SHA; this consuming workflow is no less careful. Resolved via
-      # `gh api repos/garrison-hq/muster-action/git/refs/tags/v1` (an
-      # annotated tag; the tag object's `object.sha` is the commit it
-      # points at).
+      # SHA; this consuming workflow is no less careful.
+      #
+      # F-3 (independent verification, round 2): `garrison-hq/muster-action`'s
+      # `v1` is an ANNOTATED tag, so dereferencing it to a commit takes TWO
+      # calls, not one:
+      #   1. `gh api repos/garrison-hq/muster-action/git/refs/tags/v1` --
+      #      returns the ref, whose `object.sha` is the annotated TAG
+      #      object's own sha (9483fd34af4bd82cc88898c8d8ad458cd65f6bef),
+      #      NOT the commit.
+      #   2. `gh api repos/garrison-hq/muster-action/git/tags/9483fd34af4bd82cc88898c8d8ad458cd65f6bef`
+      #      -- dereferences that tag object; ITS `object.sha` is the actual
+      #      commit, which is the SHA pinned below.
+      # Stopping after call 1 and using its `object.sha` (as an earlier
+      # version of this comment said) produces the tag object's sha, not the
+      # commit -- wrong pin if followed literally. `actions/checkout`'s `v6`
+      # above is a LIGHTWEIGHT tag, so its ref's `object.sha` already IS the
+      # commit and one call suffices there; that shortcut does not apply to
+      # annotated tags like this one.
       - name: Run muster skills conformance (FR-002)
         uses: garrison-hq/muster-action@b40681a514f9500f5958b4f9f3efeacd30aae6ca # v1
         with:
@@ -58,5 +72,17 @@ jobs:
       # has exactly one manifest case (plus the one control case), and vice
       # versa. Placed after the muster step so a static-gate failure and a
       # completeness failure both surface in this job's log.
+      #
+      # F-4 (independent verification, round 2): placement alone does not
+      # make that claim true -- without `if: always()`, a failing muster
+      # step (exit != 0) short-circuits the job and this step is SKIPPED,
+      # so only the muster failure would appear in the log, not both.
+      # `if: always()` is added so this step still runs after a muster
+      # failure, which is what actually makes "both surface in this job's
+      # log" correct. (This does mean the step also attempts to run after a
+      # Checkout failure, in which case it will fail again for its own
+      # reason -- missing repository files -- which is an acceptable
+      # trade-off for a read-only, no-secrets static check.)
       - name: Verify manifest completeness (FR-007)
+        if: always()
         run: node conformance/scripts/check-manifest-completeness.mjs
