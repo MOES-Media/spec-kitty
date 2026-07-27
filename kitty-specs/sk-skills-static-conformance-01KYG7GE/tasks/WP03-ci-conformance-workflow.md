@@ -12,6 +12,9 @@ requirement_refs:
 planning_base_branch: kitty/mission-sk-skills-static-conformance
 merge_target_branch: kitty/mission-sk-skills-static-conformance
 branch_strategy: Planning artifacts for this mission were generated on kitty/mission-sk-skills-static-conformance. During /spec-kitty.implement this WP may branch from a dependency-specific base, but completed changes must merge back into kitty/mission-sk-skills-static-conformance unless the human explicitly redirects the landing branch.
+base_branch: kitty/mission-sk-skills-static-conformance-01KYG7GE
+base_commit: 2ccc9141396ff7521fe0c3e4bcc06421bbb870f3
+created_at: '2026-07-26T23:59:54.847486+00:00'
 subtasks:
 - T011
 - T012
@@ -270,3 +273,83 @@ grep -n "version:" .github/workflows/conformance.yml     # MUST show '1.1.0' exa
   which GitHub Actions provides by default after checkout.
 
 Implementation command: `spec-kitty agent action implement WP03 --agent claude`
+
+## Activity Log
+
+- 2026-07-27T02:00Z – claude – T011: fetched the real `garrison-hq/muster-action`
+  `action.yml` at the `v1` tag via `gh api repos/garrison-hq/muster-action/contents/action.yml?ref=v1`
+  and decoded it. **Confirmed: matches the briefing.** Real inputs are exactly
+  `command` (required, e.g. "skills run"), `args` (positional, default ''),
+  `version` (npm version/range, default `'^1.1.0'` — this WP overrides with the
+  exact pin per C-003), `endpoint`, `token`, `health-url`, `health-timeout`,
+  `annotations` (default 'true'), `fail-on` (default 'error'), `node-version`
+  (default '22'), `working-directory` (default '.'). Outputs: `exit-code`,
+  `result`. No input-name correction needed.
+  Bonus finding relevant to T012 step 5: `garrison-hq/muster-action@v1`'s own
+  composite `runs.steps` include `actions/setup-node@v6.4.0` with
+  `node-version: ${{ inputs.node-version }}` (default `'22'`) as its *first*
+  step, before running `npx`. `actions/setup-node` prepends to `GITHUB_PATH`,
+  which persists for the remainder of the job — so `node` is guaranteed on
+  `PATH` for this workflow's next step (the FR-007 completeness check)
+  without this workflow adding its own `setup-node` step. Confirmed by reading
+  the action's real `run.sh`/`action.yml` source, not assumed.
+- 2026-07-27T02:05Z – claude – T012: authored `.github/workflows/conformance.yml`
+  with 2 triggers (`pull_request` — any branch, `push` — `main` only) and 3
+  steps (`actions/checkout@v6` — matches this fork's dominant existing pin,
+  confirmed via `grep -rn "actions/checkout@" .github/workflows/*.yml`;
+  `garrison-hq/muster-action@v1` with `command: 'skills run'`,
+  `args: 'conformance/skills/manifest.yaml'`, `version: '1.1.0'`; then
+  `node conformance/scripts/check-manifest-completeness.mjs`). No `secrets:`
+  anywhere. `grep -nE "version:\s*['\"]?1\.1\.0['\"]?$"` matches line 34 with
+  no `^`/`~`/`latest` variant present. Did **not** add a separate
+  cache-warm/network-disabling step: spec.md's Acceptance Scenario 2/10 and
+  quickstart.md §1's two-step cache-warm-then-offline procedure is the
+  *local developer* verification path for NFR-002 (documented in
+  `conformance/README.md`, WP02's scope) — plan.md's IC-06 and Acceptance
+  Scenario 3 both describe the CI workflow itself as a single
+  `garrison-hq/muster-action@v1` invocation with no separate offline/cache
+  step, and the real `run.sh` I inspected for T011 confirms the action
+  always calls `npx -y "$PKG" ...` directly (no `--offline` flag) — a
+  GitHub-hosted runner has normal network access, so no cache-warm step
+  precedes it.
+- 2026-07-27T02:10Z – claude – T013: **BLOCKED, not fabricated.** Checked
+  whether a meaningful CI run is possible: `conformance/` does not exist on
+  this lane's branch (`kitty/mission-sk-skills-static-conformance-01KYG7GE-lane-c`)
+  or on the mission branch (`kitty/mission-sk-skills-static-conformance-01KYG7GE`)
+  — `git show kitty/mission-sk-skills-static-conformance-01KYG7GE:conformance`
+  returns "path 'conformance' does not exist". It exists only on WP01's own
+  lane branch (`kitty/mission-sk-skills-static-conformance-01KYG7GE-lane-a`,
+  commits T002/T003/T004), which is not merged anywhere yet (WP01 is still
+  `for_review`). Neither that lane-a branch nor this lane-c branch nor the
+  mission branch has ever been pushed to `origin` (`MOES-Media/spec-kitty`)
+  for this mission slug — confirmed via `git ls-remote origin` showing zero
+  refs for `01KYG7GE`. A CI run triggered from lane-c alone would fail at the
+  muster-action step (manifest path not found) for a reason that proves
+  nothing about this workflow's correctness, and would not produce the
+  "both steps green" evidence T013 requires. Per this WP's own instructions,
+  no `run_id` or wall-clock-minutes figure is recorded here because none is
+  real. **Reported as blocked pending lane integration**: a genuine run
+  needs WP01's lane-a merged into (or otherwise combined on) a branch that
+  also carries this WP's `.github/workflows/conformance.yml`, then that
+  combined branch pushed to `origin` to trigger Actions. This is a
+  mission-level sequencing dependency (plan.md's "Risks — Cross-WP
+  handoff" section already flags it), not something WP03 alone can resolve
+  without either merging WP01 prematurely (out of scope/authorization for
+  this WP) or duplicating WP01's files into this lane (would violate the
+  "touch only .github/workflows/conformance.yml" scope guard).
+- 2026-07-27T02:12Z – claude – T014 verification gate run: `git diff --cached
+  --stat` (staged, this WP's only change) shows exactly one file,
+  `.github/workflows/conformance.yml`, 41 insertions. `conformance/` does not
+  exist in this checkout at all (see T013 note) so there is trivially no
+  change under it. `grep -n "secrets:" .github/workflows/conformance.yml`
+  returns nothing. `grep -n "version:"` shows `version: '1.1.0'` exact.
+  Additional validation performed beyond the WP's own checklist: `python3
+  -c "import yaml; yaml.safe_load(open(...))"` parses without error (the
+  bare `on:` key is coerced to the YAML-1.1 boolean `true` by PyYAML's
+  default loader — a well-known false positive shared by every other
+  workflow in this repo, all of which use unquoted `on:` too; GitHub's own
+  workflow parser is unaffected). Installed `actionlint` v1.7.12 fresh via
+  `go install github.com/rhysd/actionlint/cmd/actionlint@latest` (no
+  actionlint/yamllint pre-installed in this environment) and ran it against
+  the new file: `actionlint .github/workflows/conformance.yml` exits `0`
+  with zero findings.
