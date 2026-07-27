@@ -32,7 +32,8 @@ split by purpose.
 - RFC-1's required front-matter keyspace is `soul_spec, id, name, locale,
   composition, profiles, profile_overrides, values, voice, interaction,
   safety, extensions`, where `voice` requires four 0–100 integers and
-  `interaction` requires four enums (`src/adapters/rfc1/schema.json:11-24`
+  `interaction` requires four enums
+  (`src/adapters/rfc1/schema.json:11-24 @v1.1.0≡8953ee8`
   and sub-blocks). **None of these exist in an agent profile.** A projector
   must fabricate them. Static checks against fabricated values are vacuous,
   and grading them would launder muster-invented numbers as SK conformance
@@ -47,8 +48,8 @@ split by purpose.
   resolution) need fields only the **source YAML** carries.
 - The adapter pattern question resolves from the code: the registry that
   motivates `implements SpecAdapter` stubs serves only `muster check
-  --adapter` over Soul documents (`src/cli/index.ts:224-227,1282` at
-  `v1.1.0` — the `ADAPTER_REGISTRY` const and the `check` command's
+  --adapter` over Soul documents (`src/cli/index.ts:224-227,1282 @v1.1.0` —
+  the `ADAPTER_REGISTRY` const and the `check` command's
   registration); the newest adapter (`memory-utilization`) skips
   `SpecAdapter` entirely and is manifest-runner + factory + hand-wired CLI
   command (`src/adapters/memory-utilization/index.ts:562-601 @8953ee8`,
@@ -61,8 +62,8 @@ split by purpose.
 - The projector **is** unavoidable for cross-layer composition:
   `composition.ts` supports exactly `persona | sop | skill` and the persona
   slot must resolve through RFC-1 §7.5/Appendix G
-  (`src/crosslayer/composition.ts:25,74,82-91,295-303`), and persona+sop are
-  both mandatory (`:103-131`).
+  (`src/crosslayer/composition.ts:25,74,82-91,295-303 @v1.1.0≡8953ee8`), and
+  persona+sop are both mandatory (`:103-131 @v1.1.0≡8953ee8`).
 
 **Recommendation (c), narrowly.** M2 (garrison-hq/muster#58) builds a
 manifest-runner-shaped `spec-kitty-profile` adapter that grades the
@@ -103,7 +104,7 @@ and drive any OpenAI-compatible endpoint directly.
   turns and run through the core client against any OpenAI-compatible
   endpoint — and this path is **already wired in the CLI**: `doSopRun`
   builds a real client from `MUSTER_ENDPOINT`/`MUSTER_MODEL`/`MUSTER_API_KEY`
-  and executes probes (`src/cli/index.ts:1054-1067,1104-1125` at `v1.1.0` —
+  and executes probes (`src/cli/index.ts:1054-1067,1104-1125 @v1.1.0` —
   `buildSopClient()` and `doSopRun()`). Verified directly, not assumed.
 - (a) would be a running service whose only job is assembling text muster
   can embed in a manifest — a moving part with no added test power, and
@@ -142,7 +143,8 @@ manifests from doctrine (generator in muster or SK). Sub-decision:
 
 **Evidence.**
 - `checkRuleTextPresence` requires `ruleText` to be a **verbatim substring
-  of the SOP file** (`src/adapters/openclaw-sop/manifest.ts:426-446`).
+  of the SOP file**
+  (`src/adapters/openclaw-sop/manifest.ts:426-446 @v1.1.0≡8953ee8`).
   Pointing `sopFile` at the directive YAML makes verbatim `integrity_rules`
   lines satisfy this for free, and turns the drift lint into exactly what
   we want: **when upstream edits a directive, the manifest goes stale and
@@ -161,7 +163,7 @@ manifests from doctrine (generator in muster or SK). Sub-decision:
   exists and is normative**, so M3 needs zero new muster rubric surface).
 - Citation shape has direct precedent: `source.normative` = the muster
   rubric class; `source.supporting` = "OpenClaw doc URL pinned to a commit
-  SHA (C-002)" (`manifest.ts:35-68`) — substitute the directive file's
+  SHA (C-002)" (`manifest.ts:35-68 @v1.1.0≡8953ee8`) — substitute the directive file's
   GitHub URL @ SHA.
 - Volume: 25 directives × 2–4 integrity_rules ≈ 60–90 entries. Authored
   once, drift-guarded thereafter. A generator is a second source of truth
@@ -173,7 +175,7 @@ groups), `sopFile:` the directive YAML, `ruleText` verbatim from
 `integrity_rules`, `gradingClass`/`aggregation` per the existing taxonomy
 (pass-k for safety-critical, k-of-n for stylistic —
 `sop-rule-taxonomy.md` §Aggregation), `passThreshold == k` enforced for
-pass-k by the loader itself (`manifest.ts:283-321`). Judge rules quote
+pass-k by the loader itself (`manifest.ts:283-321 @v1.1.0≡8953ee8`). Judge rules quote
 `validation_criteria` inside `rubricText`. Start with the trace-decidable
 set plus the highest-value judge rules; grow by evidence.
 
@@ -195,7 +197,7 @@ still consumes plain files and the drift lint still guards).
   (MOES-Media/spec-kitty#25), M7 (MOES-Media/spec-kitty#26) — everything
   that is manifests, fixtures, query sets, the projector, and SK-side CI.
   Reason: muster resolves `skillDir`/`sopFile`/`querySetPath` **relative to
-  the manifest's own directory** (`src/cli/index.ts:993` at `v1.1.0` —
+  the manifest's own directory** (`src/cli/index.ts:993 @v1.1.0` —
   manifest-relative path resolution; `manifest.ts`'s `sopFile` "path
   relative to the manifest file") — conformance data must live beside the
   artefacts it cites, and the artefacts live in spec-kitty. This also keeps
@@ -229,7 +231,7 @@ rubrics shipped **inside the mission that introduced their checks**) gives:
 | `docs/rubric/spec-kitty-profile-taxonomy.md` | M2 (garrison-hq/muster#58) | Profile check classes: schema-conformance (delegating normativity to `agent-profile.schema.yaml@<SHA>` as the upstream clause), handoff-graph resolution & symmetry semantics (incl. the role-vs-profile-id typing of `handoff-to`), doctrine-reference resolution vs the activation set, `context-sources` integrity, profile-id-as-native-filename legality, projection-drift semantics vs `agent_profiles_manifest.json` (schema_version 1, 9 fields). Follows the `[NORMATIVE]/[CONVENTION]/[MUSTER-OWN]` source-tagging of `memory-utilization-taxonomy.md`. | all M2 checks |
 | `docs/rubric/spec-kitty-behavioral-axes.md` | M2 (needed before M4, MOES-Media/spec-kitty#24) | What "behaved correctly" means per profile axis: avoidance-boundary adherence, capability containment, handoff discipline, canonical-verb usage — each with grading class, aggregation, the verbatim `rubricText` blocks M4's `JudgeAssertion`s embed (the judge injects rubricText verbatim between `<RUBRIC>` tags — `judge.ts:62-67` — so the published text **is** the operative rubric), and its required discrimination control. | all M4 profile-axis rules |
 | `docs/rubric/sop-rule-taxonomy.md` **v1.1 appendix** | M2 | Directive-mapping appendix: which directive fields become `ruleText`, decidability mapping of the 26 directives onto the existing 5 binary + 2 judge classes, citation format for `source.supporting` = directive@SHA. The classes themselves are already normative at v1.0.0 — M3 (MOES-Media/spec-kitty#23) checks cite the **existing** classes; the appendix is author guidance, so M3 is not blocked on it. | M3/M4 directive rules (classes), authors (appendix) |
-| `docs/rubric/skills-trigger-taxonomy.md` | M5 (garrison-hq/muster#59) | The trigger-testing methodology muster currently attributes to an unverified upstream anchor (correction #5): 8-minimum per axis, should-trigger vs near-miss semantics, threshold semantics, k-of-n rationale (`trigger.ts:26-31`), discrimination-control requirement. Citations in `trigger.ts`/`types.ts`/fixtures repointed here (or to the upstream anchor if OQ-1 verifies it exists — then this doc just anchors to it). | all trigger checks (M6, MOES-Media/spec-kitty#25) |
+| `docs/rubric/skills-trigger-taxonomy.md` | M5 (garrison-hq/muster#59) | The trigger-testing methodology muster currently attributes to an unverified upstream anchor (correction #5): 8-minimum per axis, should-trigger vs near-miss semantics, threshold semantics, k-of-n rationale (`trigger.ts:26-31`), discrimination-control requirement (M6's trigger-routing sense — distinct from this mission's static rigged-fixture control case, see `conformance/README.md`). Citations in `trigger.ts`/`types.ts`/fixtures repointed here (or to the upstream anchor if OQ-1 verifies it exists — then this doc just anchors to it). | all trigger checks (M6, MOES-Media/spec-kitty#25) |
 
 Not in scope, recorded in M9 (garrison-hq/muster#60): rubrics for
 tools/memory/heartbeat/crosslayer (pre-existing gap).
@@ -240,14 +242,14 @@ tools/memory/heartbeat/crosslayer (pre-existing gap).
 
 - Correction #4: `doSkillsRun` unconditionally records every `type:
   behavioral` case as `{passed: true, skipped: true}` and never constructs a
-  client (`src/cli/index.ts:1010` at `v1.1.0`); `runTriggerConformance` is
+  client (`src/cli/index.ts:1010 @v1.1.0`); `runTriggerConformance` is
   reachable only from tests. Behavioral skill cases cannot run through the
   CLI until M5 (garrison-hq/muster#59) — hence static-only here.
 - Latent defects (recorded in `conformance/README.md`, not fixed here): the
   skills manifest is parsed with a bare TypeScript cast — no Ajv schema, no
-  runtime validation (`src/cli/index.ts:996` at `v1.1.0`) — and
+  runtime validation (`src/cli/index.ts:996 @v1.1.0`) — and
   `expectations.violations` is never compared, only `expectations.ok`
-  (`src/cli/index.ts:956` at `v1.1.0`, `passed = ok === c.expectations.ok`).
+  (`src/cli/index.ts:956 @v1.1.0`, `passed = ok === c.expectations.ok`).
 
 ---
 

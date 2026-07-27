@@ -36,9 +36,12 @@ npx --offline @garrison-hq/muster@1.1.0 skills run conformance/skills/manifest.y
 This runs, in order:
 
 1. **`muster skills run`** against `conformance/skills/manifest.yaml` — the
-   53 real skill cases plus the one FR-005 discrimination control case (54
-   `type: static` cases total). Exit `0` means every case's actual result
-   matched its declared `expectations.ok`.
+   53 real skill cases plus the one FR-005 discrimination control case (this
+   mission's static rigged-fixture check that the suite can fail — distinct
+   from mission M6's future trigger-routing discrimination-control
+   methodology, see `DECISIONS.md` D5) (54 `type: static` cases total). Exit
+   `0` means every case's actual result matched its declared
+   `expectations.ok`.
 2. **The manifest completeness check**
    (`conformance/scripts/check-manifest-completeness.mjs`) — a
    dependency-free Node script (Node stdlib only) that verifies every
@@ -137,7 +140,8 @@ node conformance/scripts/check-manifest-completeness.mjs   # exit 0 again
 pre-PR command above, on every pull request and every push to `main`. It
 requires **no repository secrets** (C-002) — the static path is fully
 offline once muster's own package resolution completes on the runner — so
-it also passes on pull requests opened from a fork.
+it is designed to also pass on pull requests opened from a fork (not yet
+empirically observed — see the timing table below).
 
 ### CI timing (NFR-001 — measured, never asserted)
 
@@ -230,8 +234,10 @@ missions do not have to re-litigate them from scratch.
   — those are separate, later programme missions (M2–M7), tracked in
   `DECISIONS.md`.
 - It does not modify muster, `muster-action`, or any spec-kitty runtime
-  source. The diff for this mission touches only `conformance/**` and
-  `.github/workflows/conformance.yml`.
+  source. The diff for this mission touches only `conformance/**`,
+  `.github/workflows/conformance.yml`, and `kitty-ops/**` (spec-kitty's own
+  mission-telemetry exhaust — inert JSONL bookkeeping, the same class as the
+  licensed `kitty-specs/**` artifacts; no runtime or source change).
 - It does not open a pull request against the upstream
   `Priivacy-ai/spec-kitty` repository — this suite is fork-resident for now
   (see `DECISIONS.md` D4's closing note on `OQ-2`).

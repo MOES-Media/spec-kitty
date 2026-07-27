@@ -277,7 +277,7 @@ never an estimate.
       two-step cache-warm-then-offline procedure (both alternatives), the
       pinned version `1.1.0`, and both known latent muster gaps
 - [ ] No numeric CI-latency ceiling is asserted anywhere in `README.md`
-- [ ] **Not marked done** until the CI timing table cites a real `run_id`
+- [x] **Not marked done** until the CI timing table cites a real `run_id`
       and real wall-clock minutes from an actual green `conformance.yml` run
       (T010) — a `TBD` placeholder blocks final approval, it does not
       satisfy it
