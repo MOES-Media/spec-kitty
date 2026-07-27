@@ -16,6 +16,7 @@ subtasks:
 - T015
 - T016
 - T017
+- T018
 agent: claude
 history:
 - timestamp: '2026-07-27T19:45:23Z'
@@ -26,11 +27,13 @@ authoritative_surface: conformance/crosslayer/
 create_intent:
 - conformance/crosslayer/sop-extract.md
 - conformance/scripts/check-sop-extract-drift.sh
+- tests/cross_cutting/test_check_sop_extract_drift.py
 execution_mode: code_change
 model: ''
 owned_files:
 - conformance/crosslayer/sop-extract.md
 - conformance/scripts/check-sop-extract-drift.sh
+- tests/cross_cutting/test_check_sop_extract_drift.py
 role: implementer
 tags: []
 tracker_refs: []
@@ -154,15 +157,56 @@ mid-test diff quoted.
 
 **Steps** (run in order):
 ```bash
-git diff --stat                                   # ONLY the two owned_files entries changed
+git diff --stat                                   # ONLY the three owned_files entries changed
 git diff --stat AGENTS.md                          # MUST show no changes — shared, read-only input
 git diff --name-only <mission-base>...<this-lane-branch> > /tmp/wp03-c002-diff.txt
 if grep -qx "conformance/README.md" /tmp/wp03-c002-diff.txt; then echo "C-002 violation"; exit 1; fi
-! (grep -v '^conformance/' /tmp/wp03-c002-diff.txt | grep -v '^kitty-specs/' | grep -v '^\.github/workflows/crosslayer\.yml$' | grep -q .)
+! (grep -vE '^(conformance|kitty-specs|tests)/' /tmp/wp03-c002-diff.txt | grep -v '^\.github/workflows/crosslayer\.yml$' | grep -q .)
 ```
-The last two lines are this WP's **per-lane C-002 check**, this WP's own
+The allow-list was widened (remediation, C-011 follow-up) from
+`conformance/` + `kitty-specs/` to also admit `tests/` — `owned_files`
+gained a test path (T018) and this scope gate must not reject it. The last
+two lines are this WP's **per-lane C-002 check**, this WP's own
 responsibility before requesting review; the cross-lane assembled-diff run
 happens again at mission review as the backstop.
+
+---
+
+### T018 — C-011 test: pin the drift gate's observable behavior (remediation)
+
+**Purpose**: The operator ruled C-011 (ATDD-First Discipline, `charter.md:504`)
+binding over `charter.yaml`'s `tdd_required: false`. WP03 originally shipped
+with no test of its own; this subtask closes that gap.
+
+**Documented one-time deviation from C-011's letter**: the failing-first
+commit ordering cannot be reconstructed retroactively — `sop-extract.md` and
+`check-sop-extract-drift.sh` were already authored and merged (T014/T015)
+before this test was written. The test is landed now, its red/green
+demonstrated against a throwaway clone of the pre-implementation commit (see
+the Activity Log), rather than fabricating a red-then-green commit history
+that did not happen.
+
+**Steps**:
+1. Write `tests/cross_cutting/test_check_sop_extract_drift.py`, pinning: a
+   clean sandbox exits 0 (twice); a mutated `sop-extract.md` exits 1 *and*
+   the mutation survives on disk; a mutated `AGENTS.md` exits 1; the default
+   (no-argument) invocation never writes `sop-extract.md` even when
+   reporting drift; `--write` regenerates the extract and leaves a
+   subsequent default call clean; an unrecognized argument is rejected.
+   Runs against a sandboxed copy of the script + its two inputs (never the
+   live checkout).
+2. Placed under `tests/cross_cutting/` (not a new `tests/conformance/`
+   directory) so it is actually collected by a live CI gate
+   (`e2e-cross-cutting`'s whole-directory scan) without requiring any edit
+   to `.github/workflows/ci-quality.yml`, which this WP does not own.
+   Carries `pytest.mark.integration` + `pytest.mark.git_repo` (not `fast` —
+   it shells out via `subprocess`, which the repo's own marker-correctness
+   architectural guard forbids pairing with `fast`).
+3. Commit separately from the Fix 1/Fix 2 remediation commit.
+
+**Files**: `tests/cross_cutting/test_check_sop_extract_drift.py` (new).
+**Validation**: `uv run python -m pytest tests/cross_cutting/test_check_sop_extract_drift.py -v`
+— all cases pass; count and exit code recorded in the Activity Log.
 
 ## Definition of Done
 
@@ -173,6 +217,9 @@ happens again at mission review as the backstop.
 - [ ] `AGENTS.md` itself is untouched by this WP
 - [ ] Per-lane C-002 check (T017) passes against this WP's own lane diff
 - [ ] No file outside `owned_files` modified
+- [ ] C-011 test (T018) committed separately, passes, with a documented
+      red/green demonstration or an honest statement of why one wasn't
+      cleanly possible
 
 ## Risks
 
@@ -194,10 +241,206 @@ happens again at mission review as the backstop.
   reviewer to independently confirm the drift script's re-extraction logic
   matches what was actually committed.
 - Confirm the per-lane C-002 check (T017) was actually run.
+- **Reject if** the default (no-argument) invocation of
+  `check-sop-extract-drift.sh` writes to `sop-extract.md` under any
+  condition — `--write` must only ever be reachable via the explicit flag.
+- **Reject if** the C-011 test (T018) is missing, does not actually run in
+  CI (confirm it carries a marker + path a live gate selects), or is not
+  committed separately from the Fix 1/Fix 2 remediation commit.
 
 Implementation command: `spec-kitty agent action implement WP03 --agent claude`
 
 ## Activity Log
+
+**Remediation pass (2026-07-27, post-review, lane-c).** Three review findings
+fixed against `HEAD` (commit `22efcade8`, Fix 2 landed): empty Activity Log
+(HIGH), no `--write` remedy for the documented regenerate command (MEDIUM),
+and a missing C-011 test (NEW, operator ruling). All commands below were
+re-run for real just now, not reconstructed from memory or the commit
+message.
+
+### T016 — mandatory real-CLI falsification (re-run, values observed now)
+
+Baseline, clean tree, run twice:
+```
+$ bash conformance/scripts/check-sop-extract-drift.sh; echo $?
+0
+$ bash conformance/scripts/check-sop-extract-drift.sh; echo $?
+0
+```
+
+Falsification (hand-edited line 1 of the committed `sop-extract.md`
+in place, from `<!--` to `<!-- DRIFT-TEST-MUTATION-T016`; `AGENTS.md` was
+never touched):
+```
+$ bash conformance/scripts/check-sop-extract-drift.sh; echo $?
+diff --git a/.../conformance/crosslayer/sop-extract.md b/tmp/sop-extract-fresh.NUKSuT
+index 00585e33a..965db6b0a 100644
+--- a/.../conformance/crosslayer/sop-extract.md
++++ b/tmp/sop-extract-fresh.NUKSuT
+@@ -1,4 +1,4 @@
+-<!-- DRIFT-TEST-MUTATION-T016
++<!--
+ SOP policy extract (FR-007, OQ-6 option (b)).
+1
+```
+
+**Mid-test diff (`git diff -- conformance/crosslayer/sop-extract.md`,
+captured immediately after the hand-edit, before restoring):**
+```diff
+diff --git a/conformance/crosslayer/sop-extract.md b/conformance/crosslayer/sop-extract.md
+index 965db6b0a..00585e33a 100644
+--- a/conformance/crosslayer/sop-extract.md
++++ b/conformance/crosslayer/sop-extract.md
+@@ -1,4 +1,4 @@
+-<!--
++<!-- DRIFT-TEST-MUTATION-T016
+ SOP policy extract (FR-007, OQ-6 option (b)).
+ 
+ This file is a bounded, verbatim subset of the repo-root AGENTS.md's
+```
+
+Restore + hash verification:
+```
+mutated hash  : 676338c9a68fad680dc1f21387b1085cf0735d2de6a77ac5a23fbeb547f67af8
+$ git checkout -- conformance/crosslayer/sop-extract.md
+restored hash : 28db7b207b9c1e1a8bda09ef66fdcfa097d21c39072960ea53f9bad54d77aedc  (matches pre-mutation)
+$ git diff --exit-code conformance/crosslayer/sop-extract.md; echo $?
+0
+```
+
+### Additional mutation-position sweep (verify-before-handing-back)
+
+Same clean baseline hash `28db7b207b9c1e1a8bda09ef66fdcfa097d21c39072960ea53f9bad54d77aedc`
+each time before mutating.
+
+| Mutation position | Run exit | Mutation present on disk (hash differs)? | Restored hash matches baseline? | Post-restore `git diff --exit-code` |
+|---|---|---|---|---|
+| First line (header marker) — same edit as T016 above | 1 | yes (`676338c9...`) | yes | 0 |
+| Last content line (line 47, "Recovery if origin/main…") | 1 | yes (`d1793369...`) | yes | 0 |
+| Single byte, mid-file (byte offset 800, `r`→`R` inside the extraction-rule prose) | 1 | yes (`5412fd06...`) | yes | 0 |
+
+### Fix 2 — `--write` mode, fresh exit codes
+
+```
+$ sed -i '1s/.*/<!-- WRITE-MODE-DRIFT-CHECK/' conformance/crosslayer/sop-extract.md
+$ bash conformance/scripts/check-sop-extract-drift.sh; echo $?      # default, drifted
+1
+$ bash conformance/scripts/check-sop-extract-drift.sh --write; echo $?
+check-sop-extract-drift: regenerated .../conformance/crosslayer/sop-extract.md from AGENTS.md
+0
+$ bash conformance/scripts/check-sop-extract-drift.sh; echo $?      # default, post-write
+0
+$ git diff --exit-code conformance/crosslayer/sop-extract.md; echo $?   # regenerated content == committed content
+0
+```
+Confirms: the default (no-argument) invocation stays read-only and still
+detects drift (exit 1) without writing; `--write` regenerates the extract
+byte-identical to what the default check would have compared against, and
+leaves the gate clean afterward. `--write` is reachable only via the
+literal flag — WP04's CI call site (bare invocation) can never trigger it.
+
+### T017 — per-lane C-002 gate (re-run against final commit state)
+
+```
+$ git diff --stat                                   # only owned_files entries changed
+ conformance/crosslayer/sop-extract.md          |  2 +-
+ conformance/scripts/check-sop-extract-drift.sh | 43 ++++++++++++++++++++++++--
+ kitty-specs/.../tasks/WP03-sop-extract-drift-gate.md | (Activity Log + T017/T018 doc)
+ tests/cross_cutting/test_check_sop_extract_drift.py | (new)
+$ git diff --stat AGENTS.md; echo $?
+(no output — AGENTS.md untouched)
+$ git diff --name-only kitty/mission-crosslayer-composition-suite-01KYJA33...kitty/mission-crosslayer-composition-suite-01KYJA33-lane-c > /tmp/wp03-c002-diff.txt
+$ cat /tmp/wp03-c002-diff.txt
+conformance/crosslayer/sop-extract.md
+conformance/scripts/check-sop-extract-drift.sh
+kitty-specs/crosslayer-composition-suite-01KYJA33/tasks/WP03-sop-extract-drift-gate.md
+tests/cross_cutting/test_check_sop_extract_drift.py
+$ grep -qx "conformance/README.md" /tmp/wp03-c002-diff.txt && echo "C-002 violation"
+(no match — no C-002 violation)
+$ ! (grep -vE '^(conformance|kitty-specs|tests)/' /tmp/wp03-c002-diff.txt | grep -v '^\.github/workflows/crosslayer\.yml$' | grep -q .); echo $?
+0   # PASS — every changed path is under conformance/, kitty-specs/, or tests/
+```
+
+### T018 — C-011 test
+
+`tests/cross_cutting/test_check_sop_extract_drift.py`, 6 test functions,
+run against a sandboxed copy of the script + `AGENTS.md` + `sop-extract.md`
+(never the live checkout):
+
+```
+$ uv run python -m pytest tests/cross_cutting/test_check_sop_extract_drift.py -v
+tests/cross_cutting/test_check_sop_extract_drift.py::test_clean_sandbox_exits_zero_twice PASSED
+tests/cross_cutting/test_check_sop_extract_drift.py::test_mutated_extract_exits_one_and_mutation_survives PASSED
+tests/cross_cutting/test_check_sop_extract_drift.py::test_mutated_agents_md_exits_one PASSED
+tests/cross_cutting/test_check_sop_extract_drift.py::test_default_invocation_never_writes_extract_even_with_drift PASSED
+tests/cross_cutting/test_check_sop_extract_drift.py::test_write_flag_regenerates_and_default_is_then_clean PASSED
+tests/cross_cutting/test_check_sop_extract_drift.py::test_unknown_argument_is_rejected PASSED
+6 passed in 71.53s
+```
+
+Placed under `tests/cross_cutting/` (not a new `tests/conformance/`
+directory) and marked `pytest.mark.integration` + `pytest.mark.git_repo` so
+it is actually selected by the live `e2e-cross-cutting` CI job without any
+edit to `.github/workflows/ci-quality.yml` (out of this WP's `owned_files`
+and forbidden by the widened T017 scope gate above). Verified this claim
+for real rather than asserting it: ran this repo's own architectural
+gate-coverage ratchet
+(`tests/architectural/test_gate_coverage.py::test_no_new_orphan_surfaces`)
+plus its marker-convention/marker-correctness guards
+(`tests/architectural/test_pytest_marker_convention.py`,
+`tests/architectural/test_pytest_marker_correctness.py`) against the new
+file — all 5 passed (199.31s), confirming the new test is neither a
+newly-orphaned (never-runs-in-CI) file nor mismarked (`fast` + `subprocess`,
+or a `git`-invoking file missing `git_repo`).
+
+**C-011 letter — documented one-time deviation.** `sop-extract.md` and
+`check-sop-extract-drift.sh` (T014/T015) were already authored and merged
+before this test was written, so a genuine failing-first commit ordering
+cannot be reconstructed retroactively for those two subtasks. Red/green was
+still demonstrated where practical, against the actual pre-implementation
+state:
+
+```
+$ git worktree add --detach /tmp/wp03-pre-impl 9bbed911bb4cc9fa93cef305891895511d6c10c8
+Preparing worktree (detached HEAD 9bbed911b)
+$ mkdir -p /tmp/wp03-pre-impl/tests/cross_cutting
+$ cp tests/cross_cutting/test_check_sop_extract_drift.py /tmp/wp03-pre-impl/tests/cross_cutting/
+$ ls /tmp/wp03-pre-impl/conformance/crosslayer   # WP03's deliverables genuinely absent here
+ls: cannot access '.../conformance/crosslayer': No such file or directory
+$ cd /tmp/wp03-pre-impl && <lane-c-venv>/bin/python -m pytest tests/cross_cutting/test_check_sop_extract_drift.py -v --tb=short
+FAILED tests/cross_cutting/test_check_sop_extract_drift.py::test_clean_sandbox_exits_zero_twice
+FAILED tests/cross_cutting/test_check_sop_extract_drift.py::test_mutated_extract_exits_one_and_mutation_survives
+FAILED tests/cross_cutting/test_check_sop_extract_drift.py::test_mutated_agents_md_exits_one
+FAILED tests/cross_cutting/test_check_sop_extract_drift.py::test_default_invocation_never_writes_extract_even_with_drift
+FAILED tests/cross_cutting/test_check_sop_extract_drift.py::test_write_flag_regenerates_and_default_is_then_clean
+FAILED tests/cross_cutting/test_check_sop_extract_drift.py::test_unknown_argument_is_rejected
+6 failed in 75.95s (0:01:15)
+  # every failure: FileNotFoundError on conformance/scripts/check-sop-extract-drift.sh
+  # (and, transitively, conformance/crosslayer/sop-extract.md) — RED, for the
+  # expected reason: the WP03 deliverables do not exist yet at this commit.
+$ cd - && git worktree remove --force /tmp/wp03-pre-impl
+$ uv run python -m pytest tests/cross_cutting/test_check_sop_extract_drift.py -v   # back at this lane's HEAD
+6 passed in 71.53s   # GREEN
+```
+Genuinely red (all 6 fail, `FileNotFoundError` on the not-yet-existing
+script/extract) at the pre-implementation commit, genuinely green at this
+lane's final state — the closest honest substitute for a red-then-green
+*commit* history that cannot be rewritten after the fact.
+
+### Verification summary
+
+- Gate clean: exit 0, twice, byte-identical (T016 baseline above).
+- First-line / last-line / single-byte mutations: exit 1 each, mutation
+  hash-verified present, restore hash-verified back to baseline.
+- Test suite: `uv run python -m pytest tests/cross_cutting/test_check_sop_extract_drift.py -v`
+  → 6 passed, exit 0.
+- `git status --porcelain` clean in this lane after the final commit (see
+  the WP03 commits on `kitty/mission-crosslayer-composition-suite-01KYJA33-lane-c`).
+- Primary checkout (`/home/jeroennouws/dev/spec-kitty-conformance`, branch
+  `kitty/mission-crosslayer-composition-suite`) was not switched or
+  committed against; its pre-existing uncommitted bookkeeping
+  (`meta.json`, `WP01`/`WP03` frontmatter reformatting) was left untouched.
 
 - **MEDIUM-1 remediation (`--write`'s `mv` was cross-device, so neither
   atomic nor mode-preserving)**: the `mktemp` scratch file `--write` builds
