@@ -1,37 +1,37 @@
 ---
-work_package_id: "WP03"
-title: "SOP policy extract and its own drift gate (lane-b part 2)"
+work_package_id: WP03
+title: SOP policy extract and its own drift gate (lane-b part 2)
 dependencies: []
 requirement_refs:
-  - FR-007
-  - C-002
-subtasks:
-  - T014
-  - T015
-  - T016
-  - T017
-owned_files:
-  - "conformance/crosslayer/sop-extract.md"
-  - "conformance/scripts/check-sop-extract-drift.sh"
-create_intent:
-  - "conformance/crosslayer/sop-extract.md"
-  - "conformance/scripts/check-sop-extract-drift.sh"
-authoritative_surface: "conformance/crosslayer/"
-execution_mode: "code_change"
+- FR-007
+- C-002
 planning_base_branch: kitty/mission-crosslayer-composition-suite
 merge_target_branch: kitty/mission-crosslayer-composition-suite
-branch_strategy: "Planning artifacts for this mission were generated on kitty/mission-crosslayer-composition-suite. During /spec-kitty.implement this WP may branch from a dependency-specific base, but completed changes must merge back into kitty/mission-crosslayer-composition-suite unless the human explicitly redirects the landing branch."
+branch_strategy: Planning artifacts for this mission were generated on kitty/mission-crosslayer-composition-suite. During /spec-kitty.implement this WP may branch from a dependency-specific base, but completed changes must merge back into kitty/mission-crosslayer-composition-suite unless the human explicitly redirects the landing branch.
 base_branch: kitty/mission-crosslayer-composition-suite-01KYJA33
-base_commit: c425bc188995b5b9a04bece05b511ba81896ce7f
-created_at: '2026-07-27T19:45:23Z'
-history:
-  - timestamp: '2026-07-27T19:45:23Z'
-    event: created
-    by: /spec-kitty.tasks-outline (planner-priti)
-agent_profile: implementer-ivan
-role: implementer
+base_commit: 9bbed911bb4cc9fa93cef305891895511d6c10c8
+created_at: '2026-07-27T20:39:34.660573+00:00'
+subtasks:
+- T014
+- T015
+- T016
+- T017
 agent: claude
+history:
+- timestamp: '2026-07-27T19:45:23Z'
+  event: created
+  by: /spec-kitty.tasks-outline (planner-priti)
+agent_profile: implementer-ivan
+authoritative_surface: conformance/crosslayer/
+create_intent:
+- conformance/crosslayer/sop-extract.md
+- conformance/scripts/check-sop-extract-drift.sh
+execution_mode: code_change
 model: ''
+owned_files:
+- conformance/crosslayer/sop-extract.md
+- conformance/scripts/check-sop-extract-drift.sh
+role: implementer
 tags: []
 tracker_refs: []
 ---
