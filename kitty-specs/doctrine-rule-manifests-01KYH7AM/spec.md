@@ -82,6 +82,16 @@ nor `validation_criteria`) or the advisory, non-numbered
       **When** the same command and jq gate are run, **Then** the `--json`
       output contains a `RULE_DRIFT` finding for that rule and the jq gate
       exits non-zero (AC-2).
+   3. **[Added post-spec-gate: proves the fragment convention actually works,
+      not merely that it is documented.]** **Given** the shipped manifests for
+      directives 042, 044, and 045 — the three directives containing the 10
+      fragment-cited rules — **When** `muster sop run <manifest> --json` is
+      run for each on a clean tree and its output is captured, **Then** the
+      captured `--json` output contains **zero** `RULE_DRIFT` findings across
+      all shipped manifests, verified by real execution rather than asserted:
+      the exact command and the observed `--json` output are recorded
+      verbatim as evidence at implement/review time (AC-4). A convention
+      never observed matching on a real run is unverified.
 
    ---
 
@@ -143,12 +153,60 @@ nor `validation_criteria`) or the advisory, non-numbered
   verbatim and `RULE_DRIFT` fires — this is the mission working as intended
   (a true positive, not a defect), at the cost of maintenance time budgeted in
   the issue's risk #1.
-- **Multi-line YAML folding**: `integrity_rules` entries authored as folded or
-  literal YAML block scalars can introduce whitespace or line-break
-  differences that break a naively copy-pasted `ruleText`'s verbatim-substring
-  match even though the *meaning* is unchanged — mitigated by quoting exact
-  scalars during authoring and manually verifying each rule against AC-2's
-  reproduction before commit (issue risk #2).
+- **Multi-line YAML folding — [Corrected post-spec-gate by explicit operator
+  decision, replacing this document's original "quoting exact scalars"
+  mitigation below, which does not work: quoting governs how the
+  *manifest's own* YAML scalar parses, not whether the parsed result matches
+  a *different file's* raw physical line-wrap.]** `checkRuleTextPresence`
+  (`src/adapters/openclaw-sop/manifest.ts:426-446`) does
+  `sopFile.content.includes(entry.ruleText)` against the directive file's
+  **raw bytes** as read by `readSOPFile` (`readFile(path, "utf-8")`) — muster's
+  own C-006 states `SOPFile.content` is verbatim, never modified, never
+  YAML-parsed. `integrity_rules` entries in the directive YAML are authored as
+  scalars that wrap across physical lines, so a semantically-correct
+  `ruleText` measured from the *parsed* scalar can fail to appear as a
+  substring of the *raw* bytes and reports `RULE_DRIFT` permanently, with no
+  relation to whether the rule's wording ever drifts. Measured against the
+  real directive files, this affects **10 of the 45 target rules**: directive
+  042 (3 of 4 rules), 044 (3 of 3), and 045 (4 of 4) — including 045's
+  flagship no-direct-push rule that FR-002 names by number, whose first rule
+  parses to `` `...or `gh pr merge` without explicit operator instruction.` ``
+  while the raw file contains `` `gh pr\n    merge` ``.
+
+  **Adopted mitigation — the single-line fragment convention (operator
+  decision, binding).** For any rule whose full text does not survive as a
+  raw-byte substring, `ruleText` is instead authored as the longest
+  contiguous fragment of the rule that lies entirely on **one physical line**
+  of the directive file's raw bytes and uniquely identifies that rule within
+  the file. Four properties are load-bearing:
+  - *Raw-byte substring*: the fragment must be a literal substring of the
+    directive file as read from disk — verified by running
+    `muster sop run <manifest> --json` and reading the output, not by eye.
+  - *Uniqueness within the file*: the fragment must appear exactly once in
+    the directive file, or it could satisfy the presence check while
+    identifying a different rule; authors must verify uniqueness (e.g. a
+    literal-string count against the raw file) before committing.
+  - *Semantic identification*: the fragment must be recognisable to a human
+    reader as *that specific rule* — not an incidental clause shared across
+    rules.
+  - *Honest partial coverage*: drift in the non-cited remainder of a wrapped
+    rule is **not** detected by this mechanism. This is a real, accepted
+    limitation, stated here rather than glossed over. `conformance/doctrine/
+    README.md` (FR-006) must record, per rule, whether its `ruleText` is a
+    full-line verbatim citation or a fragment citation, so a reader can tell
+    which rules have full-line coverage and which are partial.
+
+  **Rejected alternatives, with reasons**: (1) byte-exact raw reproduction of
+  the wrapped text, including its mid-word line break — rejected because
+  `ruleText` is also consumed as the probe `scenario.systemPrompt`
+  (`src/adapters/openclaw-sop/probes.ts:295`), so injecting a broken mid-word
+  line break into a future M4 system prompt is unacceptable, and the fragile
+  match would also misfire on any incidental future reflow of the directive
+  source; (2) excluding the 10 affected rules from scope — rejected because it
+  would leave directive 045, the flagship safety-critical no-direct-push
+  directive, entirely uncovered; (3) reflowing the directive source to remove
+  the wraps — rejected outright, forbidden by C-001 (diff touches only
+  `conformance/**` and the workflow file).
 - **jq gate silently matching nothing**: a typo in the jq filter (e.g. a
   misspelled finding `kind`) would make the gate always report zero matches,
   indistinguishable from a genuinely clean suite — this is exactly why FR-005's
@@ -166,6 +224,31 @@ nor `validation_criteria`) or the advisory, non-numbered
   failure, not a warning — AC-1 requires every shipped (non-control) manifest
   to load and exit `0`, so this class of failure must not occur in the
   delivered manifests.
+- **[Added post-spec-gate] Taxonomy-class mapping is a planning input, not
+  resolved here**: the 5 binary classes in `docs/rubric/sop-rule-taxonomy.md`
+  (`never-call-tool`, `tool-order`, `confirm-before-destructive`,
+  `exact-string-non-leakage`, `output-format`) are defined in
+  transcript/tool-call-trace terms. Directive 045's actual rule ("don't run
+  `git push origin main`, `git push --force`, or `gh pr merge` without
+  explicit operator instruction") does not map cleanly to any one of them —
+  git commands are not modelled as a distinct tool the `never-call-tool`
+  grader inspects. FR-006's directive→class mapping table therefore requires
+  a real, **per-rule** class assignment made during planning, not an abstract
+  citation of "the class" — and some process-oriented rules (045 being the
+  clearest case) may not fit any existing binary class at all. This spec does
+  not resolve that mapping; it is planning input, carried forward, not a spec
+  decision.
+- **[Added post-spec-gate] `MISSING_SOURCE` may be inert**: FR-004's jq gate
+  checks for finding kind `MISSING_SOURCE` (carried verbatim from issue
+  `MOES-Media/spec-kitty#23`), but that kind does not appear to be emitted
+  anywhere in muster's `openclaw-sop` adapter — only `RULE_DRIFT`,
+  `UNDEFINED_PRECEDENCE`, `TOOL_DRIFT`, and `MANIFEST_ERROR` are actually
+  emitted (`src/adapters/openclaw-sop/manifest.ts`); a missing
+  `source.normative` throws and is caught into a `MANIFEST_ERROR` finding
+  instead (FR-009 in that file). The gate checking for a kind that may never
+  fire is harmless, and FR-004's text is kept as-is — this note exists so
+  nobody later mistakes that kind's permanent silence for evidence the check
+  works.
 
 ## Requirements
 
@@ -173,7 +256,7 @@ nor `validation_criteria`) or the advisory, non-numbered
 
 | ID | Statement | Status |
 |----|------------|--------|
-| FR-001 | Manifests cover the 9 trace-decidable directives (018, 028, 029, 030, 033, 034, 035, 042, 045) plus ≥4 high-value judge directives (proposed: 001, 010, 039, 044); each rule's `ruleText` is a verbatim `integrity_rules` line (RULE_DRIFT-clean by construction). | Proposed |
+| FR-001 | **[Corrected post-spec-gate by explicit operator decision: this row's original text asserted an unqualified "RULE_DRIFT-clean by construction" claim; the post-spec adversarial gate proved by execution that this does not hold for every rule — see the Edge Cases entry on multi-line YAML folding for the measured exception and the adopted fragment-convention mitigation. Not sourced from seed issue `MOES-Media/spec-kitty#23` §5, whose FR table carries the unqualified claim — flagged using the same bracket-annotation convention M1's spec used for its post-spec-gate FR-007 addition.]** Manifests cover the 9 trace-decidable directives (018, 028, 029, 030, 033, 034, 035, 042, 045) plus ≥4 high-value judge directives (proposed: 001, 010, 039, 044); each rule's `ruleText` is a verbatim `integrity_rules` line for the 35 of 45 target rules whose rule text lies entirely on one physical line of the directive file, or — for the 10 of 45 rules that wrap across a physical line break (042 ×3, 044 ×3, 045 ×4) — a single-line fragment per the fragment convention (Edge Cases). RULE_DRIFT-clean by construction holds directly for the 35 unwrapped rules, and via the fragment convention for the 10 wrapped rules. | Proposed |
 | FR-002 | `gradingClass`/`aggregation` per the sop-rule-taxonomy classes: pass-k with `passThreshold == k` for safety-critical rules (045 no-direct-push, 029 signing), k-of-n for stylistic; the loader's own semantic checks must pass (`manifest.ts:283-321`). | Proposed |
 | FR-003 | Every entry: `source.normative` = `docs/rubric/sop-rule-taxonomy.md` §class; `source.supporting` = `https://github.com/Priivacy-ai/spec-kitty/blob/<SHA>/src/doctrine/directives/built-in/<file>` — the C-002 pattern with the directive as the pinned upstream doc. | Proposed |
 | FR-004 | CI job: for each manifest, `muster sop run <manifest> --json` must exit 0 **and** contain zero findings of kind `RULE_DRIFT`/`MISSING_SOURCE`/`MANIFEST_ERROR` (jq gate — required because drift findings are warnings and do not flip the exit code, correction #11). `UNDEFINED_PRECEDENCE`/`TOOL_DRIFT` warnings are reported, not gating, in v1. | Proposed |
@@ -189,6 +272,16 @@ planning or implementation (for example, a real workflow `run_id`'s
 wall-clock minutes once this manifest step lands in the shared CI job), it
 will be added then, flagged as author-added, per house precedent (M1's
 `NFR-001`).
+
+**[Added post-spec-gate: explains why this spec carries no analogue of M1's
+`NFR-002` (determinism / zero network I/O), which the gate noted the original
+draft left silent.]** M1 *implemented* the checking code and therefore needed
+to assert those properties itself. M3 only *authors static YAML* consumed by
+muster's already-existing `openclaw-sop` adapter, whose own header
+self-documents `NFR-001: Pure function; zero network I/O; deterministic
+finding order` (`src/adapters/openclaw-sop/manifest.ts:6-9`) — this mission
+inherits that guarantee rather than restating it, and still does not invent a
+numeric CI-time threshold the way the rejected "<3 min CI" NFR did.
 
 ### Constraints
 
@@ -257,6 +350,15 @@ will be added then, flagged as author-added, per house precedent (M1's
 - **Unblocks**: M4 (`MOES-Media/spec-kitty#24`) — produces the rule inventory
   M4's behavioral probes attach `probeIds` to; the programme's second static
   signal.
+- **[Added post-spec-gate] Note for M4, carried forward**: for the 10
+  fragment-cited rules (042 ×3, 044 ×3, 045 ×4 — see Edge Cases), `ruleText`
+  is a single-line fragment of the rule rather than its complete text.
+  Because `ruleText` is also consumed as the probe `scenario.systemPrompt`
+  (`src/adapters/openclaw-sop/probes.ts:295`), M4 must not assume `ruleText`
+  is the complete rule when building behavioral-probe system prompts for
+  these 10 rules — M4 must supply the full rule text itself, sourced from the
+  directive's `integrity_rules` entry independently of the fragment-convention
+  `ruleText`.
 - **Concurrency wave**: wave 2, alongside M6 (`MOES-Media/spec-kitty#25`)
   authoring and M7 (`MOES-Media/spec-kitty#26`) — disjoint trees in the fork,
   no shared-file conflict with this mission's scope.
