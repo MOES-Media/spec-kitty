@@ -35,6 +35,7 @@ create_intent:
 - conformance/crosslayer/personas/reviewer-renata.Soul.md
 - conformance/scripts/check-persona-drift.sh
 - tests/conformance/test_profile2soul.py
+- tests/conformance/__init__.py
 execution_mode: code_change
 model: ''
 owned_files:
@@ -44,6 +45,7 @@ owned_files:
 - conformance/crosslayer/personas/reviewer-renata.Soul.md
 - conformance/scripts/check-persona-drift.sh
 - tests/conformance/test_profile2soul.py
+- tests/conformance/__init__.py
 role: implementer
 tags: []
 tracker_refs: []
@@ -327,7 +329,7 @@ both quoted, not just described.
 
 **Steps** (run in order):
 ```bash
-git diff --stat                                   # ONLY the six owned_files entries changed
+git diff --stat                                   # ONLY the seven owned_files entries changed
 git diff --stat src/doctrine/                     # MUST show no changes — read-only input, never edited
 git diff --stat .github/                          # MUST show no changes — not this WP's concern
 git diff --name-only <mission-base>...<this-lane-branch> > /tmp/wp01-c002-diff.txt
@@ -373,7 +375,7 @@ instead of just the first two.
 - [ ] All of T006's six real exit codes recorded verbatim in the work log,
       including both falsification directions' actual observed output (not
       "should fail" — the real command output)
-- [ ] No file outside `owned_files` modified (six entries); `src/doctrine/**` and
+- [ ] No file outside `owned_files` modified (seven entries); `src/doctrine/**` and
       `.github/**` untouched
 - [ ] Per-lane C-002 check (T007) passes against this WP's own lane diff
 
@@ -413,7 +415,7 @@ instead of just the first two.
   `^#.*generated:\s*true` — C-003's reviewer-facing audit command
   (spec.md) depends on this exact anchor to avoid a false-positive on a
   rubric sentence that happens to contain the word "generated."
-- Confirm `git diff --stat` touches exactly the six `owned_files` entries
+- Confirm `git diff --stat` touches exactly the seven `owned_files` entries
   and nothing under `src/doctrine/**` or `.github/**`.
 
 Implementation command: `spec-kitty agent action implement WP01 --agent claude`
@@ -591,9 +593,22 @@ git diff --name-only 230ae7f0be81083f98bd80d1ffaed8bd577bffe6...kitty/mission-cr
 grep -qx "conformance/README.md" /tmp/wp01-c002-diff.txt        # not found, no violation
 ! (grep -vE '^(conformance|kitty-specs|tests)/' /tmp/wp01-c002-diff.txt | grep -q .)
 ```
-Both C-002 lines: exit **0**. `git diff --stat` (lane branch vs its own
-previous merged state) touches exactly the six `owned_files` entries; no
-changes under `src/doctrine/**` or `.github/**`.
+Both C-002 lines: exit **0**.
+
+**Correction (MEDIUM-1, next remediation round):** the sentence originally
+here claimed `git diff --stat` "touches exactly the six `owned_files`
+entries" with nothing else. That was false as written: the lane branch's
+real diff against `230ae7f0be81083f98bd80d1ffaed8bd577bffe6` already
+included this task file (`kitty-specs/.../tasks/WP01-projector-mapping-personas.md`,
+bookkeeping, expected) *and* `tests/conformance/__init__.py` (empty,
+undeclared — added by commit `4e82dc5cb`, the same commit that added
+`tests/conformance/test_profile2soul.py`, but never listed in
+`owned_files`/`create_intent`). Both C-002 allow-list checks above still
+pass (`__init__.py` sits under the widened `tests/` prefix), so no
+governance rule was broken — but the "six entries, nothing else" claim was
+inaccurate at the time it was written. See the MEDIUM-1 remediation entry
+below for the corrected count (seven `owned_files` entries) and the
+freshly re-run diff.
 
 Commits: test module committed separately (`test(WP01): add unit coverage
 for profile2soul.py (HIGH-2 remediation)`) from this task-file amendment
@@ -602,3 +617,159 @@ allow-list widening`), per operator instruction, using plain `git add`/
 `git commit` (not `spec-kitty spec-commit`/`finalize-tasks`, per fork
 issues #35/#36). `git show --stat` verified after each commit landed the
 intended files.
+
+### 2026-07-27 — Remediation round 2: MEDIUM-1 (undeclared file) + LOW-1/LOW-2 (cross-check coverage)
+
+Both HIGH findings from the prior round stand as cleared; this entry closes
+the remaining MEDIUM and both LOW findings from the second review pass.
+
+#### MEDIUM-1 — undeclared seventh file
+
+Commit `4e82dc5cb` created `tests/conformance/__init__.py` (empty, matches
+~195 sibling `__init__.py` files under `tests/` fork-wide) without adding it
+to `owned_files`/`create_intent`, making this task file's "touches exactly
+the six `owned_files` entries" claims (frontmatter comment, DoD bullet,
+reviewer-guidance bullet, and the round-1 Activity Log's T007 summary
+sentence) false as written, even though nothing outside the widened
+`tests/` allow-list was actually touched.
+
+**Fix applied**:
+1. `tests/conformance/__init__.py` added to `owned_files` and
+   `create_intent` (both now **seven** entries).
+2. The T007 Steps comment, the DoD bullet, and the reviewer-guidance bullet
+   updated from "six" to "seven".
+3. The round-1 Activity Log's T007 summary sentence corrected in place
+   (see the note directly above this entry) rather than left standing —
+   HIGH-1 was precisely about work-log claims matching what commands
+   produce, so a false claim inside the remediation entry itself could not
+   stand.
+
+**Real lane diff, re-run just now** (not restated from the finding —
+observed directly against this WP's actual `base_commit` and the current
+lane branch, after the LOW-1/LOW-2 code commit below had already landed):
+
+```
+$ git diff --name-only 230ae7f0be81083f98bd80d1ffaed8bd577bffe6...kitty/mission-crosslayer-composition-suite-01KYJA33-lane-a
+conformance/crosslayer/personas/architect-alphonso.Soul.md
+conformance/crosslayer/personas/reviewer-renata.Soul.md
+conformance/scripts/check-persona-drift.sh
+conformance/tools/PROJECTION.md
+conformance/tools/profile2soul.py
+kitty-specs/crosslayer-composition-suite-01KYJA33/status.events.jsonl
+kitty-specs/crosslayer-composition-suite-01KYJA33/status.json
+kitty-specs/crosslayer-composition-suite-01KYJA33/tasks/WP01-projector-mapping-personas.md
+tests/conformance/__init__.py
+tests/conformance/test_profile2soul.py
+```
+
+Ten paths total: the seven `owned_files` entries (five `conformance/`
+artifacts + `tests/conformance/__init__.py` + `tests/conformance/test_profile2soul.py`),
+plus three `kitty-specs/` bookkeeping paths (this task file, plus
+`status.json`/`status.events.jsonl` — spec-kitty's own mission-state
+tracking, written by tooling, not by hand, and outside `owned_files` scope
+by design). Both per-lane C-002 checks (T007) still pass: no path outside
+`^(conformance|kitty-specs|tests)/` appears, and `conformance/README.md` is
+not among them.
+
+#### LOW-1 — `safety` fabricated field now covered
+
+`safety: {}` was rendered from a bare string literal in
+`_render_front_matter`, with no `FABRICATED_SAFETY` constant — so neither
+the `PROJECTION.md` cross-check nor
+`test_fabricated_output_matches_frozen_constants` asserted it; a change to
+the rendered `safety` block would have passed all 18 (now 19) tests.
+
+**Fix**: added `FABRICATED_SAFETY: str = "{}"` to `profile2soul.py`,
+switched `_render_front_matter` to emit it via the constant, and added an
+assertion against it in both `test_fabricated_defaults_table_matches_projection_md`
+(cross-check against `PROJECTION.md`'s table) and
+`test_fabricated_output_matches_frozen_constants` (rendered-output check).
+
+**Proved by mutation, freshly run**:
+- Mutated `_render_front_matter` locally to emit `"safety: null\n"` instead
+  of `f"safety: {FABRICATED_SAFETY}\n"`.
+- `pytest tests/conformance/test_profile2soul.py -v`: **1 failed, 18
+  passed**, exit **1** — `test_fabricated_output_matches_frozen_constants`
+  failed with
+  `assert 'safety: {}' in '...\nsafety: null\nextensions: []\n...'`
+  (the mutated render output, quoted verbatim from the actual failure).
+- Restored the constant-based render line exactly.
+- `pytest tests/conformance/test_profile2soul.py -v`: **19 passed**, exit
+  **0** (green again).
+- `bash conformance/scripts/check-persona-drift.sh` after the fix (restored
+  state, committed): exit **0** — the constant-based render is byte-identical
+  to the prior hardcoded literal, so no persona regeneration was needed and
+  none of the four other owned files changed (blob-identity confirmed
+  below).
+
+Note (not in scope, flagged for transparency): `values: []` and
+`extensions: []` are rendered the same bare-literal way `safety` was and
+have the same latent gap in the render-output test (though
+`PROJECTION.md`'s table values for both are still checked by the
+cross-check test). Only `safety` was in scope for this fix; left as-is.
+
+#### LOW-2 — cross-check made bidirectional
+
+`test_fabricated_defaults_table_matches_projection_md` only looked up each
+known constant *inside* the parsed `PROJECTION.md` table — a new row added
+to the table with no matching constant would pass every assertion
+silently, unlike a rename/value-change/deletion (all three independently
+verified to fail by the prior review round).
+
+**Closed** (judged cheap, not brittle): added
+`test_fabricated_defaults_table_key_set_matches_constants`, which builds
+the expected key set from the module's own constants
+(`FABRICATED_VOICE`, `FABRICATED_INTERACTION`, `FABRICATED_EMPTY_LIST_FIELDS`,
+plus `soul_spec`/`locale`/`safety`) unioned with the two bare-literal fields
+(`values`, `extensions`) that intentionally have no constant, and asserts
+it equals `set(documented.keys())`. This is a straightforward set-equality
+check derived entirely from existing constants/fields — no per-field
+special-casing beyond what the render code already hand-codes — so it
+should not need touching again unless a genuinely new fabricated field is
+introduced, at which point the test *should* force a decision (add the
+field to this set, or explain why not).
+
+#### Quality gate (this lane worktree, current HEAD)
+
+- `pytest tests/conformance/test_profile2soul.py -v`: **19 passed**, exit
+  **0**.
+- `ruff check conformance/tools/profile2soul.py tests/conformance/test_profile2soul.py`:
+  exit **0** ("All checks passed!").
+- `ruff format --check` on both files: exit **0** ("2 files already
+  formatted").
+- `mypy --strict conformance/tools/profile2soul.py`: exit **0** ("Success:
+  no issues found in 1 source file").
+- `mypy --strict tests/conformance/test_profile2soul.py`: exit **0**
+  ("Success: no issues found in 1 source file").
+
+#### Blob-identity confirmation (four unchanged owned files)
+
+Compared each file's git blob hash at `b43b5bf26` (original implementation
+commit) against the current lane `HEAD`:
+
+```
+conformance/tools/PROJECTION.md:                                  SAME (e027c743a...)
+conformance/crosslayer/personas/architect-alphonso.Soul.md:        SAME (68345ec23...)
+conformance/crosslayer/personas/reviewer-renata.Soul.md:            SAME (2543ac443...)
+conformance/scripts/check-persona-drift.sh:                        SAME (91f3bf809...)
+```
+
+`conformance/tools/profile2soul.py`'s blob differs from `b43b5bf26` (as
+expected — LOW-1 changed it), but its *behavior* does not: the drift script
+re-run above confirms byte-identical regeneration output.
+
+#### Commits
+
+- `e26ec2b46` — `fix(WP01): close LOW-1/LOW-2 review findings on
+  fabricated-defaults coverage` (code: `conformance/tools/profile2soul.py`,
+  `tests/conformance/test_profile2soul.py`). Plain `git add`/`git commit`
+  used (not `spec-kitty spec-commit`/`finalize-tasks`, per fork issues
+  #35/#36); `git show --stat` confirmed both intended files landed and
+  nothing else.
+- This task-file amendment (MEDIUM-1 fix + this Activity Log entry)
+  committed separately, also via plain `git add`/`git commit`; `git show
+  --stat` confirmed after landing (see commit immediately following this
+  one in `git log`).
+
+No state transition attempted — WP01 remains `for_review`; this
+programme's reviews run out-of-band per operator instruction.
