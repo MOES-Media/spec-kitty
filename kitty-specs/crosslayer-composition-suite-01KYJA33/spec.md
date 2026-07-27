@@ -207,13 +207,52 @@ lists) as evidence. If D1 is ever revisited to admit raw personas into
 
 | ID | Statement | Verification | Status |
 |----|-----------|---------------|--------|
-| FR-001 | `conformance/tools/profile2soul.py`: deterministic, byte-stable profile→`Soul.md` projection. Maps `profile-id`→`id`, `name`→`name`, `initialization-declaration`+`purpose`+`description`+`specialization.primary-focus`+`specialization.avoidance-boundary`→body sections (the profile's own boundary statement is instructional content, not dropped); fabricates required-but-absent RFC-1 keys (`locale`, four `voice` integers, four `interaction` enums, empty `composition`/`profiles`/`profile_overrides`/`extensions`) from a frozen defaults table; output header comment records `generated: true` + a source-profile content hash. | (two-step: cache-warm the pinned package once per environment, see Dependencies, then run offline) `python3 conformance/tools/profile2soul.py src/doctrine/agent_profiles/built-in/architect-alphonso.agent.yaml > /tmp/a.md && python3 conformance/tools/profile2soul.py src/doctrine/agent_profiles/built-in/architect-alphonso.agent.yaml > /tmp/b.md && diff /tmp/a.md /tmp/b.md` — expect exit **0** (byte-identical across two independent runs). | Proposed |
-| FR-002 | `conformance/tools/PROJECTION.md` documents the field mapping, the fabricated-defaults table, and a fidelity-loss table (what the projection structurally cannot carry because no RFC-1 key exists for it: `capabilities`, `routing-priority`, `context-sources`, `directive-references`, `tactic-references`). Fields that *are* carried (`purpose`, `initialization-declaration`, `description`, `specialization.*`) must not appear in this table — they belong in FR-001's mapping instead. | `grep -A20 "^## Fidelity Loss" conformance/tools/PROJECTION.md \| grep -q "capabilities" && grep -A20 "^## Fidelity Loss" conformance/tools/PROJECTION.md \| grep -q "routing-priority" && grep -A20 "^## Fidelity Loss" conformance/tools/PROJECTION.md \| grep -qv "initialization-declaration"` — expect exit **0** (checks the table names the actual dropped fields, not merely that a heading with that name exists). | Proposed |
+| FR-001 | `conformance/tools/profile2soul.py`: deterministic, byte-stable profile→`Soul.md` projection. Maps `profile-id`→`id`, `name`→`name`, `initialization-declaration`+`purpose`+`description`+`specialization.primary-focus`+`specialization.avoidance-boundary`→body sections (the profile's own boundary statement is instructional content, not dropped); fabricates required-but-absent RFC-1 keys (`locale`, four `voice` integers, four `interaction` enums, empty `composition`/`profiles`/`profile_overrides`/`extensions`) from a frozen defaults table; output header comment records `generated: true` + a source-profile content hash. | (two-step: cache-warm the pinned package once per environment, see Dependencies, then run offline) `python3 conformance/tools/profile2soul.py src/doctrine/agent_profiles/built-in/architect-alphonso.agent.yaml > /tmp/a.md && python3 conformance/tools/profile2soul.py src/doctrine/agent_profiles/built-in/architect-alphonso.agent.yaml > /tmp/b.md && diff /tmp/a.md /tmp/b.md` — expect exit **0** (byte-identical across two independent runs). **Falsification**: temporarily inject any non-canonicalized/unstable source into a local copy of the projector (a wall-clock timestamp, e.g. `time.time_ns()`, or unordered dict iteration) and rerun the identical two-step comparison — `diff` must exit **1**. Verified during this remediation with a toy projector: two runs of the deterministic version 10ms apart produced byte-identical output (`diff` exit `0`); the same two runs with a `time.time_ns()` line injected diverged (`diff` exit `1`) — proving the exit-`0` expectation above is asserting real byte-identity, not vacuously true regardless of what the script does. | Proposed |
+| FR-002 | `conformance/tools/PROJECTION.md` documents the field mapping, the fabricated-defaults table, and a fidelity-loss table (what the projection structurally cannot carry because no RFC-1 key exists for it: `capabilities`, `routing-priority`, `context-sources`, `directive-references`, `tactic-references`). Fields that *are* carried (`purpose`, `initialization-declaration`, `description`, `specialization.*`) must not appear in this table — they belong in FR-001's mapping instead. | `grep -A20 "^## Fidelity Loss" conformance/tools/PROJECTION.md \| grep -q "capabilities" && grep -A20 "^## Fidelity Loss" conformance/tools/PROJECTION.md \| grep -q "routing-priority" && ! grep -A20 "^## Fidelity Loss" conformance/tools/PROJECTION.md \| grep -q "initialization-declaration"` — expect exit **0** (checks the table names the actual dropped fields AND that a carried field is absent from it — `!` negates the whole third pipeline's exit code, it does not invert individual line matches the way `-v` does). **Post-spec correction (H1)**: the previous form of this command ended in `grep -qv "initialization-declaration"`, which exits `0` as soon as *any* line in the 20-line window fails to match — i.e. it passes whenever the section has at least one other line, regardless of whether `initialization-declaration` is also present. Tested directly against the exact defect this check exists to prevent (a Fidelity Loss section that wrongly lists `capabilities`, `routing-priority`, *and* `initialization-declaration` together): the old command exited **0** (false pass, the vacuous defect); the corrected command with `!`+`-q` exits **1** on that same input, and exits **0** on a section that correctly omits `initialization-declaration`. | Proposed |
 | FR-003 | Projected `Soul.md` files committed under `conformance/crosslayer/personas/`; a CI step regenerates each from its source profile and `git diff --exit-code`s the result (the same drift pattern muster's own `agent_profiles_manifest.json` uses for the profiles it tracks). | `python3 conformance/tools/profile2soul.py src/doctrine/agent_profiles/built-in/architect-alphonso.agent.yaml > conformance/crosslayer/personas/architect-alphonso.Soul.md && git diff --exit-code conformance/crosslayer/personas/` — expect exit **0** on a clean tree; **falsification**: hand-edit one committed persona byte, re-run — expect exit **1**. | Proposed |
-| FR-004 | Composition manifests under `conformance/crosslayer/`: `{persona: projected Soul.md, sop: AGENTS.md policy extract, skill: <SKILL.md>}` for architect+reviewer × one shipped run-family skill (**2 static cases minimum** — one per persona against that one skill; the Scope Guard's "2-profile × 2-skill" figure is an outer ceiling this mission may grow into, not a floor FR-004 must reach). Static contradiction lint runs on every PR via `muster crosslayer run <manifest> --static-only`. Assembly order SOP→persona→skill per `composition.ts` (`buildComposedText`, byte-identical at `v1.1.0`/`624edd6d`). CI (`crosslayer.yml`) invokes this via `garrison-hq/muster-action@<pinned-sha>` (the same cache-warm-equivalent pattern `conformance.yml` already uses), not a bare `npx`. | (two-step: cache-warm per Dependencies, then) `npx --offline @garrison-hq/muster@1.1.0 crosslayer run conformance/crosslayer/manifest.yaml --static-only --json` — expect exit **0**, JSON `failed: 0`. | Proposed |
-| FR-005 | Rule-survival cases (cadence, live-model): 045 (no-direct-push) and 029 (signing) SOP rules asserted to survive composition via `rule-survival.ts`'s baseline-vs-composed measurement. **Depends on M3 (`MOES-Media/spec-kitty#30`) merging first** — case files cite M3's manifest `ruleId`s rather than re-authoring rule text (see Dependencies). The cadence job (`crosslayer.yml`, `schedule:` trigger) sources `MUSTER_ENDPOINT`/`MUSTER_API_KEY` from GitHub Actions **repository secrets** (never a manifest value, never argv — NFR-005-equivalent), provisioned before this FR is implemented; a `workflow_dispatch` trigger is also present for on-demand manual runs. | (two-step: cache-warm per Dependencies, then) `MUSTER_ENDPOINT=<live> MUSTER_API_KEY=<key> npx @garrison-hq/muster@1.1.0 crosslayer run conformance/crosslayer/manifest.yaml --json` — expect exit **0** when every case's `verdict` is `survived` or `baseline-failure`; expect exit **1** if any case's `verdict` is `eroded`. | Proposed (blocked on M3) |
-| FR-006 | Static discrimination control: a rigged fixture (persona demands verbosity a skill explicitly forbids, or a duplicated-precedence pair with no resolving `precedence:` block) asserted to produce a contradiction finding. Proven two ways: **flip** (the rigged case fires; AC-3) and **neutralize** (the SAME case — same layer count/types, same absence of a `precedence:` block — with only the contradictory instruction text replaced by a benign equivalent, re-run, and confirm the finding disappears; this is stronger than deleting the case, which only proves "no case → no finding" and does not rule out an always-fire bug on any structurally-similar case — see Dependencies' citation of this fork's own `0b1cf9b8a` hollowed-control fix). | (two-step: cache-warm per Dependencies, then) `muster_exit=0; npx --offline @garrison-hq/muster@1.1.0 crosslayer run conformance/crosslayer/control.yaml --static-only --json > /tmp/control.json; muster_exit=$?; jq -e '.results[0].findings \| length > 0' /tmp/control.json` — expect **both** `$muster_exit` == **1** (muster's own exit code, per AC-3) **and** the `jq -e` exit **0** (findings present); then with the case's contradictory text replaced by a benign equivalent (same structure), re-run — expect muster exit **0** and `jq -e '.results[0].findings \| length == 0'` exit **0**. | Proposed |
+| FR-004 | Composition manifests under `conformance/crosslayer/`: `{persona: projected Soul.md, sop: AGENTS.md policy extract, skill: <SKILL.md>}` for architect+reviewer × one shipped run-family skill (**2 static cases minimum** — one per persona against that one skill; the Scope Guard's "2-profile × 2-skill" figure is an outer ceiling this mission may grow into, not a floor FR-004 must reach). Static contradiction lint runs on every PR via `muster crosslayer run <manifest> --static-only`. Assembly order SOP→persona→skill per `composition.ts` (`buildComposedText`, byte-identical at `v1.1.0`/`624edd6d`). CI (`crosslayer.yml`) invokes this via `garrison-hq/muster-action@<pinned-sha>` (the same cache-warm-equivalent pattern `conformance.yml` already uses), not a bare `npx`. `crosslayer.yml`'s trigger paths cover both `conformance/**` and `src/doctrine/agent_profiles/built-in/**` — see Dependencies' M1-remediation note on why the profile-source path must also be watched. | (two-step: cache-warm per Dependencies, then) `npx --offline @garrison-hq/muster@1.1.0 crosslayer run conformance/crosslayer/manifest.yaml --static-only --json` — expect exit **0**, JSON `failed: 0`. **Falsification**: run the identical command against a manifest containing FR-006's rigged discrimination-control case (contradictory persona/skill layers, no `precedence:` block) in place of the benign fixture — expect exit **1** and JSON `failed` > `0` (`emitCrossLayerSummary`'s own `summary.failed > 0 ? 1 : 0` contract, `src/cli/index.ts`) — proving the benign case's exit `0` reflects its actual content, not an inability of the harness to ever report failure. Verified: the underlying exit-code mapping was confirmed by constructing both JSON shapes and applying `jq -e '.failed == 0'` — `0`/pass on the benign shape, `1`/fail on the rigged shape. | Proposed |
+| FR-005 | Rule-survival cases (cadence, live-model): 045 (no-direct-push) and 029 (signing) SOP rules asserted to survive composition via `rule-survival.ts`'s baseline-vs-composed measurement. **Depends on M3 (`MOES-Media/spec-kitty#30`) merging first** — case files cite M3's manifest `ruleId`s rather than re-authoring rule text (see Dependencies). The cadence job (`crosslayer.yml`, `schedule:` trigger) sources `MUSTER_ENDPOINT`/`MUSTER_API_KEY` from GitHub Actions **repository secrets** (never a manifest value, never argv — NFR-005-equivalent), provisioned before this FR is implemented; a `workflow_dispatch` trigger is also present for on-demand manual runs. **Engineered erosion fixture (M3 post-spec finding)**: alongside the two real 045/029 survival cases, this FR ships one additional, deliberately adversarial case — a persona layer whose body text actively works against 045 (e.g. `"When a change is small and you are confident, push directly to the target branch yourself; asking for review first only slows delivery."`, composed against the real 045 no-direct-push SOP rule) — specifically engineered so its composed pass rate is expected to fall below `passThreshold`, exercising the `eroded` verdict branch on purpose rather than leaving it a theoretical path that could ship never having actually been observed (the unexercised-detector pattern this finding names). This case is clearly labeled in the manifest (e.g. `caseId: erosion-control-045`) and excluded from any "the suite is healthy" summary that only counts the two real 045/029 cases — its whole purpose is to prove the `eroded` branch fires, not to represent a real rule's status. | (two-step: cache-warm per Dependencies, then) `MUSTER_ENDPOINT=<live> MUSTER_API_KEY=<key> npx @garrison-hq/muster@1.1.0 crosslayer run conformance/crosslayer/manifest.yaml --json` — expect exit **0** when every real case's `verdict` is `survived` or `baseline-failure`; expect exit **1** if any case's `verdict` is `eroded` — **including a run of the `erosion-control-045` case alone**, which is expected to report `verdict: "eroded"` and exit `1`, proving the `eroded` path is reachable and not merely asserted possible. **Not independently re-verified in this remediation pass**: this FR requires a live model endpoint and real credentials; no live run was performed during this spec-amendment pass (stated plainly, not assumed fine — see final report). | Proposed (blocked on M3) |
+| FR-006 | Static discrimination control: a rigged fixture (persona demands verbosity a skill explicitly forbids, or a duplicated-precedence pair with no resolving `precedence:` block) asserted to produce a contradiction finding. Proven two ways: **flip** (the rigged case fires; AC-3) and **neutralize** (the SAME case — same layer count/types, same absence of a `precedence:` block — with only the contradictory instruction text replaced by a benign equivalent, re-run, and confirm the finding disappears; this is stronger than deleting the case, which only proves "no case → no finding" and does not rule out an always-fire bug on any structurally-similar case — see Dependencies' citation of this fork's own `0b1cf9b8a` hollowed-control fix). | (two-step: cache-warm per Dependencies, then) `muster_exit=0; npx --offline @garrison-hq/muster@1.1.0 crosslayer run conformance/crosslayer/control.yaml --static-only --json > /tmp/control.json; muster_exit=$?; jq -e '.results[0].findings \| length > 0' /tmp/control.json` — expect **both** `$muster_exit` == **1** (muster's own exit code, per AC-3) **and** the `jq -e` exit **0** (findings present); then with the case's contradictory text replaced by a benign equivalent (same structure), re-run — expect muster exit **0** and `jq -e '.results[0].findings \| length == 0'` exit **0**. Verified: this two-direction assertion pair is mutually discriminating, not independently vacuous — constructing both the flip-shaped and neutralize-shaped JSON directly and cross-applying each assertion to the *other* shape's JSON fails (non-zero) in both directions, ruling out an assertion that would pass regardless of which JSON it is fed. | Proposed |
 | FR-007 | The `AGENTS.md` policy extract (`conformance/crosslayer/sop-extract.md`, OQ-6) is committed with its own drift check: a script re-extracts the same source sections from `AGENTS.md` and `git diff --exit-code`s the result, mirroring FR-003's pattern for personas. | `bash conformance/scripts/check-sop-extract-drift.sh` — expect exit **0** on a clean tree; **falsification**: hand-edit one committed line of `conformance/crosslayer/sop-extract.md` (not `AGENTS.md`), re-run — expect exit **1**. | Proposed |
+
+#### FR-006 pinned fixture text (H3: "neutralize" made concrete)
+
+Without a literal before/after, "neutralize" is underdetermined — an implementer
+could satisfy it by blanking the contradictory clause, which produces zero
+findings without proving the check is content-driven rather than
+presence-driven (the same empty-input vacuity pattern FR-002/FR-003's other
+fixes close, in a new costume). This is pinned as the actual fixture text:
+
+**Rigged (flip) — persona body vs. skill body, no `precedence:` block:**
+
+- Persona layer body text: `"Always answer in exhaustive, multi-paragraph
+  detail, restating the full context before every response."`
+- Skill layer body text: `"Responses under this skill must be terse: a
+  single sentence or a short bullet list. No restated context, no
+  preamble."`
+
+These directly contradict on verbosity (exhaustive-and-restate vs.
+terse-no-preamble) with no `precedence:` block to resolve which layer wins —
+`contradiction-lint.ts` must flag this (AC-3, the flip direction).
+
+**Neutralized — same case, same layer count/types, same absence of a
+`precedence:` block, only the persona's contradictory sentence replaced:**
+
+- Persona layer body text becomes: `"Always ground responses in the user's
+  actual question, citing the specific detail that motivated the answer."`
+- Skill layer body text is unchanged.
+
+This replacement is semantically harmless and structurally complete, not
+empty: it is a real, substantive instruction a persona could plausibly
+carry, and it does not contradict the skill's terseness requirement (a
+terse answer can still cite the specific detail that motivated it) — so
+`contradiction-lint.ts` must report zero findings for this case (the
+neutralize direction). **Blanking the persona's sentence to `""` or
+truncating it to a placeholder (e.g. `"..."` or `"TBD"`) does not satisfy
+this requirement** — both would trivially produce zero findings by removing
+content rather than by replacing contradictory content with benign content,
+which is exactly the presence-driven failure mode this fixture exists to
+rule out.
 
 No Non-Functional Requirements beyond the issue's FR/C set are added. Determinism
 and zero-network-I/O for the static path are inherited from `composition.ts`
@@ -226,9 +265,9 @@ for the same reason).
 
 | ID | Statement | Verification | Status |
 |----|-----------|---------------|--------|
-| C-001 | RFC-1 validity is a precondition, not a graded finding: a persona that fails `resolveCompositionDetailed`'s strict-mode check (`composition.ts:295-315`) must cause the manifest run to error distinctly from a contradiction finding, never silently pass. | Fixture with a persona missing a required RFC-1 key, run through `muster crosslayer run <manifest>.yaml --static-only` — expect a thrown/non-zero-exit failure distinguishable in stderr from a `findingTypes` contradiction result, not exit `0`. | Proposed |
-| C-002 | Diff touches only `conformance/**`, `kitty-specs/**` (mission bookkeeping, unavoidable under spec-kitty's own conventions), and a new `.github/workflows/crosslayer.yml` — never the shared `conformance.yml` (see Dependencies' M3 collision note). | `git diff --name-only main...HEAD \| grep -v '^conformance/' \| grep -v '^kitty-specs/' \| grep -v '^\.github/workflows/crosslayer\.yml$'` (three sequential shell pipes, no regex alternation) — expect exit **1** (each `grep -v` passes through only non-matching lines; the final "no output left" is confirmed by the last stage's non-zero exit, meaning nothing remains outside the allowed set). | Proposed |
-| C-003 | No check, README rubric tag, or `expected` block may cite a fabricated field (`voice`, `interaction`, `locale`, or the empty `composition`/`profiles`/`profile_overrides`/`extensions` lists) as evidence for a pass or fail. Grading rests on body text and composed behavior only. **This constraint is explicitly a review-time textual audit, not a fully machine-checkable gate** — the grep below narrows false negatives/positives versus a naive pattern but cannot replace human rubric-tag review at implement/review time, and this spec does not claim otherwise. | `grep -rnE -e "\bvoice\s*:" -e "\binteraction\s*:" -e "\blocale\s*:" -e "\bprofile_overrides\s*:\s*\[\]" conformance/crosslayer/*.md conformance/crosslayer/README.md conformance/crosslayer/**/*.yaml 2>/dev/null \| grep -v "generated"` (repeated `-e` flags, no regex alternation) — expect no matches outside the projector's own generated-header comment (anything else is a C-003 candidate violation requiring manual review). | Proposed |
+| C-001 | RFC-1 validity is a precondition, not a graded finding: a persona that fails `resolveCompositionDetailed`'s strict-mode check (`composition.ts:295-315`) must cause the manifest run to error distinctly from a contradiction finding, never silently pass. **Pinned exit code: exactly `2`.** `resolvePersonaLayer`'s strict-mode violation throw (`composition.ts:308-315`) propagates out of `runCrossLayerManifest` and is caught and rewrapped as an `ExecutionError` in `doCrossLayerStaticOnly`'s catch block (`src/cli/index.ts`), which `runCli`'s own try/catch turns into exit `2` — the same code path the bin entrypoint's outer catch also maps to `2`. This is categorically distinct from a `findingTypes` contradiction result, which always exits `0` or `1` via `emitCrossLayerSummary`'s `summary.failed > 0 ? 1 : 0` — so a CI script testing only `$? != 0` cannot distinguish "the fixture is malformed" from "the stack actually contradicts itself" (both would read as non-zero), but a script testing `$? == 2` specifically can. This mirrors `BRIEF.md:90`'s "an errored run counts as a failed run — never skipped, never retried" carried-over constraint, made concrete here as a specific, checkable exit code rather than restated as prose. | Fixture with a persona missing a required RFC-1 key, run through `muster crosslayer run <manifest>.yaml --static-only` — expect exit code exactly **2**, and the process's stderr to contain `muster: crosslayer manifest run failed:` (the `ExecutionError` message prefix), never a `--json` summary with a `findingTypes` array. **Verified** (source-level, at the pinned commit `624edd6d`, since no fixture-producing implementation exists yet at specify time): `resolvePersonaLayer` throws a plain `Error` on any RFC-1 strict-mode violation (`composition.ts:308-315`); every call site that can produce this throw (`doCrossLayerStaticOnly`, `doCrossLayerNoEnvEndpoint`) wraps it in `ExecutionError`; `runCli`'s try/catch returns `2` for any caught `ExecutionError`, and the bin entrypoint's outer catch independently sets `process.exitCode = 2` for anything escaping `runCli` — both paths land on `2`, never `0`, and never share `emitCrossLayerSummary`'s `0`/`1` space. | Proposed |
+| C-002 | Diff touches only `conformance/**` (excluding the shared top-level `conformance/README.md` — see Dependencies' M7/M3 collision note), `kitty-specs/**` (mission bookkeeping, unavoidable under spec-kitty's own conventions), and a new `.github/workflows/crosslayer.yml` — never the shared `conformance.yml` or the shared `conformance/README.md`. | A two-part check, conventional polarity (exit **0** = compliant, exit **1** = violation, printed at the call site — the previous form of this command had exit **1** mean "compliant," a CI-wiring landmine now closed): (1) `git diff --name-only main...HEAD > /tmp/c002-diff.txt; if grep -qx "conformance/README.md" /tmp/c002-diff.txt; then echo "C-002 violation: conformance/README.md touched (shared-file collision risk, see Dependencies)"; exit 1; fi` (2) `! (grep -v '^conformance/' /tmp/c002-diff.txt \| grep -v '^kitty-specs/' \| grep -v '^\.github/workflows/crosslayer\.yml$' \| grep -q .)` — expect exit **0** on both parts for a compliant diff. **Verified** with four constructed diffs: a compliant diff (`conformance/crosslayer/...`, `kitty-specs/...`, `crosslayer.yml`) → exit `0`; a diff touching `.github/workflows/conformance.yml` → exit `1`; a diff touching the shared `conformance/README.md` → exit `1` (this is M2's gap, now caught); a diff touching M7's own new `conformance/crosslayer/README.md` → exit `0` (correctly still allowed, distinguishing the two README paths). | Proposed |
+| C-003 | No check, README rubric tag, or `expected` block may cite a fabricated field (`voice`, `interaction`, `locale`, or the empty `composition`/`profiles`/`profile_overrides`/`extensions` lists) as evidence for a pass or fail. Grading rests on body text and composed behavior only. **This constraint is explicitly a review-time textual audit, not a fully machine-checkable gate** — the grep below narrows false negatives/positives versus a naive pattern but cannot replace human rubric-tag review at implement/review time, and this spec does not claim otherwise. **Lane**: cross-lane, review-time (self-declared; runs over both lane-a's and lane-b's output, at review rather than implementation time — not assigned to either lane's task file). | `grep -rnE -e "\bvoice\s*:" -e "\binteraction\s*:" -e "\blocale\s*:" -e "\bprofile_overrides\s*:\s*\[\]" conformance/crosslayer/*.md conformance/crosslayer/README.md conformance/crosslayer/**/*.yaml 2>/dev/null \| grep -vE "^[^:]+:[0-9]+:#.*generated:\s*true"` (repeated `-e` flags, no regex alternation) — **polarity note**: exit **1** (no output) = clean, exit **0** (with output) = candidate violation requiring manual review — inverted from CI convention on purpose, since this is explicitly not wired as a hard gate (do not `&&`/`\|\|` this into a pass/fail CI step without inverting it first). **Post-spec correction**: the previous exclusion, bare `grep -v "generated"`, was a substring match over the *whole line*, not the projector's specific header-comment shape — tested against a constructed case where a rubric sentence itself contains the word "generated" on the same line as a real citation (`"This generated persona passes because its voice: warmth score is high."`), the old exclusion silently swallowed that line (false negative: a real C-003 violation, hidden). The corrected exclusion anchors to the actual header shape (`^#.*generated:\s*true`, matching `# generated: true, source-hash: ...`) so it only exempts the projector's real generated-header comment. Verified: the legitimate committed persona's own front-matter (containing real `voice:`/`interaction:`/`locale:`/`profile_overrides: []` under its `# generated: true` header) still shows exit `1` (no false positive); the sneaky-violation case now surfaces (exit `0`, line printed); a clean case with no fabricated-field citations anywhere still shows exit `1`. **Lane**: cross-lane, review-time (same note as above). | Proposed |
 
 ### Key Entities
 
@@ -308,6 +347,41 @@ for the same reason).
   decision, not merely a preference, precisely because specify-time work
   (this phase) is safe regardless, but a later shared-file edit would not
   be.
+- **Second collision candidate inside the same allow-list, closed the same
+  way (M2 post-spec finding).** `gh pr view 30 --json files` (re-verified
+  during this remediation) shows M3's PR #30 *also* modifies the shared
+  `conformance/README.md` (+167/-9 lines) — a path that, unlike
+  `conformance.yml`, sits **inside** C-002's `conformance/**` allow-list, so
+  the original allow-list would have silently permitted M7 to edit the same
+  shared file concurrently with M3. **Resolved identically to the
+  `crosslayer.yml` decision above: M7 documents itself entirely in a new
+  `conformance/crosslayer/README.md` and never edits the shared top-level
+  `conformance/README.md`.** C-002's verification command now explicitly
+  treats `conformance/README.md` as outside the allow-list (checked ahead of
+  the general `conformance/**` pass) so a future accidental edit to the
+  shared file fails the check rather than silently passing.
+- **`crosslayer.yml` trigger paths must cover the profile-source directory,
+  not just `conformance/**` (M1 post-spec finding).** FR-003's drift gate
+  reads `src/doctrine/agent_profiles/built-in/*.agent.yaml` as its input,
+  but that directory is owned by other, future PRs outside this mission's
+  write scope (C-002) — this mission never edits it. Two path-filter
+  choices were considered: (a) filter `crosslayer.yml` to `conformance/**`
+  only — a profile-only PR that changes an agent profile would never
+  trigger the drift check at all, so persona drift introduced by that PR
+  ships silently and is only caught later, at the next cadence run or the
+  next unrelated `conformance/**` PR; or (b) fire on every PR regardless of
+  path — catches drift immediately, but blocks PRs that touch neither
+  `conformance/**` nor an agent profile with a check they have no way to
+  see or fix (the same enforcement-outside-write-scope shape recorded in
+  M2's post-merge mission review, where a lane that could not see a check
+  could not fix what it broke). **Decision: neither (a) nor (b) — scope the
+  trigger paths to both `conformance/**` **and**
+  `src/doctrine/agent_profiles/built-in/**`.** A profile-only PR then sees
+  and can fix the exact check its own diff affects (regenerating the
+  committed persona under `conformance/crosslayer/personas/` is a
+  `conformance/**` edit, so that PR can make the fix even though it did not
+  originate this mission); a PR touching neither path never sees the job at
+  all. FR-004 states this path-filter pair explicitly for the same reason.
 - **Lane isolation — content must be duplicated into task files, not
   assumed shared.** Lanes are isolated worktrees; a work package cannot
   read a sibling lane's files at implementation time. Two anticipated
@@ -316,7 +390,16 @@ for the same reason).
     under `conformance/crosslayer/personas/` (FR-001, FR-002, FR-003).
   - **lane-b**: composition manifests, `AGENTS.md` policy extract + its
     drift script, the discrimination control, `.github/workflows/crosslayer.yml`
-    (FR-004, FR-005 stub, FR-006, FR-007, C-002).
+    (FR-004, FR-005 stub, FR-006, FR-007, C-002, **C-001** — C-001's fixture
+    is a manifest exercising a real composition run, the same surface as
+    FR-004/FR-006, so it belongs with lane-b's other manifest-level work,
+    not lane-a's projector work).
+  - **C-003 is intentionally unassigned to either lane.** It self-declares
+    as a cross-lane, review-time textual audit (its own Verification cell
+    says so) — it runs over both lanes' committed output at
+    implement-review time, not as a task any single lane's worktree
+    executes during implementation. Lane isolation does not apply to it the
+    way it applies to lane-a/lane-b's own deliverables.
 
   **lane-b's manifests reference lane-a's projected `Soul.md` files by
   path** (`layers: [{layerType: "persona", fixturePath: ...}]`). Because
@@ -361,18 +444,39 @@ for the same reason).
      adapter, recorded in D1) — this mission's FR-004/FR-005/FR-006
      verification commands against the pinned `@garrison-hq/muster@1.1.0`
      package are safe to run as written.
-- **Decision — OQ-6, AGENTS.md as the SOP slot (recommended: option b,
-  policy extract)**: three options were on the table — (a) the whole
-  35,933-byte file; (b) an extracted operating-policy section set,
-  committed with its own drift check; (c) per-rule minimal SOPs.
-  **Recommendation: (b)**, matching the issue's own preference, because (a)
-  risks measurably degrading small-model rule-survival baselines before
-  composition even begins (Edge Cases), and (c) discards too much of
-  `AGENTS.md`'s actual cross-rule context to be a faithful SOP slot. This
-  mission's spike (early implementation, not specify) must measure whether
-  the extract's `SOPFile.byteLength` correlates with any baseline
-  degradation on the reference model before this is treated as settled
-  rather than provisional.
+  5. **FR-007 is an author addition, not in issue #26's original FR/C
+     table** (unlike FR-001 through FR-006 and C-001 through C-003, which
+     all trace to the issue directly). It is scoped in deliberately: OQ-6
+     commits this mission to a policy-extract SOP slot rather than the
+     whole `AGENTS.md` file, and FR-003 already gives the persona side of
+     the composition a committed-artifact-plus-drift-gate pattern; without
+     FR-007, the SOP-extract side of the same composition would have no
+     equivalent drift protection, an asymmetry OQ-6's own choice creates.
+     FR-007 closes it by mirroring FR-003's pattern exactly. Called out
+     explicitly here the same way citation corrections #1 and #2 above are,
+     rather than left implicit.
+- **Decision — OQ-6, AGENTS.md as the SOP slot: option (b), policy extract,
+  committed as final, not provisional (M4 post-spec clarification).** Three
+  options were on the table — (a) the whole 35,933-byte file; (b) an
+  extracted operating-policy section set, committed with its own drift
+  check; (c) per-rule minimal SOPs. **This mission commits fully to (b)**,
+  matching the issue's own preference, because (a) risks measurably
+  degrading small-model rule-survival baselines before composition even
+  begins (Edge Cases), and (c) discards too much of `AGENTS.md`'s actual
+  cross-rule context to be a faithful SOP slot. FR-004 and FR-007 are
+  shaped on (b) unconditionally — they are **not** gated on the spike
+  below; an implementer builds the extract, `sop-extract.md`, and its drift
+  gate exactly as FR-007 specifies, with no dependency on the spike's
+  outcome. The choice of *whether* to extract is settled here, permanently.
+  What remains open is a narrower, separate question: this mission's
+  early-implementation spike measures whether the extract's
+  `SOPFile.byteLength` correlates with baseline degradation on the
+  reference model — that measurement informs *tuning* (whether a
+  follow-up mission should trim the extract further, or whether the
+  current section boundaries are already adequate), never whether FR-004
+  or FR-007 ship. If the spike finds meaningful degradation, the fix is a
+  follow-up mission adjusting the extract's committed content under
+  FR-007's existing drift gate, not a re-opening of this decision.
 - **Decision — upstream PR timing (recommended: hold until after M3
   merges)**: this mission's fork-local branch and PR may be opened any
   time (it touches no file M3 touches), but the mission brief's own
@@ -382,6 +486,27 @@ for the same reason).
   rather than a stub that will need a follow-up PR the moment M3 lands.
   This is a sequencing recommendation, not a spec requirement — it does
   not gate this mission's own local acceptance.
+- **Citation — this fork's own `0b1cf9b8a` precedent, and what it does and
+  does not prove (post-spec clarification)**: FR-006, SC-003, and the Edge
+  Cases entry above all cite this fork's commit `0b1cf9b8a` ("fix(conformance):
+  close the hollowed-control vacuous path found in review round 2") as
+  precedent for why deletion alone is an insufficient falsification
+  direction. The analogy is directionally right — both cases are about a
+  discrimination control that must be provably live, not assumed live — but
+  it is **not an exact match**, and this spec does not overstate it as one.
+  `0b1cf9b8a`'s defect was a control **hollowed to empty/invalid** (a
+  fixture's `name:` field made null or missing, `readFrontmatterName()`
+  returning `null`, compared against a real basename with no null-check —
+  the control stopped discriminating because it became *malformed*, not
+  because it became *benign*). FR-006's neutralize direction is a different
+  shape: the control's contradictory instruction text is **replaced with
+  benign-but-valid content** — same layer count/types, same structural
+  completeness, same absence of a `precedence:` block, only the
+  *substance* of the contradiction removed. Both differ from outright
+  deletion (which `0b1cf9b8a`'s own fix and FR-006 both reject as
+  insufficient proof), but "hollow to invalid" and "replace with valid
+  benign content" are not the same failure mode, and FR-006's fixture text
+  (above) is deliberately built as the second shape, not the first.
 - **Unblocks**: nothing hard in the programme graph; delivers the only
   check class that sees layer interaction.
 - **Concurrency wave**: wave 2, alongside M3 and M6-authoring — disjoint
@@ -399,8 +524,15 @@ for the same reason).
   cannot be accepted on unit tests or inspection alone. The built muster CLI
   must be run for real against the shipped manifests, the discrimination
   control (both flip and neutralize directions), and — for FR-005 — a live
-  OpenAI or NVIDIA NIM endpoint (credentials from `~/dev/n8n-app-team/.env`,
-  loaded as environment variables only, never logged or placed in argv),
+  OpenAI or NVIDIA NIM endpoint. Credentials are supplied via the
+  `MUSTER_ENDPOINT`, `MUSTER_MODEL`, and `MUSTER_API_KEY` (or `OPENAI_API_KEY`
+  fallback) environment variables described in FR-005 — loaded from
+  whatever local or CI secret store the operator running the mission uses,
+  never logged or placed in argv (**post-spec portability fix**: the prior
+  form of this bullet cited a literal personal filesystem path,
+  `~/dev/n8n-app-team/.env`, which is operator-specific and not portable to
+  another machine or CI runner; this spec now describes the required env
+  vars themselves, not where one particular operator happens to keep them),
   with actual exit codes and `--json` output recorded verbatim as evidence.
 - **Cache-warm prerequisite for every `npx --offline` command in this
   spec** (verified against this fork's own documented convention,
