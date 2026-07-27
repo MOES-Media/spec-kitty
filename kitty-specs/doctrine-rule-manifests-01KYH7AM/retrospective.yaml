@@ -77,9 +77,64 @@ not_helpful:
   - e-009
   details: WP WP03 required 2 operator-driven --force lane transition(s). Force overrides typically indicate the runtime
     guard failed or the operator routed around it; investigate the underlying cause.
-gaps: []
+gaps:
+- id: g-101
+  category: tooling
+  summary: unknown probeIds are silently skipped with no warning
+  details: 'A ruleId whose probeIds list references a probe identifier the harness
+    does not recognize is silently skipped: the run reports "0 probes" for that rule
+    and still exits 0. A single typo in an authored probe ID deletes a rule''s entire
+    behavioral coverage without any signal. This is H-1''s shape (a truncated/wrong
+    citation shipping green) recurring one layer up, and M4 is exactly the mission
+    that starts authoring real probeIds against these 45 manifests, so it will hit
+    this gap directly. Fix direction: make an unrecognized probeId a hard error (or
+    at minimum a reported finding), not a silent zero-coverage pass.'
+  evidence_refs:
+  - e-014
+- id: g-102
+  category: tooling
+  summary: no machine check that ruleText equals the complete integrity_rules bullet
+  details: 'H-1 (ruleText truncated at the first physical line, reversing a rule''s
+    meaning in its continuation, shipping green) is currently prevented only by hand
+    -- careful authoring and manual review, not a gate. check-doctrine-manifest-completeness.mjs
+    checks rule *count* per directive but never checks that a given ruleText *value*
+    is the full bullet. A ~20-line addition to that script would close this permanently:
+    parse each manifest''s ruleText, unescape the literal \n, and assert byte-equality
+    against the directive''s full integrity_rules bullet (reconstructed from its raw
+    source lines). Until this exists, any future edit to a fragment ruleText (this
+    mission''s 10, or any new fragment rule M4 or later missions add) can silently
+    truncate again with both gates still green.'
+  evidence_refs:
+  - e-013
+- id: g-103
+  category: tooling
+  summary: blacksmith-runner CI debt is larger than this mission's own record shows
+  details: '16 workflow files in this fork reference blacksmith-4vcpu-* runners the
+    fork does not have, and 11 of those trigger on pull_request -- but this mission''s
+    own PR only surfaced 4 permanently-queued checks, because the other workflows''
+    `paths:` filters did not match this change''s footprint (two documentation files
+    under kitty-specs/ and conformance/doctrine/). A future PR touching a broader
+    footprint will surface more of these queued/unrunnable checks at once. Not fixed
+    here (out of scope, no standing authorization to edit or re-target those workflows)
+    -- recorded so a future mission sizes the real remediation (16 files / 11 pull_request
+    triggers), not the 4 this mission happened to trip.'
+  evidence_refs:
+  - e-011
+  - e-012
 proposals: []
 evidence_refs:
+- id: e-011
+  kind: file
+  path: .github/workflows/drift-detector.yml
+- id: e-012
+  kind: file
+  path: .github/workflows/ci-quality.yml
+- id: e-013
+  kind: file
+  path: conformance/scripts/check-doctrine-manifest-completeness.mjs
+- id: e-014
+  kind: file
+  path: conformance/doctrine/README.md
 - id: e-001
   kind: file
   path: kitty-specs/doctrine-rule-manifests-01KYH7AM/meta.json

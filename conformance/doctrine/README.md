@@ -33,7 +33,14 @@ correctly. `fragment` therefore describes the directive's raw-byte shape
 or `fragment`, has a `ruleText` that is its rule's complete text, verified
 line-break-for-line-break against the directive file. See
 `contracts/rule-classification-and-citation.md` for each fragment rule's
-line-span provenance and uniqueness verification (`grep -F -c` == 1). **Class**
+line-span provenance and uniqueness verification — a contiguous byte
+search over the directive file's raw content (`content.count(ruleText)
+== 1`), the same substring semantics `checkRuleTextPresence` uses at
+grading time. **`grep -F -c` is not used for this**: fed a multi-line
+pattern it counts matching *lines*, not contiguous occurrences, so it
+cannot tell a genuine multi-line match from the same lines reordered —
+see `contracts/rule-classification-and-citation.md`'s "Why not
+`grep -F -c`" note for the worked example. **Class**
 `UNMAPPED` means no existing `sop-rule-taxonomy.md` class fits the rule;
 `gradingClass: judge` is then the schema's structural fallback, not a real
 class assignment.

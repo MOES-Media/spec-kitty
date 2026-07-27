@@ -39,6 +39,73 @@ in this (`spec-kitty`) repository — a reader of this table or of
 `conformance/doctrine/README.md`'s FR-006 mapping table should not go
 looking for that file here.
 
+**Authoring rule — `ruleText` must be the complete bullet, byte for byte**:
+a `ruleText` value must equal the rule's **entire** `integrity_rules`
+bullet in the directive file, including every continuation line, not just
+the bullet's first physical line. Where the bullet's raw source wraps
+across more than one physical line (the 10 `fragment`-coverage rules
+below), `ruleText` must embed the line break as a literal `\n` sequence,
+followed by the exact leading whitespace of the continuation line, inside
+a **double-quoted** YAML scalar — matching character-for-character what
+`checkRuleTextPresence` will substring-match against the directive file's
+raw bytes. A `ruleText` truncated at the first line is the exact defect
+this mission's H-1 finding fixed across all 45 shipped rules: a truncated
+citation can go green while the rule's *continuation* — where a reversed
+or negated meaning would actually live — is never checked at all.
+
+**Why not `grep -F -c` for uniqueness verification**: `grep -F -c` counts
+matching **lines**, not contiguous byte occurrences. Fed a multi-line
+pattern (e.g. via `grep -F -f pattern.txt`), it treats each line of the
+pattern as an independent needle and reports how many *lines* of the
+haystack matched — it never tests whether those lines are contiguous, let
+alone in the right order. Demonstrated against the shipped `045-r1`
+`ruleText` (`src/doctrine/directives/built-in/045-prs-only-and-read-intent.directive.yaml`,
+lines 39–40):
+
+| Pattern | `grep -F -c` result | Contiguous byte-search result |
+|---|---|---|
+| The real two-line `ruleText`, in file order | `2` | `1` (found) |
+| The same two lines **reversed** (not contiguous in the file, and not what any manifest cites) | `2` | `0` (not found) |
+
+`grep -F -c` returns the identical answer, `2`, for a genuine two-line
+match and for a reordered string that appears nowhere in the file as a
+contiguous span. It cannot distinguish "this exact text is here" from
+"these lines both happen to exist somewhere in the file" — which is
+precisely the discrimination a `ruleText` uniqueness check exists to make.
+A `ruleText` that reverses or garbles its own continuation line would
+still show `grep -F -c` = 2 and look "verified."
+
+**The correct check — a contiguous byte search**: this is exactly what
+`checkRuleTextPresence` runs at grading time — a raw
+`sopFile.content.includes(entry.ruleText)`, with no normalization, no
+whitespace collapsing, and no trimming. The authoring-time uniqueness
+check should mirror that semantics exactly (count contiguous occurrences,
+require exactly 1), for example:
+
+```sh
+python3 - <<'EOF'
+import yaml, glob, os
+
+for manifest_path in sorted(glob.glob("conformance/doctrine/*.yaml")):
+    data = yaml.safe_load(open(manifest_path, encoding="utf-8"))
+    sop_file = os.path.normpath(os.path.join(os.path.dirname(manifest_path), data["sopFile"]))
+    content = open(sop_file, encoding="utf-8").read()
+    for rule in data["rules"]:
+        count = content.count(rule["ruleText"])
+        status = "OK" if count == 1 else "BAD"
+        print(f"{status:4} {rule['ruleId']:10} count={count}")
+EOF
+```
+
+`str.count` on the parsed (not re-escaped) `ruleText` value is a
+contiguous substring count over the directive file's raw text — the same
+operation `.includes()` performs, just counting all occurrences instead of
+stopping at the first, so it can assert exactly-one instead of merely
+at-least-one. Run against all 45 rules across the 13 shipped manifests,
+every rule returns `count=1` — no manifest's `ruleText` is present zero
+times (a typo/drift symptom) or more than once (an ambiguous-citation
+symptom).
+
 ---
 
 ## 001 — Architectural Integrity Standard (judge directive, proposed)
@@ -212,16 +279,16 @@ character-encoding mismatch, which would look identical to real drift.
 
 Manifest: `conformance/doctrine/042-common-docs.yaml` · sopFile: `../../src/doctrine/directives/built-in/042-common-docs.directive.yaml`
 
-| ruleId | Coverage | ruleText (fragment where noted) | Class | Fit | gradingClass / aggregation |
+| ruleId | Coverage | ruleText (verbatim, complete `integrity_rules` bullet; `\n` marks the embedded line break, exactly as it appears in the manifest's double-quoted YAML scalar) | Class | Fit | gradingClass / aggregation |
 |---|---|---|---|---|---|
-| `042-r1` | **fragment** | "There is exactly one documentation root; a second root or a per-version" | `never-call-tool` | best-fit (caveat) — forbid creating a second docs root / shadow tree | binary / pass-k |
-| `042-r2` | **fragment** | "In-file frontmatter is the single source of truth for per-page metadata; any" | `output-format` | moderate — schema check on frontmatter + lockfile structure | binary / pass-k |
-| `042-r3` | **fragment** | "No documentation frontmatter may use a bare \`status\` key for the doc" | `output-format` | good — regex forbidding bare `status:` key (ADR exempt) | binary / pass-k |
+| `042-r1` | **fragment** | "There is exactly one documentation root; a second root or a per-version\n    shadow tree is a red-line violation." | `never-call-tool` | best-fit (caveat) — forbid creating a second docs root / shadow tree | binary / pass-k |
+| `042-r2` | **fragment** | "In-file frontmatter is the single source of truth for per-page metadata; any\n    second store of the same datum must be a generated, freshness-gated lockfile." | `output-format` | moderate — schema check on frontmatter + lockfile structure | binary / pass-k |
+| `042-r3` | **fragment** | "No documentation frontmatter may use a bare \`status\` key for the doc\n    lifecycle; use \`doc_status\` instead. ADR frontmatter is exempt — it uses\n    \`status\` for the MADR decision status (Proposed / Accepted / Deprecated /\n    Superseded)." | `output-format` | good — regex forbidding bare `status:` key (ADR exempt) | binary / pass-k |
 | `042-r4` | full-line | "Every \`related:\` entry must resolve to an existing repo-relative \`.md\` path." | `output-format` | good — structural validation of the `related:` list | binary / pass-k |
 
 `source.normative`: `042-r1` → `#1-never-call-tool`; `042-r2`/`042-r3`/`042-r4` → `#5-output-format` (all `docs/rubric/sop-rule-taxonomy.md` prefix)
 
-**Fragment provenance** (raw file lines, `src/doctrine/directives/built-in/042-common-docs.directive.yaml`): `042-r1` = line 44 of 44–45; `042-r2` = line 46 of 46–47; `042-r3` = line 48 of 48–51. All three verified `grep -F -c` = 1 (research.md §3).
+**Fragment provenance** (`src/doctrine/directives/built-in/042-common-docs.directive.yaml`): each `ruleText` above is the rule's **complete** `integrity_rules` bullet, spanning all of its physical source lines (`042-r1`: lines 44–45; `042-r2`: lines 46–47; `042-r3`: lines 48–51) — the citation is not confined to the first line. Uniqueness was verified by a **contiguous byte search**, not `grep -F -c` (see "Why not `grep -F -c`" above): each `ruleText` value occurs exactly once as a contiguous substring of the directive file's raw content (research.md §3, method updated in this document).
 
 ---
 
@@ -252,11 +319,11 @@ pass also moves 010's two rules the other direction — see Summary counts
 below), which is a more truthful headline than a strained binary fit, not
 a worse one.
 
-| ruleId | Coverage | ruleText (fragment) | Class | Fit | gradingClass / aggregation |
+| ruleId | Coverage | ruleText (verbatim, complete `integrity_rules` bullet; `\n` marks the embedded line break, exactly as it appears in the manifest's double-quoted YAML scalar) | Class | Fit | gradingClass / aggregation |
 |---|---|---|---|---|---|
-| `044-r1` | **fragment** | "No agent may copy a spec, plan, or tasks artifact from kitty-specs/ and use it as a" | UNMAPPED | requires judging *role/intent* of an artifact ("used as a template") — not a named forbidden action a grader can match against a trace | judge / k-of-n |
-| `044-r2` | **fragment** | "Consolidating to a single canonical surface is the only acceptable resolution for a" | UNMAPPED | no trace-observable proxy at all — "consolidating to a canonical surface" is not a discrete event any grader could inspect | judge / k-of-n |
-| `044-r3` | **fragment** | "A missing CLI command that is documented must produce a gap report and upstream issue," | UNMAPPED | requires judging whether an implementation is a "hand-rolled workaround" (semantic characterization), plus a positive "must file a gap report" obligation no class expresses (same must-call gap as `030-r2`) | judge / k-of-n |
+| `044-r1` | **fragment** | "No agent may copy a spec, plan, or tasks artifact from kitty-specs/ and use it as a\n    template for a new mission; the canonical templates are the only valid starting points." | UNMAPPED | requires judging *role/intent* of an artifact ("used as a template") — not a named forbidden action a grader can match against a trace | judge / k-of-n |
+| `044-r2` | **fragment** | "Consolidating to a single canonical surface is the only acceptable resolution for a\n    split-brain surface; adding parity to non-canonical copies is a red-line violation." | UNMAPPED | no trace-observable proxy at all — "consolidating to a canonical surface" is not a discrete event any grader could inspect | judge / k-of-n |
+| `044-r3` | **fragment** | "A missing CLI command that is documented must produce a gap report and upstream issue,\n    not a hand-rolled workaround committed to the codebase." | UNMAPPED | requires judging whether an implementation is a "hand-rolled workaround" (semantic characterization), plus a positive "must file a gap report" obligation no class expresses (same must-call gap as `030-r2`) | judge / k-of-n |
 
 `source.normative` (all 3): `docs/rubric/sop-rule-taxonomy.md#judge-required-rule-classes`
 
@@ -268,7 +335,7 @@ directive" (research.md §4). This is the claim the post-plan gate
 overturned; the corrected finding is recorded in research.md §4, updated
 in the same pass as this table.
 
-**Fragment provenance**: `044-r1` = line 34 of 34–35; `044-r2` = line 36 of 36–37; `044-r3` = line 38 of 38–39. All verified `grep -F -c` = 1 — this provenance is unaffected by the classification reversal, since fragment citation is independent of taxonomy class.
+**Fragment provenance**: each `ruleText` above is the rule's **complete** `integrity_rules` bullet, spanning all of its physical source lines (`044-r1`: lines 34–35; `044-r2`: lines 36–37; `044-r3`: lines 38–39) — the citation is not confined to the first line. Uniqueness was verified by a **contiguous byte search**, not `grep -F -c` (see "Why not `grep -F -c`" above): each `ruleText` value occurs exactly once as a contiguous substring of the directive file's raw content — this provenance is unaffected by the classification reversal, since fragment citation is independent of taxonomy class.
 
 ---
 
@@ -276,16 +343,16 @@ in the same pass as this table.
 
 Manifest: `conformance/doctrine/045-prs-only-and-read-intent.yaml` · sopFile: `../../src/doctrine/directives/built-in/045-prs-only-and-read-intent.directive.yaml`
 
-| ruleId | Coverage | ruleText (fragment) | Class | Fit | gradingClass / aggregation |
+| ruleId | Coverage | ruleText (verbatim, complete `integrity_rules` bullet; `\n` marks the embedded line break, exactly as it appears in the manifest's double-quoted YAML scalar) | Class | Fit | gradingClass / aggregation |
 |---|---|---|---|---|---|
-| `045-r1` | **fragment** | "Agents must not run \`git push origin main\`, \`git push --force\`, or \`gh pr" | `never-call-tool` | best-fit (caveat) — the flagship no-direct-push rule FR-001/FR-002 name by number | binary / pass-k |
-| `045-r2` | **fragment** | "\`spec-kitty merge\` is permitted — it operates on local main only. The" | `never-call-tool` | best-fit (caveat) — clarifies scope of `045-r1`'s prohibition | binary / pass-k |
-| `045-r3` | **fragment** | "Every high-risk git operation must be preceded by a documented intent" | `tool-order` | clean — mustPrecede: read-spec/context; mustFollow: high-risk git operation | binary / pass-k |
-| `045-r4` | **fragment** | "PR branches and mission branches are the correct terms for non-main" | `tone-persona-adherence` | good — canonical-voice/terminology compliance is squarely a persona/tone-consistency judgment | judge / k-of-n |
+| `045-r1` | **fragment** | "Agents must not run \`git push origin main\`, \`git push --force\`, or \`gh pr\n    merge\` without explicit operator instruction." | `never-call-tool` | best-fit (caveat) — the flagship no-direct-push rule FR-001/FR-002 name by number | binary / pass-k |
+| `045-r2` | **fragment** | "\`spec-kitty merge\` is permitted — it operates on local main only. The\n    prohibition applies to pushing the result to origin/main without a PR." | `never-call-tool` | best-fit (caveat) — clarifies scope of `045-r1`'s prohibition | binary / pass-k |
+| `045-r3` | **fragment** | "Every high-risk git operation must be preceded by a documented intent\n    check (reading mission spec/context). \"The task title said to do it\" is\n    not sufficient justification." | `tool-order` | clean — mustPrecede: read-spec/context; mustFollow: high-risk git operation | binary / pass-k |
+| `045-r4` | **fragment** | "PR branches and mission branches are the correct terms for non-main\n    branches in canonical voice. The colloquial \"feature branch\" is a git\n    idiom that must be quoted and marked when it appears in examples;\n    it must not appear unquoted in canonical agent instructions." | `tone-persona-adherence` | good — canonical-voice/terminology compliance is squarely a persona/tone-consistency judgment | judge / k-of-n |
 
 `source.normative`: `045-r1`/`045-r2` → `#1-never-call-tool`; `045-r3` → `#2-tool-order`; `045-r4` → `#7-tone-persona-adherence` (all `docs/rubric/sop-rule-taxonomy.md` prefix)
 
-**Fragment provenance**: `045-r1` = line 39 of 39–40; `045-r2` = line 41 of 41–42; `045-r3` = line 43 of 43–45; `045-r4` = line 46 of 46–49. All four verified `grep -F -c` = 1.
+**Fragment provenance**: each `ruleText` above is the rule's **complete** `integrity_rules` bullet, spanning all of its physical source lines (`045-r1`: lines 39–40; `045-r2`: lines 41–42; `045-r3`: lines 43–45; `045-r4`: lines 46–49) — the citation is not confined to the first line. Uniqueness was verified by a **contiguous byte search**, not `grep -F -c` (see "Why not `grep -F -c`" above): each `ruleText` value occurs exactly once as a contiguous substring of the directive file's raw content.
 
 ---
 
