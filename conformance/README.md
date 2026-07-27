@@ -43,15 +43,32 @@ This runs, in order:
    `0` means every case's actual result matched its declared
    `expectations.ok`.
 2. **The manifest completeness check**
-   (`conformance/scripts/check-manifest-completeness.mjs`) — a
-   dependency-free Node script (Node stdlib only) that verifies every
-   directory under `src/doctrine/skills/*` has exactly one manifest case,
-   and vice versa. Exit `0` means the manifest and the real skill tree agree;
-   exit `1` names every missing/extra skill by name; exit codes and the
-   script's interface are documented in
+   (`conformance/scripts/check-manifest-completeness.mjs`) — a Node script
+   that verifies every directory under `src/doctrine/skills/*` has exactly
+   one manifest case, and vice versa, **and** that the FR-005 discrimination
+   control still discriminates (see "Proving the suite discriminates"
+   below). The completeness half is Node-stdlib-only; the discrimination
+   half execs the pinned muster CLI itself, in `--json` mode, once per run
+   — see "Local prerequisite" immediately below. Exit `0` means the
+   manifest and the real skill tree agree AND muster's own `--json` output
+   confirms the control fires; exit `1` names the specific problem (a
+   missing/extra skill, or a control/skill case whose observed muster
+   result no longer matches expectations); exit codes and the script's
+   interface are documented in
    `kitty-specs/sk-skills-static-conformance-01KYG7GE/contracts/completeness-check-cli-contract.md`.
 
 Both must exit `0` for the suite to be considered green.
+
+**Local prerequisite.** `check-manifest-completeness.mjs` now shells out to
+`npx --offline @garrison-hq/muster@1.1.0 skills run <manifest> --json`
+internally (see "Proving the suite discriminates" below) — it is no longer
+a pure-stdlib, no-process-exec script. Running it standalone (not preceded
+by the `npx --offline @garrison-hq/muster@1.1.0 skills run ...` command
+above in the same session) still requires the pinned package to be warm in
+the local npm cache first, exactly per the two-step procedure in the next
+section. If the CLI is not available, the script prints an actionable
+message naming the exact cache-warm command to run — never a raw stack
+trace.
 
 ## The two-step cache-warm-then-offline procedure
 
@@ -87,7 +104,7 @@ two-step shape is the same property, expressed through the Action's own
 input contract rather than a literal `npm install` step in the workflow
 file.
 
-## Proving the suite discriminates (manual check, not run in CI)
+## Proving the suite discriminates
 
 A static checker that reports "pass" on every input is indistinguishable
 from a no-op. `conformance/skills/control/name-mismatch/` is a deliberately
@@ -96,37 +113,130 @@ broken fixture (frontmatter `name` does not match its directory name) with
 case "passes" today because the harness's actual result (`ok: false`)
 matches the declared expectation.
 
-**What enforces this depends on which way the fixture breaks.** muster's own
-`skills run` catch block scores *any* parse/read failure — a missing
-directory, a missing `SKILL.md`, a corrupt or hollowed-out fixture with no
-parseable frontmatter `name` — the same way it scores a correctly-detected
-name mismatch: both register as `ok: false`, which matches this control
-case's declared `expectations.ok: false` either way (this is a muster-side
-limitation, out of scope per C-001 — see "Known muster gaps" below).
-Deleting `conformance/skills/control/name-mismatch/` entirely, or hollowing
-its frontmatter (removing the fixture's `name:` key, or its frontmatter
-block, or emptying the value) so it no longer has a parseable `name` at
-all, therefore both leave `muster skills run` at exit `0` — invisible to
-muster, caught only by `check-manifest-completeness.mjs`.
+### History: why a property check on the fixture's text could not be finished
 
-Aligning the fixture's frontmatter `name` with its directory basename is a
-different failure mode, and is **not** invisible to muster: muster's own
-static gate directly compares `name` to the directory basename, so
-`muster skills run` genuinely flips to `ok: true` against this case's
-declared `ok: false`, and the run exits `1` (`skills: FAIL — 53/54 cases
-passed, 1 failed`). Alignment is caught by **both** checks.
+Three rounds of patching a **property check** on the fixture's own text
+(read the frontmatter `name:` with a regex, in
+`check-manifest-completeness.mjs`, and assert it differs from the directory
+basename) found **seven** distinct ways to defeat it while leaving both
+muster's own exit code and the completeness script at exit `0`:
 
-`check-manifest-completeness.mjs` independently asserts (fork-side, no
-muster change) that every case's `skillDir` resolves to an existing
-directory containing a `SKILL.md`, and, for this control case specifically,
-that its frontmatter carries a parseable `name` which still differs from
-its directory basename. If a future change deletes the fixture outright or
-hollows its frontmatter to remove the `name`, `check-manifest-completeness.mjs`
-— not `muster skills run` — will start failing, naming the control case
-explicitly. If a future change instead aligns `name` with the directory,
-both checks start failing: `muster skills run` reports `53/54 cases
-passed`, and `check-manifest-completeness.mjs` names the control case
-explicitly as no longer discriminating.
+1. Deleting the whole fixture directory.
+2–4. Hollowing the frontmatter three ways (no frontmatter at all, no `name:`
+   key, or an empty `name:` value) — muster's own `skills run` catch block
+   scores *any* parse/read failure the same way it scores a correctly
+   detected name mismatch (both register as `ok: false`, matching this
+   control's declared `expectations.ok: false` either way — a muster-side
+   limitation, out of scope per C-001; see "Known muster gaps" below).
+5. Quoting the aligned name (`name: "name-mismatch"`) — an earlier version
+   of the completeness script's regex compared the quotes literally.
+6. **Deleting the `description:` line.** muster's own `validateStatic()`
+   runs schema validation *before* the name-vs-basename check
+   (`src/adapters/skills/validate.ts`) and returns early on a schema
+   failure — with `description` missing, the schema fails first, so the
+   name-mismatch check never runs at all. The fixture still legitimately
+   scores `ok: false` (for the missing `description`, not the name
+   mismatch), which the property check could not tell apart from a genuine
+   name mismatch.
+7. Corrupting the frontmatter's YAML syntax so the parser throws (a
+   duplicate `name:` key, an unterminated quote, or tabs used for block
+   indentation) — `extractFrontmatter`'s `catch { parsed = {} }` (muster
+   v1.1.0) turns any of these into an empty frontmatter object, landing on
+   the same schema-early-return path as (6). A related near-miss: a folded
+   scalar (`name: >-` with the value on the next line) parses correctly
+   under muster's real YAML parser but was read as the literal string
+   `">-"` by the completeness script's own regex-based reader — not a
+   muster-side gap, but a gap in the fork-side property check itself.
+
+The root cause common to all seven: the property check
+(`frontmatterName !== basename`, tested with a hand-rolled regex, not a
+YAML parser) and muster's own scoring (`ok === expectations.ok`) are each
+satisfied by a strictly larger set of conditions than "muster actually
+detected and reported the name mismatch" — neither one asks that question
+directly. Patching individual bypasses one at a time is not a terminating
+process for a text-regex frontmatter reader that is not, and cannot be
+patched into being, a YAML parser.
+
+### The redesign: observe muster's own conclusion instead of re-deriving it
+
+`check-manifest-completeness.mjs` no longer tests any property of the
+fixture's text for discrimination. It runs the pinned muster CLI once, in
+`--json` mode —
+
+```sh
+npx --offline @garrison-hq/muster@1.1.0 skills run conformance/skills/manifest.yaml --json
+```
+
+— and asserts directly on what muster itself reported, confirmed against
+`@garrison-hq/muster@1.1.0`'s pinned source
+(`src/adapters/skills/validate.ts`'s `validateName()`, `src/cli/index.ts`'s
+`doSkillsRun()`) and against a live run:
+
+- **For the control case**: `violations[]` must contain an entry with
+  `path === "name"` whose `message` matches
+  `/must equal the parent directory name/` — the exact violation
+  `validateName()` emits for a genuine mismatch (observed literal:
+  `name "wrong-name" must equal the parent directory name
+  "name-mismatch"`).
+- **For each of the 53 real skill cases**: `violations[]` must contain zero
+  entries with `severity === "error"`. This is deliberately *not* "an empty
+  `violations[]` array" — a live run shows `spec-kitty-runtime-next`
+  legitimately carries two warning-severity violations (a nested-`SKILL.md`
+  layout note) while still being a conforming skill; requiring a literally
+  empty array would make this check disagree with muster about a correct,
+  untampered case. Filtering on `severity === "error"` matches muster's own
+  pass/fail arithmetic exactly (`hasError = violations.some(v => v.severity
+  === "error")`), so this check can never contradict muster's own verdict.
+
+Every one of the seven bypasses above either prevents the specific
+`{path: "name", message: /must equal the parent directory name/}` violation
+from ever being produced (hollowing, the description-deletion/schema-early-
+return class, the parser-throwing YAML syntax) or removes it by genuinely
+aligning the name (in which case failing is correct and intended). None of
+them can produce that exact shape while failing to be a genuine, present,
+misaligned name — the assertion is a direct read of muster's own
+conclusion, not a re-derivation of it, so there is no proxy left to defeat.
+
+**What FR-007 still checks by property, unchanged:** every case's
+`skillDir` resolves to an existing directory containing a `SKILL.md`,
+skill-tree case ids equal their resolved directory's basename, the
+manifest's case count reconciles against the real skill tree, and there is
+exactly one control case. These serve manifest completeness — a genuinely
+separate purpose from control discrimination — and still fail fast, with a
+specific message, before the script ever shells out to muster (e.g.
+deleting the control fixture directory outright is caught here, not by the
+muster-based check).
+
+### The new coupling, disclosed
+
+This is a real, new coupling: `check-manifest-completeness.mjs` now depends
+on `@garrison-hq/muster@1.1.0`'s `--json` output *shape*
+(`{ ok, total, passed, failed, skipped, results: [{ id, type, passed,
+violations: [{ path, message, severity, section }] }] }`) at the exact
+pinned version, not just its `ok`/exit-code contract. Unlike the coupling
+the redesign replaces, this is a coupling to muster's **observed
+behaviour** — read from its pinned source and a live run, and re-verified
+by 12 verification rounds (below) — rather than to a fork-side heuristic
+about the fixture's text that had no way to stay in sync with what muster
+actually does.
+
+`expectations.violations` in the manifest cannot carry either assertion:
+muster 1.1.0's pass/fail rule is exactly `passed = ok === c.expectations.ok`
+(`src/cli/index.ts:956` at the pinned tag) — the `violations:` list
+declared per case in the manifest is documentation only, never compared by
+muster itself (see "Known muster gaps" below). The live `--json` output is
+read by this script directly; it is the only place either assertion could
+live.
+
+The **operational** consequence: `check-manifest-completeness.mjs` now
+requires the pinned muster CLI to be runnable (see "Local prerequisite"
+above). CI already installs it via the preceding `garrison-hq/muster-action`
+step, which warms the same npm cache this script's own `npx --offline` call
+then reads from. If the CLI is not available when the script runs, it fails
+with an actionable message naming the exact cache-warm command — not a raw
+stack trace.
+
+### Manual verification (documented here, not part of CI)
 
 To manually prove `muster skills run` alone can also *fail* (documented
 here, not part of CI, since it requires temporarily corrupting the

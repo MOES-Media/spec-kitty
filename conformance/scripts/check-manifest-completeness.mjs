@@ -2,63 +2,128 @@
 // Verifies that conformance/skills/manifest.yaml's type:static case count
 // and name set exactly match the real src/doctrine/skills/* directory tree,
 // offset by the one deliberately-broken FR-005 control case (see
-// conformance/skills/manifest.yaml's control-name-mismatch entry).
+// conformance/skills/manifest.yaml's control-name-mismatch entry) -- AND
+// that the control case actually discriminates a real name-mismatch failure,
+// verified by observing muster's own --json output rather than by any
+// property test on the fixture's text (see "Discrimination redesign" below).
 //
-// FR-007. Node stdlib only (fs, path) -- no npm dependency, no YAML parser.
+// FR-007. Node stdlib only (fs, path, child_process) for everything except
+// the discrimination check, which shells out to the pinned muster CLI --
+// see "Discrimination redesign" for why that coupling was added and is
+// unavoidable.
 // Contract: kitty-specs/sk-skills-static-conformance-01KYG7GE/contracts/
 //           completeness-check-cli-contract.md
 //
 // Invocation: node conformance/scripts/check-manifest-completeness.mjs
-// Working directory: repository root. No arguments, no env vars, no network.
+// Working directory: repository root. No arguments, no env vars.
+// Network: none directly, but the discrimination check below execs
+// `npx --offline @garrison-hq/muster@<pinned>`, which requires the pinned
+// package to already be warm in the local npm cache -- see
+// conformance/README.md's "two-step cache-warm-then-offline procedure" and
+// "Local prerequisite" note.
 //
-// Post-merge mission review (M1) findings remediated here:
-// - HIGH-1: this script used to say nothing about whether a case's skillDir
-//   actually resolves to a real, well-formed skill directory. Deleting
-//   conformance/skills/control/name-mismatch/ entirely, or "fixing" its
-//   frontmatter name to match its directory basename, both used to leave
-//   this script (and muster's own harness -- see the catch-block defect
-//   described below) at exit 0. This script now asserts, for every case,
-//   that skillDir resolves to an existing directory containing a SKILL.md,
-//   and, for the control case specifically, that its frontmatter `name`
-//   still differs from its directory basename (the discriminating property
-//   the control exists to exercise).
-// - HIGH-2: this script used to classify tree membership by skillDir but
-//   build its name set from `id`, never requiring the two to agree.
-//   Repointing one case's skillDir at a different real skill directory left
-//   this script at exit 0 while one real skill was validated twice and
-//   another zero times. This script now asserts basename(skillDir) === id
-//   for every skill-tree case, and derives the manifest-side name set from
-//   the resolved skillDir's basename, never from the id field directly.
-// - MEDIUM-5: readActualSkillNames() used to filter only on isDirectory(),
-//   so an empty probe directory under src/doctrine/skills/ (no SKILL.md)
-//   would count as a skill. FR-007's wording is "skill directories matching
-//   src/doctrine/skills/*/SKILL.md" -- the directory scan now also requires
-//   a SKILL.md to be present, coherent with (not duplicating) HIGH-1's
-//   per-case SKILL.md assertion above.
+// ─── History (context for the redesign below; none of these property
+// checks exist in this file anymore) ───────────────────────────────────────
 //
-// Independent verification of the above M1 fix found six further findings
-// (PR #29 review round 2), three fixed here:
-// - F-1 [BLOCKING]: checkControlCasesDiscriminate()'s HIGH-1 fix above only
-//   compared frontmatterName === actualBasename. Since readFrontmatterName()
-//   returns null for a hollowed-out control (no frontmatter, no `name:`
-//   key, or an empty value), `null === actualBasename` was false, so a
-//   control with NO name at all was scored the same as a control whose
-//   name still genuinely differs -- the same failure class the HIGH-1 fix
-//   exists to remediate. Null/empty is now its own error, checked first.
-// - F-5: readFrontmatterName()'s regex captured a quoted value's quotes
-//   along with the text, so a quoted-and-aligned name (`name:
-//   "name-mismatch"`) did not trip the alignment check. Quotes are now
-//   stripped before comparison.
-// - F-6 [cosmetic]: checkSkillDirsResolve() never confirmed a resolved
-//   skillDir was actually a directory; a skillDir pointing at a file was
-//   misreported as "has no SKILL.md". Now reported accurately.
+// Post-merge mission review (M1) originally added: (a) an assertion that
+// every case's skillDir resolves to an existing directory containing a
+// SKILL.md (HIGH-1 first half), (b) an assertion that skill-tree case ids
+// equal their resolved directory's basename (HIGH-2 -- kept below, see
+// checkSkillCaseIdsMatchBasename), and (c) a *property* check on the
+// control case: read its frontmatter `name:` via a hand-rolled regex and
+// assert it differs from its directory basename (HIGH-1 second half).
+//
+// PR #29 review round 2 found three gaps in (c) and patched them in place:
+// a null/hollowed name scored as "still discriminating" (F-1), a quoted
+// name's quotes were compared literally so a quoted-and-aligned name slipped
+// through (F-5), and a skillDir-pointing-at-a-file was misreported (F-6,
+// unrelated to (c) but fixed alongside it).
+//
+// A third-pass audit then found FOUR MORE ways to defeat the *property*
+// check in (c), all leaving muster's own exit code AND this script both
+// green: deleting the `description:` line (the schema-validation early
+// return in muster's own validateStatic() means validateName() -- the
+// function that would emit the name-mismatch violation -- never runs, so
+// the fixture still legitimately scores ok:false for a *different* reason,
+// which the property check cannot tell apart from a genuine name mismatch);
+// a duplicate `name:` key, an unterminated quote, and a tab-indented value
+// (all three throw inside the YAML parser during frontmatter extraction,
+// caught by `catch { parsed = {} }`, landing on the same schema-early-return
+// path as the description-deletion bypass); and a folded scalar (`name:
+// >-`) which a real YAML parser reads correctly but this script's own
+// regex-based `readFrontmatterName()` read as the literal string `">-"`.
+//
+// Three rounds of patching, seven distinct bypasses, all sharing one root
+// cause: this script's property check (`frontmatterName !== basename`) and
+// muster's own scoring (`ok === expectations.ok`) are each satisfied by a
+// strictly larger set of conditions than "muster actually detected and
+// reported the name mismatch" -- neither one asks that question directly.
+// A text-regex "frontmatter reader" that is not a YAML parser cannot be
+// patched into being one; enumerating its gaps one bypass at a time is not
+// a terminating process.
+//
+// ─── Discrimination redesign (current design) ──────────────────────────────
+//
+// The control-discrimination check no longer tests any property of the
+// fixture's text. It runs the pinned muster CLI once, in --json mode
+// (readMusterResultsById(), below), and asserts on what muster ITSELF
+// reported for the control case: that `violations[]` contains an entry with
+// `path === "name"` whose `message` matches
+// `/must equal the parent directory name/` (the exact string muster's
+// validateName() emits -- confirmed against @garrison-hq/muster@1.1.0's
+// pinned source, src/adapters/skills/validate.ts, and against a live
+// `--json` run against this repo's own manifest; see conformance/README.md).
+//
+// This directly measures the behaviour the control exists to exercise. Every
+// one of the seven known bypasses above either prevents that specific
+// violation from ever being produced (hollowing/quoting/schema-early-return
+// bypasses -- muster instead reports a generic parse-error or a schema
+// violation, never the name-mismatch message) or removes it by aligning the
+// name (muster then reports no `name`-path violation at all). None of them
+// can produce the exact `{path: "name", message: /must equal the parent
+// directory name/}` shape while also failing to be a genuine, present,
+// misaligned name -- there is no proxy left to fool, because the assertion
+// is a direct read of muster's own conclusion, not a re-derivation of it.
+//
+// The corresponding check on the 53 real skill cases asserts that muster
+// reports zero *error*-severity violations for each -- not a literally empty
+// `violations[]` array. A live run against this manifest shows
+// `spec-kitty-runtime-next` legitimately carries two warning-severity
+// violations (a nested-SKILL.md layout note) while still being a
+// conforming, `ok: true` skill; asserting a literally empty array would
+// make this check fail against the current, correct, un-tampered manifest.
+// Filtering on `severity === "error"` matches muster's own pass/fail
+// arithmetic exactly (`hasError = violations.some(v => v.severity ===
+// "error")` in validateStatic()'s caller), so this check can never disagree
+// with muster about what "clean" means.
+//
+// `expectations.violations` in the manifest cannot carry either assertion:
+// muster 1.1.0's own pass/fail rule is exactly `passed = ok ===
+// c.expectations.ok` (src/cli/index.ts:956 at the pinned tag) -- the
+// `violations:` list in the manifest is documentation only, never compared.
+// This script's own read of the LIVE `--json` output is therefore the only
+// place either assertion can live.
+//
+// What FR-007 still checks by property, unchanged: every case's skillDir
+// resolves to an existing directory containing a SKILL.md
+// (checkSkillDirsResolve), skill-tree case ids equal their resolved
+// directory's basename (checkSkillCaseIdsMatchBasename), the manifest's
+// static-case count reconciles against the real skill tree plus exactly one
+// control case, and there is exactly one control case
+// (checkControlCaseCount). These serve manifest completeness -- a
+// genuinely separate purpose from control discrimination -- and are cheap,
+// local, and have no gaps of their own: keeping them here (rather than
+// folding them into the muster-based check) also means a missing/corrupt
+// control fixture directory (bypass class: delete the whole directory) is
+// still reported with a clear, specific message before this script ever
+// shells out to muster at all.
 //
 // Muster itself is out of scope for this fix (C-001, no muster change):
-// this script cannot and does not change how `npx @garrison-hq/muster
-// skills run` scores a missing/corrupt fixture -- it only adds an
-// independent, fork-side assertion that catches what muster's own harness
-// cannot distinguish.
+// this script cannot and does not change how `muster skills run` computes
+// its own `ok`/`passed` fields -- it only adds an independent,
+// fork-side assertion on muster's own reported violations.
 
+import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -68,6 +133,12 @@ const REPO_ROOT = join(__dirname, "..", "..");
 const SKILLS_DIR = join(REPO_ROOT, "src", "doctrine", "skills");
 const MANIFEST_PATH = join(REPO_ROOT, "conformance", "skills", "manifest.yaml");
 
+// Must match conformance/README.md's pinned version exactly (C-003,
+// NFR-002) -- never a range. Keep these two in sync by hand; there is no
+// single source of truth to derive both from without adding a package.json
+// dependency this suite deliberately does not carry.
+const MUSTER_VERSION = "1.1.0";
+
 // The manifest carries exactly one non-skill-tree case: the FR-005
 // discrimination control (control-name-mismatch, skillDir: control/...).
 // It is deliberately excluded from the src/doctrine/skills/* comparison
@@ -75,6 +146,15 @@ const MANIFEST_PATH = join(REPO_ROOT, "conformance", "skills", "manifest.yaml");
 // number, per WP01's hard rule 5 / data-model.md's CompletenessCheckResult
 // invariant.
 const CONTROL_CASE_COUNT = 1;
+
+// The exact violation shape muster's validateName() emits for a name/
+// directory mismatch (src/adapters/skills/validate.ts, pinned v1.1.0):
+// `path: "name"`, `message: name "<name>" must equal the parent directory
+// name "<basename>"`. Matched by substring rather than reproducing the full
+// interpolated string, so this does not need updating if the surrounding
+// fixture names ever change.
+const NAME_MISMATCH_PATH = "name";
+const NAME_MISMATCH_MESSAGE_PATTERN = /must equal the parent directory name/;
 
 // Step 1: read the real skill set. Filter by directory-entry TYPE, never by
 // excluding a literal filename -- src/doctrine/skills/ also contains a
@@ -118,28 +198,6 @@ function readManifestCases() {
   return cases;
 }
 
-// Extracts the YAML frontmatter `name:` value from a SKILL.md file. Plain
-// text parse (same house style as readManifestCases above) -- no YAML
-// parser, no npm dependency. Returns null if the file has no frontmatter or
-// no `name:` key.
-//
-// F-5 (independent verification of this mission's own M1 fix): the previous
-// version of this regex captured a quoted value's quotes along with the
-// text, so `name: "name-mismatch"` was read as the literal string
-// `"name-mismatch"` (quotes included), which never equals the bare
-// directory basename `name-mismatch` -- the alignment check in
-// checkControlCasesDiscriminate() would silently fail to fire for a quoted,
-// aligned name. Strip one layer of matching surrounding single or double
-// quotes before returning, same as real YAML scalar parsing would.
-function readFrontmatterName(skillMdPath) {
-  const text = readFileSync(skillMdPath, "utf8");
-  const frontmatterMatch = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  if (!frontmatterMatch) return null;
-  const nameMatch = frontmatterMatch[1].match(/^name:\s*(\S+)\s*$/m);
-  if (!nameMatch) return null;
-  return nameMatch[1].replace(/^(['"])(.*)\1$/, "$2");
-}
-
 // Resolves every manifest case's skillDir to an absolute path and classifies
 // it as either a skill-tree case (resolves one level directly under
 // SKILLS_DIR) or a control case (everything else) -- purely structural,
@@ -162,11 +220,10 @@ function resolveAndClassify(manifestCases) {
   return { skillCases, controlCases };
 }
 
-// HIGH-1 (first assertion): every case's skillDir must resolve to an
-// existing directory containing a SKILL.md. Runs for every case, skill-tree
-// or control -- a missing/corrupt control fixture is exactly the failure
-// mode muster's own harness cannot distinguish from "correctly detected a
-// name mismatch" (see conformance/README.md).
+// Every case's skillDir must resolve to an existing directory containing a
+// SKILL.md. Runs for every case, skill-tree or control -- a missing/corrupt
+// control fixture (e.g. the whole directory deleted) is reported here,
+// clearly and locally, before this script ever shells out to muster.
 function checkSkillDirsResolve(allCases) {
   const errors = [];
   const structurallyOk = new Set();
@@ -181,12 +238,6 @@ function checkSkillDirsResolve(allCases) {
       );
       continue;
     }
-    // F-6 (independent verification of this mission's own M1 fix): this
-    // check never confirmed c.resolved was actually a directory. A skillDir
-    // pointing at a file was previously caught by the SKILL.md-existence
-    // check below and misreported as "has no SKILL.md" -- true in a
-    // vacuous sense (a file has no children at all) but misleading about
-    // the actual fault. Report the real problem directly.
     if (!statSync(c.resolved).isDirectory()) {
       errors.push(
         `case '${c.id}': skillDir '${c.skillDir}' resolves to a file, not a directory`,
@@ -203,11 +254,10 @@ function checkSkillDirsResolve(allCases) {
   return { errors, structurallyOk };
 }
 
-// HIGH-2: every skill-tree case's id must equal the basename of the
-// directory its skillDir resolves to. Without this, membership is
-// classified by skillDir while the name set is built from id, and the two
-// can silently diverge (e.g. one case's skillDir repointed at another
-// skill's directory).
+// Every skill-tree case's id must equal the basename of the directory its
+// skillDir resolves to. Without this, membership is classified by skillDir
+// while the name set is built from id, and the two can silently diverge
+// (e.g. one case's skillDir repointed at another skill's directory).
 function checkSkillCaseIdsMatchBasename(skillCases) {
   const errors = [];
   for (const c of skillCases) {
@@ -222,24 +272,12 @@ function checkSkillCaseIdsMatchBasename(skillCases) {
   return errors;
 }
 
-// HIGH-1 (second assertion): for the control case(s) -- structurally, every
-// case outside the skill tree -- the frontmatter `name` must still differ
-// from the directory basename. If it doesn't, the control has been "fixed"
-// (aligned) and no longer discriminates a genuine failure from "not there".
-//
-// F-1 (independent verification of this mission's own HIGH-1 fix -- the
-// same failure class the fix exists to remediate): readFrontmatterName()
-// returns null when the fixture has no frontmatter, no `name:` key, or an
-// empty `name:` value. The equality test below is `frontmatterName ===
-// actualBasename`; `null === 'name-mismatch'` is false, so a control that
-// has been HOLLOWED OUT (frontmatter deleted, name key removed, or emptied)
-// was previously scored as "still discriminating" -- i.e. treated exactly
-// like a genuine, intact name mismatch, when in fact it can no longer
-// discriminate anything at all. A null/empty frontmatter name is a strictly
-// worse failure than a mismatched-but-present one: it must be reported as
-// its own, explicit error, and reported BEFORE the equality test runs so
-// the vacuous `null === basename` comparison is never reached.
-function checkControlCasesDiscriminate(controlCases, structurallyOk) {
+// Structural count check only: exactly one case must be classified as a
+// control case (skillDir outside src/doctrine/skills/). This is unrelated
+// to whether that control *discriminates* anything -- that question is
+// answered by checkControlDiscriminatesInMuster(), below, from muster's own
+// --json output.
+function checkControlCaseCount(controlCases) {
   const errors = [];
   if (controlCases.length !== CONTROL_CASE_COUNT) {
     errors.push(
@@ -247,25 +285,154 @@ function checkControlCasesDiscriminate(controlCases, structurallyOk) {
         `${controlCases.map((c) => c.id).join(", ") || "(none)"}`,
     );
   }
+  return errors;
+}
+
+// Invokes the pinned muster CLI once, in --json mode, against this suite's
+// own manifest, and returns a Map from case id to its structured
+// SkillsCaseResult ({ id, type, passed, violations }) -- confirmed shape
+// against @garrison-hq/muster@1.1.0's pinned source (src/cli/index.ts,
+// doSkillsRun()) and against a live run.
+//
+// A non-zero muster exit code (e.g. a genuine conformance regression, such
+// as the control's name being aligned so muster's own ok flips to true) is
+// NOT treated as "muster is unavailable": doSkillsRun() always writes its
+// JSON report to stdout before returning the outcome-derived exit code, so
+// stdout is still present and parseable. Only an actually-missing/failed
+// invocation (no parseable stdout at all) falls through to the actionable
+// "muster is not available" message below, rather than a raw stack trace.
+function readMusterResultsById() {
+  const args = [
+    "--offline",
+    `@garrison-hq/muster@${MUSTER_VERSION}`,
+    "skills",
+    "run",
+    MANIFEST_PATH,
+    "--json",
+  ];
+  let stdout;
+  try {
+    stdout = execFileSync("npx", args, {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } catch (error) {
+    if (typeof error.stdout === "string" && error.stdout.trim().length > 0) {
+      // Non-zero exit, but muster still emitted its JSON report -- use it.
+      stdout = error.stdout;
+    } else {
+      failWithMusterUnavailable(error);
+    }
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(stdout);
+  } catch (parseError) {
+    console.log("manifest completeness: ERROR");
+    console.log(
+      `  muster --json output was not valid JSON (${parseError.message}) -- cannot run the discrimination check`,
+    );
+    process.exit(1);
+  }
+  if (!parsed || !Array.isArray(parsed.results)) {
+    console.log("manifest completeness: ERROR");
+    console.log(
+      "  muster --json output did not have the expected { results: [...] } shape -- cannot run the discrimination check",
+    );
+    process.exit(1);
+  }
+  return new Map(parsed.results.map((r) => [r.id, r]));
+}
+
+// Prints an actionable message -- not a raw stack trace -- when the pinned
+// muster CLI cannot be run at all, and exits 1. This is the operational
+// consequence of the discrimination redesign: this script now requires
+// muster to be installed (specifically, warm in npm's local cache for
+// `npx --offline` to find). CI already installs it (the preceding "Run
+// muster skills conformance" workflow step warms the same cache this step
+// then reads from); local developers must run the cache-warm step manually
+// once -- see conformance/README.md's "Local prerequisite" note.
+function failWithMusterUnavailable(error) {
+  console.log("manifest completeness: ERROR");
+  console.log(
+    "  could not run the pinned muster CLI needed for the discrimination-control check:",
+  );
+  console.log(
+    `    npx --offline @garrison-hq/muster@${MUSTER_VERSION} skills run <manifest> --json`,
+  );
+  console.log(`  underlying error: ${error.message}`);
+  console.log(
+    "  this script now depends on muster being installed locally. Warm the npm cache once with:",
+  );
+  console.log(`    npm install --no-save @garrison-hq/muster@${MUSTER_VERSION}`);
+  console.log(
+    "  then re-run this script (see conformance/README.md's 'Local prerequisite' note).",
+  );
+  process.exit(1);
+}
+
+// The discrimination-control assertion (see "Discrimination redesign" in
+// the header comment): for the control case(s), muster's OWN --json output
+// must contain a { path: "name", message: /must equal the parent directory
+// name/ } violation. This is a direct read of muster's conclusion, not a
+// re-derivation of a property from the fixture's text -- every known bypass
+// either prevents this specific violation from being produced at all
+// (hollowing, quoting-defeated-by-a-real-parser, schema-early-return via a
+// deleted description or a parser-throwing frontmatter) or removes it by
+// genuinely aligning the name, in which case it is correct and desired that
+// this check fires.
+function checkControlDiscriminatesInMuster(controlCases, structurallyOk, resultsById) {
+  const errors = [];
   for (const c of controlCases) {
-    if (!structurallyOk.has(c.id)) continue; // already reported above
-    const actualBasename = basename(c.resolved);
-    const skillMdPath = join(c.resolved, "SKILL.md");
-    const frontmatterName = readFrontmatterName(skillMdPath);
-    if (frontmatterName === null || frontmatterName.trim() === "") {
+    if (!structurallyOk.has(c.id)) continue; // already reported by checkSkillDirsResolve
+    const result = resultsById.get(c.id);
+    if (!result) {
       errors.push(
-        `control case '${c.id}': SKILL.md at '${skillMdPath}' has no parseable frontmatter ` +
-          `'name:' value (missing frontmatter, missing 'name:' key, or an empty value) -- ` +
-          `a control with no name cannot discriminate a genuine name-mismatch failure from ` +
-          `a missing/corrupt fixture, which is a worse failure than a mismatched-but-present name`,
+        `control case '${c.id}': not present in muster --json output -- cannot verify it discriminates a name mismatch`,
       );
       continue;
     }
-    if (frontmatterName === actualBasename) {
+    const violations = Array.isArray(result.violations) ? result.violations : [];
+    const hasNameMismatch = violations.some(
+      (v) => v.path === NAME_MISMATCH_PATH && NAME_MISMATCH_MESSAGE_PATTERN.test(String(v.message)),
+    );
+    if (!hasNameMismatch) {
       errors.push(
-        `control case '${c.id}': frontmatter name '${frontmatterName}' now matches ` +
-          `its directory basename '${actualBasename}' -- this control no longer ` +
-          `discriminates a genuine name-mismatch failure from a missing/corrupt fixture`,
+        `control case '${c.id}': muster's own --json output has no ` +
+          `{ path: "name", message: /must equal the parent directory name/ } violation -- ` +
+          `this control no longer proves muster actually detected a name mismatch ` +
+          `(observed violations: ${JSON.stringify(violations)})`,
+      );
+    }
+  }
+  return errors;
+}
+
+// The complementary assertion: every real skill case must have zero
+// error-severity violations in muster's own --json output. Deliberately NOT
+// "an empty violations[] array" -- a live run shows spec-kitty-runtime-next
+// legitimately carries warning-severity violations (a nested-SKILL.md
+// layout note) while still being a conforming skill; filtering on
+// `severity === "error"` matches muster's own pass/fail arithmetic exactly
+// (see header comment) instead of introducing a stricter, disagreeing
+// definition of "clean".
+function checkSkillCasesCleanInMuster(skillCases, structurallyOk, resultsById) {
+  const errors = [];
+  for (const c of skillCases) {
+    if (!structurallyOk.has(c.id)) continue; // already reported by checkSkillDirsResolve
+    const result = resultsById.get(c.id);
+    if (!result) {
+      errors.push(`skill case '${c.id}': not present in muster --json output`);
+      continue;
+    }
+    const violations = Array.isArray(result.violations) ? result.violations : [];
+    const errorViolations = violations.filter((v) => v.severity === "error");
+    if (errorViolations.length > 0) {
+      errors.push(
+        `skill case '${c.id}': muster reported ${errorViolations.length} error-severity ` +
+          `violation(s) for a real skill (expected none): ${JSON.stringify(errorViolations)}`,
       );
     }
   }
@@ -287,21 +454,42 @@ function main() {
   const { skillCases, controlCases } = resolveAndClassify(manifestCases);
   const allCases = [...skillCases, ...controlCases];
 
-  const errors = [];
+  // Pass 1: cheap, local, property-based structural checks (FR-007
+  // completeness). Fail fast here without ever shelling out to muster --
+  // a missing/corrupt control fixture directory, a file where a directory
+  // is expected, or a miscounted control-case set are all reported clearly
+  // by these alone.
+  const structuralErrors = [];
   const { errors: resolveErrors, structurallyOk } = checkSkillDirsResolve(allCases);
-  errors.push(...resolveErrors);
-  errors.push(...checkSkillCaseIdsMatchBasename(skillCases.filter((c) => structurallyOk.has(c.id))));
-  errors.push(...checkControlCasesDiscriminate(controlCases, structurallyOk));
+  structuralErrors.push(...resolveErrors);
+  structuralErrors.push(
+    ...checkSkillCaseIdsMatchBasename(skillCases.filter((c) => structurallyOk.has(c.id))),
+  );
+  structuralErrors.push(...checkControlCaseCount(controlCases));
 
-  if (errors.length > 0) {
+  if (structuralErrors.length > 0) {
     console.log("manifest completeness: MISMATCH");
-    for (const e of errors) console.log(`  ${e}`);
+    for (const e of structuralErrors) console.log(`  ${e}`);
     process.exit(1);
   }
 
-  // HIGH-2: the name set is derived from the resolved skillDir's basename,
-  // never from `id` directly -- id/basename agreement was already asserted
-  // above, but the derivation itself must not silently fall back to id.
+  // Pass 2: the observation-based discrimination check. Invokes muster
+  // exactly once, in --json mode, and asserts on what muster ITSELF
+  // reported -- see "Discrimination redesign" in the header comment.
+  const musterResultsById = readMusterResultsById();
+  const discriminationErrors = [
+    ...checkControlDiscriminatesInMuster(controlCases, structurallyOk, musterResultsById),
+    ...checkSkillCasesCleanInMuster(skillCases, structurallyOk, musterResultsById),
+  ];
+
+  if (discriminationErrors.length > 0) {
+    console.log("manifest completeness: MISMATCH");
+    for (const e of discriminationErrors) console.log(`  ${e}`);
+    process.exit(1);
+  }
+
+  // Pass 3: manifest/tree name-set completeness (unchanged from the
+  // original FR-007 implementation).
   const manifestSkillNames = skillCases.map((c) => basename(c.resolved));
   const manifestSkillSet = new Set(manifestSkillNames);
 
@@ -318,7 +506,7 @@ function main() {
 
   if (ok) {
     console.log(
-      `manifest completeness: OK (${actualSkillNames.length} skills + ${CONTROL_CASE_COUNT} control = ${actualSkillNames.length + CONTROL_CASE_COUNT} cases)`,
+      `manifest completeness: OK (${actualSkillNames.length} skills + ${CONTROL_CASE_COUNT} control = ${actualSkillNames.length + CONTROL_CASE_COUNT} cases; discrimination-control verified via muster --json)`,
     );
     process.exit(0);
   }
