@@ -1,47 +1,47 @@
 ---
-work_package_id: "WP02"
-title: "Composition manifests, discrimination control, C-001 fixture (lane-b part 1)"
+work_package_id: WP02
+title: Composition manifests, discrimination control, C-001 fixture (lane-b part 1)
 dependencies: []
 requirement_refs:
-  - FR-004
-  - FR-006
-  - C-001
-  - C-002
-subtasks:
-  - T008
-  - T009
-  - T010
-  - T011
-  - T012
-  - T013
-owned_files:
-  - "conformance/crosslayer/manifest.yaml"
-  - "conformance/crosslayer/cases/architect-run-skill.yaml"
-  - "conformance/crosslayer/cases/reviewer-run-skill.yaml"
-  - "conformance/crosslayer/control.yaml"
-  - "conformance/crosslayer/fixtures/invalid-persona-missing-key.Soul.md"
-create_intent:
-  - "conformance/crosslayer/manifest.yaml"
-  - "conformance/crosslayer/cases/architect-run-skill.yaml"
-  - "conformance/crosslayer/cases/reviewer-run-skill.yaml"
-  - "conformance/crosslayer/control.yaml"
-  - "conformance/crosslayer/fixtures/invalid-persona-missing-key.Soul.md"
-authoritative_surface: "conformance/crosslayer/"
-execution_mode: "code_change"
+- FR-004
+- FR-006
+- C-001
+- C-002
 planning_base_branch: kitty/mission-crosslayer-composition-suite
 merge_target_branch: kitty/mission-crosslayer-composition-suite
-branch_strategy: "Planning artifacts for this mission were generated on kitty/mission-crosslayer-composition-suite. During /spec-kitty.implement this WP may branch from a dependency-specific base, but completed changes must merge back into kitty/mission-crosslayer-composition-suite unless the human explicitly redirects the landing branch."
+branch_strategy: Planning artifacts for this mission were generated on kitty/mission-crosslayer-composition-suite. During /spec-kitty.implement this WP may branch from a dependency-specific base, but completed changes must merge back into kitty/mission-crosslayer-composition-suite unless the human explicitly redirects the landing branch.
 base_branch: kitty/mission-crosslayer-composition-suite-01KYJA33
-base_commit: c425bc188995b5b9a04bece05b511ba81896ce7f
-created_at: '2026-07-27T19:45:23Z'
-history:
-  - timestamp: '2026-07-27T19:45:23Z'
-    event: created
-    by: /spec-kitty.tasks-outline (planner-priti)
-agent_profile: node-norris
-role: implementer
+base_commit: 6c5d08978d7d29a6c09fead1c8e6a88610fc2805
+created_at: '2026-07-27T21:39:19.800685+00:00'
+subtasks:
+- T008
+- T009
+- T010
+- T011
+- T012
+- T013
 agent: claude
+history:
+- timestamp: '2026-07-27T19:45:23Z'
+  event: created
+  by: /spec-kitty.tasks-outline (planner-priti)
+agent_profile: node-norris
+authoritative_surface: conformance/crosslayer/
+create_intent:
+- conformance/crosslayer/manifest.yaml
+- conformance/crosslayer/cases/architect-run-skill.yaml
+- conformance/crosslayer/cases/reviewer-run-skill.yaml
+- conformance/crosslayer/control.yaml
+- conformance/crosslayer/fixtures/invalid-persona-missing-key.Soul.md
+execution_mode: code_change
 model: ''
+owned_files:
+- conformance/crosslayer/manifest.yaml
+- conformance/crosslayer/cases/architect-run-skill.yaml
+- conformance/crosslayer/cases/reviewer-run-skill.yaml
+- conformance/crosslayer/control.yaml
+- conformance/crosslayer/fixtures/invalid-persona-missing-key.Soul.md
+role: implementer
 tags: []
 tracker_refs: []
 ---
