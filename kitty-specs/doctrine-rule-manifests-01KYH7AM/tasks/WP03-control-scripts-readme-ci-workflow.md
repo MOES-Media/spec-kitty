@@ -440,12 +440,24 @@ README, formatted as you see fit, but every fact below must appear):
 | 035 | 035-r1 | full-line | output-format | binary |
 | 035 | 035-r2 | full-line | tool-order | binary |
 | 035 | 035-r3 | full-line | UNMAPPED | judge |
-| 039 | 039-r1..r11 (11 rules) | full-line | UNMAPPED | judge |
+| 039 | 039-r1 | full-line | UNMAPPED | judge |
+| 039 | 039-r2 | full-line | UNMAPPED | judge |
+| 039 | 039-r3 | full-line | UNMAPPED | judge |
+| 039 | 039-r4 | full-line | UNMAPPED | judge |
+| 039 | 039-r5 | full-line | UNMAPPED | judge |
+| 039 | 039-r6 | full-line | UNMAPPED | judge |
+| 039 | 039-r7 | full-line | UNMAPPED | judge |
+| 039 | 039-r8 | full-line | UNMAPPED | judge |
+| 039 | 039-r9 | full-line | UNMAPPED | judge |
+| 039 | 039-r10 | full-line | UNMAPPED | judge |
+| 039 | 039-r11 | full-line | UNMAPPED | judge |
 | 042 | 042-r1 | fragment | never-call-tool | binary |
 | 042 | 042-r2 | fragment | output-format | binary |
 | 042 | 042-r3 | fragment | output-format | binary |
 | 042 | 042-r4 | full-line | output-format | binary |
-| 044 | 044-r1..r3 (3 rules) | fragment | UNMAPPED | judge |
+| 044 | 044-r1 | fragment | UNMAPPED | judge |
+| 044 | 044-r2 | fragment | UNMAPPED | judge |
+| 044 | 044-r3 | fragment | UNMAPPED | judge |
 | 045 | 045-r1 | fragment | never-call-tool | binary |
 | 045 | 045-r2 | fragment | never-call-tool | binary |
 | 045 | 045-r3 | fragment | tool-order | binary |
