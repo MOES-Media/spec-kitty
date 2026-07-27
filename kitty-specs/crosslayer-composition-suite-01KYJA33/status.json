@@ -81,7 +81,8 @@
       "last_transition_at": "2026-07-27T22:50:50.984194+00:00",
       "model": "__resolved_model_absent__",
       "notes": [
-        "Ready for review: FR-007 sop-extract.md + check-sop-extract-drift.sh implemented; T016 real-CLI verification done (clean exit 0, first-line + last-line falsification exit 1, restored exit 0, hash-confirmed restore); T017 C-002 per-lane check passes; AGENTS.md untouched."
+        "Ready for review: FR-007 sop-extract.md + check-sop-extract-drift.sh implemented; T016 real-CLI verification done (clean exit 0, first-line + last-line falsification exit 1, restored exit 0, hash-confirmed restore); T017 C-002 per-lane check passes; AGENTS.md untouched.",
+        "Fifth-round review APPROVED. Across five rounds fixed: regenerate-in-place design, --write path deleting a policy section on heading rename, redirect truncating destination on mid-run failure, cross-device mv silently changing file mode. Final round verified all four --write states preserve mode 644, chmod/mv ordering leaves no 600 window, signal handling clean on SIGTERM/SIGINT/SIGHUP (disclosed SIGKILL leftover only), 8 tests pass."
       ],
       "provider": "__resolved_provider_absent__",
       "role": "reviewer",
