@@ -5,36 +5,57 @@ that must not be forgotten between tasks-authoring time and this mission's
 accept/merge gate. Recorded here, in the tasks artifact, so they survive
 independently of any one WP's own Definition of Done.
 
-## 1. Stale coordination branch — MUST be reconciled before this mission merges
+## 1. Coordination/target branch divergence — MUST be reconciled before this mission merges
 
-**Checked directly while authoring this tasks phase** (2026-07-27):
+**Checked directly while authoring this tasks phase** (2026-07-27), **and
+re-checked after running `spec-kitty agent mission finalize-tasks` for real**
+— the second check changed the finding, recorded here honestly rather than
+leaving the earlier, now-superseded version standing:
 
-- Mission coordination branch `kitty/mission-crosslayer-composition-suite-01KYJA33`
-  is at `c425bc188995b5b9a04bece05b511ba81896ce7f` (the mission's original base
-  commit on `main`).
-- Target branch `kitty/mission-crosslayer-composition-suite` is at
-  `e4ef24f9e926eed3934989dc746313d8788016c9` — **6 commits ahead** of the
-  coordination branch (the spec/plan authoring and remediation commits,
-  including the IC-00 dissolution commit itself).
-- `git merge-base` confirms the coordination branch has not advanced past
-  the mission's original base; the target branch has moved on without it.
+- **Before `finalize-tasks` ran**: mission coordination branch
+  `kitty/mission-crosslayer-composition-suite-01KYJA33` was at
+  `c425bc188995b5b9a04bece05b511ba81896ce7f` (the mission's original base
+  commit on `main`), a clean **6 commits behind** target branch
+  `kitty/mission-crosslayer-composition-suite` (then at `e4ef24f9e`) — a
+  simple fast-forward gap.
+- **After `finalize-tasks` ran** (this tasks phase's own required step): the
+  command itself writes to *both* branches — `tasks.md`/`lanes.json`/the
+  five WP prompt files landed on the **target** branch, while
+  `acceptance-matrix.json`/`issue-matrix.md` and five
+  `chore(spec-kitty): status transition WPxx` bookkeeping commits landed on
+  the **coordination** branch. `git merge-base --is-ancestor
+  kitty/mission-crosslayer-composition-suite-01KYJA33
+  kitty/mission-crosslayer-composition-suite` now exits **non-zero** — the
+  two branches have **genuinely diverged in both directions**, not merely
+  "coordination is behind": the coordination branch carries six commits
+  (five status-transition events plus its own tasks-add commit) the target
+  branch does not have, and the target branch carries eight commits
+  (spec/plan/remediation/IC-00-dissolution plus its own tasks-add and a
+  bookkeeping-fix commit) the coordination branch does not have.
 
-**Why this matters, concretely**: this is exactly the configuration that
-caused mission M3's data loss (fork issue #33) — `spec-kitty merge` replaying
-a stale coordination branch over newer work, silently reverting a shipped
-fix. It is harmless right now (no WP has been implemented or merged yet), but
-**it must be reconciled before any lane of this mission merges**, not
-discovered for the first time at merge time.
+**Why this matters, concretely, and why the fix is no longer a simple
+fast-forward**: this is exactly the configuration that caused mission M3's
+data loss (fork issue #33) — `spec-kitty merge` replaying a stale
+coordination branch over newer work, silently reverting a shipped fix. It is
+harmless right now (no WP has been implemented or merged yet), but a naive
+fast-forward-one-over-the-other reconciliation would now **discard real
+commits from whichever side is forced to reset** — the coordination branch's
+own status-transition/bookkeeping commits if target is force-applied, or the
+target branch's spec/plan/remediation history if coordination is force-
+applied. **This must be reconciled with an actual merge (or equivalent
+history-preserving operation) that keeps both sides' unique commits**, not a
+fast-forward or a hard reset, before any WP lane merges back.
 
-**Action required, before WP01–WP05's lanes begin merging back**: bring
-`kitty/mission-crosslayer-composition-suite-01KYJA33` up to date with
-`kitty/mission-crosslayer-composition-suite` (fast-forward or equivalent,
-whatever this fork's own coordination-branch update mechanism is), and
-confirm via `git merge-base --is-ancestor
+**Action required, before WP01–WP05's lanes begin merging back**: perform a
+real merge (or this fork's equivalent reconciliation mechanism) between
+`kitty/mission-crosslayer-composition-suite-01KYJA33` and
+`kitty/mission-crosslayer-composition-suite` that preserves both branches'
+unique commits, then confirm via `git merge-base --is-ancestor
 kitty/mission-crosslayer-composition-suite-01KYJA33
 kitty/mission-crosslayer-composition-suite` (expect exit `0`) that the
-coordination branch is no longer behind. This is flagged here as an explicit
-action item, not fixed as part of this tasks-authoring pass — it is an
+coordination branch is fully caught up afterward. This is flagged here as an
+explicit action item, not fixed as part of this tasks-authoring pass — per
+this mission's own "flag forward, do not fix here" directive, it is an
 operator/infrastructure action, not a work-package deliverable.
 
 ## 2. C-002 (assembled diff) and C-003 must become explicit acceptance-matrix rows at accept time
