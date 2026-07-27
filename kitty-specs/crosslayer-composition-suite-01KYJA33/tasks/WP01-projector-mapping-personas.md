@@ -1,48 +1,48 @@
 ---
-work_package_id: "WP01"
-title: "Profile-to-Soul.md projector, mapping doc, committed personas"
+work_package_id: WP01
+title: Profile-to-Soul.md projector, mapping doc, committed personas
 dependencies: []
 requirement_refs:
-  - FR-001
-  - FR-002
-  - FR-003
-  - C-002
-subtasks:
-  - T001
-  - T002
-  - T003
-  - T004
-  - T005
-  - T006
-  - T007
-owned_files:
-  - "conformance/tools/profile2soul.py"
-  - "conformance/tools/PROJECTION.md"
-  - "conformance/crosslayer/personas/architect-alphonso.Soul.md"
-  - "conformance/crosslayer/personas/reviewer-renata.Soul.md"
-  - "conformance/scripts/check-persona-drift.sh"
-create_intent:
-  - "conformance/tools/profile2soul.py"
-  - "conformance/tools/PROJECTION.md"
-  - "conformance/crosslayer/personas/architect-alphonso.Soul.md"
-  - "conformance/crosslayer/personas/reviewer-renata.Soul.md"
-  - "conformance/scripts/check-persona-drift.sh"
-authoritative_surface: "conformance/tools/"
-execution_mode: "code_change"
+- FR-001
+- FR-002
+- FR-003
+- C-002
 planning_base_branch: kitty/mission-crosslayer-composition-suite
 merge_target_branch: kitty/mission-crosslayer-composition-suite
-branch_strategy: "Planning artifacts for this mission were generated on kitty/mission-crosslayer-composition-suite. During /spec-kitty.implement this WP may branch from a dependency-specific base, but completed changes must merge back into kitty/mission-crosslayer-composition-suite unless the human explicitly redirects the landing branch."
+branch_strategy: Planning artifacts for this mission were generated on kitty/mission-crosslayer-composition-suite. During /spec-kitty.implement this WP may branch from a dependency-specific base, but completed changes must merge back into kitty/mission-crosslayer-composition-suite unless the human explicitly redirects the landing branch.
 base_branch: kitty/mission-crosslayer-composition-suite-01KYJA33
-base_commit: c425bc188995b5b9a04bece05b511ba81896ce7f
-created_at: '2026-07-27T19:45:23Z'
-history:
-  - timestamp: '2026-07-27T19:45:23Z'
-    event: created
-    by: /spec-kitty.tasks-outline (planner-priti)
-agent_profile: python-pedro
-role: implementer
+base_commit: 230ae7f0be81083f98bd80d1ffaed8bd577bffe6
+created_at: '2026-07-27T20:31:41.914275+00:00'
+subtasks:
+- T001
+- T002
+- T003
+- T004
+- T005
+- T006
+- T007
 agent: claude
+history:
+- timestamp: '2026-07-27T19:45:23Z'
+  event: created
+  by: /spec-kitty.tasks-outline (planner-priti)
+agent_profile: python-pedro
+authoritative_surface: conformance/tools/
+create_intent:
+- conformance/tools/profile2soul.py
+- conformance/tools/PROJECTION.md
+- conformance/crosslayer/personas/architect-alphonso.Soul.md
+- conformance/crosslayer/personas/reviewer-renata.Soul.md
+- conformance/scripts/check-persona-drift.sh
+execution_mode: code_change
 model: ''
+owned_files:
+- conformance/tools/profile2soul.py
+- conformance/tools/PROJECTION.md
+- conformance/crosslayer/personas/architect-alphonso.Soul.md
+- conformance/crosslayer/personas/reviewer-renata.Soul.md
+- conformance/scripts/check-persona-drift.sh
+role: implementer
 tags: []
 tracker_refs: []
 ---
