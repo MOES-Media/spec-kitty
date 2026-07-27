@@ -26,8 +26,11 @@ for manifest in conformance/doctrine/*.yaml; do
   echo "=== $manifest ==="
   npx --yes @garrison-hq/muster@1.1.0 sop run "$manifest" --json | tee /tmp/out.json
   echo "exit code: $?"     # MUST print 0
-  jq '[.lintFindings[] | select(.kind=="RULE_DRIFT" or .kind=="MISSING_SOURCE" or .kind=="MANIFEST_ERROR")]' /tmp/out.json
-  # MUST print []
+  jq '[.lintFindings[] | select(.kind=="RULE_DRIFT" or .kind=="MISSING_SOURCE" or .kind=="MANIFEST_ERROR" or .kind=="STRUCTURAL_ABSENCE")]' /tmp/out.json
+  # MUST print [] — [Corrected post-plan-gate] STRUCTURAL_ABSENCE added to
+  # match the hardened drift-gate filter (contracts/
+  # doctrine-drift-gate-contract.md); omitting it here would demonstrate a
+  # weaker check than the real CI gate actually runs.
 done
 ```
 
@@ -143,8 +146,40 @@ Also verify the manifest-deletion and control-deletion cases (research.md
 # Manifest file entirely missing:
 mv conformance/doctrine/029-agent-commit-signing-policy.yaml /tmp/
 npx --yes @garrison-hq/muster@1.1.0 sop run conformance/doctrine/029-agent-commit-signing-policy.yaml --json
-echo "exit code: $?"    # MUST print 1 (MANIFEST_ERROR, muster's own error path — no jq needed)
+echo "exit code: $?"
+# [Corrected post-plan-gate] This step previously said "MUST print 1
+# (MANIFEST_ERROR, muster's own error path — no jq needed)". That was
+# wrong — the gate ran this exact command against the real built CLI and
+# got:
+#   muster: cannot read sop manifest "...": ENOENT: ...
+#   REAL EXIT CODE: 2
+# `doSopRun` (src/cli/index.ts:1436) calls readFileOrThrow on the manifest
+# path BEFORE runSopManifestSuite is ever reached; the ENOENT propagates as
+# an ExecutionError to runCli's top-level catch (:1979-1982), which prints
+# to stderr and returns exit 2 — no --json output is produced at all, so
+# there is no MANIFEST_ERROR finding to inspect with jq. MUST print 2, with
+# a plain "muster: cannot read sop manifest ..." line on stderr and no JSON
+# on stdout.
 mv /tmp/029-agent-commit-signing-policy.yaml conformance/doctrine/
+
+# sopFile target missing (directive file deleted, or sopFile: typo'd) —
+# [Added post-plan-gate]: this failure mode was named in plan.md's
+# Verification Strategy step 6 but never actually exercised here. It is
+# the exact case FIX 1 added STRUCTURAL_ABSENCE to the jq gate for, so it
+# must be observed for real, not merely traced in prose.
+manifest=conformance/doctrine/045-prs-only-and-read-intent.yaml
+cp "$manifest" "$manifest.bak"
+sed -i 's#sopFile: .*#sopFile: "../../src/doctrine/directives/built-in/does-not-exist.directive.yaml"#' "$manifest"
+npx --yes @garrison-hq/muster@1.1.0 sop run "$manifest" --json | tee /tmp/out-absent.json
+echo "exit code: $?"    # MUST print 1
+jq '[.lintFindings[] | select(.kind=="STRUCTURAL_ABSENCE")]' /tmp/out-absent.json
+# MUST print a non-empty array (severity: "error") — this is exactly what
+# the drift gate's Phase 1 filter now selects (contracts/
+# doctrine-drift-gate-contract.md); before the fix, this manifest would
+# have reported count=0 against the old three-kind filter despite
+# `passed: false` in the same JSON.
+mv "$manifest.bak" "$manifest"
+git diff --exit-code "$manifest"
 
 # Control manifest deleted:
 mv conformance/doctrine/control/045-drifted.yaml /tmp/

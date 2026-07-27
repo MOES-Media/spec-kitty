@@ -47,12 +47,12 @@ An instance of muster's `SOPRuleManifestEntry`:
 | `ruleId` | `<directive-number>-r<n>`, sequential, unique within the file |
 | `ruleText` | verbatim full `integrity_rules` line (35 of 45), or a single-line fragment per the spec's fragment convention (10 of 45 — see `contracts/rule-classification-and-citation.md`) |
 | `probeIds` | `[]` always (C-003) |
-| `gradingClass` | `"binary"` (25 rules) or `"judge"` (20 rules, including all 20 UNMAPPED fallbacks) — full per-rule assignment in `contracts/rule-classification-and-citation.md` |
+| `gradingClass` | `"binary"` (24 rules) or `"judge"` (21 rules, including all 21 UNMAPPED fallbacks) — **[corrected post-plan-gate, was 25/20]**: 044's 3 rules revert `never-call-tool` → UNMAPPED (binding operator decision); 010's 2 rules move UNMAPPED → `output-format` (reconciliation pass) — full per-rule assignment in `contracts/rule-classification-and-citation.md` |
 | `aggregation` | `"pass-k"` for every binary entry, `"k-of-n"` for every judge entry (matches the taxonomy's two-tier model uniformly, not case-by-case) |
 | `k` | `3` (binary) or `5` (judge) |
 | `passThreshold` | `3` in both cases — equal to `k` for binary (loader-enforced invariant), the taxonomy's documented `Math.ceil(k/2)` majority default made explicit for judge |
 | `precedence` | never set — no two rules within any one manifest share a `triggerPrefix` (text before the first comma/period, lowercased) with conflicting `gradingClass`/`aggregation`; `detectUndefinedPrecedence` is warning-only regardless (FR-004), but the risk is checked, not assumed, at real-CLI verification time (quickstart.md) |
-| `source.normative` | `"docs/rubric/sop-rule-taxonomy.md#<class-anchor>"` — a specific class anchor for the 25 mapped rules, `#judge-required-rule-classes` for the 20 UNMAPPED |
+| `source.normative` | `"docs/rubric/sop-rule-taxonomy.md#<class-anchor>"` — a specific class anchor for the 24 mapped rules, `#judge-required-rule-classes` for the 21 UNMAPPED (counts corrected post-plan-gate, above). Note: `#<class-anchor>` is a deliberate deviation from the taxonomy's own literal, no-anchor citation format — see `contracts/doctrine-rule-manifest-shape.md`. Also note the taxonomy file itself lives only in the `garrison-hq/muster` package, not in this repository. |
 | `source.supporting` | `"https://github.com/Priivacy-ai/spec-kitty/blob/<SHA>/src/doctrine/directives/built-in/<file>"`, `<SHA>` = the directive file's last-touch commit upstream, verified byte-identical (research.md §5) |
 
 **Invariant — the four loader guards** (binding constraint 3): every entry
@@ -73,11 +73,16 @@ manifest entry's `gradingClass`/`source.normative` and
 `conformance/doctrine/README.md`'s FR-006 table.
 
 **Invariant**: every one of the 45 rules has exactly one row, with an
-explicit fit-quality tag (`clean` / `best-fit (caveat)` / `UNMAPPED`) — no
-rule is left implicitly "the class" without a stated reason. **20 of 45
-rows are `UNMAPPED`** (44%): all 11 of directive 039, all 3 of 001, all 2
-of 010, and one rule each from 030, 033, 034, 035 — recorded as a named,
-open taxonomy gap in the README's coverage roadmap, not silently defaulted.
+explicit fit-quality tag (`clean` / `moderate (caveat)` / `UNMAPPED`) — no
+rule is left implicitly "the class" without a stated reason. **[Corrected
+post-plan-gate, was "20 of 45 rows (44%): ... all 2 of 010, and one rule
+each from 030, 033, 034, 035"]** **21 of 45 rows are `UNMAPPED`** (47%):
+all 11 of directive 039, all 3 of 001, all 3 of 044 (reverted from
+`never-call-tool`, binding operator decision), and one rule each from 030,
+033, 034, 035. Directive 010's 2 rules are **no longer** in this list
+(reconciled to `output-format` — see `contracts/
+rule-classification-and-citation.md`) — recorded as a named, open taxonomy
+gap in the README's coverage roadmap, not silently defaulted.
 
 ---
 
@@ -116,15 +121,24 @@ per manifest, drawn directly from muster's real `SOPSuiteReport`):
 interface DriftGateCheck {
   manifestPath: string;
   museterExitCode: 0 | 1 | 2;               // muster's own exit code
-  disallowedFindings: SOPLintFinding[];      // kind in {RULE_DRIFT, MISSING_SOURCE, MANIFEST_ERROR}
-  gatePassed: boolean;                        // disallowedFindings.length === 0 (inverted for the control)
+  hasValidJson: boolean;                      // [Added post-plan-gate] false when muster exits 2 with no --json output (e.g. manifest ENOENT) — see below
+  disallowedFindings: SOPLintFinding[];      // kind in {RULE_DRIFT, MISSING_SOURCE, MANIFEST_ERROR, STRUCTURAL_ABSENCE} — STRUCTURAL_ABSENCE added post-plan-gate
+  gatePassed: boolean;                        // museterExitCode === 0 && hasValidJson && disallowedFindings.length === 0 (inverted for the control)
 }
 ```
 
 **Invariants**:
-- For all 13 shipped manifests: `disallowedFindings.length === 0` required.
+- For all 13 shipped manifests: `museterExitCode === 0`, `hasValidJson ===
+  true`, and `disallowedFindings.length === 0` all required — **[Corrected
+  post-plan-gate]**: the exit-code and JSON-validity checks were added
+  because `museterExitCode` is not always `1` or `0` when something is
+  wrong; a missing manifest file produces exit `2` with no JSON at all
+  (research.md §8's corrected absence table), which `disallowedFindings`
+  alone cannot detect — see `contracts/doctrine-drift-gate-contract.md`'s
+  "Failure handling" section.
 - For the control manifest: the analogous filter restricted to
-  `kind === "RULE_DRIFT"` must have `length >= 1` (inverted).
+  `kind === "RULE_DRIFT"` must have `length >= 1` (inverted), still subject
+  to the same `museterExitCode === 0 && hasValidJson === true` preconditions.
 - `TOOL_DRIFT` and `UNDEFINED_PRECEDENCE` findings are never inspected by
   this gate (reported-not-gating, FR-004) — `TOOL_DRIFT` is additionally
   confirmed unreachable via the CLI path at all (research.md §2), so its
@@ -165,9 +179,17 @@ interface DoctrineCompletenessResult {
 `.github/workflows/conformance.yml` gains:
 - A renamed top-level `name:` (`Skills Static Conformance` →
   `Static Conformance`) — the file now hosts two distinct suites.
-- A workflow-level `permissions: contents: read` block — new in this
-  mission; the existing file had no `permissions:` block at all (verified,
-  not assumed — research.md §9).
+- **[Corrected post-plan-gate]** A workflow-level `permissions:
+  contents: read` block was previously claimed as this mission's own
+  contribution ("new in this mission... the existing file had no
+  `permissions:` block at all"). That was accurate when checked, but PR #29
+  (`MOES-Media/spec-kitty`, open, now confirmed landing first) inserts the
+  identical block at the identical anchor. By the time this mission's WP03
+  runs, `permissions: contents: read` will already be present — WP03 must
+  check for an existing `permissions:` key before inserting and must not
+  duplicate it (see plan.md IC-06, updated). WP03 should also expect both
+  jobs' actions to already be SHA-pinned by PR #29 and must not re-pin or
+  unpin them.
 - One new job, `sop-doctrine-conformance` (job-level `name: SOP doctrine
   conformance (muster)`), independent of and parallel-safe with the
   existing `skills-conformance` job (disjoint file sets in both jobs'
@@ -176,9 +198,14 @@ interface DoctrineCompletenessResult {
 **Invariants**:
 - No `secrets:` reference anywhere in the new job (C-002) — identical
   no-secret posture to the sibling job.
-- The new job's `actions/checkout` step uses the same `@v6` tag reference
-  as the sibling job (internal consistency; SHA-pinning both jobs together
-  is a documented, not-fixed-here follow-up — research.md §9).
+- **[Corrected post-plan-gate]** The new job's `actions/checkout` step was
+  previously specified to use the same `@v6` tag reference as the sibling
+  job, with SHA-pinning noted as a documented, not-fixed-here follow-up.
+  PR #29 (landing first, per the operator's coordination decision) SHA-pins
+  both existing actions in this file. WP03 must therefore expect the
+  actions to already be SHA-pinned when it runs and match that convention
+  for its own new job's steps, rather than introducing a fresh `@v6` tag
+  reference inconsistent with the rest of the file.
 - Trigger block (`on: pull_request` / `push: main`) is shared, unchanged —
   no new trigger condition is added.
 
@@ -189,7 +216,7 @@ interface DoctrineCompletenessResult {
 | Invariant | Source | Enforced in |
 |---|---|---|
 | All 13 shipped manifests load without error and exit `0` on a clean tree | AC-1, FR-001/002 | Real-CLI verification (quickstart.md); drift gate |
-| Zero `RULE_DRIFT`/`MISSING_SOURCE`/`MANIFEST_ERROR` findings across all 13 shipped manifests | FR-004, AC-1 | `check-doctrine-drift-gate.sh` Phase 1 |
+| Zero `RULE_DRIFT`/`MISSING_SOURCE`/`MANIFEST_ERROR`/`STRUCTURAL_ABSENCE` findings, AND muster itself exits `0` with valid JSON, across all 13 shipped manifests | FR-004, AC-1 | `check-doctrine-drift-gate.sh` Phase 1 |
 | Control manifest's `--json` output contains ≥1 `RULE_DRIFT` finding | FR-005, AC-3 | `check-doctrine-drift-gate.sh` Phase 2 (inverted) |
 | Every fragment-cited rule's `ruleText` occurs exactly once in its directive file | Binding constraint 1 | `grep -F -c` = 1, verified in planning (research.md §3), re-verified at implementation |
 | No manifest silently drops a rule entry | Absence lesson (mission brief) | `check-doctrine-manifest-completeness.mjs` |

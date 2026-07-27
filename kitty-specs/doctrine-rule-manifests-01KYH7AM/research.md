@@ -196,24 +196,46 @@ those are the *only* two judge classes that exist; inventing a third is
 forbidden by the scope guard ("cites the existing classes and defines none
 of its own").
 
-**Headline finding — a real taxonomy gap, not glossed over**: **20 of the 45
-rules (44%) fit none of the seven existing classes**, including **all 11
-rules of directive 039** (Lynn Cole Engineering Culture) and **all 3 rules
-of directive 001** and **all 2 rules of directive 010** — three of the four
-"proposed" judge directives are, on inspection, entirely about code-quality,
-architecture-review, and spec-traceability judgment, not about
-conversational refusal or tone/persona, which are the only two shapes the
-taxonomy's judge tier currently models. The fourth proposed judge directive,
-044, fares better: its three rules each describe a genuinely forbidden
-*action* ("do not copy a kitty-specs artifact as a template," "do not add
-parity to a non-canonical copy," "do not hand-roll a workaround") and map
-(with the same tool-identity caveat as 045, below) onto `never-call-tool`
-rather than either judge class — meaning **044 is best modeled as binary,
-not judge**, despite being proposed as a judge directive.
+**[Corrected post-plan-gate — Fix 3 (044 revert) + Fix 5 (reconciliation)
+both applied]** This section originally read "20 of the 45 rules (44%)
+fit none of the seven existing classes ... three of the four 'proposed'
+judge directives [039, 001, 010] are ... entirely about code-quality ...
+The fourth, 044, fares better ... best modeled as binary, not judge."
+Both halves of that claim have since been revised:
 
-**A second, narrower caveat on the binary side**: eleven rules
-(028×2, 029×2, 033×1, 042×1, 044×3, 045×2 — the full accounting is in the
-contract table) are best-fit to `never-call-tool` by describing a
+- **044 reverted to UNMAPPED** (binding operator decision, post-plan
+  gate): the "044 fares better, best modeled as binary" framing is
+  withdrawn. The post-plan gate and both review delegates independently
+  judged 044's binary reclassification the weakest fit in the table — its
+  three rules require semantic judgment about intent/role ("used as a
+  template," "adding parity," "hand-rolled workaround"), unlike 033's and
+  045's literally-enumerable forbidden command strings, and `044-r2` has no
+  trace-observable proxy at all. See `contracts/
+  rule-classification-and-citation.md`'s 044 section for the full
+  reasoning; the "fares better... binary" sentence above is superseded,
+  not merely restated.
+- **010 reconciled to `output-format`** (reconciliation pass, Fix 5): both
+  010 rules were originally UNMAPPED, inconsistently with the
+  structurally-identical `030-r3` (a disclosure-in-final-artifact pattern
+  assigned `output-format`). Reconciled to match.
+
+**Headline finding, restated with the corrected classification**: **21 of
+the 45 rules (47%) fit none of the seven existing classes** (was 20, 44% —
+net +1 after 044's +3 and 010's −2), including **all 11 rules of directive
+039** (Lynn Cole Engineering Culture), **all 3 rules of directive 001**, and
+**all 3 rules of directive 044** — three of the four "proposed" judge
+directives are, on inspection, entirely about code-quality,
+architecture-review, or template/consolidation-intent judgment, not about
+conversational refusal or tone/persona, which are the only two shapes the
+taxonomy's judge tier currently models. The fourth, **010**, is better
+modeled via `output-format` for both its rules (a structural/regex check
+for a disclosure section in the final artifact, matching `030-r3`'s
+precedent) — not left an abstract "the class" citation.
+
+**A second, narrower caveat on the binary side**: eight rules
+(028×2, 029×2, 033×1, 042×1, 045×2 — was eleven, before 044's 3 rules
+reverted to UNMAPPED; the full accounting is in the contract table) are
+best-fit to `never-call-tool` by describing a
 concretely forbidden *command string* (`git push origin main`, `git add
 -A`, etc.), but `never-call-tool`'s grader (`gradeToolCallPresence`)
 matches `forbiddenTools` against tool **names** in a trace
@@ -232,24 +254,28 @@ records the caveat explicitly in the README and `contracts/
 rule-classification-and-citation.md`, so M4 inherits a documented, not
 silent, gap.
 
-**Disposition of the 20 unmappable rules**: `gradingClass: "judge"` is used
-as the schema's structural default (the Ajv enum only allows
-`"binary"|"judge"` — there is no third option), `aggregation: "k-of-n"`
-(matching the taxonomy's stylistic tier), and `source.normative` cites
-`docs/rubric/sop-rule-taxonomy.md#judge-required-rule-classes` (the general
-judge-tier section) rather than fabricating a specific-class anchor that
-does not describe the rule. Each such entry is flagged in the
-classification table with `class: UNMAPPED` and a one-line reason. This is
-recorded in `conformance/doctrine/README.md`'s coverage roadmap (FR-006) as
-an explicit, named gap — candidate language: *"39/11, 001/3, 010/2 rules
-(16 of 45) require a code-quality / architecture-review / spec-fidelity
-judge class the taxonomy does not yet define; recommend as the next
-taxonomy-extension mission's first candidate."* Four additional rules
-(030-R2, 033-R2, 034-R3, 035-R3 — one each from otherwise trace-decidable
-directives) are unmappable for a different reason (a positive "must-call"
-obligation, a set-membership content check, a causal test-quality judgment,
-and a declarative authority statement, respectively — none of which any of
-the seven classes expresses) and are recorded the same way.
+**Disposition of the 21 unmappable rules** (was 20 — see the corrected
+headline finding above): `gradingClass: "judge"` is used as the schema's
+structural default (the Ajv enum only allows `"binary"|"judge"` — there is
+no third option), `aggregation: "k-of-n"` (matching the taxonomy's
+stylistic tier), and `source.normative` cites `docs/rubric/
+sop-rule-taxonomy.md#judge-required-rule-classes` (the general judge-tier
+section) rather than fabricating a specific-class anchor that does not
+describe the rule. Each such entry is flagged in the classification table
+with `class: UNMAPPED` and a one-line reason. This is recorded in
+`conformance/doctrine/README.md`'s coverage roadmap (FR-006) as an
+explicit, named gap — candidate language (**[corrected post-plan-gate]**,
+was "39/11, 001/3, 010/2 rules (16 of 45)"): *"39/11, 001/3, 044/3 rules
+(17 of 45) require a code-quality / architecture-review / template-
+consolidation-intent judge class the taxonomy does not yet define;
+recommend as the next taxonomy-extension mission's first candidate."* Four
+additional rules (030-R2, 033-R2, 034-R3, 035-R3 — one each from otherwise
+trace-decidable directives, unaffected by the 044/010 reclassification)
+are unmappable for a different reason (a positive "must-call" obligation,
+a set-membership content check, a causal test-quality judgment, and a
+declarative authority statement, respectively — none of which any of the
+seven classes expresses) and are recorded the same way. 17 + 4 = 21,
+matching the corrected total.
 
 **What this mission does NOT do about the gap**: it does not invent an
 eighth taxonomy class (forbidden by scope), and it does not substitute a
@@ -386,8 +412,9 @@ an untested code path (the same discipline the spec itself applies to
 ## 7. `k` / `passThreshold` defaults
 
 **Decision**: binary (`pass-k`) entries use `k: 3, passThreshold: 3`;
-judge (`k-of-n`) entries — including the 20 UNMAPPED-fallback entries —
-use `k: 5, passThreshold: 3` (the taxonomy's own documented k-of-n default,
+judge (`k-of-n`) entries — including the 21 UNMAPPED-fallback entries
+(count corrected post-plan-gate, §4/§8; was 20) — use `k: 5,
+passThreshold: 3` (the taxonomy's own documented k-of-n default,
 `Math.ceil(k/2)` majority, made explicit rather than omitted).
 
 **Rationale**: with `probeIds: []` throughout (C-003), no run ever actually
@@ -415,9 +442,36 @@ Traced directly against the runtime call chain
 (`runManifestSuite` → `loadManifestPhase` → `runLintPhase` →
 `runStaticLint` → `readSOPFile`/`loadAndValidateManifest`), not assumed:
 
+**[Corrected post-plan-gate]** The "Manifest file missing" row below was
+originally written as "`MANIFEST_ERROR` JSON, exit `1`, no jq needed." **That
+was wrong** — verified by running the real built CLI against a missing
+manifest path:
+
+```
+$ node dist/cli/index.js sop run conformance/doctrine/does-not-exist.yaml --json
+muster: cannot read sop manifest "...": ENOENT: ...
+REAL EXIT CODE: 2
+```
+
+`doSopRun` (`src/cli/index.ts:1436`) calls
+`readFileOrThrow(absManifestPath, "sop manifest")` **before** it calls
+`runSopManifestSuite` at all — this is a CLI-level pre-check the plan's
+original trace (which started at `loadAndValidateManifest`, inside
+`runSopManifestSuite`) missed entirely. `readFileOrThrow` throws an
+`ExecutionError` on ENOENT (`src/cli/index.ts:150-156`), uncaught by
+`doSopRun`, which propagates to `runCli`'s top-level catch
+(`src/cli/index.ts:1979-1982`): a plain `muster: cannot read sop manifest
+"...": ...` line to stderr and exit **`2`** — **no JSON `--json` output is
+ever produced for this case, so there is no `MANIFEST_ERROR` finding to
+read.** `loadAndValidateManifest`'s own internal ENOENT handling (the
+`MANIFEST_ERROR` finding this row originally described) is real code that
+exists in the adapter, but it is unreachable from the CLI's `sop run` path
+specifically because `doSopRun`'s earlier `readFileOrThrow` pre-check
+always throws first. The corrected row:
+
 | Failure mode | What actually happens | Severity / exit code | Who catches it |
 |---|---|---|---|
-| **Manifest file missing** (`conformance/doctrine/<x>.yaml` deleted) | `loadAndValidateManifest`'s `readFile(manifestPath, ...)` throws (ENOENT); `loadManifestPhase`'s `try/catch` converts this to an early-exit `SOPSuiteReport` with a single `MANIFEST_ERROR` finding | `severity: "error"` → `passed: false` → **exit `1`** (muster's own exit code, no jq needed) | Muster itself, unconditionally |
+| **Manifest file missing** (`conformance/doctrine/<x>.yaml` deleted) | `doSopRun`'s own `readFileOrThrow(absManifestPath, "sop manifest")` (`src/cli/index.ts:1436`) throws an `ExecutionError` on ENOENT **before** `runSopManifestSuite`/`loadAndValidateManifest` is ever reached; uncaught by `doSopRun`, it propagates to `runCli`'s top-level catch (`:1979-1982`) | Plain `muster: cannot read sop manifest "...": ENOENT ...` to **stderr**, **no `--json` output at all** → **exit `2`** (NOT exit `1`, NOT a `MANIFEST_ERROR` finding — corrected from this row's original, incorrect claim) | `runCli`'s top-level `catch (error instanceof ExecutionError)`, one layer above the adapter's own internal `loadManifestPhase` try/catch, which never runs for this input |
 | **`sopFile` path resolves to nothing** (directive file deleted, or `sopFile:` typo'd) | `loadManifestPhase` resolves the path but does not check existence; `runLintPhase` calls `runStaticLint`, whose first line `readSOPFile(sopFilePath)` throws (ENOENT), **uncaught inside `runStaticLint` itself** (`index.ts`'s `runStaticLint` does not wrap step 1 in try/catch); `runLintPhase`'s own `try/catch` converts this to a `STRUCTURAL_ABSENCE` finding | `severity: "error"` → `passed: false` → **exit `1`** | `runLintPhase`, one layer up from where M1's equivalent case would be caught |
 | **Directive file deleted upstream** (same mechanism as above — `sopFile` now dangling) | Identical to the previous row — `readSOPFile` cannot distinguish "never existed" from "existed, now deleted" | Same: `STRUCTURAL_ABSENCE`, exit `1` | `runLintPhase` |
 | **A rule entry silently dropped from a manifest** (e.g. an edit accidentally deletes one `- ruleId: ...` block, leaving the file structurally valid) | **Nothing in muster's own code path detects this.** `checkRuleTextPresence`, `detectUndefinedPrecedence`, and `detectToolDrift` all iterate `manifest.rules` — a shorter array simply means fewer checks run; the suite reports `passed: true`, **exit `0`**, with a clean-looking `--json` output that silently covers fewer rules than intended | **No finding of any kind; exit `0` — a false-clean pass** | **Nothing, by design of the adapter** — this is exactly M1's "absence lesson": a control (or here, a whole rule) that disappears produces a *cleaner*-looking result, not a louder one |
@@ -442,15 +496,42 @@ manifests must be clean" loop and the "control must discriminate" check in
 one invocation, and the control's `grep -F -c` check is folded into its
 authoring/quickstart procedure (quickstart.md §3).
 
-The first three rows are **not** independently re-guarded by this mission's
-own tooling — they are already hard `error`-severity, exit-`1` failures
-muster itself produces unconditionally, and re-implementing a duplicate
-check would be exactly the kind of redundant-authority split directive 044
-itself warns against (don't add a second, parity copy of a check that
-already has one canonical home). The jq gate (§9) still asserts on these
-kinds defensively, per FR-004's literal text, but the mission's confidence
-that they fire does not rest on the jq gate alone — it rests on the traced
-call chain in the table above.
+**[Corrected post-plan-gate]** The paragraph below originally claimed all
+three of the first three rows are hard `error`-severity, exit-`1` failures
+muster produces unconditionally, needing no independent re-guarding. That
+claim is only true for rows 2–3 (`STRUCTURAL_ABSENCE`, exit `1`). Row 1
+(manifest file missing) is exit `2` with **no JSON output at all** (see the
+corrected row above) — a categorically different failure shape that a
+JSON-parsing jq filter cannot select findings out of, because there is no
+JSON to select from. This distinction is why the drift-gate script (§10;
+`contracts/doctrine-drift-gate-contract.md`) was hardened, post-plan, to
+capture muster's real exit code and treat non-zero/non-JSON output as its
+own named hard gate failure **independent of jq** — jq alone was never
+sufficient for row 1, and the original text's "no jq needed" framing (while
+correct that muster's own exit code already reflects the failure) elided
+the fact that the CI *gate script itself*, as originally pseudocoded,
+never inspected that exit code at all, so nothing in the script would
+actually have surfaced it as a **named** failure rather than an opaque `jq`
+crash on empty input.
+
+Rows 2–3 (`STRUCTURAL_ABSENCE`) **are** exit `1` with valid JSON, so a jq
+filter can select them — but the drift-gate script's Phase 1 filter,
+before this fix, did not: it selected only `RULE_DRIFT`/`MISSING_SOURCE`/
+`MANIFEST_ERROR`, omitting `STRUCTURAL_ABSENCE` entirely, so a deleted
+directive file or a typo'd `sopFile:` path reported `count=0` in the jq
+gate even though muster's own `passed` field was already `false`. This is
+now fixed: `contracts/doctrine-drift-gate-contract.md`'s Phase 1 filter
+includes `STRUCTURAL_ABSENCE` (binding operator decision, applied
+post-plan-gate — this is the third recurrence of the absence-class defect
+in this programme, so it is fixed now rather than deferred as a named
+gap). Re-implementing a duplicate *detector* for rows 2–3 inside this
+mission's own completeness script would still be the kind of
+redundant-authority split directive 044 warns against — the fix is to
+*select* the finding muster already produces, not to re-detect it
+independently — and `contracts/doctrine-manifest-completeness-contract.md`
+now states explicitly that its filename-stem pairing never reads
+`sopFile:`, so the jq gate's `STRUCTURAL_ABSENCE` selection is the sole
+guard for that failure mode, not a redundant second one.
 
 ---
 
@@ -475,26 +556,45 @@ poses has a citable answer rather than an implicit one.
 **Two claims in the task brief corrected against the real file** (measured,
 not assumed, per this project's own citation discipline): the task brief
 describes M1's shipped workflow as having "SHA-pinned actions" and
-`permissions: contents: read`. **Neither is actually present** in the
-merged `.github/workflows/conformance.yml` — it uses `actions/checkout@v6`
-(a movable tag reference, not a SHA pin) and declares no `permissions:`
-block at all (confirmed by reading the file directly, not inferred). This
-plan does not silently repeat the inaccurate framing:
-- **`permissions: contents: read`** is genuinely worth adding — both jobs
-  only checkout code, neither writes or pushes anything — so this mission
-  **adds it now**, at the workflow's top level (applies to both jobs), as
-  a real, credited hardening this mission contributes, not a pre-existing
-  pattern it merely follows.
-- **SHA-pinning actions** is a good idea but is **not** done here: this
-  new job's own `actions/checkout` step uses the same `@v6` tag reference
-  as the existing job, for internal consistency within one file (pinning
-  only the new job's action while leaving the sibling job on a tag would
-  be a worse, asymmetric state than uniform tag-pinning). This is recorded
-  in `conformance/README.md`'s known-gaps section (mirroring M1's own
-  "known muster gaps this suite runs on top of" pattern) as a named,
-  not-fixed-here observation: neither job in this file is SHA-pinned;
-  pinning both together is a reasonable follow-up hardening pass, out of
-  this mission's scope to do asymmetrically.
+`permissions: contents: read`. **Neither was actually present** in the
+merged `.github/workflows/conformance.yml` at the time this plan was
+originally written — it used `actions/checkout@v6` (a movable tag
+reference, not a SHA pin) and declared no `permissions:` block at all
+(confirmed by reading the file directly, not inferred).
+
+**[Corrected post-plan-gate — PR #29 collision, binding operator
+decision]** The paragraph originally continued by having this mission
+**add** `permissions: contents: read` itself, crediting it as this
+mission's own hardening contribution, and leaving SHA-pinning as a
+named, not-fixed-here follow-up. That framing no longer holds: PR #29
+(`MOES-Media/spec-kitty`, open, in final verification at the time of this
+correction) inserts an identical `permissions:\n  contents: read` block at
+the identical anchor in `.github/workflows/conformance.yml` — immediately
+after `- main`, immediately before `jobs:` — and additionally SHA-pins both
+existing actions. **The operator's decision: PR #29 lands first.**
+Consequently:
+- This mission **drops the claim** that `permissions: contents: read` is
+  its own contribution. By the time this mission's WP03 runs, that block
+  will already be present in the file.
+- WP03's implementation **must check for an existing `permissions:` key
+  before inserting one**, and must not duplicate it if PR #29 has already
+  landed (which the operator's sequencing decision guarantees it will
+  have).
+- WP03 should **expect both existing actions to already be SHA-pinned**
+  by PR #29, and must not re-pin (to a different SHA) or unpin them back
+  to a tag reference. The new job's own `actions/checkout` step should
+  match whatever pinning convention PR #29 leaves in place (SHA, not
+  `@v6`), rather than introducing a fresh tag reference inconsistent with
+  the rest of the file.
+- `conformance/README.md`'s known-gaps section (previously slated to note
+  "neither job in this file is SHA-pinned") must instead simply not carry
+  that now-false gap note — SHA-pinning will already be done, by PR #29,
+  not by this mission.
+- **Dependency recorded, not rediscovered**: this mission depends on PR
+  #29 landing to `main` before WP03 runs (in addition to the pre-existing
+  dependency on M1's own merge, spec.md's Dependencies & Assumptions
+  section) — see the Work-Package Outline's WP03 entry and IC-06 in
+  plan.md, both updated to cite PR #29 explicitly.
 
 **New job's steps**:
 1. `actions/checkout@v6` (matches the sibling job).
@@ -525,14 +625,26 @@ dependency this mission introduces) against the real `--json` output of
 one control manifest with the inverted assertion. Full contract:
 `contracts/doctrine-drift-gate-contract.md`.
 
-**Filter for the main gate** (must find nothing):
+**Filter for the main gate** (must find nothing) — **[Corrected
+post-plan-gate]: `STRUCTURAL_ABSENCE` added**, see
+`contracts/doctrine-drift-gate-contract.md`'s "Why `STRUCTURAL_ABSENCE` is
+in this filter" note for why this is a binding operator decision, not a
+style choice a future edit may quietly revert:
 ```sh
-jq '[.lintFindings[] | select(.kind=="RULE_DRIFT" or .kind=="MISSING_SOURCE" or .kind=="MANIFEST_ERROR")]'
+jq '[.lintFindings[] | select(.kind=="RULE_DRIFT" or .kind=="MISSING_SOURCE" or .kind=="MANIFEST_ERROR" or .kind=="STRUCTURAL_ABSENCE")]'
 ```
 **Filter for the control** (must find at least one `RULE_DRIFT`):
 ```sh
 jq '[.lintFindings[] | select(.kind=="RULE_DRIFT")] | length'
 ```
+
+This filter alone is not the complete gate: it only ever sees valid JSON.
+`contracts/doctrine-drift-gate-contract.md`'s "Failure handling" section
+additionally requires the script to capture muster's real exit code and
+treat non-zero exit or non-JSON output as a hard failure independent of
+this filter (§8's corrected absence table shows exactly why — a missing
+manifest file produces no JSON at all, exit `2`, which no `jq` filter can
+inspect).
 
 **Rationale for `jq` over a Node script here specifically**: FR-004's own
 text names this "a jq gate," and `jq` is the more literal, directly
@@ -558,16 +670,24 @@ for the `npx` step itself).
 
 ## 11. Needing a human decision (not resolved autonomously)
 
-- **The taxonomy gap (§4)**: 20 of 45 rules (44%), including all of 039 and
-  entire directives 001/010, do not fit any existing
+- **The taxonomy gap (§4)** — **[Corrected post-plan-gate: counts and
+  directive set both changed]**. This bullet originally read "20 of 45
+  rules (44%), including all of 039 and entire directives 001/010." Since
+  then: (1) the operator has **resolved** the 044 half of this question —
+  044's classification is reverted to UNMAPPED (binding decision, §4
+  above), not left open; (2) 010 has been reconciled to `output-format`
+  (Fix 5 reconciliation pass) and is no longer part of the fully-unmapped
+  set. The corrected count: **21 of 45 rules (47%)**, including all of 039
+  and entire directives 001/044, do not fit any existing
   `sop-rule-taxonomy.md` class. This mission ships them as documented
   `UNMAPPED` judge-fallback entries rather than either inventing a new
   class (forbidden by scope) or substituting a different judge-directive
-  set (a scope change to FR-001's locked list). **The operator may want to
-  either commission a taxonomy-extension mission before M4 attaches probes
-  to these 16+4 rules, or accept the substitution latitude the spec-quality
-  checklist explicitly reserved and swap one or more of 001/010/039 for a
-  cleaner-fitting judge directive.** This plan does not make that call.
+  set (a scope change to FR-001's locked list). **What remains genuinely
+  open for the operator**: whether to commission a taxonomy-extension
+  mission before M4 attaches probes to these 17+4 rules, or accept the
+  substitution latitude the spec-quality checklist explicitly reserved and
+  swap one or more of 001/039/044 for a cleaner-fitting judge directive.
+  This plan does not make that remaining call.
 - **GitHub anchor slugs for `source.normative`** (§5): high-confidence,
   not click-verified in a rendered browser (no browser tool available this
   session) — a five-minute manual click-through before merge is recommended.

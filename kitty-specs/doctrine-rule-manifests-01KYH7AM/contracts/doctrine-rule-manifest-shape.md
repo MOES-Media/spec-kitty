@@ -28,6 +28,26 @@ rules:
       supporting: "https://github.com/Priivacy-ai/spec-kitty/blob/<SHA>/src/doctrine/directives/built-in/<file>"  # optional, always present in this mission
 ```
 
+**Deliberate deviation from the taxonomy's own citation-format spec, stated
+explicitly (not silently redefined).** `sop-rule-taxonomy.md`'s own
+"Citation Format for Manifest Entries" section (muster,
+`docs/rubric/sop-rule-taxonomy.md:224-238`) specifies `source.normative` as
+the **literal string** `"docs/rubric/sop-rule-taxonomy.md"`, with **no
+anchor fragment**. Every manifest in this mission instead appends
+`#<class-anchor>` (e.g. `#1-never-call-tool`, `#judge-required-rule-classes`).
+This is harmless to muster's own loader (`loadAndValidateManifest`'s guard
+only checks that `source.normative` is a non-empty string —
+`manifest.ts:292-297` — it does not compare against the literal path) and
+is arguably more precise for a human reader jumping to the exact class
+section rather than the top of a long document. But it is still an
+undocumented deviation from a normative document this mission cites rather
+than redefines, so it is recorded here explicitly rather than left for a
+future reader to notice and wonder whether it was intentional: **this
+mission deviates deliberately, for readability, and the deviation does not
+change any loader-observable behavior.** A future mission wanting strict
+literal conformance to the taxonomy's citation format would need to strip
+every `#<anchor>` suffix; this mission does not do so.
+
 No `probes:` section is present in any of this mission's 14 files —
 `loadManifestProbes` (runner.ts) treats an absent `probes` key as
 `{ complianceProbes: {}, adversarialProbes: {} }`, which is exactly the

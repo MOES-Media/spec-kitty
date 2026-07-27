@@ -23,10 +23,16 @@ each `sopFile:` pointing at the directive YAML itself so muster's existing
 `RULE_DRIFT` static lint (`checkRuleTextPresence`) turns upstream directive
 edits into visible staleness. Every one of the 45 rules gets a real,
 individually-justified taxonomy-class assignment against
-`docs/rubric/sop-rule-taxonomy.md`'s 7 existing classes (25 map cleanly or
-by documented best-fit; 20 do not fit any existing class and are shipped as
-explicit `UNMAPPED` judge-fallback entries — a real taxonomy gap this plan
-surfaces rather than glosses over), a commit-pinned upstream citation
+`docs/rubric/sop-rule-taxonomy.md`'s 7 existing classes (**[corrected
+post-plan-gate: 24 map cleanly or by documented best-fit; 21 do not fit
+any existing class — was 25/20 before two post-plan-gate corrections: 044's
+three rules revert from `never-call-tool` to UNMAPPED (binding operator
+decision — the classification was judged the weakest fit in the table,
+`contracts/rule-classification-and-citation.md`), and 010's two rules move
+from UNMAPPED to `output-format` on a reconciliation pass against the
+structurally-identical `030-r3` precedent — net +1 UNMAPPED]** and are
+shipped as explicit `UNMAPPED` judge-fallback entries — a real taxonomy gap
+this plan surfaces rather than glosses over), a commit-pinned upstream citation
 verified byte-for-byte against the real `Priivacy-ai/spec-kitty` repository,
 and — for the 10 rules whose text wraps across a physical line in the
 directive's raw YAML (042×3, 044×3, 045×4) — a single-line fragment whose
@@ -165,8 +171,14 @@ conformance/
 
 .github/workflows/
 └── conformance.yml                          # MODIFIED (shared with M1): renamed top-level `name:`,
-                                              # added `permissions: contents: read`, added the new
-                                              # `sop-doctrine-conformance` job (3 steps)
+                                              # added the new `sop-doctrine-conformance` job (3 steps).
+                                              # [Corrected post-plan-gate] `permissions: contents: read`
+                                              # and SHA-pinned actions are NOT this mission's
+                                              # contribution — PR #29 (MOES-Media/spec-kitty, lands
+                                              # first per operator decision) adds both. WP03 checks
+                                              # for an existing `permissions:` key before inserting
+                                              # and does not re-pin/unpin the already-SHA-pinned
+                                              # actions.
 ```
 
 **Structure Decision**: `conformance/doctrine/` sits as a sibling to M1's
@@ -287,7 +299,16 @@ verification before the mission is proposed for merge.
   038/`reconcile-change-scope-tensions` are excluded by construction), plus
   local-invocation instructions for the two new scripts, mirroring M1's
   `conformance/README.md` honesty conventions (known-gaps section,
-  structural-vs-observed distinctions).
+  structural-vs-observed distinctions). **[Added post-plan-gate]** The
+  README must also state explicitly that `docs/rubric/
+  sop-rule-taxonomy.md` (the normative source every mapping-table row
+  cites) is **cross-repo** — it lives only in the `garrison-hq/muster`
+  package, not in this repository — so a reader does not go looking for a
+  file that isn't here. The README must also carry
+  `contracts/rule-classification-and-citation.md`'s note that
+  `source.normative` cites this path with a `#<class-anchor>` suffix, a
+  deliberate deviation from the taxonomy's own literal (no-anchor) citation
+  format spec, not an oversight.
 - **Relevant requirements**: FR-006.
 - **Affected surfaces**: `conformance/doctrine/README.md` (new).
 - **Sequencing/depends-on**: IC-01 through IC-04 (documents facts those
@@ -302,22 +323,40 @@ verification before the mission is proposed for merge.
 
 - **Purpose**: Modify `.github/workflows/conformance.yml` in place: rename
   the top-level `name:` (`Skills Static Conformance` → `Static
-  Conformance`), add a workflow-level `permissions: contents: read` block
-  (new hardening this mission contributes — the file currently has none),
-  and add the new `sop-doctrine-conformance` job (checkout, drift gate,
-  completeness check).
+  Conformance`) and add the new `sop-doctrine-conformance` job (checkout,
+  drift gate, completeness check). **[Corrected post-plan-gate]** This
+  concern no longer includes adding `permissions: contents: read` as this
+  mission's own contribution: PR #29 (`MOES-Media/spec-kitty`, open, in
+  final verification) inserts an identical `permissions:\n  contents:
+  read` block at the identical anchor (immediately after `- main`,
+  immediately before `jobs:`) and additionally SHA-pins both existing
+  actions. **Operator decision: PR #29 lands first.** This mission's WP03
+  therefore (a) checks for an existing `permissions:` key before
+  inserting one, and does not duplicate it if PR #29 has already landed;
+  (b) expects both existing actions to already be SHA-pinned and does not
+  re-pin or unpin them; (c) pins its own new job's `actions/checkout` step
+  to match whatever convention PR #29 leaves in place (a SHA, not a fresh
+  `@v6` tag reference).
 - **Relevant requirements**: FR-004, FR-005, C-002.
-- **Affected surfaces**: `.github/workflows/conformance.yml` (the sole
-  file shared with M1's own job).
+- **Affected surfaces**: `.github/workflows/conformance.yml` (shared with
+  both M1's own job and PR #29's hardening changes).
 - **Sequencing/depends-on**: IC-03 + IC-04 (needs both scripts' stable
   paths/exit-code contracts — satisfied by their contracts alone; IC-06
   does not need their source, only the contract files, same lane-independence
-  pattern M1 used for its own WP03).
+  pattern M1 used for its own WP03) **plus PR #29 having landed to `main`**
+  (new dependency, recorded here rather than rediscovered at implement
+  time — research.md §9).
 - **Risks**: this mission rebases on M1's merged state and must not run
   concurrently with any other mission editing this same file (spec
   Dependencies & Assumptions) — flagged for the tasks-phase sequencing
   decision, not resolved here since this mission is single-lane (per the
   issue's own WP decomposition, §"Work-Package Outline" below).
+  **Additionally**: PR #29 (`MOES-Media/spec-kitty`, open) touches this
+  same file at the same anchor point this mission's `permissions:` edit
+  would have targeted — confirmed real via `gh pr view 29`. The operator
+  has decided PR #29 lands first; this mission's WP03 must rebase on that
+  merged state and treat the collision as already resolved (check-before-
+  insert), not as a merge conflict to fix reactively.
 
 ## Work-Package Outline (preview for `/spec-kitty.tasks` — not tasks.md)
 
@@ -346,10 +385,13 @@ tree + README"), consistent with this plan's Implementation Concern Map:
   issue `MOES-Media/spec-kitty#23` is assigned to the Human-in-Charge
   (DIR-012).
 - **WP02** (IC-01, the 4 proposed judge directives: 001, 010, 039, 044 —
-  18 rule entries — including the headline finding that 001/010/039 are
-  entirely `UNMAPPED` and 044 is better modeled as `never-call-tool` than
-  judge): sequenced after or alongside WP01; no file collision (each
-  directive's manifest is its own file).
+  18 rule entries — including the headline finding, **corrected
+  post-plan-gate**, that 001/039/044 are entirely `UNMAPPED` (044 reverted
+  from a prior, since-withdrawn `never-call-tool` reclassification —
+  binding operator decision) while 010 is better modeled as `output-format`
+  than left `UNMAPPED` (reconciliation pass against `030-r3`'s precedent)):
+  sequenced after or alongside WP01; no file collision (each directive's
+  manifest is its own file).
 - **WP03** (IC-02 + IC-03 + IC-04 + IC-05 + IC-06 — control, both scripts,
   README, and the shared workflow file): depends on WP01+WP02's manifests
   existing at their final paths (the drift gate globs them; the README
@@ -360,6 +402,18 @@ tree + README"), consistent with this plan's Implementation Concern Map:
   completeness script's per-directive comparison both read real paths), so
   the contract-only independence pattern does not apply here — flagged
   explicitly so `/spec-kitty.tasks` does not mis-sequence it as parallel-safe.
+  **[Added post-plan-gate]** WP03 additionally depends on **PR #29**
+  (`MOES-Media/spec-kitty`, open, in final verification — operator decision:
+  it lands first) having merged to `main` before WP03 touches
+  `.github/workflows/conformance.yml`: PR #29 inserts an identical
+  `permissions:\n  contents: read` block at the identical anchor (after
+  `- main`, before `jobs:`) and SHA-pins both existing actions. WP03's
+  workflow edit must (1) check for an existing `permissions:` key before
+  inserting one, never duplicating it; (2) expect both actions to already
+  be SHA-pinned and not re-pin or unpin them; (3) pin its own new job's
+  `actions/checkout` step to the same convention (a SHA, not a fresh `@v6`
+  tag). This is a real dependency, not a hypothetical one — confirmed via
+  `gh pr view 29 --repo MOES-Media/spec-kitty`.
 
 **Build order**: WP01 and WP02 may proceed in either order or interleaved
 (disjoint files); WP03 must follow both.

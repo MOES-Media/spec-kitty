@@ -52,6 +52,21 @@ node conformance/scripts/check-doctrine-manifest-completeness.mjs
    convention) and that the control manifest exists at
    `conformance/doctrine/control/045-drifted.yaml` with exactly 1 rule
    entry.
+
+   **This filename-stem pairing is the entire extent of what this script
+   checks about a manifest's identity — it never reads or validates a
+   manifest's `sopFile:` field.** A manifest can exist at the right path,
+   with the right rule count, and still point its `sopFile:` at a deleted
+   directive file or a typo'd path; this script would report `OK` for that
+   manifest regardless. That specific failure mode (a dangling/typo'd
+   `sopFile:` target) is guarded exclusively by
+   `contracts/doctrine-drift-gate-contract.md`'s Phase 1 jq filter, which
+   selects muster's own `STRUCTURAL_ABSENCE` finding — added there
+   specifically because this script cannot see it. The division of labor
+   is deliberate and is recorded here so it is not silently assumed to be
+   double-covered: **filename-stem pairing** is this script's job;
+   **`sopFile:` target existence** is the jq gate's job; neither script
+   re-implements the other's guard.
 4. **Compare and report** — for each directive, assert
    `actualManifestRuleCount === expectedDirectiveRuleCount`. On any
    mismatch (including a manifest file being entirely absent, treated as
@@ -108,6 +123,12 @@ otherwise matter — disjoint checks, same pattern as M1's step ordering).
   correctness, or citation shape — those are muster's own Ajv/semantic
   checks (via the drift gate) plus manual review against
   `contracts/rule-classification-and-citation.md`.
+- Does not validate `sopFile:` targets. Pairing is by filename-stem
+  convention only (Algorithm §3 above) — a manifest whose `sopFile:` points
+  at a missing or misspelled path still reports `OK` here. The drift gate's
+  `STRUCTURAL_ABSENCE` filter entry (`contracts/
+  doctrine-drift-gate-contract.md`) is the sole guard against that failure
+  mode; this script does not duplicate it.
 - Does not detect a rule entry whose `ruleId` was duplicated **and** whose
   count still happens to match (e.g., one entry deleted, another
   copy-pasted twice) — muster's own loader already throws on duplicate

@@ -26,6 +26,19 @@ for every judge (`k-of-n`) entry, including UNMAPPED fallbacks (research.md §7)
 
 **`source.supporting` URL template** (all rows): `https://github.com/Priivacy-ai/spec-kitty/blob/<SHA>/src/doctrine/directives/built-in/<file>.directive.yaml` — `<SHA>` per the directive-level table at the end of this file (research.md §5, upstream-verified byte-for-byte).
 
+**`source.normative` — deliberate deviation, stated explicitly**: every row
+below cites `docs/rubric/sop-rule-taxonomy.md#<class-anchor>`. The
+taxonomy's own "Citation Format for Manifest Entries" section specifies
+the literal string `"docs/rubric/sop-rule-taxonomy.md"` with no anchor.
+This mission deviates deliberately, for reader precision, not by oversight
+— see `contracts/doctrine-rule-manifest-shape.md`'s "Deliberate deviation"
+note for the full rationale (harmless to the loader's guard, which only
+checks non-emptiness). **Cross-repo note**: `docs/rubric/
+sop-rule-taxonomy.md` lives only in the `garrison-hq/muster` package, not
+in this (`spec-kitty`) repository — a reader of this table or of
+`conformance/doctrine/README.md`'s FR-006 mapping table should not go
+looking for that file here.
+
 ---
 
 ## 001 — Architectural Integrity Standard (judge directive, proposed)
@@ -42,16 +55,27 @@ Manifest: `conformance/doctrine/001-architectural-integrity-standard.yaml` · so
 
 ---
 
-## 010 — Specification Fidelity Requirement (judge directive, proposed)
+## 010 — Specification Fidelity Requirement (judge directive, proposed — reclassified output-format on reconciliation)
 
 Manifest: `conformance/doctrine/010-specification-fidelity-requirement.yaml` · sopFile: `../../src/doctrine/directives/built-in/010-specification-fidelity-requirement.directive.yaml`
 
+**[Corrected post-plan-gate, reconciliation pass]** Both rules were
+originally marked UNMAPPED ("process/documentation-presence judgment" and
+"artifact-inspectability judgment"). The gate flagged this as inconsistent
+with `030-r3` ("Pre-existing validation debt must not be hidden inside new
+work."), which is structurally the same disclosure-in-final-artifact
+pattern and was assigned `output-format` (a regex/structural check for a
+required disclosure section in the final artifact). Reconciled to the same
+standard: both are "must-not-be-silent-about-X" obligations checkable
+against the final artifact's structure, not holistic judgments requiring
+an LM's qualitative opinion.
+
 | ruleId | Coverage | ruleText | Class | Fit | gradingClass / aggregation |
 |---|---|---|---|---|---|
-| `010-r1` | full-line | "Unrecorded scope drift is not permitted." | UNMAPPED | process/documentation-presence judgment | judge / k-of-n |
-| `010-r2` | full-line | "Requirement-to-implementation traceability must remain inspectable." | UNMAPPED | artifact-inspectability judgment | judge / k-of-n |
+| `010-r1` | full-line | "Unrecorded scope drift is not permitted." | `output-format` | moderate — regex/structural check for a scope-drift disclosure section in the final PR/spec artifact, same pattern as `030-r3`'s "pre-existing failures" disclosure check | binary / pass-k |
+| `010-r2` | full-line | "Requirement-to-implementation traceability must remain inspectable." | `output-format` | moderate (boundary case, flagged rather than picked silently) — reconciled to match `010-r1`/`030-r3`'s pattern as a structural check for traceability links/annotations in the final artifact; weaker fit than `010-r1` because "remain inspectable" plausibly describes an ongoing property of the whole work process, not only a single final-turn artifact section — a future probe author revisiting this boundary should not read this fit as stronger than it is | binary / pass-k |
 
-`source.normative` (both): `docs/rubric/sop-rule-taxonomy.md#judge-required-rule-classes`
+`source.normative` (both): `docs/rubric/sop-rule-taxonomy.md#5-output-format`
 
 ---
 
@@ -101,7 +125,7 @@ Manifest: `conformance/doctrine/030-test-and-typecheck-quality-gate.yaml` · sop
 
 | ruleId | Coverage | ruleText | Class | Fit | gradingClass / aggregation |
 |---|---|---|---|---|---|
-| `030-r1` | full-line | "New behavior is not ready for review while relevant tests or applicable static validation gates are red." | `tool-order` | clean — mustPrecede: green test run; mustFollow: handoff/review-request | binary / pass-k |
+| `030-r1` | full-line | "New behavior is not ready for review while relevant tests or applicable static validation gates are red." | `tool-order` | moderate (caveat, downgraded from "clean" on reconciliation) — `gradeToolOrder` (`graders.ts`) matches `mustPrecede`/`mustFollow` purely by tool-call **name** presence in the trace; it has no way to inspect whether a matched "test run" call's *result* was green or red. This rule is outcome-conditioned (red vs. green), not merely order-conditioned (ran vs. didn't run before handoff) — the taxonomy has no class that inspects a prior call's outcome, so `tool-order` is still the closest available fit but only if a future M4 probe models "a green/passing test run" as a distinct trace-event kind from "a test run occurred," which the grader does not do today. Flagged as a boundary case rather than picked silently. | binary / pass-k |
 | `030-r2` | full-line | "Configured supply-chain or compliance gates must not be skipped silently when they are part of the repository's expected validation flow." | UNMAPPED | positive "must-call" obligation — no class expresses a mandatory tool call | judge / k-of-n |
 | `030-r3` | full-line | "Pre-existing validation debt must not be hidden inside new work." | `output-format` | moderate — regex requiring a "pre-existing failures" disclosure section | binary / pass-k |
 
@@ -129,10 +153,10 @@ Manifest: `conformance/doctrine/034-test-first-development.yaml` · sopFile: `..
 | ruleId | Coverage | ruleText | Class | Fit | gradingClass / aggregation |
 |---|---|---|---|---|---|
 | `034-r1` | full-line | "Production code must not be written ahead of a failing test that motivates it." | `tool-order` | **clean** — mustPrecede: failing-test-file edit; mustFollow: production-source edit | binary / pass-k |
-| `034-r2` | full-line | "Skipping the test-first cycle requires explicit justification in the commit or PR." | `confirm-before-destructive` | good — destructiveTools: ["skip-test-first"] (conceptual), confirmationKind: agent-explicit-confirm | binary / pass-k |
+| `034-r2` | full-line | "Skipping the test-first cycle requires explicit justification in the commit or PR." | `output-format` | moderate (reclassified on reconciliation from `confirm-before-destructive`) — the rule requires a justification **string to be present in a final artifact** (the commit/PR message) when the skip condition holds, which is a regex/structural check on that artifact, not a confirmation turn preceding a destructive tool call. The original `confirm-before-destructive` pick required treating "skip-test-first" as a `destructiveTools` entry that is never actually a callable tool — a conceptual fiction the fit column itself hedged with "(conceptual)". `output-format` needs no such fiction and matches the established pattern used for `010-r1`, `030-r3`, and `018-r1`/`r2` (regex-check-the-final-artifact-for-a-disclosure). | binary / pass-k |
 | `034-r3` | full-line | "A bug-reproduction test that can only run AFTER the fix exists (it imports the fix's new symbol or passes its new parameter) captures the fix's shape, not the bug — it is invalid; rewrite it to drive the stable entry point, and move any new-API import to lazy/in-test scope so the reproduction still collects and fails red on the unfixed code." | UNMAPPED | requires causal judgment about *why* a test fails — not trace-decidable | judge / k-of-n |
 
-`source.normative`: `034-r1` → `docs/rubric/sop-rule-taxonomy.md#2-tool-order`; `034-r2` → `docs/rubric/sop-rule-taxonomy.md#3-confirm-before-destructive`; `034-r3` → `docs/rubric/sop-rule-taxonomy.md#judge-required-rule-classes`
+`source.normative`: `034-r1` → `docs/rubric/sop-rule-taxonomy.md#2-tool-order`; `034-r2` → `docs/rubric/sop-rule-taxonomy.md#5-output-format` (reclassified on reconciliation, see fit note above); `034-r3` → `docs/rubric/sop-rule-taxonomy.md#judge-required-rule-classes`
 
 ---
 
@@ -143,10 +167,10 @@ Manifest: `conformance/doctrine/035-bulk-edit-occurrence-classification.yaml` ·
 | ruleId | Coverage | ruleText | Class | Fit | gradingClass / aggregation |
 |---|---|---|---|---|---|
 | `035-r1` | full-line | "Every occurrence category in the map must have an explicit action assignment." | `output-format` | **clean** — `occurrence_map.yaml` is a structured artifact validated by JSON Schema | binary / pass-k |
-| `035-r2` | full-line | "Categories marked do_not_change must not be modified without updating the map." | `confirm-before-destructive` | moderate — destructiveTools: ["modify do_not_change category"], confirmationKind: agent-explicit-confirm | binary / pass-k |
+| `035-r2` | full-line | "Categories marked do_not_change must not be modified without updating the map." | `tool-order` | good (reclassified on reconciliation from `confirm-before-destructive`) — the rule names a genuine before/after ordering between two file-edit events (update `occurrence_map.yaml` must precede modifying a `do_not_change`-tagged file), the same shape `034-r1` uses ("clean" tool-order fit: mustPrecede = failing-test-file edit, mustFollow = production-source edit). `mustPrecede`: edit `occurrence_map.yaml`'s category entry; `mustFollow`: edit a file in a `do_not_change` category. This is a better-justified fit than the original `confirm-before-destructive` pick, which required an assistant utterance ("confirmation turn") this rule does not actually call for — it calls for a prior *file edit*, which `tool-order` models directly and `confirm-before-destructive` does not. | binary / pass-k |
 | `035-r3` | full-line | "The occurrence map is the sole authority for what categories may change." | UNMAPPED | declarative authority statement, not an independently checkable event | judge / k-of-n |
 
-`source.normative`: `035-r1` → `docs/rubric/sop-rule-taxonomy.md#5-output-format`; `035-r2` → `docs/rubric/sop-rule-taxonomy.md#3-confirm-before-destructive`; `035-r3` → `docs/rubric/sop-rule-taxonomy.md#judge-required-rule-classes`
+`source.normative`: `035-r1` → `docs/rubric/sop-rule-taxonomy.md#5-output-format`; `035-r2` → `docs/rubric/sop-rule-taxonomy.md#2-tool-order` (reclassified on reconciliation, see fit note above); `035-r3` → `docs/rubric/sop-rule-taxonomy.md#judge-required-rule-classes`
 
 ---
 
@@ -201,23 +225,50 @@ Manifest: `conformance/doctrine/042-common-docs.yaml` · sopFile: `../../src/doc
 
 ---
 
-## 044 — Canonical Sources and Unification (judge directive, proposed — reclassified binary on inspection)
+## 044 — Canonical Sources and Unification (judge directive, proposed — reverted to UNMAPPED post-plan-gate)
 
 Manifest: `conformance/doctrine/044-canonical-sources-and-unification.yaml` · sopFile: `../../src/doctrine/directives/built-in/044-canonical-sources-and-unification.directive.yaml`
 
+**[Reverted post-plan-gate, binding operator decision]** This mission's
+plan originally reclassified all three 044 rules to `never-call-tool`/
+binary (see the struck framing below, kept for record). The post-plan
+adversarial gate and both review delegates independently judged this the
+weakest classification in the whole table: unlike `033-r1`'s and
+`045-r1`/`045-r2`'s literally-enumerable forbidden command strings (`git
+add -A`, `git push --force`) — which the contract itself uses as the
+comparison bar for a clean `never-call-tool` fit — all three 044 rules
+("used as a template," "adding parity to non-canonical copies,"
+"hand-rolled workaround") require semantic judgment about *intent and
+role*, not detection of a named forbidden action. `044-r2` in particular
+has no trace-observable proxy at all: "consolidating to a single canonical
+surface" is not a tool call, a file edit, or any other discrete trace
+event a grader could inspect. The table's own former "weak-fit (caveat)"
+label (a term not even defined in this contract's Legend) tacitly conceded
+this while the surrounding prose ("fares better," "best modeled as
+binary") oversold it. **Operator's standing position: honest UNMAPPED
+beats a forced fit** — reverting these three rules to UNMAPPED raises the
+mission's total UNMAPPED count to 21 of 45 (after the Fix 5 reconciliation
+pass also moves 010's two rules the other direction — see Summary counts
+below), which is a more truthful headline than a strained binary fit, not
+a worse one.
+
 | ruleId | Coverage | ruleText (fragment) | Class | Fit | gradingClass / aggregation |
 |---|---|---|---|---|---|
-| `044-r1` | **fragment** | "No agent may copy a spec, plan, or tasks artifact from kitty-specs/ and use it as a" | `never-call-tool` | weak-fit (caveat) — forbid "copy kitty-specs artifact as template" as a conceptual tool | binary / pass-k |
-| `044-r2` | **fragment** | "Consolidating to a single canonical surface is the only acceptable resolution for a" | `never-call-tool` | weak-fit (caveat) — forbid "add parity to non-canonical copy" | binary / pass-k |
-| `044-r3` | **fragment** | "A missing CLI command that is documented must produce a gap report and upstream issue," | `never-call-tool` | weak-fit (caveat) — forbid the hand-rolled-workaround half; the positive "must file a gap report" half is not separately checked (same must-call gap as `030-r2`) | binary / pass-k |
+| `044-r1` | **fragment** | "No agent may copy a spec, plan, or tasks artifact from kitty-specs/ and use it as a" | UNMAPPED | requires judging *role/intent* of an artifact ("used as a template") — not a named forbidden action a grader can match against a trace | judge / k-of-n |
+| `044-r2` | **fragment** | "Consolidating to a single canonical surface is the only acceptable resolution for a" | UNMAPPED | no trace-observable proxy at all — "consolidating to a canonical surface" is not a discrete event any grader could inspect | judge / k-of-n |
+| `044-r3` | **fragment** | "A missing CLI command that is documented must produce a gap report and upstream issue," | UNMAPPED | requires judging whether an implementation is a "hand-rolled workaround" (semantic characterization), plus a positive "must file a gap report" obligation no class expresses (same must-call gap as `030-r2`) | judge / k-of-n |
 
-`source.normative` (all 3): `docs/rubric/sop-rule-taxonomy.md#1-never-call-tool`
+`source.normative` (all 3): `docs/rubric/sop-rule-taxonomy.md#judge-required-rule-classes`
 
-**Why binary, despite 044 being a "proposed judge directive"**: unlike
-001/010/039, every 044 rule names a concretely forbidden *action*, not a
-qualitative design judgment — see research.md §4's headline finding.
+**Superseded rationale, kept for record only (do not re-apply)**: the
+plan's original reasoning was "unlike 001/010/039, every 044 rule names a
+concretely forbidden *action*, not a qualitative design judgment ... 044 is
+best modeled as binary, not judge, despite being proposed as a judge
+directive" (research.md §4). This is the claim the post-plan gate
+overturned; the corrected finding is recorded in research.md §4, updated
+in the same pass as this table.
 
-**Fragment provenance**: `044-r1` = line 34 of 34–35; `044-r2` = line 36 of 36–37; `044-r3` = line 38 of 38–39. All verified `grep -F -c` = 1.
+**Fragment provenance**: `044-r1` = line 34 of 34–35; `044-r2` = line 36 of 36–37; `044-r3` = line 38 of 38–39. All verified `grep -F -c` = 1 — this provenance is unaffected by the classification reversal, since fragment citation is independent of taxonomy class.
 
 ---
 
@@ -258,11 +309,33 @@ Manifest: `conformance/doctrine/045-prs-only-and-read-intent.yaml` · sopFile: `
 
 ## Summary counts
 
+**[Corrected post-plan-gate — Fix 3 (044 revert) + Fix 5 (reconciliation
+pass) both applied]** The counts below superseded the plan's original
+25-mapped/20-UNMAPPED split after two changes: (1) all three 044 rules
+revert from `never-call-tool` to UNMAPPED (binding operator decision,
+above); (2) the reconciliation pass moves 010's two rules from UNMAPPED to
+`output-format`, moves `034-r2` from `confirm-before-destructive` to
+`output-format`, and moves `035-r2` from `confirm-before-destructive` to
+`tool-order` (all documented in their respective sections above). Net
+effect: mapped count moves 25 → 22 (044 revert) → 24 (010 reconciliation);
+UNMAPPED moves 20 → 23 (044 revert) → 21 (010 reconciliation).
+
 - 45 rules total across 13 directives (verified: `awk`-based `integrity_rules`
   bullet count per directive, research.md's companion completeness-check
-  design; sums to 45 exactly).
-- 10 fragment-cited rules (042×3, 044×3, 045×4); 35 full-line rules.
-- 25 rules mapped to an existing class: `never-call-tool` ×11, `output-format`
-  ×8, `tool-order` ×3, `confirm-before-destructive` ×2, `tone-persona-adherence` ×1.
-- 20 rules UNMAPPED (judge-fallback): all 11 of directive 039, all 3 of
-  directive 001, all 2 of directive 010, plus one each from 030, 033, 034, 035.
+  design; sums to 45 exactly — unaffected by classification changes).
+- 10 fragment-cited rules (042×3, 044×3, 045×4); 35 full-line rules
+  (unaffected by classification changes — fragment citation is independent
+  of taxonomy class).
+- **24 rules mapped to an existing class** (was 25): `never-call-tool` ×8
+  (was 11; 044's 3 rules reverted to UNMAPPED), `output-format` ×11 (was 8;
+  +2 from 010-r1/010-r2, +1 from 034-r2), `tool-order` ×4 (was 3; +1 from
+  035-r2), `confirm-before-destructive` ×0 (was 2; both prior entries
+  reclassified — this mission ships zero examples of this class, which is
+  not a structural problem: the taxonomy does not require every mission to
+  exercise every class), `tone-persona-adherence` ×1 (unchanged).
+- **21 rules UNMAPPED (judge-fallback)** (was 20): all 11 of directive 039,
+  all 3 of directive 001, all 3 of directive 044 (reverted, was
+  `never-call-tool`), plus one each from 030, 033, 034, 035. Directive 010
+  is **no longer** in this list (both its rules move to `output-format` on
+  reconciliation) — the "which three of the four proposed judge directives
+  are fully unmapped" set changes from {039, 001, 010} to {039, 001, 044}.
