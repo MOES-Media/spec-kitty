@@ -1,7 +1,7 @@
 {
-  "event_count": 3,
-  "last_event_id": "01KYJJ59CG6VG5G3Q2QYH2M36J",
-  "materialized_at": "2026-07-27T19:52:19.089014+00:00",
+  "event_count": 4,
+  "last_event_id": "01KYJJ5AMYZQXH18S392RW6NE0",
+  "materialized_at": "2026-07-27T19:52:20.382831+00:00",
   "mission_number": "",
   "mission_slug": "crosslayer-composition-suite-01KYJA33",
   "mission_type": "software-dev",
@@ -14,7 +14,7 @@
     "for_review": 0,
     "in_progress": 0,
     "in_review": 0,
-    "planned": 3
+    "planned": 4
   },
   "work_packages": {
     "WP01": {
@@ -37,6 +37,13 @@
       "lane": "planned",
       "last_event_id": "01KYJJ59CG6VG5G3Q2QYH2M36J",
       "last_transition_at": "2026-07-27T19:52:19.089014+00:00"
+    },
+    "WP04": {
+      "actor": "finalize-tasks",
+      "force_count": 0,
+      "lane": "planned",
+      "last_event_id": "01KYJJ5AMYZQXH18S392RW6NE0",
+      "last_transition_at": "2026-07-27T19:52:20.382831+00:00"
     }
   }
 }
