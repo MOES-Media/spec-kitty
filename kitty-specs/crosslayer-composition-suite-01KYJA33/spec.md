@@ -516,8 +516,25 @@ for the same reason).
   RFC-1/openclaw-sop source (all file:line citations in this spec) pins to
   `624edd6dddedb86fb89f13084510f02b5a2c7d25`, confirmed identical to the
   fork's actually-consumed `@garrison-hq/muster@1.1.0`
-  (`6bdb070dfa204a45f00a715ce5bd584c669444e6`) for every cited file. Claims
-  about this mission's own repository pin to `c425bc188995b5b9a04bece05b511ba81896ce7f`
+  (`6bdb070dfa204a45f00a715ce5bd584c669444e6`) **for five of the six cited
+  files** — `src/crosslayer/composition.ts`,
+  `src/adapters/openclaw-sop/manifest.ts`, `src/adapters/rfc1/schema.json`,
+  `src/crosslayer/rule-survival.ts`, and `src/crosslayer/contradiction-lint.ts`
+  are byte-identical between the two pins, re-verified directly against
+  muster's own repository during post-plan review (`git diff --stat
+  624edd6d..6bdb070d -- <path>`, empty for each) (**post-plan review
+  correction**: the prior form of this bullet claimed byte-identity "for
+  every cited file," which is false for the sixth). `src/cli/index.ts`
+  **differs**: `git diff --stat` between the two pins shows 372 changed
+  lines, because an unrelated adapter (`memory-utilization`) was added to
+  that file after `v1.1.0` and before `624edd6d`. The specific logic this
+  spec's citations rely on — the `ExecutionError`→exit-`2` mapping and
+  `emitCrossLayerSummary`'s exit-code contract (FR-004, C-001) — was
+  diffed directly at both pins and is unchanged (only line offsets shift,
+  from the unrelated addition); C-001/FR-004's substance therefore still
+  holds at both pins, only the whole-file byte-identity claim does not.
+  Claims about this mission's own repository pin to
+  `c425bc188995b5b9a04bece05b511ba81896ce7f`
   (this mission's base commit on `main`). Neither citation type pins to
   `HEAD` or a branch name.
 - **Real-CLI verification requirement** (operator directive): this mission

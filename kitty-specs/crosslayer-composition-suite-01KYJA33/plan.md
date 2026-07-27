@@ -161,6 +161,22 @@ allow-list exactly.
   around**: the spec assumes duplicated content is available at
   tasks-authoring time, but the content's source (the defaults table +
   the projector) does not exist until a lane runs.
+- **Where this happens, stated explicitly (post-plan review finding)**:
+  "outside any lane's worktree" is ambiguous — an implementer could
+  reasonably (and unsafely) read it as "on `main` or the primary checkout."
+  It is neither. Per `src/specify_cli/lanes/merge.py`, this fork's merge
+  engine has two distinct merge steps with different risk profiles:
+  `consolidate_lane_into_mission` (`:247`) folds a lane branch into the
+  mission branch with a plain `git merge --no-ff` — no squash, no
+  `-X theirs` — so content committed on the mission's own coordination
+  branch is not at risk from a lane merge. Only
+  `integrate_mission_into_target` (`:259`) defaults to
+  `MergeStrategy.SQUASH`, and only that one path, at the final
+  mission→target step, runs `git merge --squash -X theirs`
+  (`:612-618`) once. IC-00's defaults-table choice and the pinned
+  `Soul.md` bytes must therefore be authored on the mission's own
+  coordination branch, before either lane's worktree is allocated —
+  never on `main` or the primary checkout.
 - **Resolution**: before `/spec-kitty.tasks` materializes lane-a's and
   lane-b's task files, whoever authors those files must, once, outside any
   lane's worktree: (1) choose and freeze the actual defaults-table values
@@ -347,6 +363,27 @@ allow-list exactly.
   adding `$ref` lines. Creating lane-c's worktree early, before lane-b
   merges, would reproduce the exact lane-isolation bite hazard 2 warns
   about, for no benefit (M3 blocks it anyway).
+- **Enforcement, not just procedure (post-plan review finding)**: the
+  ordering above is not automatically enforced by prose alone — it is
+  enforced by machinery that only engages if lane-c's WP frontmatter
+  actually declares the dependency. Concretely: lane-c's WP(s) **must**
+  declare `depends_on` on lane-b's WP id(s) in frontmatter. That feeds
+  `dependency_graph` → `compute_lanes`'s `depends_on_lanes`, which makes
+  `worktree_allocator._merge_dependency_lane_tips`
+  (`lanes/worktree_allocator.py:300`) auto-merge lane-b's branch tip into
+  lane-c's worktree (failing closed on conflict), and makes
+  `merge/ordering.get_merge_order` (`:69`) topologically sort lane-c after
+  lane-b instead of falling back to bare numerical WP order — a fallback
+  it takes silently (`logger.warning` only, `:104-110`) if no WP declares
+  a dependency. Without the frontmatter declaration, none of this engages.
+  Separately, `policy/merge_gates._evaluate_dependency_gate` (`:229`) can
+  refuse a merge when a dependency isn't done/approved, but only when
+  `MergeGateConfig.mode == "block"`; **this repo's `.kittify/config.yaml`
+  does not set it, so it defaults to `"warn"`** (`policy/config.py:74`) —
+  confirmed by inspection, no override present. In `warn` mode an
+  out-of-order merge is not hard-blocked by this gate. Task authoring and
+  accept-time review must independently verify lane-c was actually
+  sequenced after lane-b's merge; do not rely on the gate alone.
 - **Acceptance evidence**: `MUSTER_ENDPOINT=<live> MUSTER_API_KEY=<key> npx
   @garrison-hq/muster@1.1.0 crosslayer run conformance/crosslayer/manifest.yaml
   --json` — expect exit `0` when every real case's `verdict` is `survived`
@@ -391,6 +428,28 @@ allow-list exactly.
   worktree executes during implementation. This closes a lane-assignment
   gap the spec left implicit for C-002 specifically (it assigned C-001
   explicitly but not this one).
+  **Post-plan review correction — C-002 also runs per-lane**: C-002 and
+  C-003 are not the same shape. C-003 genuinely needs cross-lane
+  visibility (it audits both lanes' committed output together). C-002
+  does not — `git diff --name-only <base>...<lane-branch>` is computable
+  for a single lane in isolation, before that lane even merges. Deferring
+  it entirely to the assembled-diff run discards a free fail-fast check:
+  a lane that accidentally touches `conformance/README.md` or
+  `.github/workflows/conformance.yml` would otherwise only be caught
+  after both lanes have already merged, instead of at once. **C-002
+  therefore runs twice**: (1) per-lane, against that lane's own diff,
+  before each lane's merge into the mission branch — lane-a's and
+  lane-b's own responsibility, each on its own branch; and (2) once more
+  over the fully assembled diff, as already described above, as the
+  cross-lane pre-merge/mission-review backstop. Both runs use the same
+  command shape, scoped to `<base>...<lane-branch>` for (1) and
+  `main...HEAD` for (2). **Record both C-002 and C-003 as
+  acceptance-matrix criteria at accept time** — the acceptance matrix is
+  the one artifact this codebase's `_evaluate_evidence_gate` can actually
+  see and act on; left as free-floating prose with "no lane owns it," a
+  cross-lane check degrades into "nobody does" it. Whoever runs the
+  accept gate must add explicit acceptance-matrix rows for C-002 and
+  C-003, not just leave them documented here.
 
 ## Dependency Graph
 
@@ -497,3 +556,21 @@ during this plan pass:
    operator/architect, not decided by this plan (decomposition and
    sequencing is my mandate; whether to gate mission completion on a
    blocked FR is a product/architecture call).
+7. **Spec's "byte-identical for every cited file" citation was imprecise
+   (post-plan review finding)**: re-verified directly against muster's
+   own repository (`git diff --stat` between the two pinned commits, per
+   cited file). Five of the six cited files
+   (`src/crosslayer/composition.ts`,
+   `src/adapters/openclaw-sop/manifest.ts`,
+   `src/adapters/rfc1/schema.json`, `src/crosslayer/rule-survival.ts`,
+   `src/crosslayer/contradiction-lint.ts`) are byte-identical between
+   `v1.1.0` (`6bdb070d`) and the pinned commit (`624edd6d`). The sixth,
+   `src/cli/index.ts`, is not — an unrelated `memory-utilization` adapter
+   was added to it between the two pins (372 changed lines). The specific
+   cited logic (the `ExecutionError`→exit-`2` mapping,
+   `emitCrossLayerSummary`'s exit-code contract) was diffed directly at
+   both pins and is byte-identical modulo line-offset shift from the
+   unrelated addition, so C-001/FR-004's substance is unaffected — only
+   the blanket whole-file claim was wrong. Corrected in spec.md's
+   Dependencies & Assumptions section directly, not left as an
+   uncorrected citation.
