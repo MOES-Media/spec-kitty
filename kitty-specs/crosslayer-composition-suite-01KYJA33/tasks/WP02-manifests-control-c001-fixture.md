@@ -854,3 +854,136 @@ No file under `conformance/crosslayer/personas/` (WP01's exclusive scope)
 was touched. `git status --short` on lane-b confirmed clean of any scratch
 path at commit time; all neutralize-direction proofs ran from
 `/tmp/claude-1000/...` scratch locations outside the repo, never staged.
+
+### M7 mission-review remediation pass (HIGH-1, MEDIUM-1, MEDIUM-3 fixed; MEDIUM-2, LOW-2, LOW-3 recorded)
+
+**HIGH-1 — the C-001 amendment above was claimed but never landed.** A
+prior pass's Activity Log entry (immediately above) said spec.md's C-001
+row was amended "this commit, planning branch." It was not: a worktree
+collision (a second agent's uncommitted revert of this same coordination
+worktree, not this lane's fault) lost that specific hunk while an
+unrelated FR-006 amendment survived. `spec.md`'s C-001 row was still
+pinning exit `2` at this pass's start. Re-verified fresh rather than
+trusting the above entry's claims (both the RFC-1-invalid-persona case and
+the contrasting path-traversal case, real `@garrison-hq/muster@1.1.0` CLI,
+this pass): exit **1**, `{"passed": false, "error": "Persona layer failed
+RFC-1 strict-mode validation: [Appendix E] voice: must have required
+property 'voice'"}`, no `findings` key, empty stderr — versus exit **2**,
+`muster: crosslayer manifest run failed: Path traversal rejected...`, for
+the path-traversal case. Identical to what the above entry claimed to have
+found; only the spec.md edit itself was missing. Landed now (this pass) in
+spec.md's C-001 row.
+
+**Distinguishability wording tightened.** A reviewer found the above
+entry's "a graded contradiction result always carries `findings`" claim
+over-broad: true only for *static* graded results. `runBehavioralCase`'s
+graded return is `{id, passed, verdict}` — no `findings` key at all, ever
+(`manifest-runner.ts`, confirmed by reading the source this pass). And a
+*static* case with no `expected:` block returns the same
+error-present/`findings`-absent shape as C-001's malformed fixture
+(`{"passed": false, "skipped": true, "error": "...has no expected
+declaration..."}`, `manifest-runner.ts` ~line 313). spec.md's C-001 row now
+says "static graded result" and identifies the `"RFC-1 strict-mode
+validation"` substring — which the committed test already asserts — as the
+actually reliable discriminator, not the shape alone. `garrison-hq/muster#70`'s
+issue body carried the same over-broad claim publicly; corrected there too
+(edit + explanatory comment), since it was being read as-is.
+
+**MEDIUM-1 — lane-b carried a stale WP04 task-file copy that would have
+reverted lane-d's C-011 remediation.** Lane-b's `2a9f5012e` restored
+`kitty-specs/` from the planning branch as it stood before lane-d's C-011
+widening landed; the branch had since advanced and lane-b's copy of
+`tasks/WP04-crosslayer-ci-workflow.md` did not. A prior pass's report
+claimed this lane made "zero `kitty-specs/` commits" — wrong; `2a9f5012e`
+is one, and the source of this regression. Fixed: restored that one file
+in lane-b, byte-for-byte, from the planning branch's committed HEAD (
+`1021d29eb`, confirmed via a zero-line diff before staging), committed
+separately from the symlink-documentation fix. Verified in a throwaway
+clone (`git clone --no-local`, never the coordination worktree's own
+working tree): merging the fixed lane-b branch into the planning branch's
+`1021d29eb` (the literal ref specified when this check was requested)
+produces a **clean merge for the WP04 task file** — zero conflict, C-011's
+widening intact — with two unrelated bookkeeping-only conflicts
+(`status.json`, `status.events.jsonl`, append-only mission telemetry every
+lane touches; expected for any lane merge, not evidence of a problem here).
+By the time this check ran, the coordination branch had legitimately
+advanced one further commit (`d591ca932`, WP04's own MEDIUM-2 remediation,
+landed by that WP's own review agent while this pass was running) — merging
+against that newer tip does produce a WP04-file conflict, but every
+conflicting hunk is the newer tip adding content on top of exactly what
+lane-b's fix already restored; there is no lost content in either
+direction, only a mechanical "who edited nearby lines" conflict, trivially
+resolved by taking the coordination branch's side.
+
+**MEDIUM-3 — the tracked symlink defeats the path-traversal guard.**
+`fixtures/spk-run-next.SKILL.md`'s justification (needed to reference a
+real skill file outside the manifest directory without duplicating it) was
+correct, previously verified. But `assertWithinManifestDir`
+(`manifest-runner.ts:132`) is purely lexical — `normalize()`+`startsWith()`
+on the committed path string, no `realpath`/`lstat`/`readlink`/
+`isSymbolicLink` anywhere in `src/crosslayer/` (confirmed by reading the
+muster source directly this pass, plus one unrelated `realpathSync` hit in
+`src/cli/index.ts` for an ESM entry-point check, not path security) — so a
+symlink whose committed path stays inside `conformance/crosslayer/`
+defeats it at exit 0 even though the target resolves outside the manifest
+directory; `fs.readFile` (line ~190) then transparently follows it.
+Reproduced directly (scratch symlink, exit 0, real content read) versus
+the equivalent literal path (exit 2, rejected). This particular symlink
+remains benign (in-repo target, diff-visible via mode `120000`,
+`CaseResult.findings` never carries clause text), but the bypass is real
+and this fixture tree is the first place in the mission to introduce a
+tracked symlink. Documented in lane-b's own owned code files — a SECURITY
+NOTE at the `fixturePath` in both `cases/architect-run-skill.yaml` and
+`cases/reviewer-run-skill.yaml`, plus a pointer at `manifest.yaml`'s entry
+point — not only in this planning artifact, so a reader of the fixture
+tree encounters it directly. Filed upstream:
+[garrison-hq/muster#71](https://github.com/garrison-hq/muster/issues/71)
+(symmetrical to #70), with the exact guard code, the `fs.readFile` call
+site, repro steps for both directions, and a suggested fix direction (not
+prescriptive). Not fixed here — muster is out of scope for this mission.
+
+**MEDIUM-2 — recorded, not re-litigated.** The FR-006 remediation above
+(control was vacuous) was itself not test-first: the original test pinned
+the vacuity as expected/passing behavior, and the fix changed both the
+fixture and the test in one commit rather than a separate RED step against
+the corrected wording. The docstrings are honest about this (they say what
+happened, not that it was test-first), and the reviewer's own break-tests
+(falsifying the fix by reverting it and confirming the pinned test fails)
+retired the risk that the fix is a false green. Noting this plainly: this
+mission's "first genuine test-first ordering" framing (see the C-011 RED
+entry at the top of this Activity Log, which *is* test-first) should not
+be read as covering this later in-lane FR-006 fix, which was not.
+
+**LOW-2 — recorded, muster-side, not this mission's to fix.**
+`ACCOMMODATION_OPERATORS` contains `"without exception"` and
+`SCOPE_QUALIFIERS` contains `"in the context of"` / `"in case"` —
+multi-word phrases — but `contradiction-lint.ts`'s `tokenize()` splits
+on whitespace, so a multi-word list entry can never match a single
+token. A fixture author relying on any of these three phrases to
+trigger a finding would see it silently fail to register. Not fixed
+here (muster's tokenizer, out of scope); noted so a future fixture
+author in this mission doesn't lean on a dead phrase.
+
+**LOW-3 — recorded, already disclosed, not overstated.** The FR-006
+control (and `contradiction-lint.ts` generally) discriminates on
+**token presence**, not semantics: a bare `"Never."` contradicting
+nothing still fires a finding, and a benign sentence merely prefixed
+with `"Always"` can false-positive. This is already disclosed in both
+`control.yaml`'s comments and spec.md; this entry leaves that
+disclosure as-is and does not claim it has been resolved, since it has
+not.
+
+**Files touched (lane-b, this pass, owned scope, two separate commits)**:
+`kitty-specs/crosslayer-composition-suite-01KYJA33/tasks/WP04-crosslayer-ci-workflow.md`
+(restored from planning-branch HEAD — bookkeeping only, not a WP02 code
+file, but the only viable fix location for a stale copy that lives in
+lane-b's own worktree); `conformance/crosslayer/manifest.yaml`,
+`conformance/crosslayer/cases/architect-run-skill.yaml`,
+`conformance/crosslayer/cases/reviewer-run-skill.yaml` (symlink
+documentation).
+
+**Files touched (planning branch, via coordination worktree, this pass)**:
+`kitty-specs/crosslayer-composition-suite-01KYJA33/spec.md` (C-001 row) and
+this Activity Log entry. Coordination worktree confirmed clean (`git
+status`) both before this entry was written and after WP04's own
+concurrent remediation (`d591ca932`) landed and released it back.
