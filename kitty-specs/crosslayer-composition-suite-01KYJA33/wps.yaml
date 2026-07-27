@@ -107,8 +107,9 @@ work_packages:
     prompt_file: "tasks/WP04-crosslayer-ci-workflow.md"
 
   - id: WP05
-    title: "FR-005 rule-survival case authoring (lane-c, blocked on M3 + WP02/WP04 merge)"
+    title: "FR-005 rule-survival case authoring (lane-c, blocked on M3 + WP01/WP02/WP04 merge)"
     dependencies:
+      - WP01
       - WP02
       - WP04
     owned_files:
