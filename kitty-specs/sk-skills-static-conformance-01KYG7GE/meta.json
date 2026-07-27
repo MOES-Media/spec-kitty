@@ -1,4 +1,5 @@
 {
+  "baseline_merge_commit": "6d084356bf7cd414425949a561d8660912883866",
   "coordination_branch": "kitty/mission-sk-skills-static-conformance-01KYG7GE",
   "created_at": "2026-07-26T22:07:41.575070+00:00",
   "flattened": false,
@@ -11,6 +12,7 @@
   "purpose_context": "This is wave-1 mission M1 of the muster <-> spec-kitty agent-conformance programme. It bootstraps a conformance/ tree in the spec-kitty fork containing a muster skills manifest covering all 53 built-in skills, a rigged control case that proves the suite can fail, the programme's D1-D5 decision record, and a PR-gating GitHub Actions workflow that runs muster via muster-action@v1 fully offline. It makes zero changes to muster itself and proves the muster<->spec-kitty integration seam end to end, unblocking three later spec-kitty-side conformance missions (M3, M6, M7).",
   "purpose_tldr": "Wire spec-kitty's 53 built-in SKILL.md files through muster's static skills adapter and gate every PR on the result.",
   "slug": "sk-skills-static-conformance-01KYG7GE",
+  "status_phase": "1",
   "target_branch": "kitty/mission-sk-skills-static-conformance",
   "topology": "coord",
   "vcs": "git",
