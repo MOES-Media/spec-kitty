@@ -96,8 +96,28 @@ broken fixture (frontmatter `name` does not match its directory name) with
 case "passes" today because the harness's actual result (`ok: false`)
 matches the declared expectation.
 
-To manually prove the suite can also *fail* (documented here, not part of
-CI, since it requires temporarily corrupting the manifest):
+**What enforces this is `check-manifest-completeness.mjs`, not
+`muster skills run`.** muster's own `skills run` catch block scores *any*
+parse/read failure — a missing directory, a missing `SKILL.md`, a corrupt
+fixture — the same way it scores a correctly-detected name mismatch: both
+register as `ok: false`, which matches this control case's declared
+`expectations.ok: false` either way (this is a muster-side limitation,
+out of scope per C-001 — see "Known muster gaps" below). Deleting
+`conformance/skills/control/name-mismatch/` entirely, or "fixing" its
+name/directory mismatch, therefore both leave `muster skills run` at exit
+`0`. `check-manifest-completeness.mjs` is the check that actually
+discriminates these cases: it independently asserts (fork-side, no muster
+change) that every case's `skillDir` resolves to an existing directory
+containing a `SKILL.md`, and, for this control case specifically, that its
+frontmatter `name` still differs from its directory basename. If a future
+change "fixes" the mismatch by aligning `name` with the directory, **or**
+deletes the fixture outright, `check-manifest-completeness.mjs` — not
+`muster skills run` — will start failing, naming the control case
+explicitly.
+
+To manually prove `muster skills run` alone can also *fail* (documented
+here, not part of CI, since it requires temporarily corrupting the
+manifest):
 
 ```sh
 # Baseline: exits 0 today.
@@ -142,6 +162,21 @@ requires **no repository secrets** (C-002) — the static path is fully
 offline once muster's own package resolution completes on the runner — so
 it is designed to also pass on pull requests opened from a fork (not yet
 empirically observed — see the timing table below).
+
+**Action pinning.** Both third-party actions the workflow invokes —
+`actions/checkout` and `garrison-hq/muster-action` — are pinned to their
+resolved commit SHA, each with a trailing `# vN` comment for readability,
+never to the bare mutable tag. `garrison-hq/muster-action` is a composite
+action that executes `scripts/run.sh` in-job with `GITHUB_TOKEN` in scope,
+so a retagged `v1` would change what actually runs at an unchanged
+workflow commit — mutable-tag pinning would silently undercut this
+suite's reproducibility claim. The job also declares a workflow-level
+`permissions: contents: read` (the checkout step's only real need),
+rather than inheriting the repository-default token scope, since this job
+checks out and executes branch-supplied code, including
+`check-manifest-completeness.mjs` itself. `garrison-hq/muster-action`
+already pins its own `actions/setup-node` to a SHA internally; this
+workflow now applies the same discipline at its own call sites.
 
 ### CI timing (NFR-001 — measured, never asserted)
 
