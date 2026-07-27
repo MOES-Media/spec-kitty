@@ -73,6 +73,36 @@
       "verified_by": null,
       "verified_at": null,
       "notes": "TODO: replace with a real acceptance criterion"
+    },
+    {
+      "criterion_id": "C-001",
+      "description": "RFC-1 validity is a precondition, not a graded finding: a persona missing a required RFC-1 key must cause the manifest run to error with exit code exactly 2 (ExecutionError), categorically distinct from a findingTypes contradiction result (which only ever exits 0 or 1).",
+      "proof_type": "automated_test",
+      "evidence": null,
+      "pass_fail": "pending",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": "Verification command (spec.md C-001 row): `npx --offline @garrison-hq/muster@1.1.0 crosslayer run <manifest referencing conformance/crosslayer/fixtures/invalid-persona-missing-key.Soul.md> --static-only`, expect exit code exactly 2 and stderr containing the literal substring `muster: crosslayer manifest run failed:`, never a --json summary with a findingTypes array. Owner: WP02 (T011 fixture, T012 step 4 real-CLI verification), re-verified at mission accept per the mission's Real-CLI verification requirement (spec.md Dependencies & Assumptions). Added by post-tasks-review remediation (M-2) — this row was previously a TODO stub."
+    },
+    {
+      "criterion_id": "C-002",
+      "description": "The assembled diff touches only conformance/** (excluding the shared conformance/README.md), kitty-specs/**, and the new .github/workflows/crosslayer.yml — never the shared conformance.yml or the shared conformance/README.md.",
+      "proof_type": "automated_test",
+      "evidence": null,
+      "pass_fail": "pending",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": "Verification command (spec.md C-002 row): two-part check over `git diff --name-only main...HEAD` — (1) fails if conformance/README.md appears in the diff, (2) fails if any path outside conformance/**, kitty-specs/**, or .github/workflows/crosslayer.yml appears; exit 0 = compliant on both parts. Runs TWICE per tasks/PRE-MERGE-ACTIONS.md item 2: per-lane before each WP's own merge (WP01/T007, WP02/T013, WP03/T017, WP04/T022, WP05/T028 each carry this as their own final subtask), and once more over the fully assembled diff as the cross-lane backstop before this mission's accept/merge gate. Owner of the assembled-diff run: the mission accept gate (`spec-kitty accept`). Added by post-tasks-review remediation (M-2) — this row was previously a TODO stub."
+    },
+    {
+      "criterion_id": "C-003",
+      "description": "No check, README rubric tag, or expected block may cite a fabricated field (voice, interaction, locale, or the empty composition/profiles/profile_overrides/extensions lists) as evidence for a pass or fail. Grading rests on body text and composed behavior only. This is a review-time textual audit, not a fully machine-checkable gate.",
+      "proof_type": "manual_qa",
+      "evidence": null,
+      "pass_fail": "pending",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": "Candidate-surfacing command (spec.md C-003 row, corrected by post-tasks-review remediation H-1): `shopt -s globstar` then `grep -rnE -e \"\\bvoice\\s*:\" -e \"\\binteraction\\s*:\" -e \"\\blocale\\s*:\" -e \"\\bprofile_overrides\\s*:\\s*\\[\\]\" conformance/crosslayer/**/*.md conformance/crosslayer/**/*.yaml 2>/dev/null | grep -vE \"^[^:]+:[0-9]+:#.*generated:\\s*true\" — inverted polarity: exit 1 (no output) = clean, exit 0 (with output) = candidate violation requiring manual review. The prior form of this command (`conformance/crosslayer/*.md` plus a separate `**/*.yaml`) never recursed into `conformance/crosslayer/personas/`, so committed persona Soul.md files were invisible to it; verified by construction during remediation (planted violation: old command exit 1/false-negative, corrected command exit 0/surfaced, violation removed: exit 1/clean). Human rubric-tag review of every FR-004/FR-006 case's expected block and README prose is still required (SC-004) — this grep narrows the search, it does not replace the review. Owner: the mission accept gate (`spec-kitty accept`), per tasks/PRE-MERGE-ACTIONS.md item 2. Added by post-tasks-review remediation (M-2) — this row was previously absent (only FR-001..FR-007 stubs existed)."
     }
   ],
   "negative_invariants": []
