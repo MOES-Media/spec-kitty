@@ -724,3 +724,133 @@ guard is a pure string check on the committed path (which stays inside the
 manifest directory), while `fs.readFile` transparently follows the symlink
 at the OS level to the real file — verified with a scratch symlink before
 committing the real one (exit 0, real skill content read).
+
+### Post-review remediation (lane-b, branch
+`kitty/mission-crosslayer-composition-suite-01KYJA33-lane-b`): two reviewer-
+found defects, both spec-level (the spec asserted behaviors the code does
+not have). Implementation and RED→GREEN ordering above were sound; this
+section fixes the control and amends the two spec claims that didn't match
+reality, independently re-verified (not taken on faith from the prior
+Activity Log entries above) against the real, offline-cached
+`@garrison-hq/muster@1.1.0` CLI.
+
+**Defect 1 — FR-006 control was vacuous (findings `[]` in both directions).**
+Root cause confirmed by reading `contradiction-lint.ts` directly:
+`NEGATION_OPERATORS = {never, refuse, refusal, prohibited, forbid,
+forbidden, deny, block, not, disallow, reject}` — bare `"no"` is not a
+member. The pinned skill clause ("No restated context, no preamble.") never
+registered as a negation, so the (persona, skill) clause pair never hit a
+polarity inversion, in *either* direction.
+
+Fix (code, this lane's owned files): `conformance/crosslayer/fixtures/control-skill.SKILL.md`'s
+clause changed from "No restated context, no preamble." to "Never restate
+context or include a preamble." (same meaning, recognized vocabulary).
+`control.yaml`'s explanatory comment updated to describe the fixed,
+discriminating state instead of the prior defect. spec.md's "FR-006 pinned
+fixture text" subsection amended on the planning branch (this commit) with
+the same skill wording, plus the neutralized persona sentence changed from
+"Always ground responses ..." to "Ground each response ..." — dropping
+"Always"/"every" (`ACCOMMODATION_OPERATORS` members) which, empirically,
+still triggered `isRefinement`'s unconditional-contradiction branch against
+the skill's new "never" and would have re-vacuumed the neutralize direction
+had the neutralized sentence kept "Always".
+
+Watched RED (new/changed test, pre-fix wording):
+```
+$ python3 -m pytest tests/cross_cutting/test_crosslayer_wp02_manifests_control_c001.py::test_fr006_committed_control_discriminates_both_directions_on_findings -v
+FAILED ...
+AssertionError: Flip direction produced zero findings — the control has regressed into vacuity (see module docstring finding #1). Got: []
+assert 0 > 0
+1 failed in 65.62s
+```
+Watched GREEN (post-fix wording, same test, no other change):
+```
+$ python3 -m pytest tests/cross_cutting/test_crosslayer_wp02_manifests_control_c001.py::test_fr006_committed_control_discriminates_both_directions_on_findings -v
+1 passed in 58.56s
+```
+Full file re-run, all 6 tests (including the unchanged companion mechanism-
+proof test and both C-001 tests): 6 passed in 71.45s.
+
+Proved on `.findings`, both directions, real committed `control.yaml`
+(flip) and a scratch neutralized copy (never mutating the committed
+fixtures):
+```
+$ npx --offline @garrison-hq/muster@1.1.0 crosslayer run conformance/crosslayer/control.yaml --static-only --json > flip.json
+muster_exit=0
+{"results":[{"id":"control-verbosity-flip","passed":true,
+  "findings":["cross-layer-contradiction","undefined-precedence"]}]}
+$ jq -e '.results[0].findings | length > 0' flip.json   # true, exit 0
+$ jq -e '.results[0].findings | index("cross-layer-contradiction") != null' flip.json  # true, exit 0
+
+$ npx --offline @garrison-hq/muster@1.1.0 crosslayer run <scratch>/control.yaml --static-only --json > neutralize.json
+muster_exit=1
+{"results":[{"id":"control-verbosity-flip","passed":false,"findings":[]}]}
+$ jq -e '.results[0].findings | length == 0' neutralize.json   # true, exit 0
+```
+**Note on muster's own exit code**: it is 0 for flip and 1 for neutralize —
+the *reverse* of FR-006's originally-written `muster_exit==1`/`==0` claim
+(also amended in spec.md, see the FR-006 row's post-implementation
+correction). `manifest-runner.ts`'s `runStaticCase` computes `passed` by
+comparing the real result against the case's own `expected:` block
+(`expected: {ok: false, findingTypes: [cross-layer-contradiction]}` here),
+not by whether a finding fired — so `$muster_exit` reflects match-vs-
+`expected`, not detection. The `jq -e` assertions directly on `.findings`
+are the actual, reliable discrimination proof, per the operator's standing
+requirement to prove this on findings, not exit code.
+
+**Defect 2 — C-001's pinned exit code (`2`) does not match real behavior
+(real: `1`).** Independently re-verified (not trusted from the pre-existing
+test/Activity-Log claims above): the committed
+`fixtures/invalid-persona-missing-key.Soul.md`, run through the real CLI,
+produces exit `1`, empty stderr, and a case result of `{"passed": false,
+"error": "Persona layer failed RFC-1 strict-mode validation: [Appendix E]
+voice: must have required property 'voice'"}` — no `findings` key.
+Root cause: `resolvePersonaLayer`'s RFC-1 strict-mode throw happens inside
+`assembleComposedContext`, called during **per-case dispatch**;
+`manifest-runner.ts`'s `runManifest` wraps every per-case dispatch in its
+own `try/catch` and records `{passed: false, error: message}` there —
+never re-thrown to the CLI-level catch that maps to exit 2. The exit-2 path
+is real and separately reachable for a **manifest-level** failure (path-
+traversal guard, which runs as a preflight before any case executes and is
+not inside that per-case catch) — independently reproduced:
+```
+$ npx --offline @garrison-hq/muster@1.1.0 crosslayer run <path-traversal manifest> --static-only
+muster: crosslayer manifest run failed: Path traversal rejected: fixturePath "../outside/skill.SKILL.md" ...
+exit: 2
+```
+**Verdict: the malformed fixture IS still distinguishable at exit 1** — via
+the `error` field's presence (containing "RFC-1 strict-mode validation")
+and the categorical absence of a `findings` key, which a graded
+contradiction result always carries (even when empty). C-001's guarantee
+(a malformed fixture must be distinguishable from a genuine contradiction)
+therefore holds — just not via exit code alone.
+
+Action taken: spec.md's C-001 constraint amended (this commit, planning
+branch) to pin the real, verified shape — exit **1**, `error` field
+containing `"RFC-1 strict-mode validation"`, no `findings` key, empty
+stderr — replacing the never-observed exit `2`. This is a spec-only
+amendment; no code fix, since the swallowing behavior lives in muster
+itself, outside this mission's authoritative surface. Filed upstream:
+[garrison-hq/muster#70](https://github.com/garrison-hq/muster/issues/70)
+("crosslayer: RFC-1-invalid persona swallowed into per-case result (exit
+1), not ExecutionError (exit 2)"), with both the RFC-1-invalid-persona
+repro and the contrasting path-traversal-exit-2 repro. Not fixed here —
+muster is out of scope for this mission.
+
+**Files touched (lane-b, owned scope)**:
+`conformance/crosslayer/fixtures/control-skill.SKILL.md`,
+`conformance/crosslayer/control.yaml` (comment only),
+`tests/cross_cutting/test_crosslayer_wp02_manifests_control_c001.py`
+(module docstring + FR-006 test replaced with a findings-length-pinning
+regression test + C-001 test docstring updated to reference the amended
+spec instead of claiming a spec/reality mismatch).
+
+**Files touched (planning branch, via coordination worktree)**:
+`kitty-specs/crosslayer-composition-suite-01KYJA33/spec.md` (FR-006 pinned
+fixture text subsection, FR-006 row's exit-code note, C-001 row) and this
+Activity Log entry.
+
+No file under `conformance/crosslayer/personas/` (WP01's exclusive scope)
+was touched. `git status --short` on lane-b confirmed clean of any scratch
+path at commit time; all neutralize-direction proofs ran from
+`/tmp/claude-1000/...` scratch locations outside the repo, never staged.
