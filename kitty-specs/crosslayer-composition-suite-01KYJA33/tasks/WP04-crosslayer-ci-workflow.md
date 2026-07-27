@@ -28,11 +28,13 @@ authoritative_surface: .github/workflows/
 create_intent:
 - .github/workflows/crosslayer.yml
 - conformance/crosslayer/README.md
+- tests/cross_cutting/misc/test_crosslayer_workflow.py
 execution_mode: code_change
 model: ''
 owned_files:
 - .github/workflows/crosslayer.yml
 - conformance/crosslayer/README.md
+- tests/cross_cutting/misc/test_crosslayer_workflow.py
 role: implementer
 tags: []
 tracker_refs: []
@@ -207,15 +209,26 @@ an honest, specific blocked-status entry naming what is outstanding.
 
 ### T022 — WP04 verification gate (Definition of Done + per-lane C-002)
 
+**Owned-files/scope-gate widening (C-011 remediation)**: this WP's
+`owned_files`/`create_intent` originally admitted only the two CI/README
+deliverables, with no path a C-011-compliant failing-first test could live
+at. That is a task-file defect, not a reason to skip ATDD-first discipline
+— `owned_files`, `create_intent`, and the per-lane C-002 gate below are
+widened to admit exactly one additional file,
+`tests/cross_cutting/misc/test_crosslayer_workflow.py` (the structural
+pytest suite pinning this WP's user-observable behavior: trigger paths,
+static-job step wiring, cadence-job secrets sourcing, the zero-real-cases
+comment). Nothing else under `tests/` is opened up.
+
 **Steps** (run in order):
 ```bash
-git diff --stat                                              # ONLY the two owned_files entries changed
+git diff --stat                                              # ONLY the three owned_files entries changed
 git diff --stat .github/workflows/conformance.yml             # MUST show no changes
 git diff --stat conformance/README.md                         # MUST show no changes
 grep -n "secrets:" .github/workflows/crosslayer.yml            # MUST appear only in the cadence job, never the static job
 git diff --name-only <mission-base>...<this-lane-branch> > /tmp/wp04-c002-diff.txt
 if grep -qx "conformance/README.md" /tmp/wp04-c002-diff.txt; then echo "C-002 violation"; exit 1; fi
-! (grep -v '^conformance/' /tmp/wp04-c002-diff.txt | grep -v '^kitty-specs/' | grep -v '^\.github/workflows/crosslayer\.yml$' | grep -q .)
+! (grep -v '^conformance/' /tmp/wp04-c002-diff.txt | grep -v '^kitty-specs/' | grep -v '^\.github/workflows/crosslayer\.yml$' | grep -v '^tests/cross_cutting/misc/test_crosslayer_workflow\.py$' | grep -q .)
 ```
 The last two lines are this WP's **per-lane C-002 check**, this WP's own
 responsibility before requesting review; the cross-lane assembled-diff run
@@ -223,6 +236,12 @@ happens again at mission review as the backstop.
 
 ## Definition of Done
 
+- [ ] C-011 (ATDD-first): `tests/cross_cutting/misc/test_crosslayer_workflow.py`
+      committed RED (failing) before any implementation commit, confirmed
+      GREEN at the final commit; both runs' exit codes recorded, and
+      collection under CI's exact selector
+      (`pytest tests/e2e/ tests/cross_cutting/ -m "not distribution and not windows_ci"`)
+      proven
 - [ ] T018's input-schema verification recorded in the work log
 - [ ] `crosslayer.yml` triggers on PR, path-filtered to both
       `conformance/**` and `src/doctrine/agent_profiles/built-in/**`
@@ -272,4 +291,66 @@ Implementation command: `spec-kitty agent action implement WP04 --agent claude`
 
 ## Activity Log
 
-(none yet — populated during implementation)
+- **T018 (muster-action input-schema verification)**: confirmed —
+  `conformance.yml`'s existing usage matches the shape this WP needs.
+  `grep -n "muster-action" .github/workflows/conformance.yml` shows
+  `garrison-hq/muster-action@b40681a514f9500f5958b4f9f3efeacd30aae6ca # v1`
+  invoked with `with: {command: 'skills run', args: 'conformance/skills/manifest.yaml',
+  version: '1.1.0'}`. Input names (`command`/`args`/`version`) reused
+  as-is; no new/unreviewed pin introduced. `actions/checkout` pin reused
+  identically: `actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6`.
+- **C-011 (ATDD-first) remediation**: this WP's `owned_files`/`create_intent`
+  as authored admitted only `.github/workflows/crosslayer.yml` and
+  `conformance/crosslayer/README.md` — no path a failing-first test could
+  live at. Widened both lists (and the T022 per-lane C-002 gate) to also
+  admit `tests/cross_cutting/misc/test_crosslayer_workflow.py`, scoped
+  narrowly to that one file. A RED commit (the test alone, workflow file
+  absent) was made before any implementation commit on the lane-d branch;
+  confirmed failing via
+  `uv run python -m pytest tests/cross_cutting/misc/test_crosslayer_workflow.py -m "not distribution and not windows_ci"`
+  (13 failed / 1 passed, exit 1). CI-collection proven via the exact
+  selector `pytest tests/e2e/ tests/cross_cutting/ -m "not distribution and not windows_ci" --collect-only`,
+  which lists all test functions (14 once GREEN). Final GREEN confirmed at
+  14 passed, exit 0. Four checks were falsified directly (path-filter
+  omission, secrets injection into the static job, `--write` reintroduction
+  on the sop-extract-drift call site, zero-real-cases comment removal) —
+  each reverted, confirmed the corresponding test(s) failed, then restored.
+- **ci-quality.yml path-gap (out of WP04 scope)**: confirmed by reading
+  `.github/workflows/ci-quality.yml`'s top-level `on.pull_request.paths`/
+  `on.push.paths` (lines 3-60) — neither list contains `conformance/**` nor
+  `AGENTS.md`. A PR touching only `conformance/scripts/check-sop-extract-drift.sh`
+  would not trigger `ci-quality.yml`'s `tests/e2e/ tests/cross_cutting/`
+  job, so WP03's unit tests pinning that script would not re-run against a
+  script-only edit. This WP does not fix it: `ci-quality.yml` is not in
+  `owned_files`/`create_intent` for any WP in this mission, and this WP's
+  own `crosslayer.yml` gate (path-filtered to `conformance/**` +
+  `src/doctrine/agent_profiles/built-in/**`) still runs and still catches
+  drift for that exact case via the bare `check-sop-extract-drift.sh` call
+  site — only `ci-quality.yml`'s own unit-test re-run would be missed, and
+  that workflow's path-filter ownership belongs to whoever maintains
+  `ci-quality.yml`, not this mission.
+- **T021 (real CI verification) — BLOCKED pending lane integration.**
+  `git worktree list` at implementation time shows lane-a
+  (`kitty/mission-crosslayer-composition-suite-01KYJA33-lane-a`, WP01),
+  lane-b (`...-lane-b`, WP02), and lane-c (`...-lane-c`, WP03) all still on
+  their own, separate, unmerged lane branches — none has merged into this
+  mission's coordination branch
+  (`kitty/mission-crosslayer-composition-suite-01KYJA33`), let alone the
+  mission target branch. This WP's `crosslayer.yml` calls
+  `conformance/scripts/check-persona-drift.sh` (WP01), `conformance/crosslayer/manifest.yaml`
+  (WP02), and `conformance/scripts/check-sop-extract-drift.sh` (WP03) —
+  none of those three artifacts exist on any branch this WP's own commits
+  sit on. A real GitHub Actions run of `crosslayer.yml` right now would
+  fail immediately (missing files), which would not be evidence of a real
+  defect in this WP's own workflow — it would only be evidence of the
+  known, expected lane-isolation gap. **No `run_id` is invented or
+  claimed.** What is missing, concretely, before T021 can be completed for
+  real: WP01's lane-a merge (personas + `check-persona-drift.sh`), WP02's
+  lane-b merge (`manifest.yaml` + cases + control + C-001 fixture), and
+  WP03's lane-c merge (`sop-extract.md` + `check-sop-extract-drift.sh`)
+  must all land on a single pushed branch alongside this WP's
+  `crosslayer.yml`, and a real PR against that combined branch must then be
+  opened so the workflow's `pull_request` trigger actually fires. Static,
+  locally-runnable proof of this WP's own file (the pytest suite above) is
+  complete and GREEN; T021's real-CI half is honestly deferred, not
+  fabricated.

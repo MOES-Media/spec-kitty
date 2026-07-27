@@ -104,6 +104,9 @@
       "last_event_id": "01KYJT7Y202R6M59JHMWE2KDJY",
       "last_transition_at": "2026-07-27T22:13:34.400538+00:00",
       "model": "__resolved_model_absent__",
+      "notes": [
+        "Ready for review"
+      ],
       "provider": "__resolved_provider_absent__",
       "role": "implementer",
       "shell_pid": 1304066,
