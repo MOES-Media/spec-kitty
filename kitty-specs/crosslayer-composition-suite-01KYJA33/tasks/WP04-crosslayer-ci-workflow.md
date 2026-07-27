@@ -29,12 +29,14 @@ create_intent:
 - .github/workflows/crosslayer.yml
 - conformance/crosslayer/README.md
 - tests/cross_cutting/misc/test_crosslayer_workflow.py
+- .github/workflows/ci-quality.yml
 execution_mode: code_change
 model: ''
 owned_files:
 - .github/workflows/crosslayer.yml
 - conformance/crosslayer/README.md
 - tests/cross_cutting/misc/test_crosslayer_workflow.py
+- .github/workflows/ci-quality.yml
 role: implementer
 tags: []
 tracker_refs: []
@@ -220,15 +222,24 @@ pytest suite pinning this WP's user-observable behavior: trigger paths,
 static-job step wiring, cadence-job secrets sourcing, the zero-real-cases
 comment). Nothing else under `tests/` is opened up.
 
+**Second widening (M7 WP04 review, MEDIUM-2 remediation)**: `owned_files`/
+`create_intent` and the per-lane C-002 gate below are widened again to admit
+`.github/workflows/ci-quality.yml`, so this WP can add
+`.github/workflows/crosslayer.yml` to that file's own `on.pull_request.paths`/
+`on.push.paths` lists — otherwise a PR editing only `crosslayer.yml` would
+re-run none of the 14 tests pinning it, the exact gap mission
+`ci-suite-map-bind` FR-012 exists to close. Not left as unassigned prose:
+this WP claims the edit rather than leaving it for an unnamed maintainer.
+
 **Steps** (run in order):
 ```bash
-git diff --stat                                              # ONLY the three owned_files entries changed
+git diff --stat                                              # ONLY the four owned_files entries changed
 git diff --stat .github/workflows/conformance.yml             # MUST show no changes
 git diff --stat conformance/README.md                         # MUST show no changes
 grep -n "secrets:" .github/workflows/crosslayer.yml            # MUST appear only in the cadence job, never the static job
 git diff --name-only <mission-base>...<this-lane-branch> > /tmp/wp04-c002-diff.txt
 if grep -qx "conformance/README.md" /tmp/wp04-c002-diff.txt; then echo "C-002 violation"; exit 1; fi
-! (grep -v '^conformance/' /tmp/wp04-c002-diff.txt | grep -v '^kitty-specs/' | grep -v '^\.github/workflows/crosslayer\.yml$' | grep -v '^tests/cross_cutting/misc/test_crosslayer_workflow\.py$' | grep -q .)
+! (grep -v '^conformance/' /tmp/wp04-c002-diff.txt | grep -v '^kitty-specs/' | grep -v '^\.github/workflows/crosslayer\.yml$' | grep -v '^tests/cross_cutting/misc/test_crosslayer_workflow\.py$' | grep -v '^\.github/workflows/ci-quality\.yml$' | grep -q .)
 ```
 The last two lines are this WP's **per-lane C-002 check**, this WP's own
 responsibility before requesting review; the cross-lane assembled-diff run
@@ -315,7 +326,31 @@ Implementation command: `spec-kitty agent action implement WP04 --agent claude`
   omission, secrets injection into the static job, `--write` reintroduction
   on the sop-extract-drift call site, zero-real-cases comment removal) —
   each reverted, confirmed the corresponding test(s) failed, then restored.
-- **ci-quality.yml path-gap (out of WP04 scope)**: confirmed by reading
+- **ci-quality.yml path-gap — FIXED (M7 WP04 review, MEDIUM-2)**: originally
+  recorded below as "out of WP04 scope" and left for an unnamed maintainer.
+  The review correctly rejected that: this mission's own C-003 remediation
+  already says "unassigned-to-a-lane is not the same as unowned — leaving it
+  as free-floating prose degrades into nobody running it." A separate,
+  narrower gap than first described was confirmed: `ci-quality.yml`'s
+  `on.pull_request.paths`/`on.push.paths` enumerate six workflow files by
+  name (`ci-quality.yml`, `ci-windows.yml`, `drift-detector.yml`,
+  `release.yml`, `release-readiness.yml`,
+  `check-spec-kitty-events-alignment.yml`, per FR-012's own doctrine
+  comment), and `crosslayer.yml` was not among them, with no
+  `.github/workflows/**` wildcard anywhere in the repo to catch it by
+  default — so a PR editing only `crosslayer.yml` would re-run none of the
+  14 tests pinning it. Fixed by adding
+  `.github/workflows/crosslayer.yml` to both lists (this WP's own file, now
+  claimed rather than left unowned); `owned_files`/`create_intent` and the
+  T022 per-lane C-002 gate above widened accordingly. Verified: YAML still
+  parses, and the guard suite
+  (`test_ci_quality_path_filters`, `test_gate_coverage_parse_model`,
+  `test_suite_jobs_gate_blocking`, `test_workflow_dist_lint`,
+  `test_plugin_validate_workflow`, `test_release_ci_ownership`) re-run
+  green. (Earlier text below, describing this as out-of-scope, is retained
+  for the record but is superseded by this entry.)
+- **ci-quality.yml path-gap (out of WP04 scope) — superseded, see entry
+  above**: confirmed by reading
   `.github/workflows/ci-quality.yml`'s top-level `on.pull_request.paths`/
   `on.push.paths` (lines 3-60) — neither list contains `conformance/**` nor
   `AGENTS.md`. A PR touching only `conformance/scripts/check-sop-extract-drift.sh`
