@@ -1,4 +1,5 @@
 {
+  "baseline_merge_commit": "268f01634fec75574bb02d0f6f97b72d95a4d1fc",
   "coordination_branch": "kitty/mission-doctrine-rule-manifests-01KYH7AM",
   "created_at": "2026-07-27T07:23:45.635388+00:00",
   "flattened": false,
@@ -11,6 +12,7 @@
   "purpose_context": "This is wave-2 mission M3 of the muster <-> spec-kitty agent-conformance programme, building on M1's conformance/ tree and CI skeleton (merged at 32722b5f1). It hand-authors SOP rule manifests under conformance/doctrine/ for the 9 trace-decidable directives plus >=4 high-value judge directives, each rule's ruleText verbatim from the directive's own integrity_rules line so muster's RULE_DRIFT lint turns upstream directive edits into visible staleness. A jq gate parses muster sop run's --json output in CI because drift findings are warnings that do not flip the exit code, and a deliberately-drifted control manifest proves the drift detector itself fires. Zero muster changes; behavioral probes are deferred to wave-2 mission M4.",
   "purpose_tldr": "Turn spec-kitty's built-in directives into machine-checkable SOP rule manifests that muster's RULE_DRIFT lint gates on every PR.",
   "slug": "doctrine-rule-manifests-01KYH7AM",
+  "status_phase": "1",
   "target_branch": "kitty/mission-doctrine-rule-manifests",
   "topology": "coord",
   "vcs": "git",
