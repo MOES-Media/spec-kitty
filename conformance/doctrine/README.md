@@ -18,15 +18,25 @@ the same exact pin M1's skills suite uses), never as a source dependency.
 ## A. Directive → class mapping table (FR-006)
 
 45 rule entries across 13 directives. **Coverage** column: `full-line` means
-`ruleText` is the rule's complete `integrity_rules` bullet, copied
-byte-for-byte from the directive file; `fragment` means `ruleText` is the
-longest contiguous substring of the rule that lies entirely on one physical
-line of the directive file's raw bytes (10 of 45 rules wrap across a
-physical line break in the raw YAML and cannot be cited in full — see
-`contracts/rule-classification-and-citation.md` for the fragment provenance
-and uniqueness verification of each one). **Class** `UNMAPPED` means no
-existing `sop-rule-taxonomy.md` class fits the rule; `gradingClass: judge`
-is then the schema's structural fallback, not a real class assignment.
+`ruleText` is the rule's complete `integrity_rules` bullet and the
+directive's raw bytes for that bullet sit entirely on one physical line, so
+`ruleText` is a byte-for-byte copy of that one line. `fragment` means the
+rule's raw text in the directive wraps across a physical line break (10 of
+45 rules do); for these, `ruleText` is still the rule's **complete**
+`integrity_rules` bullet — it embeds the physical line break, and the exact
+leading indentation of every continuation line, as a literal `\n` sequence
+inside a **double-quoted** YAML scalar, so `checkRuleTextPresence`'s raw-bytes
+substring match (C-006: verbatim, never YAML-parsed) spans the break
+correctly. `fragment` therefore describes the directive's raw-byte shape
+(multi-line source), not a truncation of the cited text — nothing here is
+"cited in part": every one of the 45 rules across the 13 manifests, `full-line`
+or `fragment`, has a `ruleText` that is its rule's complete text, verified
+line-break-for-line-break against the directive file. See
+`contracts/rule-classification-and-citation.md` for each fragment rule's
+line-span provenance and uniqueness verification (`grep -F -c` == 1). **Class**
+`UNMAPPED` means no existing `sop-rule-taxonomy.md` class fits the rule;
+`gradingClass: judge` is then the schema's structural fallback, not a real
+class assignment.
 
 | Directive | ruleId | Coverage | Class | gradingClass |
 |---|---|---|---|---|
@@ -76,9 +86,12 @@ is then the schema's structural fallback, not a real class assignment.
 | 045 | 045-r3 | fragment | tool-order | binary |
 | 045 | 045-r4 | fragment | tone-persona-adherence | judge |
 
-**Summary counts**: 45 rules total across 13 directives; 10 fragment-cited
-rules (042×3, 044×3, 045×4), 35 full-line rules. **24 rules mapped to an
-existing class**: `never-call-tool`×8, `output-format`×11, `tool-order`×4,
+**Summary counts**: 45 rules total across 13 directives, every one cited in
+full; 10 rules whose directive source wraps a physical line break
+(042×3, 044×3, 045×4, `fragment` in the Coverage column above — see the
+definition in this section for what `fragment` means here), 35 rules whose
+directive source is a single physical line (`full-line`). **24 rules mapped
+to an existing class**: `never-call-tool`×8, `output-format`×11, `tool-order`×4,
 `confirm-before-destructive`×0 (this mission ships zero examples of that
 class — not a structural problem, the taxonomy does not require every
 mission to exercise every class), `tone-persona-adherence`×1. **21 rules
@@ -205,39 +218,48 @@ one exists — no ceiling is asserted anywhere in this file.
 
 ## G. `TOOL_DRIFT` exercise disclosure
 
-**`TOOL_DRIFT` is unexercised across this mission — disclosed here plainly,
-not omitted.** `detectToolDrift` (`index.ts:128-144` in the muster package)
-is skipped entirely unless the `sop run` invocation passes `--env-tools`.
-None of this mission's `sop run` invocations — not WP01's or WP02's
-per-manifest verification, and not this WP's own
-`check-doctrine-drift-gate.sh` — pass `--env-tools`. That means every
-"zero `TOOL_DRIFT`" result recorded anywhere in this mission's work log
-proves nothing: the detector never ran, it wasn't observed clean. Rules
-`033-r1`, `042-r3`, `042-r4`, `045-r1`, and `045-r2` contain backticked
-identifiers (literal command strings such as `` `git add -A` ``,
-`` `git push --force` ``) that would be genuine `TOOL_DRIFT` candidates if
-the detector were exercised for real.
+**`TOOL_DRIFT` is unreachable via the published `@garrison-hq/muster@1.1.0`
+CLI — disclosed here plainly, not as a choice this mission declined to
+make.** `detectToolDrift` (`adapters/openclaw-sop/manifest.js:173` in the
+installed package) only runs when the *library* function `runStaticLint`
+is called with an `envToolsPath` argument, and the CLI's own `doSopRun`
+handler (`cli/index.js:803`) calls the underlying suite runner as
+`runSopManifestSuite(absManifestPath, { client })` — it never threads an
+`envToolsPath` through from anywhere. Confirmed directly against the
+installed CLI this session: `muster sop run --help` shows the `run`
+subcommand accepts exactly one argument, `<manifest>`, and no
+`--env-tools`/`--env-tools-path` option of any kind exists on it. This is
+not "no invocation happened to pass `--env-tools`" — **there is no flag to
+pass.** A future contributor cannot close this gap by adding `--env-tools`
+to an existing `sop run` call; muster's own CLI surface would need a new
+flag shipped upstream first, threading it down to `runSopManifestSuite`,
+before `TOOL_DRIFT` could ever fire through this mission's invocations.
 
-This mission does not exercise `--env-tools` for real (out of scope for
-this WP — `sop run`'s CLI surface would need an environment-tools fixture
-constructed and verified, which is not part of this WP's authoring
-surface). An unexercised detector silently reported as "clean" is the same
+Because the detector cannot be reached at all via the CLI this suite
+consumes, every "zero `TOOL_DRIFT`" result recorded anywhere in this
+mission's work log proves nothing: the detector never ran and could not
+have run. Rules `033-r1`, `042-r3`, `042-r4`, `045-r1`, and `045-r2`
+contain backticked identifiers (literal command strings such as
+`` `git add -A` ``, `` `git push --force` ``) that would be genuine
+`TOOL_DRIFT` candidates if the detector were ever reachable and exercised
+for real. An unreachable detector silently reported as "clean" is the same
 failure shape as an unfired discrimination control (see the FR-005 control
-above) — this mission has already spent significant effort guarding against
-exactly that class of false-clean signal (see `STRUCTURAL_ABSENCE` in the
-local-invocation section above), and applies the same honesty standard
-here: **unexercised, not clean.**
+above) — this mission has already spent significant effort guarding
+against exactly that class of false-clean signal (see `STRUCTURAL_ABSENCE`
+in the local-invocation section above), and applies the same honesty
+standard here: **unreachable via this CLI, not clean.**
 
 `checkRuleTextPresence` (the source of every `RULE_DRIFT` result reported
-in this mission) always runs regardless of `--env-tools`, so the zero-
-`RULE_DRIFT` results recorded for the 13 shipped manifests elsewhere in this
-mission's work log remain genuine and are not affected by this disclosure.
+in this mission) always runs regardless of `--env-tools` support, so the
+zero-`RULE_DRIFT` results recorded for the 13 shipped manifests elsewhere
+in this mission's work log remain genuine and are not affected by this
+disclosure.
 
 ## What this suite does not do
 
 - It does not check `UNDEFINED_PRECEDENCE` or `TOOL_DRIFT` findings — both
   are reported, not gating, per FR-004; `TOOL_DRIFT` is additionally
-  unexercised entirely (see section G above).
+  unreachable via the published CLI entirely (see section G above).
 - It does not validate a manifest's `sopFile:` target existence in the
   completeness script — that is the drift gate's `STRUCTURAL_ABSENCE`
   filter entry's job alone (see the division-of-responsibility note in
