@@ -1,39 +1,39 @@
 ---
-work_package_id: "WP04"
-title: "crosslayer.yml CI workflow: static PR gate + cadence scaffold (lane-b part 3)"
+work_package_id: WP04
+title: 'crosslayer.yml CI workflow: static PR gate + cadence scaffold (lane-b part 3)'
 dependencies: []
 requirement_refs:
-  - FR-004
-  - FR-005
-  - C-002
-subtasks:
-  - T018
-  - T019
-  - T020
-  - T021
-  - T022
-owned_files:
-  - ".github/workflows/crosslayer.yml"
-  - "conformance/crosslayer/README.md"
-create_intent:
-  - ".github/workflows/crosslayer.yml"
-  - "conformance/crosslayer/README.md"
-authoritative_surface: ".github/workflows/"
-execution_mode: "code_change"
+- FR-004
+- FR-005
+- C-002
 planning_base_branch: kitty/mission-crosslayer-composition-suite
 merge_target_branch: kitty/mission-crosslayer-composition-suite
-branch_strategy: "Planning artifacts for this mission were generated on kitty/mission-crosslayer-composition-suite. During /spec-kitty.implement this WP may branch from a dependency-specific base, but completed changes must merge back into kitty/mission-crosslayer-composition-suite unless the human explicitly redirects the landing branch."
+branch_strategy: Planning artifacts for this mission were generated on kitty/mission-crosslayer-composition-suite. During /spec-kitty.implement this WP may branch from a dependency-specific base, but completed changes must merge back into kitty/mission-crosslayer-composition-suite unless the human explicitly redirects the landing branch.
 base_branch: kitty/mission-crosslayer-composition-suite-01KYJA33
-base_commit: c425bc188995b5b9a04bece05b511ba81896ce7f
-created_at: '2026-07-27T19:45:23Z'
-history:
-  - timestamp: '2026-07-27T19:45:23Z'
-    event: created
-    by: /spec-kitty.tasks-outline (planner-priti)
-agent_profile: node-norris
-role: implementer
+base_commit: 478b4d5f37ffb869eb0b49fba534a338bb1f27bb
+created_at: '2026-07-27T21:47:12.656709+00:00'
+subtasks:
+- T018
+- T019
+- T020
+- T021
+- T022
 agent: claude
+history:
+- timestamp: '2026-07-27T19:45:23Z'
+  event: created
+  by: /spec-kitty.tasks-outline (planner-priti)
+agent_profile: node-norris
+authoritative_surface: .github/workflows/
+create_intent:
+- .github/workflows/crosslayer.yml
+- conformance/crosslayer/README.md
+execution_mode: code_change
 model: ''
+owned_files:
+- .github/workflows/crosslayer.yml
+- conformance/crosslayer/README.md
+role: implementer
 tags: []
 tracker_refs: []
 ---
