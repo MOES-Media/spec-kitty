@@ -131,3 +131,32 @@ as of this tasks-authoring pass (checked directly via `gh issue view 26
 which was already assigned when that mission's tasks phase ran. WP01's T001
 exists to close this before implementation starts; recorded here as well so
 it is visible at a mission level, not only inside one WP's file.
+
+## 6. WP04 lane merge — task-file and status.json conflicts (recorded at WP02/WP04 approval time)
+
+Recorded while approving WP02/WP04 so the merge step is not surprised by
+either conflict:
+
+- **Resolve the WP04 task-file conflict explicitly in favor of the
+  coordination branch.** Do **not** use `-X ours` or a union strategy. Three
+  of the five conflicting hunks have real content on both sides, and lane-b's
+  three unique lines there are older, superseded versions of that content —
+  a union or `ours` resolution would silently regress lane-d's MEDIUM-2
+  remediation (the inner PR-gate fix landed at lane-d `cfddb951b`). The
+  coordination branch's version of the WP04 task file is the correct one to
+  keep.
+- **`status.json` also conflicts** at the current tip (`event_count` 21 vs
+  15 on the two sides; WP02's lane shows `for_review` on one side and
+  `in_progress` on the other). Do not hand-resolve this file. Regenerate it
+  through the canonical reducer
+  (`specify_cli.status.reducer.materialize` / `spec-kitty agent status
+  materialize`) instead — a sibling doing exactly this on a related mission
+  produced output byte-identical to the canonical reducer's, and hand-merging
+  a generated artifact risks a silent, undetected drift from the event log it
+  is derived from.
+- **Lane-b's own copy of the WP02 task file is separately stale** against the
+  planning tip (it predates the tip's later WP02 remediation commits). This
+  one needs **no action**: it auto-merges cleanly and the `e00696874` entry
+  (the WP02 mission-review remediation record) is retained either way. Noted
+  here only so the merger recognizes it as an already-understood,
+  no-action-needed conflict and doesn't spend time re-diagnosing it.
