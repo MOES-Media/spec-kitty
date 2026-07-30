@@ -132,31 +132,37 @@ which was already assigned when that mission's tasks phase ran. WP01's T001
 exists to close this before implementation starts; recorded here as well so
 it is visible at a mission level, not only inside one WP's file.
 
-## 6. WP04 lane merge — task-file and status.json conflicts (recorded at WP02/WP04 approval time)
+## 6. WP04 lane merge — task-file and status.json conflicts (RESOLVED — dissolved, not present at merge time)
 
-Recorded while approving WP02/WP04 so the merge step is not surprised by
-either conflict:
+**Originally recorded** while approving WP02/WP04, warning of a WP04
+task-file conflict (resolve in favor of the coordination branch, not
+`-X ours`/union) and a `status.json` conflict (regenerate via the canonical
+reducer, don't hand-resolve).
 
-- **Resolve the WP04 task-file conflict explicitly in favor of the
-  coordination branch.** Do **not** use `-X ours` or a union strategy. Three
-  of the five conflicting hunks have real content on both sides, and lane-b's
-  three unique lines there are older, superseded versions of that content —
-  a union or `ours` resolution would silently regress lane-d's MEDIUM-2
-  remediation (the inner PR-gate fix landed at lane-d `cfddb951b`). The
-  coordination branch's version of the WP04 task file is the correct one to
-  keep.
-- **`status.json` also conflicts** at the current tip (`event_count` 21 vs
-  15 on the two sides; WP02's lane shows `for_review` on one side and
-  `in_progress` on the other). Do not hand-resolve this file. Regenerate it
-  through the canonical reducer
-  (`specify_cli.status.reducer.materialize` / `spec-kitty agent status
-  materialize`) instead — a sibling doing exactly this on a related mission
-  produced output byte-identical to the canonical reducer's, and hand-merging
-  a generated artifact risks a silent, undetected drift from the event log it
-  is derived from.
-- **Lane-b's own copy of the WP02 task file is separately stale** against the
-  planning tip (it predates the tip's later WP02 remediation commits). This
-  one needs **no action**: it auto-merges cleanly and the `e00696874` entry
-  (the WP02 mission-review remediation record) is retained either way. Noted
-  here only so the merger recognizes it as an already-understood,
-  no-action-needed conflict and doesn't spend time re-diagnosing it.
+**Superseded (2026-07-31), recorded honestly rather than left standing**:
+the root cause of both apparent conflicts was lane-b `kitty-specs/`
+contamination — `bbfc92247` had restored the WP04 task file from the
+planning branch's tip *at that time*, but the planning branch moved forward
+again with further WP04 remediation (`d591ca932`, `1ee2ef81e`,
+`bfa2f8ec5`), so lane-b's copy fell behind and both it and `status.json`/
+`status.events.jsonl` (which naturally diverge as lane-local status tracking
+accrues) tripped `_list_wp_branch_mission_specs_changes` again at
+`move-task WP02 --to approved`.
+
+Fixed at lane-b commit `e50c6f3bc` by restoring all three paths to their
+merge-base (`cfc29bc1e`) content — lane-b now carries **zero** `kitty-specs/`
+diff against that merge-base, so the coordination branch's newer content
+wins with no conflict. Verified directly:
+`_list_wp_branch_specs_changes_for_guard(worktree_path=<lane-b>,
+base_branch="kitty/mission-crosslayer-composition-suite-01KYJA33")` returns
+`[]`, and a throwaway-clone merge of lane-b into the coordination branch tip
+(`bfa2f8ec5`) completes with `Automatic merge went well` and a
+post-merge/pre-commit `git diff --cached
+kitty/mission-crosslayer-composition-suite-01KYJA33 -- kitty-specs/` that is
+empty — i.e. the merge introduces no `kitty-specs/` change and no conflict
+at all, not even one requiring the "favor coordination branch" resolution
+originally anticipated here.
+
+**No action required at merge time for this item.** Lane-b's source
+implementation commits (`cc46d6283`, `0b6fc2d11`, `479f56058`, `bbfc92247`,
+`949399465`, `f07d6198b`) are untouched by this fix.
