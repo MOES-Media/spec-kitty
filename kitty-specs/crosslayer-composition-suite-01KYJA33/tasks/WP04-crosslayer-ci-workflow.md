@@ -179,33 +179,62 @@ shared top-level `conformance/README.md` (never edited by this mission).
 
 ---
 
-### T021 — Real CI verification (mandatory, may be legitimately blocked)
+### T021 — Workflow structure, trigger wiring & pinning-test proof (locally provable; real CI run tracked separately)
 
-**Purpose**: This cannot be simulated locally — it requires an actual GitHub
-Actions run on this mission's own PR, and it requires both this WP's workflow
-file and WP01's/WP02's/WP03's committed artifacts to coexist on a pushed
-branch.
+**Scope note (T021 split, 2026-07-31 — mirrors WP02's T012 1a/1b pattern)**:
+T021 originally bundled two genuinely different things under one subtask:
+(a) proof this WP's own workflow file is structurally correct and its
+guard-suite pinning is real and green — fully provable from this lane
+alone — and (b) an actual GitHub Actions run against a real PR, which
+cannot exist until WP01's/WP02's/WP03's lanes are merged onto the same
+branch as this WP's `crosslayer.yml`. Bundling both under one subtask
+deadlocked mission-level approval: approving WP04 requires T021 "done",
+T021's CI half requires the lanes merged, and merging requires WP04
+approved first. This subtask is now scoped to (a) only, honestly
+markable done today; (b) is tracked as its own named post-merge action in
+`tasks/PRE-MERGE-ACTIONS.md` (item 7), carrying this subtask's original
+"real CI verification" text **verbatim** so the requirement is relocated to
+where it can be honestly satisfied, not softened or dropped.
 
-**Steps**:
-1. Once this mission's lanes are merged onto a branch carrying both this
-   WP's `crosslayer.yml` and the manifest/persona/sop-extract files it
-   references, confirm the workflow actually triggers on a real PR.
-2. Confirm the static job's steps (muster-action static run, both drift-check
-   call sites) show green in that run's logs.
-3. If no such combined, pushed branch exists yet at the time this WP is
-   otherwise complete, **report this as blocked pending lane integration** —
-   the same honest non-fabrication this mission's own sibling missions have
-   required (do not invent a `run_id`; do not claim a green run that did not
-   happen). Record exactly what is missing (which lane's merge is
-   outstanding) so the blocker is actionable, not vague.
-4. Once unblocked, record the real `run_id`, `conclusion`, and wall-clock
-   minutes, independently confirmed via
-   `gh run view <run_id> --repo MOES-Media/spec-kitty --json
-   conclusion,headBranch,createdAt,updatedAt`.
+**Steps** (all provable today, from this lane alone):
+1. Confirm `crosslayer.yml`'s `on:` block: `pull_request` triggers,
+   path-filtered to `conformance/**` and
+   `src/doctrine/agent_profiles/built-in/**` (T019); `schedule:` +
+   `workflow_dispatch:` for the cadence job (T020).
+2. Confirm the static job's steps invoke
+   `garrison-hq/muster-action@<pinned sha>` against FR-004's manifest and
+   both drift-check call sites (`check-persona-drift.sh`,
+   `check-sop-extract-drift.sh`), and that no `secrets:` reference appears
+   anywhere in the static job (T018/T019).
+3. Confirm `tests/cross_cutting/misc/test_crosslayer_workflow.py` — the
+   14-test structural pytest suite pinning this workflow's trigger paths,
+   static-job step wiring, cadence-job secrets sourcing, and the
+   zero-real-cases comment — collects under CI's exact selector (`pytest
+   tests/e2e/ tests/cross_cutting/ -m "not distribution and not
+   windows_ci"`) and passes: run `uv run python3 -m pytest
+   tests/cross_cutting/misc/test_crosslayer_workflow.py -q` and record the
+   real exit code and pass count.
+4. Confirm the MEDIUM-2 inner-gate fix at lane-d `cfddb951b`: trace a PR
+   whose only changed file is `crosslayer.yml` end to end through
+   `ci-quality.yml`'s `changes` job — the outer `on.pull_request.paths`/
+   `on.push.paths` admits it, `crosslayer.yml` is now a member of the `e2e`
+   dorny filter group so `needs.changes.outputs.e2e` evaluates `'true'`
+   (false before the fix), and `e2e-cross-cutting`'s `if` (which gates on
+   `needs.changes.outputs.{e2e,core_misc,execution_context}`) evaluates true
+   (false before the fix) — so the job, and its 14 pinned tests, actually
+   runs on the merge-blocking PR path, not only on push. Record both the
+   before/after evaluation and the guard-suite re-run count (65 passed)
+   that confirmed no regression.
 
 **Files**: none new.
-**Validation**: either a real, independently-confirmed green run recorded, or
-an honest, specific blocked-status entry naming what is outstanding.
+**Validation**: 14/14 `test_crosslayer_workflow.py` tests pass; the
+before/after `e2e`/`e2e-cross-cutting` trace is recorded with exact
+true/false values on each side of `cfddb951b`.
+
+**Real CI verification — moved to `tasks/PRE-MERGE-ACTIONS.md` item 7.**
+This is no longer part of T021's Definition-of-Done gate; see that item for
+the original, unmodified text (Purpose, Steps 1-4, Files, Validation) and
+its own honest blocked-status requirement.
 
 ---
 
@@ -264,8 +293,12 @@ happens again at mission review as the backstop.
       cases until WP05/lane-c lands
 - [ ] `conformance/crosslayer/README.md` authored; shared
       `conformance/README.md` untouched
-- [ ] T021's real CI verification recorded — either a real, independently
-      confirmed green run, or an honest, specific blocked-status entry
+- [ ] T021's locally-provable proof recorded: workflow triggers/static-job
+      wiring confirmed, `test_crosslayer_workflow.py` 14/14 passing, and the
+      `cfddb951b` inner-gate trace (`e2e`/`e2e-cross-cutting` false→true)
+      confirmed on both sides. (T021's real-CI-run half is tracked
+      separately — see `PRE-MERGE-ACTIONS.md` item 7 — and is not part of
+      this WP's Definition of Done.)
 - [ ] Per-lane C-002 check (T022) passes against this WP's own lane diff
 - [ ] No file outside `owned_files` modified; `.github/workflows/conformance.yml`
       and `conformance/README.md` untouched
@@ -282,8 +315,11 @@ happens again at mission review as the backstop.
   concurrent-work collision this mission's own Dependencies section goes to
   some length to avoid.
 - **Fabricating a CI run**: do not report a green `run_id` that was not
-  independently confirmed via `gh run view`. If lane integration has not
-  happened yet, report the blocker honestly (T021 step 3).
+  independently confirmed via `gh run view`. This requirement now lives at
+  `PRE-MERGE-ACTIONS.md` item 7 (relocated out of T021 by the 2026-07-31
+  split); if lane integration has not happened yet when that item is acted
+  on, report the blocker honestly per its own step 3, verbatim from the
+  original T021 text.
 
 ## Reviewer guidance
 
@@ -447,3 +483,15 @@ Implementation command: `spec-kitty agent action implement WP04 --agent claude`
   locally-runnable proof of this WP's own file (the pytest suite above) is
   complete and GREEN; T021's real-CI half is honestly deferred, not
   fabricated.
+
+**2026-07-31 — T021 split (post-approval-blocker remediation)**: the
+paragraph above is retained verbatim as the original honest-blocked record.
+T021 itself is now redefined to cover only the locally-provable half (see
+the T021 section's "Scope note"); the real-CI-run half described above is
+relocated, with its original wording intact, to `PRE-MERGE-ACTIONS.md`
+item 7. Re-confirmed at split time: `test_crosslayer_workflow.py` 14/14
+passing (`uv run python3 -m pytest
+tests/cross_cutting/misc/test_crosslayer_workflow.py -q` → `14 passed`), and
+the `cfddb951b` inner-gate trace holds as described (outer paths admit a
+crosslayer.yml-only PR; `e2e` dorny group and `e2e-cross-cutting`'s `if`
+both evaluate false before that commit and true after).

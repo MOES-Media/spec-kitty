@@ -166,3 +166,54 @@ originally anticipated here.
 **No action required at merge time for this item.** Lane-b's source
 implementation commits (`cc46d6283`, `0b6fc2d11`, `479f56058`, `bbfc92247`,
 `949399465`, `f07d6198b`) are untouched by this fix.
+
+## 7. WP04's real CI verification (post-merge action; relocated from T021, 2026-07-31)
+
+**Origin of this item**: WP04's `T021 — Real CI verification (mandatory,
+may be legitimately blocked)` subtask bundled two things — a locally
+provable structural/pinning-test proof, and an actual GitHub Actions run
+against a real PR — under one subtask whose completion gated
+`move-task WP04 --to approved`. The real-CI half cannot exist until
+WP01/WP02/WP03's lanes are merged onto the same branch as this WP's
+`crosslayer.yml`, which created a deadlock: approving WP04 needed T021
+"done", T021's CI half needed the lanes merged, and merging needed WP04
+approved first. T021 is now redefined to cover only the locally-provable
+half (see the WP04 task file's T021 "Scope note"). This item carries T021's
+original text **verbatim**, unmodified and unsoftened, as the mission's
+still-standing real-CI requirement:
+
+> **Purpose**: This cannot be simulated locally — it requires an actual
+> GitHub Actions run on this mission's own PR, and it requires both this
+> WP's workflow file and WP01's/WP02's/WP03's committed artifacts to
+> coexist on a pushed branch.
+>
+> **Steps**:
+> 1. Once this mission's lanes are merged onto a branch carrying both this
+>    WP's `crosslayer.yml` and the manifest/persona/sop-extract files it
+>    references, confirm the workflow actually triggers on a real PR.
+> 2. Confirm the static job's steps (muster-action static run, both
+>    drift-check call sites) show green in that run's logs.
+> 3. If no such combined, pushed branch exists yet at the time this WP is
+>    otherwise complete, **report this as blocked pending lane
+>    integration** — the same honest non-fabrication this mission's own
+>    sibling missions have required (do not invent a `run_id`; do not
+>    claim a green run that did not happen). Record exactly what is
+>    missing (which lane's merge is outstanding) so the blocker is
+>    actionable, not vague.
+> 4. Once unblocked, record the real `run_id`, `conclusion`, and
+>    wall-clock minutes, independently confirmed via
+>    `gh run view <run_id> --repo MOES-Media/spec-kitty --json
+>    conclusion,headBranch,createdAt,updatedAt`.
+>
+> **Files**: none new.
+> **Validation**: either a real, independently-confirmed green run
+> recorded, or an honest, specific blocked-status entry naming what is
+> outstanding.
+
+**Action required, before this mission is considered fully closed
+(post-merge, not a condition of WP04's approval or this mission's own
+merge)**: once WP01, WP02, WP03, and WP04's lanes have all merged onto a
+single pushed branch, perform steps 1-4 above for real. **Do not weaken or
+skip this** — it is relocated here so it can be honestly satisfied at the
+point where the required lane integration actually exists, not dropped
+because it moved out of a WP's Definition of Done.
