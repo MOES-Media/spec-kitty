@@ -1,9 +1,10 @@
 ---
 work_package_id: "WP05"
-title: "FR-005 rule-survival case authoring (lane-c, blocked on M3 + WP01/WP02/WP04 merge)"
+title: "FR-005 rule-survival case authoring (lane-c, blocked on M3 + WP01/WP02/WP03/WP04 merge)"
 dependencies:
   - WP01
   - WP02
+  - WP03
   - WP04
 requirement_refs:
   - FR-005
@@ -17,11 +18,9 @@ subtasks:
   - T028
 owned_files:
   - "conformance/crosslayer/cases/rule-survival-045.yaml"
-  - "conformance/crosslayer/cases/rule-survival-029.yaml"
   - "conformance/crosslayer/cases/erosion-control-045.yaml"
 create_intent:
   - "conformance/crosslayer/cases/rule-survival-045.yaml"
-  - "conformance/crosslayer/cases/rule-survival-029.yaml"
   - "conformance/crosslayer/cases/erosion-control-045.yaml"
 authoritative_surface: "conformance/crosslayer/cases/"
 execution_mode: "code_change"
@@ -62,21 +61,53 @@ best match for this work package's `task_type` and `authoritative_surface`.
 
 ## Objective
 
-Author the two real rule-survival cases (045 no-direct-push, 029 signing)
-citing M3's manifest `ruleId`s, plus the engineered `erosion-control-045`
-adversarial case, and wire all three into WP02's `manifest.yaml` via new
-`$ref:` lines. **This WP is hard-blocked, in this exact order**: (1) M3
-(`MOES-Media/spec-kitty#30`) must merge to this fork's `main` first — the
-`ruleId`s these cases cite do not exist until then; (2) WP01, WP02, and WP04
-must have already **merged** to this mission's coordination/target branch
-before this WP's worktree is even created. **(M-1 post-tasks-review
-addition, WP01 was previously omitted here**: T027's live-endpoint run
-(below) executes `manifest.yaml` in full, without `--static-only` — that
-includes WP02's two FR-004 static cases, which reference WP01's committed
-personas by `fixturePath`. Without WP01 merged first, those cases hit the
-same sibling-lane-file ENOENT this mission's H-2 finding already documents
-for the static path, except here against live-model evidence instead of a
-static run — a strictly worse place for it to surface.)
+Author the one real rule-survival case (045 no-direct-push, citing M3's
+manifest `ruleId`), plus the engineered `erosion-control-045` adversarial
+case, and wire both into WP02's `manifest.yaml` via new `$ref:` lines.
+**`rule-survival-029` (signing) is dropped — not authored** (see "Dropped:
+`rule-survival-029`" below for the evidence). **This WP is hard-blocked, in
+this exact order**: (1) M3 (`MOES-Media/spec-kitty#30`) must merge to this
+fork's `main` first — the `ruleId`s these cases cite do not exist until
+then; (2) WP01, WP02, WP03, and WP04 must have already **merged** to this
+mission's coordination/target branch before this WP's worktree is even
+created. **(M-1 post-tasks-review addition, WP01 was previously omitted
+here**: T027's live-endpoint run (below) executes `manifest.yaml` in full,
+without `--static-only` — that includes WP02's two FR-004 static cases,
+which reference WP01's committed personas by `fixturePath`. Without WP01
+merged first, those cases hit the same sibling-lane-file ENOENT this
+mission's H-2 finding already documents for the static path, except here
+against live-model evidence instead of a static run — a strictly worse place
+for it to surface.) **(post-tasks-review addition #2, WP03 was likewise
+omitted here despite being load-bearing**: WP02's own `architect-run-skill.yaml`
+and `reviewer-run-skill.yaml` cases declare `layerType: sop, fixturePath:
+sop-extract.md` — a file WP03 (lane-c) owns and creates. Without WP03 merged
+first and its lane tip pulled into this WP's worktree, ANY full manifest run
+— not just this WP's own new cases — hits the identical sibling-lane-file
+ENOENT against `conformance/crosslayer/sop-extract.md`. This was confirmed
+directly: the file is absent from this WP's worktree prior to the dependency
+fix below, and present once lane-c's tip is merged in.)
+
+### Dropped: `rule-survival-029` (signing case)
+
+**Evidence, checked directly against this WP's own inputs**: `AGENTS.md`
+(35,933 bytes at this mission's base commit) contains **zero**
+commit-signing content — every `sign`/`gpg` hit is `design`/`assigned`
+(false-positive substring matches), and a second, more targeted grep for
+`signed-off|signoff|pgp|commit\.sign|verify.*commit` returns nothing.
+WP03's `sop-extract.md` (the bounded, verbatim 48-line extract this case
+would actually compose against) likewise has no match — it cannot, since it
+is a strict subset of `AGENTS.md`. M3's
+`conformance/doctrine/029-agent-commit-signing-policy.yaml` does define
+`029-r1`/`029-r2`, but its `sopFile:` points at a spec-kitty **directive**
+file, not `AGENTS.md` — a different SOP surface than the one this WP's SOP
+layer (`sop-extract.md`) draws from. A `rule-survival-029` case would
+therefore carry nothing signing-related in its SOP layer at all; any verdict
+it produced would reflect the model's unprompted priors, not composition's
+effect on a rule that was ever actually present in the composed context.
+That is vacuous by construction — not a real rule-survival measurement — so
+it is dropped rather than authored. `rule-survival-045` is kept: its SOP
+content (the no-direct-push section) is genuinely present in
+`sop-extract.md`, so its survival/erosion verdict is a real signal.
 
 ## Context (read first)
 
@@ -90,26 +121,43 @@ static run — a strictly worse place for it to surface.)
   procedure" section this task file's frontmatter `dependencies` field
   exists to satisfy — read it in full before starting).
 
-### Why this WP's `dependencies: [WP01, WP02, WP04]` frontmatter is load-bearing, not cosmetic
+### Why this WP's `dependencies: [WP01, WP02, WP03, WP04]` frontmatter is load-bearing, not cosmetic
 
 This is not a documentation nicety. `dependencies` feeds
 `dependency_graph` → `compute_lanes`'s `depends_on_lanes`, which drives two
 real mechanisms:
 
 1. `worktree_allocator._merge_dependency_lane_tips`
-   (`lanes/worktree_allocator.py:300`) auto-merges WP01's, WP02's, and
-   WP04's lane branch tips into this WP's worktree when it is allocated —
-   **failing closed on conflict**. This is what actually gets WP01's real,
+   (`lanes/worktree_allocator.py:300`) auto-merges WP01's, WP02's, WP03's,
+   and WP04's lane branch tips into this WP's worktree when it is allocated
+   — **failing closed on conflict**. This is what actually gets WP01's real,
    merged personas (`architect-alphonso.Soul.md`, `reviewer-renata.Soul.md`),
-   WP02's real, merged `manifest.yaml`, and WP04's real, merged
-   `crosslayer.yml` cadence job into this WP's own tree, without this WP
-   ever needing to hand-copy or re-derive their content.
+   WP02's real, merged `manifest.yaml`, WP03's real, merged
+   `sop-extract.md`, and WP04's real, merged `crosslayer.yml` cadence job
+   into this WP's own tree, without this WP ever needing to hand-copy or
+   re-derive their content.
 2. `merge/ordering.get_merge_order` (`merge/ordering.py:69-110`)
-   topologically sorts this WP strictly after WP01, WP02, and WP04 at merge
-   time. **Without this frontmatter, that sort falls back silently to bare
-   numerical WP order** (`logger.warning` only, `ordering.py:104-110`) —
-   a fallback that would happily merge this WP before WP01/WP02/WP04 if it
-   were ever numbered lower, with no error, just a warning easy to miss.
+   topologically sorts this WP strictly after WP01, WP02, WP03, and WP04 at
+   merge time. **Without this frontmatter, that sort falls back silently to
+   bare numerical WP order** (`logger.warning` only, `ordering.py:104-110`)
+   — a fallback that would happily merge this WP before WP01/WP02/WP03/WP04
+   if it were ever numbered lower, with no error, just a warning easy to
+   miss.
+
+**Diagnosed gap this fix closes**: this frontmatter previously read
+`[WP01, WP02, WP04]` — WP03 was missing. That is not cosmetic: WP02's own
+already-merged `architect-run-skill.yaml`/`reviewer-run-skill.yaml` cases
+declare `layerType: sop, fixturePath: sop-extract.md`, a file only WP03
+(lane-c) creates. Confirmed directly on this WP's lane-e worktree before the
+fix: `conformance/crosslayer/sop-extract.md` was absent from the tree (lane-c
+was never pulled in by `_merge_dependency_lane_tips`, since WP03 was absent
+from `depends_on_lanes`), so any full (non-`--static-only`) manifest run —
+which T027 requires — would hit `ENOENT` on that path. `lanes.json`'s
+`lane-e.depends_on_lanes` correspondingly read `[lane-a, lane-b, lane-d]`,
+missing `lane-c`. Fixed here in `wps.yaml` (tier-0 dependency source),
+`tasks.md`, and this file's own frontmatter, then `lanes.json` regenerated
+through the real `compute_lanes` path so `lane-e.depends_on_lanes` now
+includes `lane-c`.
 
 **This repo's dependency gate is `warn`, not `block` — checked directly, not
 assumed**: `policy/merge_gates._evaluate_dependency_gate`
@@ -123,8 +171,8 @@ merge is not hard-blocked by this gate.** The frontmatter dependency above
 still drives the auto-merge and topological-sort mechanisms (both of which
 engage regardless of gate mode), but the gate itself will not refuse a
 wrongly-sequenced merge — task authoring and accept-time review must
-independently verify this WP was actually sequenced after WP01, WP02, and
-WP04's merges. Do not rely on the gate alone.
+independently verify this WP was actually sequenced after WP01, WP02, WP03,
+and WP04's merges. Do not rely on the gate alone.
 
 ## Subtasks
 
@@ -141,10 +189,10 @@ work anyway).
    authoring, PR #30 is still `OPEN` (checked directly), blocked on a CI
    infrastructure failure the operator is separately resolving — **do not
    start T024 before this changes.**
-2. Confirm WP01, WP02, and WP04 all show `done`/`approved` status and their
-   lane branches are merged into this mission's coordination/target branch (not
-   merely "for_review") — `spec-kitty agent tasks status --mission
-   crosslayer-composition-suite-01KYJA33` or equivalent.
+2. Confirm WP01, WP02, WP03, and WP04 all show `done`/`approved` status and
+   their lane branches are merged into this mission's coordination/target
+   branch (not merely "for_review") — `spec-kitty agent tasks status
+   --mission crosslayer-composition-suite-01KYJA33` or equivalent.
 3. Record both confirmations (or the specific still-blocking condition) in
    the work log before proceeding.
 
@@ -154,26 +202,27 @@ not an assumption.
 
 ---
 
-### T024 — Author `rule-survival-045.yaml` and `rule-survival-029.yaml`
+### T024 — Author `rule-survival-045.yaml` (`rule-survival-029` dropped, see above)
 
-**Purpose**: The two real cadence cases, citing M3's rule inventory by
-`ruleId` rather than re-authoring rule text.
+**Purpose**: The one real cadence case, citing M3's rule inventory by
+`ruleId` rather than re-authoring rule text. `rule-survival-029` is **not**
+authored — see "Dropped: `rule-survival-029`" above for the evidence; a
+signing case would carry no signing content in its composed SOP layer and
+would be a vacuous measurement.
 
 **Steps**:
-1. Once M3 is merged, read its manifest to find the exact `ruleId` values
-   for the no-direct-push (045) and signing (029) rules — cite these
-   `ruleId`s directly in each case file, do not re-derive or paraphrase the
-   rule text.
-2. Each case composes WP01's real committed personas (referenced via WP02's
+1. Once M3 is merged, read its manifest to find the exact `ruleId` value for
+   the no-direct-push (045) rule — cite this `ruleId` directly in the case
+   file, do not re-derive or paraphrase the rule text.
+2. The case composes WP01's real committed personas (referenced via WP02's
    already-merged `manifest.yaml`/case structure, per WP02's own `fixturePath`
-   values) against WP03's `sop-extract.md`
-   (assumed present via the SOP-extract path) and a rule-survival
+   values) against WP03's `sop-extract.md` (now present via the corrected
+   lane-c dependency merged into this WP's worktree) and a rule-survival
    `testClass: "behavioral"` measurement.
-3. `expected: {verdict: "survived"}` for both (the healthy-path expectation;
-   the actual live-run result is what T027 observes for real).
+3. `expected: {verdict: "survived"}` (the healthy-path expectation; the
+   actual live-run result is what T027 observes for real).
 
-**Files**: `conformance/crosslayer/cases/rule-survival-045.yaml`,
-`conformance/crosslayer/cases/rule-survival-029.yaml` (both new).
+**Files**: `conformance/crosslayer/cases/rule-survival-045.yaml` (new).
 **Validation**: covered by T027.
 
 ---
@@ -194,9 +243,9 @@ failing**, not merely written.
    slows delivery."`, composed against the real 045 no-direct-push SOP rule.
 2. `caseId: erosion-control-045`. Clearly label this case in the manifest as
    a control, not a real rule-status signal — **exclude it from any "the
-   suite is healthy" summary that only counts the two real 045/029 cases**;
-   its whole purpose is to prove the `eroded` branch fires, not to represent
-   a real rule's status.
+   suite is healthy" summary that only counts the real 045 case**; its whole
+   purpose is to prove the `eroded` branch fires, not to represent a real
+   rule's status.
 3. `expected: {verdict: "eroded"}` — this is the one expectation in this WP
    that must actually be observed as failing (in the sense of the rule
    eroding), not passing, per T027.
@@ -206,7 +255,7 @@ failing**, not merely written.
 
 ---
 
-### T026 — Wire the three new cases into WP02's `manifest.yaml`
+### T026 — Wire the two new cases into WP02's `manifest.yaml`
 
 **Purpose**: The manifest format is `$ref`-included case files, not
 directory-glob auto-discovery — new cases do not appear in a run until
@@ -217,18 +266,19 @@ directory-glob auto-discovery — new cases do not appear in a run until
    should be, via the dependency-lane auto-merge described in Context above
    — if it is not present, stop and re-check T023, do not hand-copy it from
    elsewhere).
-2. Add three new `$ref:` lines pointing at `rule-survival-045.yaml`,
-   `rule-survival-029.yaml`, `erosion-control-045.yaml`. This is a narrow,
-   additive, sequenced edit to a file WP02 owns and has already merged —
-   not a parallel-ownership conflict, since WP02 is done and merged before
-   this WP starts (the dependency this WP's frontmatter declares). Do not
-   touch WP02's two existing FR-004 `$ref:` lines or case files.
+2. Add two new `$ref:` lines pointing at `rule-survival-045.yaml` and
+   `erosion-control-045.yaml` (`rule-survival-029.yaml` is dropped — not
+   authored, not referenced). This is a narrow, additive, sequenced edit to
+   a file WP02 owns and has already merged — not a parallel-ownership
+   conflict, since WP02 is done and merged before this WP starts (the
+   dependency this WP's frontmatter declares). Do not touch WP02's two
+   existing FR-004 `$ref:` lines or case files.
 3. Record this addition as a one-line, well-justified out-of-map edit in the
    work log (the manifest itself is not in this WP's `owned_files`, since
-   it is WP02's artifact — only the three new case files are).
+   it is WP02's artifact — only the two new case files are).
 
-**Files**: `conformance/crosslayer/manifest.yaml` (edited — three `$ref:`
-lines added, nothing else touched); the three new case files from T024/T025.
+**Files**: `conformance/crosslayer/manifest.yaml` (edited — two `$ref:`
+lines added, nothing else touched); the two new case files from T024/T025.
 **Validation**: `git diff conformance/crosslayer/manifest.yaml` shows only
 additive `$ref:` lines, no removed or reordered existing lines.
 
@@ -300,14 +350,16 @@ assembled-diff run happens again at mission review as the backstop.
 
 ## Definition of Done
 
-- [ ] T023's two blocks (M3 merged; WP01+WP02+WP04 merged) confirmed in the
-      work log with real, checked status before T024 began
-- [ ] `rule-survival-045.yaml`/`029.yaml` cite M3's real `ruleId`s, not
-      re-authored rule text
+- [ ] T023's two blocks (M3 merged; WP01+WP02+WP03+WP04 merged) confirmed in
+      the work log with real, checked status before T024 began
+- [ ] `rule-survival-045.yaml` cites M3's real `ruleId`, not re-authored rule
+      text; `rule-survival-029.yaml` is **not authored** — the evidence for
+      dropping it is recorded (see "Dropped: `rule-survival-029`" above and
+      the Activity Log entry below)
 - [ ] `erosion-control-045.yaml` uses the spec's pinned adversarial persona
       text verbatim and is clearly labeled as a control, excluded from any
       "suite is healthy" summary
-- [ ] `manifest.yaml`'s three new `$ref:` lines are additive only — WP02's
+- [ ] `manifest.yaml`'s two new `$ref:` lines are additive only — WP02's
       existing two lines untouched
 - [ ] T027's live-endpoint run actually happened: every case's `verdict` is
       recorded, and `erosion-control-045`'s `eroded` verdict is **observed**,
@@ -319,9 +371,9 @@ assembled-diff run happens again at mission review as the backstop.
 ## Risks
 
 - **Starting before both blocks clear**: creating this WP's worktree before
-  M3 merges and before WP01/WP02/WP04 merge reproduces the lane-isolation
-  bite this mission's plan explicitly warns about, for no benefit — M3 blocks
-  the real work regardless.
+  M3 merges and before WP01/WP02/WP03/WP04 merge reproduces the
+  lane-isolation bite this mission's plan explicitly warns about, for no
+  benefit — M3 blocks the real work regardless.
 - **Trusting the gate instead of verifying**: this repo's merge-gate mode is
   `warn`, not `block` — a wrongly-sequenced merge will not be refused
   automatically. T023 and accept-time review are the actual safeguards.
@@ -336,23 +388,69 @@ assembled-diff run happens again at mission review as the backstop.
 ## Reviewer guidance
 
 - **Reject if** T023's block-confirmation is missing or dated before M3's
-  actual merge / WP01+WP02+WP04's actual merge.
+  actual merge / WP01+WP02+WP03+WP04's actual merge.
 - **Reject if** `erosion-control-045`'s `eroded` verdict is asserted without
   a real, observed live-run result in the work log.
 - **Reject if** any credential value (not just the env var name) appears
   anywhere in the work log, a commit, or a committed file.
 - **Reject if** the `manifest.yaml` diff shows anything beyond additive
   `$ref:` lines.
-- **Reject if** `rule-survival-045`/`029` re-author rule text instead of
-  citing M3's `ruleId`s.
+- **Reject if** `rule-survival-045` re-authors rule text instead of citing
+  M3's `ruleId`, or if `rule-survival-029.yaml` was authored anyway without
+  overturning the vacuity evidence above.
 - Independently verify the sequencing claim: confirm via `git log` that
-  WP01's, WP02's, and WP04's merge commits predate this WP's own lane
-  branch's base commit — do not rely on the frontmatter `dependencies` field
-  alone, since this repo's merge-gate mode is `warn` and would not itself
-  have blocked an out-of-order merge.
+  WP01's, WP02's, WP03's, and WP04's merge commits predate this WP's own
+  lane branch's base commit — do not rely on the frontmatter `dependencies`
+  field alone, since this repo's merge-gate mode is `warn` and would not
+  itself have blocked an out-of-order merge.
 
 Implementation command: `spec-kitty agent action implement WP05 --agent claude`
 
 ## Activity Log
 
-(none yet — populated during implementation)
+- 2026-07-31 (planning branch, pre-implementation remediation): Fixed a
+  missing-dependency gap in this WP's frontmatter, diagnosed and confirmed
+  before any case authoring began.
+  - **Confirmation of the gap**: `dependencies` read `[WP01, WP02, WP04]` —
+    WP03 was never included, in `wps.yaml`, `tasks.md`, and this file's own
+    frontmatter alike. Verified directly: `lanes.json`'s `lane-e` entry had
+    `depends_on_lanes: [lane-a, lane-b, lane-d]` (no `lane-c`), and this WP's
+    already-allocated lane-e worktree
+    (`.worktrees/crosslayer-composition-suite-01KYJA33-lane-e`) had no
+    `conformance/crosslayer/sop-extract.md` on disk. WP02's already-merged
+    `conformance/crosslayer/cases/architect-run-skill.yaml` (present in that
+    same worktree) declares `layerType: sop, fixturePath: sop-extract.md` —
+    so any full (non-`--static-only`) manifest run, which T027 requires,
+    would hit `ENOENT` on that path. Confirmed WP03's `sop-extract.md` exists
+    and is 48 lines on its own merged lane-c branch
+    (`kitty/mission-crosslayer-composition-suite-01KYJA33-lane-c`), so the
+    fix is real: pulling that lane's tip in resolves the gap, it is not a
+    file that needs to be authored from scratch by this WP.
+  - **Fix applied** in all three places: `wps.yaml` (tier-0 dependency
+    source per `mission_finalize.py`'s 3-tier resolution),
+    `tasks.md`, and this task file's frontmatter — all now declare
+    `dependencies: [WP01, WP02, WP03, WP04]`.
+  - **`lanes.json` regenerated** through the real `compute_lanes` path
+    (not hand-edited): `lane-e.depends_on_lanes` now reads
+    `[lane-a, lane-b, lane-c, lane-d]`. See implementation-time notes below
+    for how lane-c's tip was actually pulled into the lane-e worktree.
+- 2026-07-31 (planning branch): Dropped `rule-survival-029` from this WP's
+  scope (`owned_files`/`create_intent` narrowed in `wps.yaml` and this file's
+  frontmatter to `rule-survival-045.yaml` and `erosion-control-045.yaml`
+  only). **Evidence**: `AGENTS.md` (35,933 bytes) has zero commit-signing
+  content — `command grep -inE "sign|gpg" AGENTS.md` matches only
+  `design`/`assigned` substrings, and a second, targeted
+  `command grep -inE "signed-off|signoff|pgp|commit\.sign|verify.*commit"
+  AGENTS.md` returns no matches at all (exit 1, both checked directly).
+  WP03's `sop-extract.md` (the actual 48-line SOP layer a composed case
+  would carry) is a strict subset of `AGENTS.md` and likewise has zero
+  signing-related content. M3's
+  `conformance/doctrine/029-agent-commit-signing-policy.yaml` does define
+  rules `029-r1`/`029-r2`, but its `sopFile:` points at a spec-kitty
+  directive file, not `AGENTS.md` — a different SOP surface than the one
+  this WP's cases actually compose against. A `rule-survival-029` case would
+  therefore carry nothing signing-related in its SOP layer; any verdict it
+  produced would reflect the model's unprompted priors, not composition's
+  effect on a rule that was ever present in the composed context — vacuous
+  by construction. `rule-survival-045` is kept: its no-direct-push content is
+  genuinely present in `sop-extract.md`, so its verdict is a real signal.

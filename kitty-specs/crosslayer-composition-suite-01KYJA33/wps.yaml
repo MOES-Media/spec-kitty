@@ -107,18 +107,17 @@ work_packages:
     prompt_file: "tasks/WP04-crosslayer-ci-workflow.md"
 
   - id: WP05
-    title: "FR-005 rule-survival case authoring (lane-c, blocked on M3 + WP01/WP02/WP04 merge)"
+    title: "FR-005 rule-survival case authoring (lane-c, blocked on M3 + WP01/WP02/WP03/WP04 merge)"
     dependencies:
       - WP01
       - WP02
+      - WP03
       - WP04
     owned_files:
       - "conformance/crosslayer/cases/rule-survival-045.yaml"
-      - "conformance/crosslayer/cases/rule-survival-029.yaml"
       - "conformance/crosslayer/cases/erosion-control-045.yaml"
     create_intent:
       - "conformance/crosslayer/cases/rule-survival-045.yaml"
-      - "conformance/crosslayer/cases/rule-survival-029.yaml"
       - "conformance/crosslayer/cases/erosion-control-045.yaml"
     requirement_refs:
       - FR-005
