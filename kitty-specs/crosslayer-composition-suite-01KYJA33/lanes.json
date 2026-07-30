@@ -83,8 +83,9 @@
       ],
       "write_scope": [
         "conformance/crosslayer/cases/erosion-control-045.yaml",
-        "conformance/crosslayer/cases/rule-survival-029.yaml",
-        "conformance/crosslayer/cases/rule-survival-045.yaml"
+        "conformance/crosslayer/cases/rule-survival-045.yaml",
+        "conformance/crosslayer/fixtures/erosion-persona-045.Soul.md",
+        "tests/cross_cutting/test_crosslayer_wp05_rule_survival_cases.py"
       ],
       "predicted_surfaces": [
         "api",
@@ -94,12 +95,14 @@
       "depends_on_lanes": [
         "lane-a",
         "lane-b",
+        "lane-c",
         "lane-d"
       ],
       "parallel_group": 1
     }
   ],
-  "computed_at": "2026-07-27T20:19:26.694668+00:00",
+  "computed_at": "2026-07-30T23:40:59.940648+00:00",
   "computed_from": "dependency_graph+ownership",
-  "planning_artifact_wps": []
+  "planning_artifact_wps": [],
+  "planning_commit_sha": null
 }
