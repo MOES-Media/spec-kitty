@@ -107,7 +107,8 @@
       "last_transition_at": "2026-07-30T22:18:16.156571+00:00",
       "model": "__resolved_model_absent__",
       "notes": [
-        "Ready for review"
+        "Ready for review",
+        "Re-review confirmed MEDIUM-1 resolved, status.json regeneration byte-identical to canonical reducer output, LOW-5 assertion firing both ways, all three README claims verified against lane-b, MEDIUM-2 inner-filter gap closed at cfddb951b (e2e group false->true, e2e-cross-cutting if false->true)."
       ],
       "provider": "__resolved_provider_absent__",
       "role": "reviewer",
