@@ -36,6 +36,7 @@ create_intent:
 - conformance/scripts/check-persona-drift.sh
 - tests/conformance/test_profile2soul.py
 - tests/conformance/__init__.py
+- tests/cross_cutting/test_crosslayer_wp01_persona_rfc1_conformance.py
 execution_mode: code_change
 model: ''
 owned_files:
@@ -46,6 +47,7 @@ owned_files:
 - conformance/scripts/check-persona-drift.sh
 - tests/conformance/test_profile2soul.py
 - tests/conformance/__init__.py
+- tests/cross_cutting/test_crosslayer_wp01_persona_rfc1_conformance.py
 role: implementer
 tags: []
 tracker_refs: []
@@ -329,7 +331,7 @@ both quoted, not just described.
 
 **Steps** (run in order):
 ```bash
-git diff --stat                                   # ONLY the seven owned_files entries changed
+git diff --stat                                   # ONLY the eight owned_files entries changed
 git diff --stat src/doctrine/                     # MUST show no changes — read-only input, never edited
 git diff --stat .github/                          # MUST show no changes — not this WP's concern
 git diff --name-only <mission-base>...<this-lane-branch> > /tmp/wp01-c002-diff.txt
@@ -375,8 +377,9 @@ instead of just the first two.
 - [ ] All of T006's six real exit codes recorded verbatim in the work log,
       including both falsification directions' actual observed output (not
       "should fail" — the real command output)
-- [ ] No file outside `owned_files` modified (seven entries); `src/doctrine/**` and
-      `.github/**` untouched
+- [ ] No file outside `owned_files` modified (eight entries; routed, not
+      merely located — see Activity Log's round-3 note on why "under `tests/`"
+      alone was never sufficient); `src/doctrine/**` and `.github/**` untouched
 - [ ] Per-lane C-002 check (T007) passes against this WP's own lane diff
 
 ## Risks
@@ -415,7 +418,7 @@ instead of just the first two.
   `^#.*generated:\s*true` — C-003's reviewer-facing audit command
   (spec.md) depends on this exact anchor to avoid a false-positive on a
   rubric sentence that happens to contain the word "generated."
-- Confirm `git diff --stat` touches exactly the seven `owned_files` entries
+- Confirm `git diff --stat` touches exactly the eight `owned_files` entries
   and nothing under `src/doctrine/**` or `.github/**`.
 
 Implementation command: `spec-kitty agent action implement WP01 --agent claude`
@@ -770,6 +773,186 @@ re-run above confirms byte-identical regeneration output.
   committed separately, also via plain `git add`/`git commit`; `git show
   --stat` confirmed after landing (see commit immediately following this
   one in `git log`).
+
+### 2026-07-31 — Remediation round 3: CHANGES-REQUIRED close-out (HIGH-1 routing gap, MEDIUM-1 owned_files, mission-record sync, FR-001/C-003 root-cause amendment)
+
+A round-3 review found four defects. The RFC-1 fix itself (the projector,
+`PROJECTION.md`, the two personas, `check-persona-drift.sh`) was verified
+sound and is **not** reopened by this entry — only routing/bookkeeping/spec
+text.
+
+#### HIGH-1 — `tests/conformance/test_persona_rfc1_parser_conformance.py` was selected by zero CI gates
+
+The RFC-1-parser regression test added by the RED/GREEN pair
+`79de09db1`/`89d68ba49` (both lane-a) carried `pytestmark = [pytest.mark.
+integration, pytest.mark.e2e]` but lived under `tests/conformance/`, a path
+no CI workflow references on any lane. `unit-contract-residual`
+(`.github/workflows/ci-quality.yml`, the whole-tree marker catch-all)
+explicitly negates both `integration` and `e2e`; every scoped, path-routed
+gate misses `tests/conformance/**`. The repo's own ratchet caught it:
+
+```
+tests/architectural/test_gate_coverage.py::test_no_new_orphan_surfaces
+AssertionError: 1 test file(s) are selected by ZERO CI gates and are not
+in the recorded baseline: tests/conformance/test_persona_rfc1_parser_conformance.py
+```
+
+**Fix (lane-a commit `840a132dd`, "fix(WP01): route RFC-1-parser
+conformance test through a CI gate (HIGH-1)")**: `git mv` to
+`tests/cross_cutting/test_crosslayer_wp01_persona_rfc1_conformance.py` —
+where the sibling `tests/cross_cutting/test_crosslayer_wp05_rule_survival_
+cases.py` (lane-e) already lives, and which the `e2e-cross-cutting` job
+runs directly by path (`tests/e2e/ tests/cross_cutting/`). Markers and
+content unchanged; the two cross-references to the old path
+(`conformance/tools/PROJECTION.md`, `tests/conformance/test_profile2soul.py`)
+were updated to the new one. Not taken: routing `tests/conformance/**`
+into a filter group instead — that file (`ci-quality.yml`'s change-detection
+filters) is lane-d's owned file; this would have cost a cross-lane
+dependency for no benefit over simply living where CI already looks.
+
+**RED/GREEN, re-pinned at the new path** (both real, fresh runs, this
+worktree, `tests/architectural/test_gate_coverage.py`):
+- RED (lane-a `89d68ba49`, before this fix — content-correct, still
+  ungated): `1 failed, 30 passed` — `test_no_new_orphan_surfaces` fails
+  naming exactly the one orphan file above (a second, unrelated failure —
+  `test_model_fidelity_spotcheck_sharded_next_tier` — appeared in one
+  interleaved local run because the file was mid-`git mv` when that run's
+  later subprocess-collection step executed; the clean baseline figure
+  the original finding cited, `1 failed / 30 passed`, is the real one and
+  is what's recorded here).
+- GREEN (lane-a `840a132dd`, after this fix): **`31 passed`** — full clean
+  run, no failures, `numFailedTests == 0`.
+- The moved test itself, re-run directly against the real, offline-cached
+  `@garrison-hq/muster@1.1.0` CLI at its new path: `2 passed` (both
+  personas), unchanged from `89d68ba49`.
+
+**On T007's DoD wording**: "any collected unit test for this WP's own
+artifact must live under `tests/`" was satisfied throughout (the file was
+always under `tests/`) and was never sufficient — the property that
+actually matters is that the test is *selected by some CI gate*, not
+merely that it is located under `tests/`. Recommend this DoD line be
+reworded to say so explicitly for future WPs on this mission; not changed
+here since editing that clause is outside this remediation's four items.
+
+#### MEDIUM-1 — undeclared eighth file (second occurrence of this exact defect)
+
+Commit `89d68ba49` added `tests/conformance/test_persona_rfc1_parser_
+conformance.py` without adding it to `owned_files`/`create_intent` (its
+relocated path is added instead, since the file only ever lands in this
+task file's frontmatter after HIGH-1's fix). This is the same defect
+round 2 already closed once for `tests/conformance/__init__.py`
+(`4e82dc5cb`) — recurring on a file this WP itself authored, not merely on
+CI/tooling output.
+
+**Fix applied**: `tests/cross_cutting/test_crosslayer_wp01_persona_rfc1_
+conformance.py` added to `owned_files`/`create_intent` (both now **eight**
+entries, was seven). The T007 Steps comment, the DoD bullet, and the
+reviewer-guidance bullet updated from "seven" to "eight".
+
+**Real lane diff, re-run against this WP's actual `base_commit` and lane-a's
+current tip**:
+
+```
+$ git diff --name-only 230ae7f0be81083f98bd80d1ffaed8bd577bffe6...840a132dd
+conformance/crosslayer/personas/architect-alphonso.Soul.md
+conformance/crosslayer/personas/reviewer-renata.Soul.md
+conformance/scripts/check-persona-drift.sh
+conformance/tools/PROJECTION.md
+conformance/tools/profile2soul.py
+tests/conformance/__init__.py
+tests/conformance/test_profile2soul.py
+tests/cross_cutting/test_crosslayer_wp01_persona_rfc1_conformance.py
+```
+
+Eight paths, all matching the widened `owned_files` list exactly (this
+lane worktree carries no `kitty-specs/` bookkeeping commits at all — see
+below on why). Per-lane C-002 check (T007, allow-list `^(conformance|
+kitty-specs|tests)/`) still passes: every path above matches, and
+`conformance/README.md` is not among them.
+
+#### Mission record — this remediation was previously invisible
+
+Before this entry, coord/target both stopped at round 2 (2026-07-27), and
+lane-a's own `kitty-specs/` tree is (correctly) byte-identical to its merge
+base with coord (`git diff --stat b45ffd3bc HEAD -- kitty-specs/` is empty
+on lane-a) — merging cannot clobber coord's Activity Log, so lane-a never
+carries this task file's edits itself; per this mission's own established
+convention (see round 1/round 2's "chore(WP01): revert kitty-specs/ lane
+contamination", commit `9bb0df3be`, lane-a), all `kitty-specs/` bookkeeping
+for this WP lands only on coord/target, never on a lane commit. This
+means, until this entry, nothing anywhere recorded: the HIGH-1
+routing defect, the MEDIUM-1 owned-files gap, or that T006's six recorded
+exit codes (round-1 entry above) were captured against the *original*,
+since-replaced projector/personas (pre-`89d68ba49`) — stale the moment
+the RFC-1 fix landed.
+
+#### T006 — real-CLI verification, re-run against the corrected artifact (all six exit codes, freshly observed, this pass)
+
+Re-run for real in lane-a's current tree (post-`89d68ba49`, post-`840a132dd`),
+not restated from the round-1 entry above, which was captured against the
+original (broken) projector/personas:
+
+1. **FR-001 determinism — pass direction**: `diff` on two independent
+   `profile2soul.py` invocations against `architect-alphonso.agent.yaml`:
+   exit **0**.
+2. **FR-001 determinism — falsification direction**: a throwaway copy of
+   `profile2soul.py` had `import time` added and the header's source-hash
+   line changed to hash the source bytes plus `str(time.time_ns()).encode()`;
+   two invocations one second apart produced two different
+   `# generated: true, source-hash: ...` lines: `diff` exit **1**. Copy
+   discarded, never committed.
+3. **FR-002 fidelity-loss check — pass direction**: the corrected `!`+`-q`
+   command against the current `PROJECTION.md`: combined exit **0**.
+4. **FR-002 fidelity-loss check — falsification direction**: a throwaway
+   copy of `PROJECTION.md` with `initialization-declaration` injected into
+   its Fidelity Loss section: combined exit **1**. Copy discarded.
+5. **FR-003 drift gate — pass direction**: `bash conformance/scripts/
+   check-persona-drift.sh` on the clean, committed tree: exit **0**.
+6. **FR-003 drift gate — falsification direction**: one byte of the
+   committed `architect-alphonso.Soul.md` hand-edited (`formality: 50` →
+   `formality: 51`); re-running the drift script printed the real diff
+   (`- formality: 51` / `+ formality: 50`) and `DRIFT DETECTED: ...`, exit
+   **1**. The file was restored exactly
+   (`git checkout -- conformance/crosslayer/personas/architect-alphonso.Soul.md`);
+   `git diff --exit-code conformance/crosslayer/personas/` afterward: exit
+   **0** (clean tree confirmed); a clean re-run of the drift script: exit
+   **0**.
+
+Summary of all six exit codes, re-observed against the corrected artifact:
+(1) 0, (2) 1, (3) 0, (4) 1, (5) 0, (6) 1 — identical polarity to the
+round-1 record, now genuinely against the fixed projector/personas rather
+than the originals.
+
+#### spec.md amendment (root cause)
+
+FR-001 and C-003 described the six fabricated key groups as **empty
+lists** (`composition: []`, `profiles: []`, `profile_overrides: []`,
+`extensions: []`) and never mentioned `values`, `safety`, or
+`voice.formatting` at all — the actual root cause of why the original
+(broken) shape was ever approved: the DoD only ever cross-checked the
+deliverable against this mission's own (wrong) FR text, never against
+muster's real RFC-1 parser. Amended in the same commit as this entry (see
+`spec.md`'s new "FR-001 — fabricated-defaults shape corrected against
+muster's real parser (WP01 remediation)" subsection, and the corrected
+FR-001/C-003 rows) — full detail lives there, not duplicated here. C-003's
+own textual-audit probe had also silently lost one of its four detectors
+(`\bprofile_overrides\s*:\s*\[\]` can never match now that the shape is
+`{}`) and its recorded verification of "no false positive" on the
+legitimate persona was wrong (real exit is `0`, not `1` — pre-existing,
+also true at the RED commit, corrected as such rather than as a
+regression); both fixed there too, with the generalizable lesson recorded
+for M4/M6/M9.
+
+#### Commits (this entry)
+
+- Lane-a `840a132dd` — `fix(WP01): route RFC-1-parser conformance test
+  through a CI gate (HIGH-1)` (code: `git mv` + two cross-reference
+  updates; `tests/`, `conformance/tools/PROJECTION.md` only).
+- This task-file amendment (MEDIUM-1 fix + this Activity Log entry) and
+  the `spec.md` amendment, committed together on coord and mirrored
+  identically onto target, both via plain `git add`/`git commit` (not
+  `spec-kitty spec-commit`/`finalize-tasks`, per fork issues #35/#36);
+  `git show --stat` confirmed after landing on each branch.
 
 No state transition attempted — WP01 remains `for_review`; this
 programme's reviews run out-of-band per operator instruction.
