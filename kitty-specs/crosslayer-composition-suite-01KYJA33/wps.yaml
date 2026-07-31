@@ -8,12 +8,18 @@ work_packages:
       - "conformance/crosslayer/personas/architect-alphonso.Soul.md"
       - "conformance/crosslayer/personas/reviewer-renata.Soul.md"
       - "conformance/scripts/check-persona-drift.sh"
+      - "tests/conformance/__init__.py"
+      - "tests/conformance/test_profile2soul.py"
+      - "tests/cross_cutting/test_crosslayer_wp01_persona_rfc1_conformance.py"
     create_intent:
       - "conformance/tools/profile2soul.py"
       - "conformance/tools/PROJECTION.md"
       - "conformance/crosslayer/personas/architect-alphonso.Soul.md"
       - "conformance/crosslayer/personas/reviewer-renata.Soul.md"
       - "conformance/scripts/check-persona-drift.sh"
+      - "tests/conformance/__init__.py"
+      - "tests/conformance/test_profile2soul.py"
+      - "tests/cross_cutting/test_crosslayer_wp01_persona_rfc1_conformance.py"
     requirement_refs:
       - FR-001
       - FR-002

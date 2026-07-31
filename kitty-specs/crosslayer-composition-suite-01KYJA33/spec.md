@@ -36,8 +36,9 @@ Two artifacts make this possible:
    `src/adapters/rfc1/schema.json:11-24`, verified byte-identical at
    muster `v1.1.0` (`6bdb070dfa204a45f00a715ce5bd584c669444e6`) and at
    `624edd6dddedb86fb89f13084510f02b5a2c7d25`, the commit this mission's
-   citations are pinned to). `voice` needs four 0–100 integers; `interaction`
-   needs four enums; neither exists anywhere in an agent profile. The
+   citations are pinned to). `voice` needs four 0–100 integers plus a
+   required `formatting` enum; `interaction` needs four enums; neither
+   exists anywhere in an agent profile. The
    projector fabricates them from a frozen, published defaults table —
    **and D1 (`conformance/DECISIONS.md`) already settles that this
    fabrication may never itself be graded** (constraint 5: every check cites
