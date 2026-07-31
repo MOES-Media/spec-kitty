@@ -28,10 +28,10 @@
       "criterion_id": "FR-003",
       "description": "The committed projected personas under conformance/crosslayer/personas/ are regenerable and drift-checked: regenerating each from its source profile leaves the working tree clean, hand-editing one committed byte makes the same check fail, and the shipped CI drift script (conformance/scripts/check-persona-drift.sh) agrees.",
       "proof_type": "automated_test",
-      "evidence": null,
-      "pass_fail": "pending",
-      "verified_by": null,
-      "verified_at": null,
+      "evidence": "Scratch assembly 8bd440f76, 2026-07-31: regenerate architect-alphonso.Soul.md then git diff --exit-code conformance/crosslayer/personas/ exit 0; one appended byte to reviewer-renata.Soul.md makes the same check exit 1; bash conformance/scripts/check-persona-drift.sh exit 0; tree restored via git checkout HEAD -- and confirmed clean.",
+      "pass_fail": "pass",
+      "verified_by": "mission-accept-gate",
+      "verified_at": "2026-07-31T04:50:46.368325+00:00",
       "notes": "Verification command (spec.md FR-003 row): `python3 conformance/tools/profile2soul.py src/doctrine/agent_profiles/built-in/architect-alphonso.agent.yaml > conformance/crosslayer/personas/architect-alphonso.Soul.md && git diff --exit-code conformance/crosslayer/personas/` -- OBSERVED exit 0. Falsification: appended one newline byte to conformance/crosslayer/personas/reviewer-renata.Soul.md and re-ran `git diff --exit-code conformance/crosslayer/personas/` -- OBSERVED exit 1 (`1 file changed, 1 insertion(+)`). The shipped drift script `bash conformance/scripts/check-persona-drift.sh` -- OBSERVED exit 0 on the clean tree. The scratch edit was reverted with `git checkout HEAD -- conformance/crosslayer/personas/` and `git status --porcelain conformance/` confirmed clean afterwards. Owner: WP01 (lane-a). Run on the scratch assembly described in FR-001's notes. This row was a `TODO: replace with a real acceptance criterion` stub before this pass."
     },
     {
