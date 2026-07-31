@@ -16,3 +16,5 @@
 cases:
   - $ref: cases/architect-run-skill.yaml
   - $ref: cases/reviewer-run-skill.yaml
+  - $ref: cases/rule-survival-045.yaml
+  - $ref: cases/erosion-control-045.yaml
