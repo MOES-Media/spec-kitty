@@ -2,7 +2,7 @@
   "mission_slug": "crosslayer-composition-suite-01KYJA33",
   "mission_number": "",
   "mission_type": "software-dev",
-  "overall_verdict": "pending",
+  "overall_verdict": "fail",
   "criteria": [
     {
       "criterion_id": "FR-001",
@@ -38,10 +38,10 @@
       "criterion_id": "FR-004",
       "description": "The two committed static composition cases (architect+SOP+skill and reviewer+SOP+skill, conformance/crosslayer/manifest.yaml) run green under `muster crosslayer run <manifest> --static-only`: exit 0, JSON `failed: 0`, each case matching its own declared `expected: {ok: true, findingTypes: []}`.",
       "proof_type": "automated_test",
-      "evidence": null,
-      "pass_fail": "pending",
-      "verified_by": null,
-      "verified_at": null,
+      "evidence": "Scratch assembly 8bd440f76, 2026-07-31: npx --offline @garrison-hq/muster@1.1.0 crosslayer run conformance/crosslayer/manifest.yaml --static-only --json exit 1, {total:2, passed:0, failed:2, skipped:0}; both architect-run-skill and reviewer-run-skill report passed:false with findings [cross-layer-contradiction, undefined-precedence] against their own expected {ok:true, findingTypes:[]}. Diagnosed via muster's own assembleComposedContext+lintComposition on the same three layers: 9 cross-layer-contradiction findings from persona-vs-sop and sop-vs-skill negation pairs, plus undefined-precedence. First cross-lane composition of WP01+WP02+WP03's real artifacts; no lane could run it in isolation.",
+      "pass_fail": "fail",
+      "verified_by": "mission-accept-gate",
+      "verified_at": "2026-07-31T04:51:01.683800+00:00",
       "notes": "Verification command (spec.md FR-004 row): `npx --offline @garrison-hq/muster@1.1.0 crosslayer run conformance/crosslayer/manifest.yaml --static-only --json` -- OBSERVED exit 1, not the expected 0. JSON summary: `{\"total\": 2, \"passed\": 0, \"failed\": 2, \"skipped\": 0}`; BOTH cases report `\"passed\": false` with `\"findings\": [\"cross-layer-contradiction\", \"undefined-precedence\"]` against their own `expected: {ok: true, findingTypes: []}` blocks. Diagnosed further by calling muster's own `assembleComposedContext` + `lintComposition` directly on the identical three layers: 9 `cross-layer-contradiction` findings plus `undefined-precedence`, produced by contradiction-lint.ts's negation-token heuristic pairing WP01's persona clauses (\"... Does NOT implement code or manage day-to-day tasks.\", \"I do not write implementation code.\") against WP03's sop-extract clauses (\"**All changes to origin/main MUST go through pull requests. Direct pushes are prohibited.**\", \"**Why:** ... Direct pushes to origin/main bypass all of these.\") and WP02's skill clause (\"For `query`, inspect only; do not execute a prompt or mark a result.\"), with no `precedence:` block to resolve them. This is the FIRST time the three lanes' real artifacts have been composed together: no lane could run this in isolation, and spec.md's FR-004 H-2 note anticipated only the isolated-lane ENOENT, not a findings-bearing failure once the files all exist. Recorded as `fail` because that is what the command actually does on the assembled state. It is NOT a defect in any single WP's own deliverable -- each lane's artifact is individually correct and each lane's own gate passed -- it is a genuine cross-lane integration failure of FR-004's stated expectation, and it is the accept gate's job to surface it rather than to absorb it. Owner: WP02 (manifest/cases) with WP01 (persona text) and WP03 (sop-extract text) as the other two inputs; disposition is an operator decision (retune the case `expected` blocks, add a `precedence:` block, or amend FR-004), not an accept-gate one. Run on the scratch assembly described in FR-001's notes. This row was a `TODO: replace with a real acceptance criterion` stub before this pass."
     },
     {
