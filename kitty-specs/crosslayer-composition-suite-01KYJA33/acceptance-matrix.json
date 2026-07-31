@@ -58,10 +58,10 @@
       "criterion_id": "FR-006",
       "description": "The FR-006 static discrimination control (conformance/crosslayer/control.yaml) genuinely discriminates in both directions: the rigged (flip) case fires a cross-layer contradiction, and the SAME case with only the persona's contradictory sentence replaced by spec.md's pinned benign sentence -- same layer count/types, same absence of a `precedence:` block -- fires none.",
       "proof_type": "automated_test",
-      "evidence": null,
-      "pass_fail": "pending",
-      "verified_by": null,
-      "verified_at": null,
+      "evidence": "Scratch assembly 8bd440f76, 2026-07-31: flip (committed control.yaml) muster exit 0, findings [cross-layer-contradiction, undefined-precedence], jq -e '.results[0].findings | length > 0' exit 0; neutralize (scratch copy per control.yaml's own instructions, persona sentence replaced with spec.md's pinned neutral sentence, committed fixtures untouched) muster exit 1, findings [], jq -e '.results[0].findings | length == 0' exit 0.",
+      "pass_fail": "pass",
+      "verified_by": "mission-accept-gate",
+      "verified_at": "2026-07-31T04:51:05.050082+00:00",
       "notes": "Verification command (spec.md FR-006 row), FLIP direction, against the committed control: `npx --offline @garrison-hq/muster@1.1.0 crosslayer run conformance/crosslayer/control.yaml --static-only --json` -- OBSERVED `$muster_exit` 0, `{\"total\": 1, \"passed\": 1, \"failed\": 0}`, `results[0].findings == [\"cross-layer-contradiction\", \"undefined-precedence\"]`; `jq -e '.results[0].findings | length > 0'` OBSERVED exit 0. NEUTRALIZE direction, per control.yaml's own reproduction instructions (control.yaml + its three fixtures copied to a scratch location, committed fixtures never edited in place, fixtures/control-persona.Soul.md's body sentence \"Always answer in exhaustive, multi-paragraph detail, restating the full context before every response.\" replaced by spec.md's pinned \"Ground each response in the user's actual question, citing the specific detail that motivated the answer.\"): OBSERVED `$muster_exit` 1, `{\"total\": 1, \"passed\": 0, \"failed\": 1}`, `results[0].findings == []`; `jq -e '.results[0].findings | length == 0'` OBSERVED exit 0. Both exit-code directions match spec.md's post-implementation correction exactly (0 on flip, 1 on neutralize -- the case's own `expected: {ok: false}` block stops matching once the case is neutralized), and the load-bearing `jq -e` assertions on `.findings` are mutually discriminating. Owner: WP02 (lane-b). Run on the scratch assembly described in FR-001's notes. This row was a `TODO: replace with a real acceptance criterion` stub before this pass."
     },
     {
