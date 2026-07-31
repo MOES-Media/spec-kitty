@@ -123,6 +123,7 @@ work_packages:
       - "conformance/crosslayer/fixtures/erosion-persona-045.Soul.md"
       - "conformance/crosslayer/fixtures/erosion-persona-045-neutral.Soul.md"
       - "conformance/crosslayer/evidence/sc003-erosion-control-045.json"
+      - "conformance/scripts/sc003-erosion-control-045-neutralize-direction-driver.mjs"
       - "tests/cross_cutting/test_crosslayer_wp05_rule_survival_cases.py"
     create_intent:
       - "conformance/crosslayer/cases/rule-survival-045.yaml"
@@ -130,6 +131,7 @@ work_packages:
       - "conformance/crosslayer/fixtures/erosion-persona-045.Soul.md"
       - "conformance/crosslayer/fixtures/erosion-persona-045-neutral.Soul.md"
       - "conformance/crosslayer/evidence/sc003-erosion-control-045.json"
+      - "conformance/scripts/sc003-erosion-control-045-neutralize-direction-driver.mjs"
       - "tests/cross_cutting/test_crosslayer_wp05_rule_survival_cases.py"
     requirement_refs:
       - FR-005
