@@ -84,6 +84,8 @@
       "write_scope": [
         "conformance/crosslayer/cases/erosion-control-045.yaml",
         "conformance/crosslayer/cases/rule-survival-045.yaml",
+        "conformance/crosslayer/evidence/sc003-erosion-control-045.json",
+        "conformance/crosslayer/fixtures/erosion-persona-045-neutral.Soul.md",
         "conformance/crosslayer/fixtures/erosion-persona-045.Soul.md",
         "tests/cross_cutting/test_crosslayer_wp05_rule_survival_cases.py"
       ],
