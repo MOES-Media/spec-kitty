@@ -87,6 +87,7 @@
         "conformance/crosslayer/evidence/sc003-erosion-control-045.json",
         "conformance/crosslayer/fixtures/erosion-persona-045-neutral.Soul.md",
         "conformance/crosslayer/fixtures/erosion-persona-045.Soul.md",
+        "conformance/scripts/sc003-erosion-control-045-neutralize-direction-driver.mjs",
         "tests/cross_cutting/test_crosslayer_wp05_rule_survival_cases.py"
       ],
       "predicted_surfaces": [

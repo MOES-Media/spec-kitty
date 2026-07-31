@@ -22,6 +22,7 @@ owned_files:
   - "conformance/crosslayer/fixtures/erosion-persona-045.Soul.md"
   - "conformance/crosslayer/fixtures/erosion-persona-045-neutral.Soul.md"
   - "conformance/crosslayer/evidence/sc003-erosion-control-045.json"
+  - "conformance/scripts/sc003-erosion-control-045-neutralize-direction-driver.mjs"
   - "tests/cross_cutting/test_crosslayer_wp05_rule_survival_cases.py"
 create_intent:
   - "conformance/crosslayer/cases/rule-survival-045.yaml"
@@ -29,6 +30,7 @@ create_intent:
   - "conformance/crosslayer/fixtures/erosion-persona-045.Soul.md"
   - "conformance/crosslayer/fixtures/erosion-persona-045-neutral.Soul.md"
   - "conformance/crosslayer/evidence/sc003-erosion-control-045.json"
+  - "conformance/scripts/sc003-erosion-control-045-neutralize-direction-driver.mjs"
   - "tests/cross_cutting/test_crosslayer_wp05_rule_survival_cases.py"
 authoritative_surface: "conformance/crosslayer/cases/"
 execution_mode: "code_change"
@@ -838,3 +840,197 @@ Implementation command: `spec-kitty agent action implement WP05 --agent claude`
   `emitCrossLayerSummary`/`rule-survival.ts`, out of this WP's and this
   repository's scope): follow-up handle
   `crosslayer-composition-suite-01KYJA33-followup-sc003-summary-exclusion`.
+
+- 2026-07-31 (WP05 re-review APPROVE-WITH-FOLLOWUPS remediation — F1-F7;
+  spec.md/this task file/`wps.yaml`/`lanes.json`/`tasks.md` on the
+  target/coord branches, test/driver changes on lane-e commits
+  `8c4d7e301`/`315e9e7ca`): closes the re-review's remaining follow-ups.
+
+  **F3 (sequencing collision, lane-a vs lane-e)**: `tests/cross_cutting/
+  test_crosslayer_wp05_rule_survival_cases.py`'s
+  `test_known_defect_wp01_persona_fixture_fails_rfc1_frontmatter_check`
+  pinned WP01's RFC-1 leading-comment defect as a known-defect: the persona
+  STILL FAILS to parse. WP01 (lane-a) has since fixed the defect for real
+  (commit `89d68ba49`, "GREEN — make projected personas actually
+  RFC-1-conformant", on top of the `79de09db1` RED pin) — lane-e's own copy
+  of the persona was stale (merged from lane-a's tip at `9bb0df3be`, two
+  commits behind `89d68ba49`; confirmed via
+  `git log --oneline 9bb0df3be..89d68ba49`). Merged lane-a's current tip
+  into lane-e (`8c4d7e301`, clean merge, no conflicts — lane-e never
+  touched the personas/profile2soul.py/PROJECTION.md files after the
+  original dependency-lane merge, confirmed via `git log --oneline
+  cf6b9e21c..464d8ce69 -- <those paths>` returning nothing) and re-ran the
+  old test: it failed exactly as the collision predicted (`AssertionError:
+  a fixture-parse failure must never masquerade as a graded verdict --
+  assert 'verdict' not in {..., 'verdict': 'baseline-failure'}`).
+  **Decision: inverted, not loosened to tolerate both states** — a test
+  that passes regardless of outcome asserts nothing, which this programme
+  treats as a defect in its own right (this task file's own DoD/Reviewer-
+  guidance sections exist because of exactly that failure mode elsewhere).
+  `315e9e7ca` renames the test to
+  `test_wp01_persona_fixture_passes_rfc1_frontmatter_check` and requires
+  the persona parse cleanly and reach `baseline-failure` grading (same
+  shape as `test_erosion_control_045_persona_is_rfc1_compliant`).
+  Discrimination verified in both directions: 8 passed against the current
+  (fixed) persona; substituting the pre-fix persona back in (the
+  `cf6b9e21c`-merged snapshot, via scratch file swap, restored before
+  commit — `git status` confirmed clean) reproduces the identical original
+  "missing the YAML front-matter opening delimiter" `AssertionError`. The
+  module docstring's present-tense defect description is rewritten as a
+  "HISTORICAL NOTE" recording the defect was found, diagnosed, and has
+  since been fixed.
+
+  **F2 (does the RFC-1 fix clear the full manifest?)**: re-ran the full
+  manifest (all 4 cases, no `--static-only`) against the merged
+  lane-e+lane-a tree, offline, via the same syntactically-valid-but-
+  unreachable dummy endpoint this module's own tests use (NFR-001
+  convention — no live credentials needed to check this specific claim):
+  `MUSTER_ENDPOINT=http://127.0.0.1:1/v1 MUSTER_MODEL=dummy
+  MUSTER_API_KEY=dummy-not-a-real-credential npx --offline
+  @garrison-hq/muster@1.1.0 crosslayer run
+  conformance/crosslayer/manifest.yaml --json`. Result: **the RFC-1
+  leading-comment defect is gone for all four cases** — none show the
+  "missing the YAML front-matter opening delimiter" error any more.
+  Verbatim per-case, with cause attributed distinctly per case (do not
+  conflate the two independent defects below):
+  - `architect-run-skill` / `reviewer-run-skill` (WP02, static): `passed:
+    false`, `findings: ["cross-layer-contradiction", "undefined-
+    precedence"]`. This is a **separate, independently diagnosed
+    false-positive defect in muster's own `contradiction-lint.ts`**
+    (confirmed read-only against the muster repo: a branch
+    `fix/crosslayer-contradiction-false-positives` exists there but has not
+    yet landed a commit touching `contradiction-lint.ts` as of this
+    writing — the fix is in progress, not yet shipped). **Not this WP's
+    defect, not fixed here** — it is `lintComposition`'s own static-path
+    behavior, out of `conformance/crosslayer/`'s scope to patch around.
+  - `rule-survival-045` (this WP's real FR-005 case, `testClass:
+    behavioral`, so `lintComposition` never runs on it and the
+    contradiction-lint defect above cannot touch it): `passed: false`,
+    `verdict: "baseline-failure"` — **this is new**: previously this case
+    never reached grading at all (categorical parse error, no `verdict`
+    key). It now composes cleanly and reaches the behavioral grader; the
+    `baseline-failure` verdict itself is the expected artefact of
+    exercising this offline against an unreachable dummy endpoint (every
+    baseline and composed run errors, 0% pass rate on both legs — the
+    identical mechanism `test_erosion_control_045_persona_is_rfc1_
+    compliant` already documents), not a real live-model signal. A real
+    `survived`/`eroded` verdict still requires a live endpoint (out of
+    scope for this specific F2 check, which is only about whether the
+    RFC-1 parse blocker is cleared — it is).
+  - `erosion-control-045` (this WP's control): `passed: false`, `verdict:
+    "baseline-failure"` — same offline-artefact reasoning as
+    `rule-survival-045` above; muster's own charter-check additionally
+    printed `DISCRIMINATION CONTROL PASSED — potential grader bug` to
+    stderr, which is expected here too (an unreachable-endpoint offline
+    run cannot produce a real `eroded` verdict; this is not evidence
+    against the control, which the live T027/SC-003 runs already proved).
+
+  **F1 (spec.md's FR-005 row false exit-code clause)**: `spec.md:223`
+  (FR-005's Requirements-table Verification cell) claimed a standalone run
+  of `erosion-control-045` alone is "expected to report `verdict: "eroded"`
+  and exit `1`" — false, per `manifest-runner.ts`'s own contract (`passed =
+  result.verdict === c.expected.verdict`): a correctly-declared control
+  that erodes exactly as its own `expected: {verdict: "eroded"}` block
+  declares is a **passing** case (`summary.failed === 0`), giving exit
+  **0**, not `1` — exactly what T027's own Activity Log entry above
+  already derived and what the final, tuned, committed run actually
+  observed. Amended on the target and coord branches (spec.md, both
+  byte-identical after the edit) following this mission's own
+  `70a8c23d5`/`cefb15206`/`3e55515de` precedent for spec amendments — a
+  dedicated correction landing next to (not replacing) the row's existing
+  `3e55515de` amendment, since that commit corrected the 029-drop in this
+  same row but left this exit-code clause standing. **Swept the row's
+  neighbours for the same defect and found one more**: the "Programme
+  operator" user story's own literal `**Independent Test**:` field (lines
+  129-136) generalizes the identical error ("the run's exit code is `0`
+  only when no case's verdict is `eroded`") — also false for the same
+  reason (`erosion-control-045` is wired into this exact manifest per
+  T026, and can legitimately show `verdict: "eroded"` while the run still
+  exits `0`). Corrected there too, to key on "observed `verdict` matches
+  its own declared `expected.verdict`" rather than the literal string
+  `eroded`. **Left unchanged, checked and found accurate**: AC-2 (`Given
+  the same live run, When the composed pass rate for 045 drops below its
+  declared passThreshold, Then the case's verdict is eroded and the
+  manifest run's overall exit code is 1`) — this is about the REAL
+  `rule-survival-045` case (declared `expected: {verdict: "survived"}`)
+  eroding *unexpectedly*, i.e. mismatching its own declared expectation,
+  which does correctly drive `passed: false` → exit `1`; not the same
+  scenario as a control passing by matching its own `eroded` expectation.
+
+  **F4 (Activity Log accuracy — 7P/0F claim)**: this task file's Finding
+  #1 remediation entry above states the clean-checkout GREEN re-measurement
+  after `5e878d4bb` was "7 passed, 0 failed." **Checked directly against
+  the actual commit, not assumed**: `5e878d4bb` itself already adds
+  `test_erosion_control_045_neutral_persona_is_rfc1_compliant` (visible in
+  `git show 5e878d4bb -- tests/cross_cutting/
+  test_crosslayer_wp05_rule_survival_cases.py`), which asserts
+  `fixtures/erosion-persona-045-neutral.Soul.md` is committed — but that
+  fixture is only added one commit later, in `464d8ce69`. Reproduced in a
+  throwaway detached worktree at `5e878d4bb` (with the offline muster cache
+  copied in, no other change): **7 passed, 1 failed** — the new test fails
+  with `AssertionError: neutral erosion persona fixture not committed at
+  .../erosion-persona-045-neutral.Soul.md`, not the claimed 0 failures. The
+  same check at `464d8ce69` (after the fixture lands): **8 passed, 0
+  failed**, confirming the record's own eventual "GREEN" claim is correct
+  there. This is legitimate TDD — a failing-first pin for the neutral
+  fixture, immediately fixed one commit later — not a defect in the work;
+  the record is corrected here to say `5e878d4bb` was 7P/1F, not 7P/0F,
+  and that `464d8ce69` is the commit that actually reached 8P/0F.
+
+  **F5 (`manifest.yaml` shared append-only surface)**: recorded explicitly,
+  not just implied — `conformance/crosslayer/manifest.yaml` is in **lane-b's
+  (WP02's)** `write_scope`/`owned_files` (all three of `wps.yaml`,
+  `lanes.json`, and WP02's own task file), and absent from WP05's
+  `write_scope`/`owned_files` in all three of the same records for WP05.
+  T026 nonetheless edits it (two additive `$ref:` lines, disclosed in this
+  task file's own T026 subtask and DoD, and verified narrow via `git diff
+  conformance/crosslayer/manifest.yaml` showing only added lines, never
+  removed/reordered ones). This is accepted as a **shared, append-only
+  surface**: a file one WP owns for authoring, that a strictly-later,
+  dependency-ordered WP may append `$ref:` lines to once the owning WP is
+  merged/approved — not a parallel-ownership conflict, and not something
+  T028's `^conformance/` allow-list would ever catch as an out-of-scope
+  edit (it matches the pattern trivially). Recorded here so a future reader
+  does not mistake the absence of `manifest.yaml` from WP05's `owned_files`
+  for an undisclosed edit.
+
+  **F6 (C-002's `^tests/` allow-list is a coarse guard)**: T028's per-lane
+  C-002 check widens its allow-list with `grep -v '^tests/'` (see T028's
+  own Activity Log entry above, mirroring WP02's own T013 precedent
+  exactly). Recorded explicitly here, matching what this mission already
+  accepted from WP02: `^tests/` admits **any** lane's test file, not just
+  this WP's own `tests/cross_cutting/
+  test_crosslayer_wp05_rule_survival_cases.py` — the real per-file
+  constraint lives only in `owned_files`, which T028's shell-based check
+  does not (and structurally cannot, without re-implementing `owned_files`
+  parsing in shell) enforce at the individual-file level. This is accepted
+  looseness, not a gap unique to this WP — the same tradeoff this mission
+  already made for WP02's identical allow-list widening.
+
+  **F7 (neutralize-direction driver reproducibility)**: the evidence
+  artefact's own `not_yet_done` field (as originally committed, `464d8ce69`)
+  stated its generating driver was "an ephemeral, uncommitted local tool,"
+  meaning the artefact's exact per-run counts were not reproducible from
+  anything in this repository. **Committed the driver**
+  (`conformance/scripts/sc003-erosion-control-045-neutralize-direction-
+  driver.mjs`, widened into `owned_files`/`create_intent` here, in
+  `wps.yaml`, `lanes.json`'s lane-e `write_scope`, and `tasks.md`'s Owned
+  Files line) rather than merely noting the limitation on the artefact,
+  per this WP's own precedent elsewhere on this mission of preferring a
+  committed, re-runnable mechanism over prose. The driver invokes the
+  identical real, installed `@garrison-hq/muster@1.1.0` package exports
+  (`assembleComposedContext`/`runRuleSurvival`) the original ephemeral tool
+  used — never a mock, never reimplemented grading logic — reads the
+  committed `cases/erosion-control-045.yaml` for its rule/probe/baseline/
+  composed/passThreshold values (so it can never drift from the case it
+  proves), and requires only `MUSTER_ENDPOINT`/`MUSTER_MODEL`/
+  `MUSTER_API_KEY` (env-var only, never argv/logged) to re-run. **Verified
+  mechanically** (offline, dummy unreachable endpoint, no live credentials
+  — proves the wiring, not a real verdict): both directions compose
+  cleanly and reach `baseline-failure` grading, the identical offline-
+  artefact shape this module's own tests already document. The evidence
+  artefact's `not_yet_done` field is renamed to `driver` and now points at
+  this committed script; the original real, live-observed per-run counts
+  in the artefact are left unchanged (not re-run/overwritten by this
+  remediation — they are the original genuine live observation, only the
+  reproducibility gap around them is closed).
