@@ -68,10 +68,10 @@
       "criterion_id": "FR-007",
       "description": "The AGENTS.md policy extract (conformance/crosslayer/sop-extract.md) is committed with a working drift check: the shipped script re-extracts the same source sections and exits 0 on a clean tree, and exits 1 the moment one committed line of the extract is hand-edited.",
       "proof_type": "automated_test",
-      "evidence": null,
-      "pass_fail": "pending",
-      "verified_by": null,
-      "verified_at": null,
+      "evidence": "Scratch assembly 8bd440f76, 2026-07-31: bash conformance/scripts/check-sop-extract-drift.sh exit 0 on a clean tree; after appending ' HANDEDIT' to sop-extract.md's first line, exit 1 with the unified diff printed; tree restored via git checkout HEAD --.",
+      "pass_fail": "pass",
+      "verified_by": "mission-accept-gate",
+      "verified_at": "2026-07-31T04:51:08.500313+00:00",
       "notes": "Verification command (spec.md FR-007 row): `bash conformance/scripts/check-sop-extract-drift.sh` -- OBSERVED exit 0 on the clean tree. Falsification: appended ` HANDEDIT` to the first non-blank line of conformance/crosslayer/sop-extract.md (not AGENTS.md) and re-ran -- OBSERVED exit 1, with the script printing the exact `-<!-- HANDEDIT` / `+<!--` unified diff against its freshly re-extracted temp file. The scratch edit was reverted with `git checkout HEAD -- conformance/crosslayer/sop-extract.md`. Owner: WP03 (lane-c). Run on the scratch assembly described in FR-001's notes. This row was a `TODO: replace with a real acceptance criterion` stub before this pass."
     },
     {
