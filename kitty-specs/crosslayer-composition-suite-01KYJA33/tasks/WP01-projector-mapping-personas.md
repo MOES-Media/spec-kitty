@@ -859,14 +859,22 @@ conformance/crosslayer/personas/reviewer-renata.Soul.md
 conformance/scripts/check-persona-drift.sh
 conformance/tools/PROJECTION.md
 conformance/tools/profile2soul.py
+kitty-specs/crosslayer-composition-suite-01KYJA33/status.events.jsonl
+kitty-specs/crosslayer-composition-suite-01KYJA33/status.json
+kitty-specs/crosslayer-composition-suite-01KYJA33/tasks/WP01-projector-mapping-personas.md
 tests/conformance/__init__.py
 tests/conformance/test_profile2soul.py
 tests/cross_cutting/test_crosslayer_wp01_persona_rfc1_conformance.py
 ```
 
-Eight paths, all matching the widened `owned_files` list exactly (this
-lane worktree carries no `kitty-specs/` bookkeeping commits at all — see
-below on why). Per-lane C-002 check (T007, allow-list `^(conformance|
+Eleven paths total: the eight `owned_files` entries (five `conformance/`
+artifacts + `tests/conformance/__init__.py` +
+`tests/conformance/test_profile2soul.py` +
+`tests/cross_cutting/test_crosslayer_wp01_persona_rfc1_conformance.py`),
+plus three `kitty-specs/` bookkeeping paths (this task file, plus
+`status.json`/`status.events.jsonl` — spec-kitty's own mission-state
+tracking, written by tooling, not by hand, and outside `owned_files` scope
+by design). Per-lane C-002 check (T007, allow-list `^(conformance|
 kitty-specs|tests)/`) still passes: every path above matches, and
 `conformance/README.md` is not among them.
 
