@@ -18,10 +18,10 @@
       "criterion_id": "FR-002",
       "description": "conformance/tools/PROJECTION.md's Fidelity Loss table names the fields the projection structurally cannot carry (capabilities, routing-priority, context-sources, directive-references, tactic-references) and does NOT list a field that the projection does carry (initialization-declaration) -- the table documents real loss, not carried fields misfiled as loss.",
       "proof_type": "automated_test",
-      "evidence": null,
-      "pass_fail": "pending",
-      "verified_by": null,
-      "verified_at": null,
+      "evidence": "Scratch assembly 8bd440f76, 2026-07-31: spec.md FR-002's corrected three-pipeline grep over conformance/tools/PROJECTION.md (capabilities present, routing-priority present, initialization-declaration absent from the Fidelity Loss window) exit 0.",
+      "pass_fail": "pass",
+      "verified_by": "mission-accept-gate",
+      "verified_at": "2026-07-31T04:50:43.098186+00:00",
       "notes": "Verification command (spec.md FR-002 row, as corrected by H1 -- `!` on the third pipeline, not `grep -qv`): `grep -A20 \"^## Fidelity Loss\" conformance/tools/PROJECTION.md | grep -q \"capabilities\" && grep -A20 \"^## Fidelity Loss\" conformance/tools/PROJECTION.md | grep -q \"routing-priority\" && ! grep -A20 \"^## Fidelity Loss\" conformance/tools/PROJECTION.md | grep -q \"initialization-declaration\"` -- OBSERVED exit 0. Owner: WP01 (lane-a). Run on the scratch assembly described in FR-001's notes. This row was a `TODO: replace with a real acceptance criterion` stub before this pass."
     },
     {
