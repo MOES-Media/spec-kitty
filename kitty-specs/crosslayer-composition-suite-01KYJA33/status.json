@@ -132,6 +132,9 @@
       "last_event_id": "01KYV8JHW7NFBJNP6T2C3ZCF77",
       "last_transition_at": "2026-07-31T04:57:57.895127+00:00",
       "model": "__resolved_model_absent__",
+      "notes": [
+        "Accept-gate pass 2026-07-31: issue-matrix false positives (#22/#26/#33/#70) cleared at source by disambiguating incidental citations (commit c380917); no verdict invented."
+      ],
       "provider": "__resolved_provider_absent__",
       "role": "reviewer",
       "shell_pid": 2864671,
