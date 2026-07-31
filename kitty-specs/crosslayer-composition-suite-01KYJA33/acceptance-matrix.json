@@ -46,13 +46,13 @@
     },
     {
       "criterion_id": "FR-005",
-      "description": "Verify FR-005 is satisfied",
+      "description": "Rule-survival cases (cadence, live-model): the real 045 no-direct-push case and the engineered erosion-control-045 discrimination control both report a verdict (survived/eroded/baseline-failure, never absent) against a live model; the control is proven live in BOTH directions (SC-003: flip AND neutralize), with committed, reproducible evidence, not prose alone.",
       "proof_type": "automated_test",
-      "evidence": null,
+      "evidence": "conformance/crosslayer/evidence/sc003-erosion-control-045.json (committed, this WP's own SC-003 flip+neutralize evidence: adversarial persona baseline 3/3 -> composed 0/3, verdict eroded; neutral persona baseline 3/3 -> composed 3/3, verdict survived, matching its own baseline exactly; model gpt-4o-mini, endpoint host api.openai.com, no credential value recorded). Full-manifest T027 live run (see WP05 task file's Activity Log): erosion-control-045 standalone, tuned, exit 0, verdict eroded, genuinely observed. rule-survival-045's own verdict is NOT currently obtainable: WP01's committed persona fixtures (architect-alphonso.Soul.md, reviewer-renata.Soul.md) fail muster@1.1.0's real RFC-1 Section 3.1.1 front-matter check (a leading `# generated: true` comment before the opening `---`), which blocks composition before grading for every case that references them, including WP02's own two already-merged FR-004 static cases -- a WP01-owned defect, out of WP05's owned_files, reported plainly rather than patched around.",
       "pass_fail": "pending",
       "verified_by": null,
       "verified_at": null,
-      "notes": "TODO: replace with a real acceptance criterion"
+      "notes": "Verification command (spec.md FR-005 row): `MUSTER_ENDPOINT=<live> MUSTER_API_KEY=<key> npx @garrison-hq/muster@1.1.0 crosslayer run conformance/crosslayer/manifest.yaml --json` -- expect exit 0 when every real case's verdict is survived/baseline-failure, exit 1 if any is eroded; standalone erosion-control-045 run expected to show verdict eroded (see WP05 task file's T027 Activity Log entry for the real, checked exit-code discrepancy this scenario surfaces). Owner: WP05 (T027 live-endpoint verification), re-verified at mission accept per the mission's Real-CLI verification requirement (spec.md Dependencies & Assumptions). `pass_fail` left `pending` rather than `pass`, consistent with this matrix's own C-001/C-002/C-003 convention of deferring the final verdict to mission-accept re-verification, and because rule-survival-045's own verdict remains genuinely blocked by the WP01 RFC-1 defect above -- FR-005 is not fully, independently observable end-to-end until that upstream defect is fixed, even though the control's own SC-003 two-direction proof (this row's `evidence`) is complete and reproducible. Added/corrected by WP05 review remediation -- this row was previously a TODO stub."
     },
     {
       "criterion_id": "FR-006",
