@@ -144,9 +144,10 @@ assigned to the Human-in-Charge before implementation starts.
    to T002. Record the outcome (assignee, or "already assigned") in this WP's
    history/activity log via `spec-kitty agent tasks add-history`.
 3. Always cite this issue by its full URL
-   (`https://github.com/MOES-Media/spec-kitty/issues/25`), never `#25` — bare
-   `#NN` citations trigger `discover_issue_references` verdict requirements at
-   review time.
+   (`https://github.com/MOES-Media/spec-kitty/issues/25`) — a bare
+   hash-number shorthand triggers `discover_issue_references` verdict
+   requirements at review time, so avoid that shorthand form entirely, even
+   in passing mentions.
 
 **Files**: none (process gate only).
 **Validation**: assignee recorded in the work log before T002's commit.
