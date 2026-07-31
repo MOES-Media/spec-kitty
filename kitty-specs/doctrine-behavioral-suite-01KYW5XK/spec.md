@@ -188,6 +188,23 @@ time re-deriving an already-knowable fact is inventory waste; WP01 is
 rescoped to committing the citation and filing the muster follow-up FR,
 freeing lane-a to start FR-001 immediately.
 
+**[LIMITATION] FR-004's design is architecturally immune to muster#82, not
+merely unaffected by coincidence.** #82 (single-tool bias capping the
+should-trigger axis's discriminative power) is a defect in the **skills**
+adapter's `TriggerCase` schema and `runBehavioralSkillCase`
+(`src/cli/index.ts`, muster `main@6e0840b27`): every case supplies exactly
+one `ToolDefinition` from the skill's own frontmatter, `SkillsManifestBehavioralCase`
+has no schema field for a second, competing tool, and M6's plan has since
+established this is a structural limit of the pinned CLI (`@garrison-hq/muster@1.2.1`),
+not a fixable gap — a distractor-tool mechanism does not exist to reach for.
+FR-004's containment scenarios never touch this mechanism at all: they run
+through `openclaw-sop`'s `runComplianceProbeEntry`
+(`src/adapters/openclaw-sop/runner.ts:259`), whose scenario system prompts
+describe a tool palette in **prose**, graded by a judge rubric — there is no
+`TriggerCase`, no `ToolDefinition[]` sent to the model, and no should-trigger
+axis anywhere in this path. This mission does not assume, and does not need,
+a distractor-tools capability the pinned CLI cannot provide.
+
 #### FR-007 elaboration — the runsErrored walk, spelled out
 
 `SOPSuiteReport.verdicts: SOPCaseVerdict[]`, and each `SOPCaseVerdict.runs:
@@ -299,10 +316,8 @@ endpoint to be intentionally killed, which is not the cadence job's job).
   (skills-vs-a2a exit-code inversion on a firing control), #75 (heartbeat
   5000ms vitest timeout, endpoint-dependent failure count — filed as 10,
   independently reproduced as 13 against a different unreachable target),
-  #82 (single-tool bias capping the skills should-trigger axis, filed P3 —
-  not directly relevant to this mission's judge-graded rules, noted for
-  completeness since it's part of this programme's accumulated known-defects
-  context), #78 (`examples/README.md` stale after M5). None of these block
+  #82 (single-tool bias capping the skills should-trigger axis, filed P3),
+  #78 (`examples/README.md` stale after M5). None of these block
   M4; #76's underlying class is addressed head-on by FR-007's `runsErrored`
   design rather than deferred.
 
