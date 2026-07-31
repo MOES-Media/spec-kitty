@@ -83,7 +83,9 @@ inline command only lane-b could fix.
 
 This mission's own artifact — the projector — is, by D1's own words, "the
 programme's least-principled artifact": it fabricates RFC-1 fields
-(`voice`, `interaction`, `locale`, four empty lists) that are never graded
+(`voice`, `interaction`, `locale`, the object `composition`/
+`profile_overrides`/`extensions` blocks, the `profiles` list, and the
+`values`/`safety` blocks) that are never graded
 (C-003) and never seen by `contradiction-lint.ts` (verified directly against
 muster's source, see Context). Do not let that fabrication leak into any
 check's stated reason for passing or failing.
@@ -129,7 +131,8 @@ whether WP02 has already merged.
 **DIR-012 status, checked, not assumed**: this mission's seed is GitHub issue
 `MOES-Media/spec-kitty#26`. `gh issue view 26 --repo MOES-Media/spec-kitty
 --json assignees` was checked while authoring this task file and returned
-**zero assignees** (unlike M1's issue #22, which was already assigned when
+**zero assignees** (unlike M1's seed ticket `MOES-Media/spec-kitty#22`,
+cited here as precedent only, which was already assigned when
 that mission's WP01 was authored). This is a real, outstanding gate — T001
 below is not a formality here.
 
@@ -170,11 +173,23 @@ profile YAML to an RFC-1-conformant `Soul.md`.
    body sections (the profile's own boundary statement is instructional
    content — carry it, do not drop it).
 2. Fabricate the required-but-absent RFC-1 keys from a frozen, in-script
-   defaults table this task authors: `locale`, four `voice` 0–100 integers,
-   four `interaction` enums, and empty `composition`/`profiles`/
-   `profile_overrides`/`extensions` lists. Document the table's values in
-   `PROJECTION.md` (T003) — do not invent new values later without updating
-   both files together.
+   defaults table this task authors: `locale`; an **object** `composition`
+   block (`extends`/`mixins`/`merge_policy`); a `profiles` list that must
+   include `"default"` (§9); an **object** `profile_overrides`; an
+   **object** `values` block (required `priorities`); four `voice` 0–100
+   integers plus a required `formatting` enum; four `interaction` enums; a
+   `safety` block (three required enums:
+   `refusal_style`/`privacy`/`speculation`); and an **object**
+   `extensions`. Document the table's values in `PROJECTION.md` (T003) — do
+   not invent new values later without updating both files together.
+   **Corrected at the accept gate (2026-07-31)**: this step previously read
+   "empty `composition`/`profiles`/`profile_overrides`/`extensions`
+   **lists**" and omitted `values`/`safety`/`voice.formatting` entirely —
+   the same wrong shape spec.md's FR-001 row already corrected against
+   muster's real RFC-1 Appendix E/§9 schema (see spec.md's "FR-001 —
+   fabricated-defaults shape corrected against muster's real parser"
+   subsection). The implementation shipped the correct shape; only this
+   instruction text had been left stale.
 3. Emit a header comment recording `generated: true` plus a source-profile
    content hash (this is also C-003's textual-audit anchor — the corrected
    exclusion pattern reviewers use, `^#.*generated:\s*true`, depends on this
@@ -440,7 +455,7 @@ commands against the current lane tree, not from memory.
 ```
 
 **Assignee: `MOES-Media`** (already assigned — not assigned by this step).
-This matches M1's issue #22 precedent; DIR-012 is satisfied.
+This matches M1's `MOES-Media/spec-kitty#22` precedent; DIR-012 is satisfied.
 
 #### T006 — real-CLI verification (all six exit codes, freshly observed)
 
@@ -705,11 +720,21 @@ assertion against it in both `test_fabricated_defaults_table_matches_projection_
   none of the four other owned files changed (blob-identity confirmed
   below).
 
-Note (not in scope, flagged for transparency): `values: []` and
-`extensions: []` are rendered the same bare-literal way `safety` was and
-have the same latent gap in the render-output test (though
-`PROJECTION.md`'s table values for both are still checked by the
-cross-check test). Only `safety` was in scope for this fix; left as-is.
+Note (not in scope, flagged for transparency): other fabricated fields are
+rendered the same bare-literal way `safety` was and have the same latent
+gap in the render-output test (though `PROJECTION.md`'s table values for
+them are still checked by the cross-check test). Only `safety` was in scope
+for this fix; left as-is. **Corrected at the accept gate (2026-07-31)**:
+this note previously named those fields as `values: []` and
+`extensions: []`. Neither is a shape `profile2soul.py` emits — checked
+against the committed projector and personas, it renders `values:` /
+`  priorities: []` (a block, not a list) and `extensions: {}` (an object,
+via `FABRICATED_EMPTY_OBJECT_FIELDS`). The bare-literal fields that
+actually carry this latent gap are `values`' `priorities: []` line,
+`composition`'s `extends: []`/`mixins: []` lines, and the literal `{}`
+values of `profile_overrides`/`extensions`. The `[]` spellings were a
+survival of the pre-fix empty-list shape spec.md's FR-001 row already
+corrected; the code was never wrong, only this note.
 
 #### LOW-2 — cross-check made bidirectional
 

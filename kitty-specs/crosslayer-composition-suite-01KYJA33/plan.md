@@ -74,7 +74,7 @@ Checked against `.kittify/charter/charter.yaml`'s directive set:
 | DIR-008 (no secrets in code) | FR-005's `MUSTER_ENDPOINT`/`MUSTER_API_KEY` — env-var only, never in manifest/argv/log (spec already states this; carried into WP-B's `crosslayer.yml` and WP-C's case files as a hard constraint) | Gate for WP-B, WP-C |
 | DIR-009 (CHANGELOG for breaking changes) | N/A — no public API surface changes; conformance tooling is internal | N/A |
 | DIR-010/DIR-011 (ASCII-safe identifiers) | N/A — this mission introduces no slug/identifier generation from user input | N/A |
-| DIR-012 (assign tracker issue to HiC before implementing) | Applies to whoever starts implementation from issue #26 — flagged for the tasks/implement phase, not actionable at plan time | Carried forward, not a plan-phase gate |
+| DIR-012 (assign tracker issue to HiC before implementing) | Applies to whoever starts implementation from this mission's seed ticket, `MOES-Media/spec-kitty#26` — flagged for the tasks/implement phase, not actionable at plan time | Carried forward, not a plan-phase gate |
 | DIR-013 (pre-existing test failures → file an issue first) | Not evaluated in this pass (no test suite was run); carried forward as an implement-phase responsibility | Carried forward |
 
 No violations requiring Complexity Tracking justification — nothing here
@@ -148,8 +148,9 @@ allow-list exactly.
 ### IC-00 — Reference-computation pre-step: considered and dissolved (post-plan architectural review)
 
 - **Original concern**: FR-001's "frozen defaults table" does not exist
-  anywhere yet — not in spec.md, not in D1/`DECISIONS.md`, not in issue
-  #26 — it is a deliverable this mission authors, not a pre-existing
+  anywhere yet — not in spec.md, not in D1/`DECISIONS.md`, not in the seed
+  ticket `MOES-Media/spec-kitty#26` — it is a deliverable this mission
+  authors, not a pre-existing
   citation. The spec's Dependencies section (prior form) read this as
   requiring lane-b's task file to carry lane-a's *literal* projected
   `Soul.md` bytes as inline fixture content (isolated worktrees, content
@@ -164,7 +165,9 @@ allow-list exactly.
   `personaDoc.body.trim()` into `layerTexts` — the map
   `contradiction-lint.ts`'s `extractClauses`/`analyseLayerPair` actually
   scans for contradictions. RFC-1 front-matter (`voice`, `interaction`,
-  `locale`, the fabricated empty lists) never reaches the lint; it is only
+  `locale`, the fabricated object `composition`/`profile_overrides`/
+  `extensions` blocks, the `profiles` list, the `values`/`safety` blocks)
+  never reaches the lint; it is only
   ever consulted, structurally (presence/shape, not specific values), by
   RFC-1 strict-mode resolution. C-003 independently forbids grading any
   fabricated field as evidence. **FR-004's graded surface is therefore
@@ -540,7 +543,8 @@ during this plan pass:
    fully as IC-00 above). The spec's Dependencies section (prior form)
    required lane-b's task file to embed lane-a's literal projector output,
    and the "frozen defaults table" that output would have depended on is
-   not specified anywhere in spec.md, D1, or issue #26. Checked directly
+   not specified anywhere in spec.md, D1, or the seed ticket
+   `MOES-Media/spec-kitty#26`. Checked directly
    against muster's source (`composition.ts:281-333`): the persona layer
    contributes only its RFC-1 body text to `layerTexts`, which is the only
    thing `contradiction-lint.ts` scans; front-matter fields (the fabricated

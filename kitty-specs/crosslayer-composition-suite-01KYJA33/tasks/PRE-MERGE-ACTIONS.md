@@ -35,7 +35,9 @@ leaving the earlier, now-superseded version standing:
 
 **Why this matters, concretely, and why the fix is no longer a simple
 fast-forward**: this is exactly the configuration that caused mission M3's
-data loss (fork issue #33) — `spec-kitty merge` replaying a stale
+data loss (fork issue `MOES-Media/spec-kitty#33`, cited as prior-art
+context, not as a finding this mission disposes of) — `spec-kitty merge`
+replaying a stale
 coordination branch over newer work, silently reverting a shipped fix. It is
 harmless right now (no WP has been implemented or merged yet), but a naive
 fast-forward-one-over-the-other reconciliation would now **discard real

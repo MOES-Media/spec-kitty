@@ -938,7 +938,9 @@ NOTE at the `fixturePath` in both `cases/architect-run-skill.yaml` and
 point — not only in this planning artifact, so a reader of the fixture
 tree encounters it directly. Filed upstream:
 [garrison-hq/muster#71](https://github.com/garrison-hq/muster/issues/71)
-(symmetrical to #70), with the exact guard code, the `fs.readFile` call
+(symmetrical to
+[garrison-hq/muster#70](https://github.com/garrison-hq/muster/issues/70)),
+with the exact guard code, the `fs.readFile` call
 site, repro steps for both directions, and a suggested fix direction (not
 prescriptive). Not fixed here — muster is out of scope for this mission.
 
