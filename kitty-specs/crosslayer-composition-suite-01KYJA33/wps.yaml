@@ -89,9 +89,13 @@ work_packages:
     owned_files:
       - ".github/workflows/crosslayer.yml"
       - "conformance/crosslayer/README.md"
+      - "tests/cross_cutting/misc/test_crosslayer_workflow.py"
+      - ".github/workflows/ci-quality.yml"
     create_intent:
       - ".github/workflows/crosslayer.yml"
       - "conformance/crosslayer/README.md"
+      - "tests/cross_cutting/misc/test_crosslayer_workflow.py"
+      - ".github/workflows/ci-quality.yml"
     requirement_refs:
       - FR-004
       - FR-005

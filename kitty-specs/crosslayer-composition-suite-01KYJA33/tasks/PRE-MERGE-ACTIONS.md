@@ -102,13 +102,13 @@ two-way divergence and are reconciled at merge time, not here.
 
 ## 3. Lane-c (WP05) sequencing must be independently verified, not gate-trusted
 
-WP05's frontmatter declares `dependencies: [WP02, WP04]`, which drives the
+WP05's frontmatter declares `dependencies: [WP01, WP02, WP03, WP04]`, which drives the
 real auto-merge and topological-sort mechanisms in this codebase. **This
 repo's `merge_gates.mode` is `"warn"`, not `"block"`** (confirmed directly:
 `.kittify/config.yaml` sets no `merge_gates` override, so
 `policy/config.py`'s dataclass default applies) — an out-of-order merge is
 not hard-blocked by the dependency gate. At accept time, independently
-confirm via `git log`/`git merge-base` that WP02's and WP04's merge commits
+confirm via `git log`/`git merge-base` that WP01's, WP02's, WP03's and WP04's merge commits
 actually precede WP05's lane branch base commit — do not accept the
 frontmatter declaration alone as proof of correct sequencing.
 
@@ -131,3 +131,89 @@ as of this tasks-authoring pass (checked directly via `gh issue view 26
 which was already assigned when that mission's tasks phase ran. WP01's T001
 exists to close this before implementation starts; recorded here as well so
 it is visible at a mission level, not only inside one WP's file.
+
+## 6. WP04 lane merge — task-file and status.json conflicts (RESOLVED — dissolved, not present at merge time)
+
+**Originally recorded** while approving WP02/WP04, warning of a WP04
+task-file conflict (resolve in favor of the coordination branch, not
+`-X ours`/union) and a `status.json` conflict (regenerate via the canonical
+reducer, don't hand-resolve).
+
+**Superseded (2026-07-31), recorded honestly rather than left standing**:
+the root cause of both apparent conflicts was lane-b `kitty-specs/`
+contamination — `bbfc92247` had restored the WP04 task file from the
+planning branch's tip *at that time*, but the planning branch moved forward
+again with further WP04 remediation (`d591ca932`, `1ee2ef81e`,
+`bfa2f8ec5`), so lane-b's copy fell behind and both it and `status.json`/
+`status.events.jsonl` (which naturally diverge as lane-local status tracking
+accrues) tripped `_list_wp_branch_mission_specs_changes` again at
+`move-task WP02 --to approved`.
+
+Fixed at lane-b commit `e50c6f3bc` by restoring all three paths to their
+merge-base (`cfc29bc1e`) content — lane-b now carries **zero** `kitty-specs/`
+diff against that merge-base, so the coordination branch's newer content
+wins with no conflict. Verified directly:
+`_list_wp_branch_specs_changes_for_guard(worktree_path=<lane-b>,
+base_branch="kitty/mission-crosslayer-composition-suite-01KYJA33")` returns
+`[]`, and a throwaway-clone merge of lane-b into the coordination branch tip
+(`bfa2f8ec5`) completes with `Automatic merge went well` and a
+post-merge/pre-commit `git diff --cached
+kitty/mission-crosslayer-composition-suite-01KYJA33 -- kitty-specs/` that is
+empty — i.e. the merge introduces no `kitty-specs/` change and no conflict
+at all, not even one requiring the "favor coordination branch" resolution
+originally anticipated here.
+
+**No action required at merge time for this item.** Lane-b's source
+implementation commits (`cc46d6283`, `0b6fc2d11`, `479f56058`, `bbfc92247`,
+`949399465`, `f07d6198b`) are untouched by this fix.
+
+## 7. WP04's real CI verification (post-merge action; relocated from T021, 2026-07-31)
+
+**Origin of this item**: WP04's `T021 — Real CI verification (mandatory,
+may be legitimately blocked)` subtask bundled two things — a locally
+provable structural/pinning-test proof, and an actual GitHub Actions run
+against a real PR — under one subtask whose completion gated
+`move-task WP04 --to approved`. The real-CI half cannot exist until
+WP01/WP02/WP03's lanes are merged onto the same branch as this WP's
+`crosslayer.yml`, which created a deadlock: approving WP04 needed T021
+"done", T021's CI half needed the lanes merged, and merging needed WP04
+approved first. T021 is now redefined to cover only the locally-provable
+half (see the WP04 task file's T021 "Scope note"). This item carries T021's
+original text **verbatim**, unmodified and unsoftened, as the mission's
+still-standing real-CI requirement:
+
+> **Purpose**: This cannot be simulated locally — it requires an actual
+> GitHub Actions run on this mission's own PR, and it requires both this
+> WP's workflow file and WP01's/WP02's/WP03's committed artifacts to
+> coexist on a pushed branch.
+>
+> **Steps**:
+> 1. Once this mission's lanes are merged onto a branch carrying both this
+>    WP's `crosslayer.yml` and the manifest/persona/sop-extract files it
+>    references, confirm the workflow actually triggers on a real PR.
+> 2. Confirm the static job's steps (muster-action static run, both
+>    drift-check call sites) show green in that run's logs.
+> 3. If no such combined, pushed branch exists yet at the time this WP is
+>    otherwise complete, **report this as blocked pending lane
+>    integration** — the same honest non-fabrication this mission's own
+>    sibling missions have required (do not invent a `run_id`; do not
+>    claim a green run that did not happen). Record exactly what is
+>    missing (which lane's merge is outstanding) so the blocker is
+>    actionable, not vague.
+> 4. Once unblocked, record the real `run_id`, `conclusion`, and
+>    wall-clock minutes, independently confirmed via
+>    `gh run view <run_id> --repo MOES-Media/spec-kitty --json
+>    conclusion,headBranch,createdAt,updatedAt`.
+>
+> **Files**: none new.
+> **Validation**: either a real, independently-confirmed green run
+> recorded, or an honest, specific blocked-status entry naming what is
+> outstanding.
+
+**Action required, before this mission is considered fully closed
+(post-merge, not a condition of WP04's approval or this mission's own
+merge)**: once WP01, WP02, WP03, and WP04's lanes have all merged onto a
+single pushed branch, perform steps 1-4 above for real. **Do not weaken or
+skip this** — it is relocated here so it can be honestly satisfied at the
+point where the required lane integration actually exists, not dropped
+because it moved out of a WP's Definition of Done.
