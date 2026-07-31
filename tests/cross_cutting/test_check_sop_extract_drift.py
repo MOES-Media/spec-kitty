@@ -236,7 +236,9 @@ def test_unknown_argument_is_rejected(tmp_path: Path) -> None:
 
 
 def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    # File-integrity check (before/after AGENTS.md hash comparison), not a
+    # charter hash-content use — TID251 explicitly exempts this case.
+    return hashlib.sha256(path.read_bytes()).hexdigest()  # noqa: TID251
 
 
 def test_write_never_modifies_agents_md(tmp_path: Path) -> None:
