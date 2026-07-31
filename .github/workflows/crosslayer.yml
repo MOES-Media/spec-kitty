@@ -64,6 +64,28 @@ jobs:
           args: 'conformance/crosslayer/manifest.yaml --static-only'
           version: '1.2.1'
 
+      # landing fold: check-persona-drift.sh shells out to a bare `python3
+      # conformance/tools/profile2soul.py`, which imports ruamel.yaml
+      # (declared in pyproject.toml, but never installed on a stock
+      # ubuntu-latest runner without this step -- caught by a real PR run:
+      # ModuleNotFoundError: No module named 'ruamel'). Same setup-uv +
+      # uv sync pattern ci-quality.yml already uses for its Python jobs.
+      # The venv's bin/ is put on PATH (rather than wrapping the two script
+      # steps below in `uv run`) so their `run:` lines stay the exact bare
+      # invocation test_crosslayer_workflow.py pins
+      # (test_static_job_wires_persona_drift_call_site_bare /
+      # test_static_job_wires_sop_extract_drift_call_site_bare) -- only the
+      # environment gets the dependency, not the invocation contract.
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: |
+          uv sync --frozen --all-extras
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+
       # WP01's committed script, invoked bare (one-liner, no arguments) --
       # see spec.md Dependencies & Assumptions, coupling #3 (WP04 <-> WP01).
       # check-persona-drift.sh has no --write mode at all.
