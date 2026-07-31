@@ -124,7 +124,9 @@ because the endpoint died), for both the offline static path and one real
 - What happens when the endpoint is reachable but every run errors (e.g.
   wrong model name)? → Each case's `runsErrored` is nonzero; an errored run
   is counted as a non-trigger, never skipped, never silently a 0
-  (muster FR-011 behavior) — the evidence artifact (FR-005) must surface
+  (muster's own upstream errored-run-counting behavior, unrelated to and
+  outside this mission's own FR/NFR/C numbering below) — the evidence
+  artifact (FR-005) must surface
   `runsErrored` per case so a 0% trigger rate caused by breakage is never
   misread as a 0% trigger rate caused by good discrimination.
 - What happens to the process exit code when the required control case fails
@@ -459,7 +461,8 @@ caused wrong-worktree resolution via `resolve_workspace_for_wp()`.
   or key.
 - **Failure policy**: if the endpoint is unreachable, cases show
   `runsErrored > 0` and are counted as non-triggers, never skipped
-  (muster's FR-011 behavior, unchanged); if credentials are entirely unset,
+  (muster's own upstream behavior, unchanged, unrelated to and outside this
+  mission's own FR/NFR/C numbering below); if credentials are entirely unset,
   muster's CLI degrades every behavioral case to `{passed: true, skipped:
   true}` — this mission's workflow must assert at least one non-control case
   is `skipped !== true` before treating a run's exit code as meaningful
