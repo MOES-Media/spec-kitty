@@ -473,6 +473,54 @@ final PR/review, not merely asserted in prose:
   #78 (`examples/README.md` stale after M5). None of these block
   M4; #76's underlying class is addressed head-on by FR-007's `runsErrored`
   design rather than deferred.
+- **NEW, unresolved, likely BLOCKING for FR-001..004 and FR-006 as designed
+  — found during this remediation, not part of the seven findings it was
+  scoped to fix, and not yet filed upstream.** `runComplianceProbeEntry`
+  (`src/adapters/openclaw-sop/runner.ts:303-312`, identically present at the
+  pinned tag `v1.2.1`) calls `gradeJudgeCompliance(transcript, judgeAssertion,
+  client, 1, passThreshold)` for **every one of the outer `k` behavioral
+  runs**, passing `1` as the inner `runs` argument (one behavioral run = one
+  order-swap pair, 2 judge calls) but `passThreshold = entry.passThreshold ??
+  Math.ceil(entry.k / 2)` — **the manifest's own rule-level threshold,
+  intended for the outer k-run aggregation** — as the threshold `passCount
+  >= passThreshold` is checked against inside `gradeJudgeCompliance`, where
+  `passCount` can be at most `1` (only one of the two swap-position calls
+  needs to vote PASS, per `judge.ts:264-267`'s own "majority of the 2 calls"
+  comment). **Reproduced live** against a real `sop run` invocation (mock
+  OpenAI-compatible endpoint returning an unambiguous "PASS" verdict from
+  both judge calls on every run): with `k: 5, passThreshold: 5,
+  aggregation: pass-k` (exactly what this spec's own corrected FR-006
+  guidance, above, requires for `AVOIDANCE-BOUNDARY-*`/
+  `CAPABILITY-CONTAINMENT-*` rows), every one of the 5 runs came back with
+  both judge calls voting `passed: true` yet the run's own top-level
+  `passed: false` (`1 >= 5` is false), and the case verdict was
+  `passed: false, passCount: 0` — **permanently unpassable regardless of
+  model compliance**. The same reproduction with `k: 5, passThreshold: 3,
+  aggregation: k-of-n` (this spec's own guidance for
+  `HANDOFF-DISCIPLINE-*`/`CANONICAL-VERBS-*` rows) showed the identical
+  failure (`1 >= 3` is false on every run). Lowering `passThreshold` to `1`
+  in the same fixture (which the manifest schema also permits, though it
+  contradicts this mission's own design intent) produced `passed: true,
+  passCount: 5` — isolating the mechanism precisely. **This means, as of
+  `@garrison-hq/muster@1.2.1`, no judge-graded rule with `k ≥ 2` can ever
+  report `passed: true` for any individual run, for any model, however
+  compliant** — a defect independent of, and more severe than, muster#76's
+  class (which concerns discrimination between failure *reasons*, not
+  whether a compliant transcript can ever register as compliant at all).
+  This directly threatens FR-001..004's stated acceptance ("`passed: true`
+  ... against a competent model") and SC-006's live-run gate as currently
+  worded. **This remediation does not attempt to resolve it** — it is a
+  muster-runtime defect, not a spec-wording, path, or integration-fidelity
+  issue of the kind the plan's seven findings addressed, and this mission
+  has no standing to patch a pinned external dependency. It must be
+  escalated (a muster upstream issue, analogous to #75/76/77/78/82 above)
+  and resolved or worked around — e.g., a manifest-level override, a muster
+  patch, or an unpin — **before FR-006's guidance above can be validated
+  against a real model**, and before SC-006's live-credentialed-run gate can
+  be expected to produce anything but `passed: false` on every axis. Flagging
+  this here rather than leaving it for a future adversarial squad to
+  rediscover, per this mission's own repeated lesson about silent
+  workarounds (Finding 1's Dependencies-exclusion tell, above).
 
 ## Scope Guard
 
