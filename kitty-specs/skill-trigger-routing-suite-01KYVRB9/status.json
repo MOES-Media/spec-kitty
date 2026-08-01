@@ -60,6 +60,7 @@
     },
     "WP03": {
       "actor": "claude",
+      "agent": "claude",
       "agent_profile": "__resolved_profile_absent__",
       "agent_profile_version": "__resolved_profile_version_absent__",
       "assignee": "claude",
@@ -68,6 +69,9 @@
       "last_event_id": "01KYZRAKG5DM3N6R9B0VGYDXJX",
       "last_transition_at": "2026-08-01T22:50:12.357781+00:00",
       "model": "__resolved_model_absent__",
+      "notes": [
+        "T015-T020 complete: behavioral-manifest.yaml (14 cases, 1 control) + all 4 canonical verification scripts authored, each proven RED/GREEN against real WP01/WP02 files and against constructed rejection cases; check-control-discrimination.mjs's 5-proof mode sequence proven against synthetic fixtures (0,0,1,1,2), live-endpoint re-proof still owed to WP04. FR-001/FR-002 acceptance recorded pass; FR-004 kept pending naming the live-proof remainder. Found and flagged for WP04: spec.md/quickstart.md/this task file's own FR-003 one-liner reads r.cases but muster's real --json shape is r.results."
+      ],
       "provider": "__resolved_provider_absent__",
       "role": "implementer",
       "subtasks": {
