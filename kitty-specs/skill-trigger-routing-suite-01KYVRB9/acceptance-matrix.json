@@ -48,10 +48,10 @@
       "criterion_id": "FR-005",
       "description": "Verify FR-005 is satisfied",
       "proof_type": "automated_test",
-      "evidence": null,
-      "pass_fail": "pending",
-      "verified_by": null,
-      "verified_at": null,
+      "evidence": "Cadence workflow .github/workflows/skill-trigger-routing.yml (commit 38ceca693, fixed 666978a40) is workflow_dispatch-only, invokes check-trigger-queryset-shape.mjs -> check-twin-phrasing.mjs -> skills run -> FR-003 skip-guard -> check-control-discrimination.mjs --mode healthy -> build-evidence-artifact.mjs -> check-evidence-artifact-shape.mjs -> git commit, per the verification-scripts-cli-contract's CI wiring. First real committed evidence artifact conformance/skills/trigger-evidence/2026-08-01T23-16-10.435Z.json (commit dd853b5cc): built by build-evidence-artifact.mjs from the real T022 healthy report, validated GREEN by check-evidence-artifact-shape.mjs (14 cases, schema-valid, runsErrored present on every case including 0), NFR-002-grep clean. Never on pull_request (C-002, verified by real YAML parse + scratch-copy rejection).",
+      "pass_fail": "pass",
+      "verified_by": "claude",
+      "verified_at": "2026-08-01T23:26:24.565496+00:00",
       "notes": "TODO: replace with a real acceptance criterion"
     },
     {
