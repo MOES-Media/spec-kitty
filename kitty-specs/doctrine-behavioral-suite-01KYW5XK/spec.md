@@ -230,12 +230,36 @@ falsification proof performed during spec/implementation validation, not a
 step that runs on every cadence execution (it would require the operator's
 endpoint to be intentionally killed, which is not the cadence job's job).
 
+**The same `runsErrored` computation is required on the main-suite job too,
+not only control-suite.** As originally drafted this elaboration and the
+Discrimination Controls section both scoped the `runsErrored` assertion to
+the control-suite job alone ("the control-suite job's own step explicitly
+asserts non-zero exit and `runsErrored == 0`") — leaving the main-suite job
+(the real per-profile cadence run FR-001..004 actually depend on) with no
+equivalent check. That gap reintroduces exactly the ambiguity FR-007 exists
+to close, one layer up: if the real endpoint dies mid-cadence-run, every
+profile-axis case errors, every case's `passed` reads `false`, and the
+Live-Model Plan's own Failure Policy text ("the cadence workflow's
+main-suite job failing... does not block anything") would have a maintainer
+read that red run as "the model failed its avoidance boundary" when it in
+fact proves nothing about the model at all. The main-suite job's workflow
+step must therefore also compute, per case, `jq '[.runs[] | select(.error
+!= null)] | length'` against each profile's report and write the result
+into that case's `runsErrored` field in the committed evidence artifact
+(the field already exists in the Evidence Artifact JSON shape below — this
+closes the gap between the schema declaring the field and the workflow
+actually populating it from a real run). Any case where `runsErrored > 0`
+must be surfaced distinctly from a genuine failure — e.g. a `::warning::`
+step annotation in the workflow log, and the evidence artifact recording
+the nonzero count is itself sufficient for a maintainer to tell the two
+apart without re-deriving it by hand.
+
 ### Constraints
 
 | ID | Title | Constraint | Category | Priority | Status |
 |----|-------|------------|----------|----------|--------|
 | C-001 | No secrets in manifests or argv | Endpoint config via `MUSTER_ENDPOINT`/`MUSTER_MODEL`/`MUSTER_API_KEY` only — confirmed the real muster env var names (`src/cli/index.ts:1608-1645`, `buildSopClient`). CI grep gate reuses the exact two regexes from muster's own `tests/unit/invariants.test.ts`'s NI-001 scan (`/nvapi-[A-Za-z0-9]{8}/`, `/\bsk-[A-Za-z0-9_-]{20}/`, confirmed at `tests/unit/invariants.test.ts:~80`), not new patterns invented for this mission. | Technical | High | Open |
-| C-002 | Cadence, never PR-triggered | The dispatch workflow is `workflow_dispatch` only (optionally nightly later, M8) and must never declare an `on: pull_request` trigger. | Technical | High | Open |
+| C-002 | Cadence, never PR-triggered, and must actually run the suite | The dispatch workflow is `workflow_dispatch` only (optionally nightly later, M8) and must never declare an `on: pull_request` trigger. **Existing and being correctly non-PR-triggered is not sufficient**: the workflow's main-suite job must invoke `muster sop run` (or the pinned `garrison-hq/muster-action@1.2.1`) against every file under `conformance/behavioral/profiles/*.yaml` and every FR-005-edited file under `conformance/doctrine/*.yaml`, and the control-suite job must invoke it against `conformance/behavioral/control-manifest.yaml` — a workflow that satisfies the trigger constraint but invokes zero manifests (an empty or `echo`-only job) satisfies this constraint's letter while doing nothing, and is explicitly out of bounds. Verification for this half of the constraint is procedural, not a shell one-liner: the workflow YAML's job steps are reviewed to confirm each `uses:`/`run:` step names a real manifest path under the paths above, cross-checked against `ls conformance/behavioral/profiles/*.yaml conformance/behavioral/control-manifest.yaml` returning the same file set the workflow references — a workflow step referencing a manifest that does not exist on disk, or omitting a manifest that does, fails this check. | Technical | High | Open |
 | C-003 | Deployed-truth system prompt, never hand-paraphrased | The `systemPrompt` field embeds the projected body from FR-009's generator verbatim; the manifest names the source projection file (`conformance/behavioral/projected/<id>.md`) plus its content hash. Hand-editing a scenario's `systemPrompt` inline is prohibited — it must always be the generator's committed output. | Technical | High | Open |
 | C-004 | **New, not in the source issue** — no fabricated field is ever cited as grading evidence | Mirrors M7's C-003 pattern: FR-009's projector fabricates nothing (it renders the profile's own real fields — unlike M7's Soul.md projector, which fabricates RFC-1 keys the profile schema doesn't carry). This constraint instead guards the *opposite* risk: no rubric may cite the profile's YAML fields (`routing-priority`, `max-concurrent-tasks`, `context-sources`) that the rendered Claude-agent body does not actually carry into the system prompt — grading must only ever reference what the model actually saw. | Technical | Medium | Open |
 
@@ -285,6 +309,67 @@ endpoint to be intentionally killed, which is not the cadence job's job).
 - **SC-005**: The suite's own README states the model+context-not-harness
   limit in the same document a new contributor reads first, not only in the
   programme plan.
+- **SC-006**: Before this mission is accepted, at least one live run against
+  a real credentialed OpenAI-compatible endpoint has exercised FR-001..004
+  end to end — not only the offline mock-`ChatClient` falsification fixtures
+  those FRs' Verification cells otherwise permit — with the specific
+  observed evidence spelled out in "Acceptance Gate: One Live Credentialed
+  Run" below.
+
+## Acceptance Gate: One Live Credentialed Run
+
+FR-001 through FR-004's Verification cells are satisfiable end to end with
+nothing but mock-`ChatClient` fixtures: every positive case names a live
+`muster sop run` invocation, but every *falsification* case — the half that
+actually proves the grader can fail — is explicitly scripted against a
+scripted/mock client "since this falsification must be reproducible
+offline" (FR-001's own wording). Taken together, a mission could pass every
+FR-001..004 Verification cell as written without a single real network call
+ever reaching a real model. That is a static suite wearing a costume; this
+mission's whole reason to exist (Overview) is finding *behavioral* defects a
+real model produces, and a suite that never has to touch one cannot do that
+even once before being accepted.
+
+This gate does not replace any FR-001..004 Verification cell (the mock
+falsification fixtures stay — they are the only reproducible way to prove a
+grader *can* fail, per FR-001's own correction). It adds a one-time,
+pre-acceptance condition, checked at `/spec-kitty.accept` (not a per-PR CI
+gate — this mission has none, per C-002) and evidenced in the mission's
+final PR/review, not merely asserted in prose:
+
+1. **A real credentialed run**, `MUSTER_ENDPOINT`/`MUSTER_MODEL` set to a
+   real bring-your-own OpenAI-compatible endpoint (local Ollama/DGX, NIM, or
+   hosted) and `MUSTER_API_KEY` set to a real credential where the endpoint
+   requires one, has executed `muster sop run` against **all five**
+   `conformance/behavioral/profiles/<id>.yaml` manifests and against
+   `conformance/behavioral/control-manifest.yaml`.
+2. **Specific observed output, not merely a green/red exit code**:
+   - the committed evidence artifact
+     (`conformance/behavioral/evidence/<ISO-date>-<mid8>.json`) exists from
+     this run, and its `perProfile` object's four axis entries for at least
+     `architect-alphonso` each show `totalRuns` matching FR-006's `runs ≥ 5`
+     and a `runsErrored` value recorded from the real run (not a placeholder
+     `0` carried over from a template);
+   - the raw `--json` report backing that artifact has, for at least one
+     case per profile, a non-empty `runs[].transcript` string, and those
+     transcript strings are not byte-identical across the case's own
+     `runs[]` (proving distinct per-run model generations occurred, not one
+     cached reply copied into every run slot — a no-op or cached client
+     would otherwise satisfy "a report exists" trivially);
+   - the control-manifest's run from this same gate shows `runsErrored == 0`
+     for both controls (proving the credentialed call actually reached the
+     model rather than silently no-op'ing) alongside `passed: false` for
+     both, per FR-007;
+   - the raw JSON report(s) backing all of the above are attached to or
+     linked from the mission's acceptance evidence — this mission's own
+     Evidence Artifact section already names the failure mode being guarded
+     against here ("a control recorded at `0/24` that re-measured at
+     `4/24` because the evidence lived only in prose").
+3. **This is a floor, not the cadence job.** One passing gate run does not
+   certify every future scheduled run; it certifies that FR-001..004's
+   design was validated against a real model at least once before
+   acceptance, closing the gap a mock-only implementation would otherwise
+   leave open indefinitely.
 
 ## Dependencies & Assumptions
 
@@ -366,7 +451,13 @@ merged into the main per-profile manifests; both live in
 by the dispatch workflow (a single workflow with two jobs: main-suite,
 control-suite; the control-suite job's own step explicitly asserts non-zero
 exit and `runsErrored == 0`, never treating the control job's exit `1` as a
-build failure).
+build failure). **The main-suite job runs the same `runsErrored` computation
+per case** (FR-007 elaboration) — its step doesn't gate the job's exit code
+(a genuinely non-compliant model must still surface as a red run per the
+Live-Model Plan's Failure Policy), but it must populate the evidence
+artifact's per-axis `runsErrored` field from the real run so a `runsErrored
+> 0` case is never silently read as "the model failed this axis" when the
+endpoint was actually the thing that failed.
 
 ## Live-Model Plan
 
