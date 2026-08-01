@@ -118,9 +118,16 @@ run today is a manual `workflow_dispatch` action.
 A healthy run's exit code is expected to be **1**, not 0 — the
 discrimination-control case is designed to fail (`passed: false`) even on a
 fully healthy endpoint, so a healthy run "including its required control"
-legitimately returns a non-zero CLI exit code. No step in this workflow
-asserts on the bare `skills run` exit code; every check inspects the JSON
-report's per-case fields instead.
+legitimately returns a non-zero CLI exit code (garrison-hq/muster#77). The
+"Run behavioral trigger-routing manifest" step's shell *does* assert on
+that bare exit code — it must, or Actions' default `bash -e {0}` would
+abort the job on that very exit 1 before any later step ever ran — but the
+assertion only rejects a code neither `0` nor `1`; both legitimate values
+are let through unexamined. Every actual pass/fail *verdict* in this
+workflow (the FR-003 skip-guard, the FR-004 discrimination check, the
+FR-005 evidence-artifact shape check) comes from a later step inspecting
+the JSON report's per-case fields, never from the bare `skills run` exit
+code itself.
 
 ## `[CONVENTION]` — twin-phrasing near-miss sets (D-1)
 
