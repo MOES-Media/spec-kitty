@@ -8,10 +8,10 @@
       "criterion_id": "FR-001",
       "description": "Verify FR-001 is satisfied",
       "proof_type": "automated_test",
-      "evidence": null,
+      "evidence": "commits 99e05482b,be190a9ca,f3ce5263e,ce0a0dfb8,933a4139c,748e08850 on kitty/mission-skill-trigger-routing-suite-01KYVRB9; WP01 delivers 10 of the 13 minimum query-set files (the 5 duplicate pairs). Inline python3 shape check (mirrors trigger.ts:403-422 MIN_QUERIES_PER_AXIS=8) exits 0 against all 10 files (verified against a constructed 7-entry rejection case exiting 1). Remaining scope: WP02's 3 run-family files, then the canonical conformance/scripts/check-trigger-queryset-shape.mjs (WP03) is the FR-001-discharging command.",
       "pass_fail": "pending",
-      "verified_by": null,
-      "verified_at": null,
+      "verified_by": "claude",
+      "verified_at": "2026-08-01T22:14:42.985709+00:00",
       "notes": "TODO: replace with a real acceptance criterion"
     },
     {
