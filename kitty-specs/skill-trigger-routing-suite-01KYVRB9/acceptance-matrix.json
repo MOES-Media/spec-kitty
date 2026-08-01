@@ -37,11 +37,11 @@
     {
       "criterion_id": "FR-004",
       "description": "Verify FR-004 is satisfied",
-      "proof_type": "automated_test",
-      "evidence": "commit 7c6b87fcd on kitty/mission-skill-trigger-routing-suite-01KYVRB9. WP02 discharges only the query-set-authoring portion of FR-004: rigged-impossible-control-queries.yaml exists, >=8/axis (verified: shouldTrigger=8, nearMiss=8), and follows muster's examples/ rigged-impossible fixture pattern per Decision D-3 rather than its fixtures/ copy \u2014 a whole-file case-sensitive grep for the ZZZCONTROL substring exits 1 (no match) at commit 56eb74618, so this file does not reproduce muster#73's self-match defect (github.com/garrison-hq/muster/issues/73). This is necessary but not sufficient for FR-004: the manifest wiring (isControl: true case, WP03) and the live observed-failing proof with runsErrored==0 vs a dead-endpoint runsErrored>0 falsification run (WP04, garrison-hq/muster#76) are both still open. FR-004's own verification command cannot be satisfied by this WP alone.",
+      "proof_type": "inline_check",
+      "evidence": "WP02 (commit 7c6b87fcd, GREEN re-verified at 56eb74618): discharges only the query-set-authoring portion of FR-004. rigged-impossible-control-queries.yaml exists, >=8/axis (shouldTrigger=8,nearMiss=8), follows muster's examples/ rigged-impossible pattern per Decision D-3 not fixtures/. Whole-file case-sensitive grep for the ZZZCONTROL substring exits 1 (no match) -- does not reproduce muster#73's self-match defect (github.com/garrison-hq/muster/issues/73). Not sufficient alone: manifest wiring (isControl:true case, WP03) and the live observed-failing proof distinguishing runsErrored==0 (healthy) from runsErrored>0 (dead endpoint, github.com/garrison-hq/muster/issues/76) are both still open, owned by WP03/WP04.",
       "pass_fail": "pending",
       "verified_by": "claude",
-      "verified_at": "2026-08-01T22:25:17.264028+00:00",
+      "verified_at": "2026-08-01T22:27:40.942151+00:00",
       "notes": "TODO: replace with a real acceptance criterion"
     },
     {
