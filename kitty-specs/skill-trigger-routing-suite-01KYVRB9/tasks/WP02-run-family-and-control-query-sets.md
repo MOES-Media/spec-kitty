@@ -297,3 +297,7 @@ each; `ZZZCONTROL` grep exits 1.
 ```sh
 spec-kitty agent action implement WP02 --agent claude
 ```
+
+## Activity Log
+
+- 2026-08-01T22:22:31Z – claude – T009: ATDD RED committed at 380beab8c (placeholder-run-family-queries.yaml, 8/8 axis entries — passes shape gate, fails twin-phrasing). Inline triple-cross-reference check (throwaway python3) reports 2 of 2 sibling should-trigger sets have no borrowed phrase (expect 2). Anti-vacuity: same check against a constructed valid near-miss set (borrowing from both siblings) reports 0 of 2 missing, confirming the checker is not an always-fail check.
