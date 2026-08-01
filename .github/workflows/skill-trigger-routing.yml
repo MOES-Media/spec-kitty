@@ -52,9 +52,30 @@ jobs:
       # intentionally-healthy endpoint -- the dead-endpoint half of FR-004's
       # proof is a one-time, by-hand step (never a CI step), recorded in the
       # mission work log.
+      #
+      # muster returns `ok ? 0 : 1` (never higher) from `skills run`, and a
+      # HEALTHY run legitimately exits 1: the rigged-impossible
+      # discrimination control (FR-004) is designed to report `passed:
+      # false` even against a fully healthy endpoint (garrison-hq/muster#77
+      # -- see this file's own "Cadence workflow" paragraph in
+      # conformance/skills/README.md for the full explanation). Actions'
+      # default shell is `bash -e {0}`, so a bare, unguarded `run:` line
+      # here would abort the job on that legitimate exit 1 before any of
+      # this workflow's own assertions (FR-003's skip-guard, FR-004's
+      # control check, FR-005's evidence build/shape check, the commit)
+      # ever executed -- this capture-and-classify form is what lets those
+      # steps run at all. Only an exit code muster itself never documents
+      # (neither 0 nor 1) is treated as this step's own failure.
       - name: Run behavioral trigger-routing manifest (FR-003/FR-004)
         run: |
+          set +e
           npx --offline @garrison-hq/muster@1.2.1 skills run conformance/skills/behavioral-manifest.yaml --json > /tmp/report.json
+          rc=$?
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 1 ]; then
+            echo "muster skills run exited $rc (expected 0 or 1 -- see garrison-hq/muster#77)"
+            exit "$rc"
+          fi
+          echo "muster skills run exited $rc (0 or 1 both legitimate here, muster#77)"
 
       # FR-003's skip-guard: a run with no credentials configured degrades
       # every behavioral case to {passed:true, skipped:true} -- a green run
