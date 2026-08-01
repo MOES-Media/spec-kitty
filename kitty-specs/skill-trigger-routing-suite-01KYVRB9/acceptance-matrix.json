@@ -18,10 +18,10 @@
       "criterion_id": "FR-002",
       "description": "Verify FR-002 is satisfied",
       "proof_type": "automated_test",
-      "evidence": null,
+      "evidence": "commits 99e05482b,be190a9ca,f3ce5263e,ce0a0dfb8,933a4139c on kitty/mission-skill-trigger-routing-suite-01KYVRB9. WP01 fully satisfies FR-002's duplicate-pair direction: all 5 pairs (ad-hoc-profile-load<->spk-doctrine-profile-load, spec-kitty-runtime-next<->spk-run-next, spec-kitty-runtime-review<->spk-run-review-wp, spec-kitty-implement-review<->spk-run-implement-review, spec-kitty-git-workflow<->spk-admin-git-workflow) have a byte-identical borrowed phrase in both directions, confirmed by inline python3 set-intersection self-check exiting 0 for all 5 pairs (verified against a constructed zero-overlap poisoned pair exiting 1). Remaining scope: FR-002's run-family-cluster ordered-pair direction is WP02's responsibility, then WP03's canonical check-twin-phrasing.mjs is the FR-002-discharging command.",
       "pass_fail": "pending",
-      "verified_by": null,
-      "verified_at": null,
+      "verified_by": "claude",
+      "verified_at": "2026-08-01T22:14:55.975109+00:00",
       "notes": "TODO: replace with a real acceptance criterion"
     },
     {
