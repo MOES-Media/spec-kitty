@@ -17,11 +17,11 @@
     {
       "criterion_id": "FR-002",
       "description": "Verify FR-002 is satisfied",
-      "proof_type": "inline_check",
-      "evidence": "WP02 (commits 4759627be,636a6022d,2fb21060f,56eb74618): FR-002's run-family-cluster ordered-pair direction now satisfied \u2014 all 3 members (spk-run-next, spk-run-review-wp, spk-run-implement-review) x 2 siblings each = 6 ordered pairs, each with a byte-identical borrowed shouldTrigger phrase in the sibling's near-miss set, confirmed by an inline python3 triple set-intersection self-check exiting OK for all 6 pairs (anti-vacuity: same check against an in-memory poisoned zero-overlap member reports FAIL for both its pairs). Combined with WP01's duplicate-pair direction, both FR-002 directions are content-complete via inline/local checks. Canonical check-twin-phrasing.mjs (WP03) still owed.",
-      "pass_fail": "pending",
+      "proof_type": "automated_test",
+      "evidence": "conformance/scripts/check-twin-phrasing.mjs (commit 0706a2eed). GREEN: node conformance/scripts/check-twin-phrasing.mjs conformance/skills/trigger-queries/ exits 0, 'twin-phrasing: OK (6 cluster(s), 16 ordered direction(s) checked)' -- all 5 duplicate pairs (10 directions) + the run-family triple (6 directions). RED (falsification condition): spk-run-next-run-family-queries.yaml's nearMiss stripped to unrelated filler (yaml.safe_dump mutation) exits 1, naming both now-unsatisfied run-family directions by id; file restored, git diff --exit-code confirms no residue. This script loads clusters by filename convention (never by walking behavioral-manifest.yaml's case list) and reproduces WP01's 10-direction and WP02's 6-direction inline self-check results exactly against the same real files. Both content (WP01/WP02) and the canonical verification script (WP03) now exist; FR-002 is fully discharged.",
+      "pass_fail": "pass",
       "verified_by": "claude",
-      "verified_at": "2026-08-01T22:27:37.167220+00:00",
+      "verified_at": "2026-08-01T22:48:44.447641+00:00",
       "notes": "TODO: replace with a real acceptance criterion"
     },
     {
