@@ -7,11 +7,11 @@
     {
       "criterion_id": "FR-001",
       "description": "Verify FR-001 is satisfied",
-      "proof_type": "automated_test",
-      "evidence": "commits 99e05482b,be190a9ca,f3ce5263e,ce0a0dfb8,933a4139c,748e08850 (WP01) plus 4759627be,636a6022d,2fb21060f,7c6b87fcd,56eb74618 (WP02) on kitty/mission-skill-trigger-routing-suite-01KYVRB9. All 13 minimum query-set files now exist (10 duplicate-pair from WP01 + 3 run-family from WP02); WP02 also authors a 14th file, the FR-004 control's query set, outside FR-001's own 13-file minimum. Inline python3 shape check (mirrors trigger.ts:403-422 MIN_QUERIES_PER_AXIS=8) exits 0 against all 3 run-family files and the control file (verified against a constructed 7-entry rejection case exiting 1, WP01; re-verified for the run-family/control files in WP02). Remaining scope: the canonical conformance/scripts/check-trigger-queryset-shape.mjs (WP03) is the FR-001-discharging command; this WP's inline checks are a local proxy for it, not a substitute.",
+      "proof_type": "inline_check",
+      "evidence": "WP02 (commits 4759627be,636a6022d,2fb21060f,7c6b87fcd,56eb74618): all 13 minimum query-set files now exist (10 duplicate-pair WP01 + 3 run-family WP02). Inline python3 shape check exits 0 on all files (shouldTrigger=8,nearMiss=8 each), verified against a constructed 7-entry rejection case exiting 1. Canonical conformance/scripts/check-trigger-queryset-shape.mjs (WP03) still owed.",
       "pass_fail": "pending",
       "verified_by": "claude",
-      "verified_at": "2026-08-01T22:25:17.264028+00:00",
+      "verified_at": "2026-08-01T22:27:22.945774+00:00",
       "notes": "TODO: replace with a real acceptance criterion"
     },
     {
@@ -38,7 +38,7 @@
       "criterion_id": "FR-004",
       "description": "Verify FR-004 is satisfied",
       "proof_type": "automated_test",
-      "evidence": "commit 7c6b87fcd on kitty/mission-skill-trigger-routing-suite-01KYVRB9. WP02 discharges only the query-set-authoring portion of FR-004: rigged-impossible-control-queries.yaml exists, >=8/axis (verified: shouldTrigger=8, nearMiss=8), and follows muster's examples/ rigged-impossible fixture pattern per Decision D-3 rather than its fixtures/ copy — a whole-file case-sensitive grep for the ZZZCONTROL substring exits 1 (no match) at commit 56eb74618, so this file does not reproduce muster#73's self-match defect (github.com/garrison-hq/muster/issues/73). This is necessary but not sufficient for FR-004: the manifest wiring (isControl: true case, WP03) and the live observed-failing proof with runsErrored==0 vs a dead-endpoint runsErrored>0 falsification run (WP04, garrison-hq/muster#76) are both still open. FR-004's own verification command cannot be satisfied by this WP alone.",
+      "evidence": "commit 7c6b87fcd on kitty/mission-skill-trigger-routing-suite-01KYVRB9. WP02 discharges only the query-set-authoring portion of FR-004: rigged-impossible-control-queries.yaml exists, >=8/axis (verified: shouldTrigger=8, nearMiss=8), and follows muster's examples/ rigged-impossible fixture pattern per Decision D-3 rather than its fixtures/ copy \u2014 a whole-file case-sensitive grep for the ZZZCONTROL substring exits 1 (no match) at commit 56eb74618, so this file does not reproduce muster#73's self-match defect (github.com/garrison-hq/muster/issues/73). This is necessary but not sufficient for FR-004: the manifest wiring (isControl: true case, WP03) and the live observed-failing proof with runsErrored==0 vs a dead-endpoint runsErrored>0 falsification run (WP04, garrison-hq/muster#76) are both still open. FR-004's own verification command cannot be satisfied by this WP alone.",
       "pass_fail": "pending",
       "verified_by": "claude",
       "verified_at": "2026-08-01T22:25:17.264028+00:00",
