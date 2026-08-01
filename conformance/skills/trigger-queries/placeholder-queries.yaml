@@ -1,0 +1,5 @@
+id: placeholder
+source: "docs/rubric/skills-trigger-taxonomy.md"
+threshold: 0.5
+shouldTrigger: ["only one query"]
+nearMiss: ["only one query"]
