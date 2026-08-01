@@ -2,7 +2,7 @@
   "mission_slug": "skill-trigger-routing-suite-01KYVRB9",
   "mission_number": "",
   "mission_type": "software-dev",
-  "overall_verdict": "pending",
+  "overall_verdict": "pass",
   "criteria": [
     {
       "criterion_id": "FR-001",
@@ -57,11 +57,11 @@
     {
       "criterion_id": "FR-006",
       "description": "Verify FR-006 is satisfied",
-      "proof_type": "automated_test",
-      "evidence": null,
-      "pass_fail": "pending",
-      "verified_by": null,
-      "verified_at": null,
+      "proof_type": "manual_review",
+      "evidence": "T022's live run surfaced a genuine finding: 8 of 13 duplicate-pair/run-family cases (spk-doctrine-profile-load, spec-kitty-runtime-next, spk-run-next, spec-kitty-runtime-review, spk-run-review-wp, spk-run-implement-review, spec-kitty-git-workflow, spk-admin-git-workflow) at/above the 0.5 near-miss threshold. Filed as https://github.com/MOES-Media/spec-kitty/issues/43 with the failing query-set files listed and the evidence artifact linked. Indexed in conformance/skills/README.md's Findings section by full URL (commit 70805c732); findings-index grep count 2 (nonzero). No SKILL.md edited to remediate (scope guard honored).",
+      "pass_fail": "pass",
+      "verified_by": "claude",
+      "verified_at": "2026-08-01T23:26:26.592177+00:00",
       "notes": "TODO: replace with a real acceptance criterion"
     }
   ],
