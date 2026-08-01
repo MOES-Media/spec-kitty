@@ -77,10 +77,33 @@ are run separately, as above):
 ```sh
 node conformance/scripts/check-trigger-queryset-shape.mjs conformance/skills/trigger-queries/*.yaml \
   && node conformance/scripts/check-twin-phrasing.mjs conformance/skills/trigger-queries/ \
-  && node conformance/scripts/check-evidence-artifact-shape.mjs conformance/skills/trigger-evidence/*.json \
-  && command grep -rE '(sk-|api[_-]?key\s*[:=]\s*["\047][A-Za-z0-9]{16,})' conformance/skills/behavioral-manifest.yaml .github/workflows/skill-trigger-routing.yml; \
-  [ $? -eq 1 ] && echo "conformance: all local checks green"
+  && node conformance/scripts/check-evidence-artifact-shape.mjs conformance/skills/trigger-evidence/*.json
+node_chain_status=$?
+
+command grep -rE '(sk-|api[_-]?key\s*[:=]\s*["\047][A-Za-z0-9]{16,})' conformance/skills/behavioral-manifest.yaml .github/workflows/skill-trigger-routing.yml
+grep_status=$?
+
+if [ "$node_chain_status" -eq 0 ] && [ "$grep_status" -eq 1 ]; then
+  echo "conformance: all local checks green"
+else
+  echo "conformance: FAILED (node checks exit=$node_chain_status, credential-grep exit=$grep_status)"
+  exit 1
+fi
 ```
+
+The two status codes are captured on their own lines and tested
+separately for exactly this reason: a single `A && B && C && D; [ $? -eq 1
+]` chain is indistinguishable from success when `D` (the credential grep,
+which is expected to exit `1` for "no leak found") happens to share its
+success exit code with an *earlier* command's failure — any of `A`/`B`/`C`
+failing with exit `1` short-circuits the chain, and `$?` after the `;` is
+that same `1`, which the old form then read as "green." Observed against a
+real failing case (`shouldTrigger` truncated to 7 entries): the old form
+printed `trigger-queryset-shape: FAIL` immediately followed by
+`conformance: all local checks green` and exited `0`; the form above
+prints `conformance: FAILED (node checks exit=1, credential-grep exit=1)`
+and exits `1` for the identical input, and still prints `conformance: all
+local checks green` (exit `0`) against the real, passing files.
 
 ## Cadence workflow
 
