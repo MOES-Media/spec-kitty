@@ -37,11 +37,11 @@
     {
       "criterion_id": "FR-004",
       "description": "Verify FR-004 is satisfied",
-      "proof_type": "inline_check",
-      "evidence": "WP02 (commit 7c6b87fcd, GREEN re-verified at 56eb74618): discharges only the query-set-authoring portion of FR-004. rigged-impossible-control-queries.yaml exists, >=8/axis (shouldTrigger=8,nearMiss=8), follows muster's examples/ rigged-impossible pattern per Decision D-3 not fixtures/. Whole-file case-sensitive grep for the ZZZCONTROL substring exits 1 (no match) -- does not reproduce muster#73's self-match defect (github.com/garrison-hq/muster/issues/73). Not sufficient alone: manifest wiring (isControl:true case, WP03) and the live observed-failing proof distinguishing runsErrored==0 (healthy) from runsErrored>0 (dead endpoint, github.com/garrison-hq/muster/issues/76) are both still open, owned by WP03/WP04.",
+      "proof_type": "automated_test",
+      "evidence": "WP03 discharges: (1) manifest wiring -- behavioral-manifest.yaml (commit a5115ff72) has exactly one isControl:true case (rigged-impossible-control), confirmed by python3 yaml.safe_load count; (2) the canonical conformance/scripts/check-control-discrimination.mjs (commit b26c734b5) now exists, computing the derived runsErrored(case) sum from shouldTriggerAxis/nearMissAxis queryBreakdown (never a nonexistent top-level field), with a required --mode flag that never silently defaults. Its LOGIC is proven against two hand-written synthetic report.json fixtures (data-model.md Trigger Verdict shape): --mode healthy vs healthy fixture=0, --mode dead-endpoint vs dead fixture=0, --mode healthy vs dead fixture (cross-wired)=1, --mode dead-endpoint vs healthy fixture (cross-wired inverse)=1, no --mode=2 -- all five match the contract exactly. STILL OWED (WP04, not yet done): the actual live-endpoint proof spec.md's FR-004 verification command requires -- running the manifest against a real, reachable MUSTER_ENDPOINT to capture report-healthy.json, and against a deliberately unreachable endpoint to capture report-dead.json, then re-running this exact five-proof sequence against those REAL reports (quickstart.md section 4). WP03's synthetic-fixture proof is necessary but explicitly not sufficient for this criterion; it must not be mistaken for the live proof. Also still owed: the cadence GitHub Actions workflow (.github/workflows/skill-trigger-routing.yml) that invokes this in CI, and the committed evidence artifact -- both WP04 scope.",
       "pass_fail": "pending",
       "verified_by": "claude",
-      "verified_at": "2026-08-01T22:27:40.942151+00:00",
+      "verified_at": "2026-08-01T22:48:58.464347+00:00",
       "notes": "TODO: replace with a real acceptance criterion"
     },
     {
