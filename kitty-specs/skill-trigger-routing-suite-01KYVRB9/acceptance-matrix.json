@@ -28,10 +28,10 @@
       "criterion_id": "FR-003",
       "description": "Verify FR-003 is satisfied",
       "proof_type": "automated_test",
-      "evidence": null,
-      "pass_fail": "pending",
-      "verified_by": null,
-      "verified_at": null,
+      "evidence": "conformance/skills/behavioral-manifest.yaml (commit a5115ff72, WP03) pinned model:gpt-4o-mini/runsPerQuery:3/threshold:0.5; skip-guard one-liner corrected r.cases->r.results (commit e6cadee5c, WP04 Job 1) and proven against a real run: unset-endpoint report has every behavioral case skipped:true (exit 1 via corrected form), synthetic no-skip variant exits 0. Live configured-endpoint proof: T022's real gpt-4o-mini run (commit dd853b5cc) shows 0 skipped cases out of 14. Credentials via MUSTER_API_KEY env var only, never committed (NFR-002 grep clean).",
+      "pass_fail": "pass",
+      "verified_by": "claude",
+      "verified_at": "2026-08-01T23:26:02.770836+00:00",
       "notes": "TODO: replace with a real acceptance criterion"
     },
     {
