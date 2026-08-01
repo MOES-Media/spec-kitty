@@ -17,11 +17,11 @@
     {
       "criterion_id": "FR-002",
       "description": "Verify FR-002 is satisfied",
-      "proof_type": "automated_test",
-      "evidence": "commits 99e05482b,be190a9ca,f3ce5263e,ce0a0dfb8,933a4139c (WP01) plus 4759627be,636a6022d,2fb21060f,56eb74618 (WP02) on kitty/mission-skill-trigger-routing-suite-01KYVRB9. WP01 satisfied FR-002's duplicate-pair direction (5 pairs, bidirectional). WP02 now also satisfies FR-002's run-family-cluster ordered-pair direction: all 3 members (spk-run-next, spk-run-review-wp, spk-run-implement-review) x 2 siblings each = 6 ordered pairs, each with a byte-identical borrowed shouldTrigger phrase in the sibling's near-miss set, confirmed by an inline python3 triple set-intersection self-check exiting with 'OK' for all 6 pairs (verified against an in-memory poisoned member with a zero-overlap near-miss set, which the same check logic correctly reports FAIL for). Both FR-002 directions (duplicate-pair and run-family) are now content-complete via inline/local checks. Remaining scope: WP03's canonical check-twin-phrasing.mjs is the actual FR-002-discharging command; this WP's inline checks are a local proxy, not a substitute.",
+      "proof_type": "inline_check",
+      "evidence": "WP02 (commits 4759627be,636a6022d,2fb21060f,56eb74618): FR-002's run-family-cluster ordered-pair direction now satisfied \u2014 all 3 members (spk-run-next, spk-run-review-wp, spk-run-implement-review) x 2 siblings each = 6 ordered pairs, each with a byte-identical borrowed shouldTrigger phrase in the sibling's near-miss set, confirmed by an inline python3 triple set-intersection self-check exiting OK for all 6 pairs (anti-vacuity: same check against an in-memory poisoned zero-overlap member reports FAIL for both its pairs). Combined with WP01's duplicate-pair direction, both FR-002 directions are content-complete via inline/local checks. Canonical check-twin-phrasing.mjs (WP03) still owed.",
       "pass_fail": "pending",
       "verified_by": "claude",
-      "verified_at": "2026-08-01T22:25:17.264028+00:00",
+      "verified_at": "2026-08-01T22:27:37.167220+00:00",
       "notes": "TODO: replace with a real acceptance criterion"
     },
     {
