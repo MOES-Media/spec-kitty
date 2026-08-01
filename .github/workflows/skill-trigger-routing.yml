@@ -10,10 +10,14 @@ on:
   workflow_dispatch: {}
 
 # MEDIUM-4-style guard (matches conformance.yml's own convention): pin to
-# the minimum token scope this job needs (read-only checkout) rather than
-# inheriting the repository default.
+# the minimum token scope this job needs rather than inheriting the
+# repository default. `write` (not `read`) is required here -- unlike
+# conformance.yml, this workflow's last step commits and pushes the FR-005
+# evidence artifact back to the branch it ran on; `protect-main.yml` already
+# allowlists a `github-actions[bot]`-committed push (its "approved automated
+# process" branch), so this does not weaken main-branch protection.
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   skill-trigger-routing:
