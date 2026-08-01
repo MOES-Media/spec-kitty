@@ -1,7 +1,7 @@
 {
-  "event_count": 4,
-  "last_event_id": "01KYW71G85CN8XJ6S079FRJWQA",
-  "materialized_at": "2026-07-31T13:50:25.029787+00:00",
+  "event_count": 5,
+  "last_event_id": "01KYZPCB4KJW0RXHTKGFMD8ZDF",
+  "materialized_at": "2026-08-01T22:16:12.179306+00:00",
   "mission_number": "",
   "mission_slug": "skill-trigger-routing-suite-01KYVRB9",
   "mission_type": "software-dev",
@@ -9,20 +9,25 @@
     "approved": 0,
     "blocked": 0,
     "canceled": 0,
-    "claimed": 0,
+    "claimed": 1,
     "done": 0,
     "for_review": 0,
     "in_progress": 0,
     "in_review": 0,
-    "planned": 4
+    "planned": 3
   },
   "work_packages": {
     "WP01": {
-      "actor": "finalize-tasks",
+      "actor": "claude",
+      "agent_profile": "__resolved_profile_absent__",
+      "agent_profile_version": "__resolved_profile_version_absent__",
       "force_count": 0,
-      "lane": "planned",
-      "last_event_id": "01KYW71F5AF6MM6RTAM752Z0NA",
-      "last_transition_at": "2026-07-31T13:50:23.914606+00:00",
+      "lane": "claimed",
+      "last_event_id": "01KYZPCB4KJW0RXHTKGFMD8ZDF",
+      "last_transition_at": "2026-08-01T22:16:12.179306+00:00",
+      "model": "__resolved_model_absent__",
+      "provider": "__resolved_provider_absent__",
+      "role": "implementer",
       "subtasks": {
         "T001": "done",
         "T002": "done",
