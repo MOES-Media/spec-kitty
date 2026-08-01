@@ -39,7 +39,7 @@
   boundary (C) — measurable-threshold requirements that might otherwise be
   NFRs (runs ≥ 5, passThreshold formula) are folded into FR-006 since they
   gate that FR's own acceptance, not a standalone quality attribute.
-- [x] IDs are unique across FR-### and C-### entries (FR-001..009, C-001..004,
+- [x] IDs are unique across FR-### and C-### entries (FR-001..009, C-001..005,
   no collisions). The Charter Compliance table's citations to the charter's
   own numbered items are displayed with a `CHTR-` prefix (CHTR-003/004/
   007/011) specifically so they never collide, in raw text, with this
