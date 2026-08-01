@@ -1,7 +1,7 @@
 {
-  "event_count": 7,
-  "last_event_id": "01KYZPCBYWQE6A616GA3WKYXYB",
-  "materialized_at": "2026-08-01T22:16:13.020870+00:00",
+  "event_count": 8,
+  "last_event_id": "01KYZQ1QCSFJX9TFZ6F7D5ERFA",
+  "materialized_at": "2026-08-01T22:27:52.857410+00:00",
   "mission_number": "",
   "mission_slug": "skill-trigger-routing-suite-01KYVRB9",
   "mission_type": "software-dev",
@@ -9,12 +9,12 @@
     "approved": 0,
     "blocked": 0,
     "canceled": 0,
-    "claimed": 0,
+    "claimed": 1,
     "done": 0,
     "for_review": 1,
     "in_progress": 0,
     "in_review": 0,
-    "planned": 3
+    "planned": 2
   },
   "work_packages": {
     "WP01": {
@@ -44,11 +44,11 @@
       }
     },
     "WP02": {
-      "actor": "finalize-tasks",
+      "actor": "claude",
       "force_count": 0,
-      "lane": "planned",
-      "last_event_id": "01KYW71FKCZZJM1GBAZSH7B1BA",
-      "last_transition_at": "2026-07-31T13:50:24.364823+00:00",
+      "lane": "claimed",
+      "last_event_id": "01KYZQ1QCSFJX9TFZ6F7D5ERFA",
+      "last_transition_at": "2026-08-01T22:27:52.857410+00:00",
       "subtasks": {
         "T009": "done",
         "T010": "done",
