@@ -363,9 +363,14 @@ before this WP's final commit.
    ```sh
    unset MUSTER_ENDPOINT MUSTER_API_KEY
    npx --offline @garrison-hq/muster@1.2.1 skills run conformance/skills/behavioral-manifest.yaml --json \
-     | node -e "const r=JSON.parse(require('fs').readFileSync(0)); process.exit(r.cases.some(c=>c.type==='behavioral' && c.skipped) ? 1 : 0)"
+     | node -e "const r=JSON.parse(require('fs').readFileSync(0)); process.exit(r.results.some(c=>c.type==='behavioral' && c.skipped) ? 1 : 0)"
    echo "exit code: $?"   # MUST be 1 -- every behavioral case skipped, proving the guard fires
    ```
+
+   (Corrected during WP04: muster's real `skills run --json` top-level shape
+   is `{ok, total, passed, failed, skipped, results}` — no top-level `cases`
+   key. The `r.cases.some(...)` form throws at runtime and coincidentally
+   still exits non-zero, passing this step's gate for the wrong reason.)
    This also incidentally proves the manifest itself parses and every
    `querySetPath`/`skillDir` resolves — a structural smoke test of T015's
    work, independent of any live endpoint.

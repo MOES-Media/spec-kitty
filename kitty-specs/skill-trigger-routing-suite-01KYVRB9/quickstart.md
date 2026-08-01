@@ -106,9 +106,15 @@ for evidence):
 ```sh
 unset MUSTER_ENDPOINT MUSTER_API_KEY
 npx --offline @garrison-hq/muster@1.2.1 skills run conformance/skills/behavioral-manifest.yaml --json \
-  | node -e "const r=JSON.parse(require('fs').readFileSync(0)); process.exit(r.cases.some(c=>c.type==='behavioral' && c.skipped) ? 1 : 0)"
+  | node -e "const r=JSON.parse(require('fs').readFileSync(0)); process.exit(r.results.some(c=>c.type==='behavioral' && c.skipped) ? 1 : 0)"
 echo "exit code: $?"   # MUST be 1 -- every behavioral case skipped, proving the guard fires
 ```
+
+(Corrected during WP04: muster's real `skills run --json` top-level shape is
+`{ok, total, passed, failed, skipped, results}` — there is no top-level
+`cases` key, per `src/cli/index.ts:1293`/`:1583` at v1.2.1. The original
+`r.cases.some(...)` throws at runtime; it happened to still exit non-zero,
+satisfying "MUST be 1" for the wrong reason.)
 
 **Configured-endpoint proof** (requires a real or test endpoint):
 
@@ -116,7 +122,7 @@ echo "exit code: $?"   # MUST be 1 -- every behavioral case skipped, proving the
 export MUSTER_ENDPOINT=<test-endpoint>
 export MUSTER_API_KEY=<from CI secret, never a literal here>
 npx --offline @garrison-hq/muster@1.2.1 skills run conformance/skills/behavioral-manifest.yaml --json \
-  | node -e "const r=JSON.parse(require('fs').readFileSync(0)); process.exit(r.cases.some(c=>c.type==='behavioral' && c.skipped) ? 1 : 0)"
+  | node -e "const r=JSON.parse(require('fs').readFileSync(0)); process.exit(r.results.some(c=>c.type==='behavioral' && c.skipped) ? 1 : 0)"
 echo "exit code: $?"   # MUST be 0 -- no behavioral case skipped
 ```
 

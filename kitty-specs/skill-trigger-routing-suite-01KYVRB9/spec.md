@@ -220,8 +220,14 @@ which today holds only the pre-existing `manifest.yaml` static suite and
   before treating a green run as evidence (see FR-005), otherwise a run with
   no credentials configured would silently pass as if it had tested routing.
 - **Verification command**:
-  `MUSTER_ENDPOINT=<test-endpoint> npx --offline @garrison-hq/muster@1.2.1 skills run conformance/skills/behavioral-manifest.yaml --json | node -e "const r=JSON.parse(require('fs').readFileSync(0)); process.exit(r.cases.some(c=>c.type==='behavioral' && c.skipped) ? 1 : 0)"`
-  exits 0 only when no behavioral case was skipped.
+  `MUSTER_ENDPOINT=<test-endpoint> npx --offline @garrison-hq/muster@1.2.1 skills run conformance/skills/behavioral-manifest.yaml --json | node -e "const r=JSON.parse(require('fs').readFileSync(0)); process.exit(r.results.some(c=>c.type==='behavioral' && c.skipped) ? 1 : 0)"`
+  exits 0 only when no behavioral case was skipped. (Corrected during WP04:
+  muster's real `skills run --json` top-level shape is
+  `{ok, total, passed, failed, skipped, results}` — there is no top-level
+  `cases` key. The original `r.cases.some(...)` throws at runtime and,
+  because a thrown Node script also exits non-zero, coincidentally still
+  satisfies "exits 1" for the unset-endpoint case — but for the wrong
+  reason, and would not distinguish a real skip from a script crash.)
 - **Falsification condition**: running the same command with `MUSTER_ENDPOINT`
   unset must make this check exit 1 (every case skipped) — construct and run
   this rejection case, not just describe it.
