@@ -50,7 +50,12 @@
       "last_event_id": "01KYW71FKCZZJM1GBAZSH7B1BA",
       "last_transition_at": "2026-07-31T13:50:24.364823+00:00",
       "subtasks": {
-        "T009": "done"
+        "T009": "done",
+        "T010": "done",
+        "T011": "done",
+        "T012": "done",
+        "T013": "done",
+        "T014": "done"
       }
     },
     "WP03": {
