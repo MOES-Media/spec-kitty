@@ -40,11 +40,20 @@
   NFRs (runs ≥ 5, passThreshold formula) are folded into FR-006 since they
   gate that FR's own acceptance, not a standalone quality attribute.
 - [x] IDs are unique across FR-### and C-### entries (FR-001..009, C-001..004,
-  no collisions).
+  no collisions). The Charter Compliance table's citations to the charter's
+  own numbered items are displayed with a `CHTR-` prefix (CHTR-003/004/
+  007/011) specifically so they never collide, in raw text, with this
+  mission's own C-003/C-004 (which name unrelated things), and never read as
+  phantom, unmapped mission constraints either (the other two charter items
+  have no defining row anywhere in this mission's own Constraints table) —
+  `finalize-tasks` scans the whole document for `FR`/`NFR`/`C`-numbered
+  tokens and cannot otherwise tell a foreign ID from one of this mission's
+  own. Verified by a whole-document regex scan: zero bare foreign FR/NFR/C
+  tokens remain outside FR-001..009/C-001..004.
 - [x] All requirement rows include a non-empty Status value (`Proposed`
   throughout — pre-implementation).
-- [x] Success criteria are measurable (SC-001..005 each name a concrete,
-  checkable condition).
+- [x] Success criteria are measurable (SC-001..006 each name a concrete,
+  checkable condition — SC-006 added during remediation, see Notes).
 - [x] Success criteria are technology-agnostic in intent, though this
   mission's own subject matter is a conformance harness over named source
   files — the same accepted trade-off as the Content Quality note above.
@@ -76,5 +85,34 @@
 - FR-004's original "verification spike" framing is resolved directly rather
   than deferred to a WP, since the underlying fact (no tool-calling in the
   `openclaw-sop` adapter) was independently confirmed during spec drafting.
-- All items pass; no spec update iterations were required beyond the initial
-  draft incorporating pre-drafting verification findings.
+- **Post-draft remediation pass** (this pass): an adversarial squad found
+  eight defects in this spec's own verification commands and acceptance
+  coverage after the initial draft passed this checklist unchanged. All
+  eight were fixed, each corrected command run for real against a
+  constructed passing fixture and its rejection case (a live local
+  OpenAI-compatible endpoint for FR-007's healthy/dead pair; synthetic
+  JSON/YAML fixtures matching the real schema for the `jq`/`yq`/`grep`
+  checks): FR-007's healthy-endpoint command was missing
+  `MUSTER_ENDPOINT`/`MUSTER_MODEL`/`MUSTER_API_KEY` (and so was
+  indistinguishable from a dead endpoint — swept into FR-002/003/004 and
+  User Scenario 2 as well, which had the same omission); FR-001..004 had no
+  gate requiring a real credentialed run before acceptance (added SC-006 and
+  the "Acceptance Gate: One Live Credentialed Run" section); C-002/FR-007
+  never required the dispatch workflow to actually invoke any manifest
+  (extended C-002, and extended FR-007's `runsErrored` gate from the
+  control-suite job only to the main-suite job as well); FR-006's `yq`
+  paths targeted fields that don't exist in the real `SOP_RULE_MANIFEST_
+  SCHEMA` (corrected to the real flat `rules[].k`/`rules[].aggregation`,
+  with a `ruleId`-prefix convention replacing the nonexistent `category`
+  field) and its `sort -u` asserted nothing (replaced with a real `yq -e`
+  assertion); FR-005's falsification predicate was an unconditional no-op
+  (replaced with a walk of `runs[].grades[].assertionKind`); FR-008's grep
+  used a GNU-only BRE alternation extension (switched to portable `grep
+  -E`, with the literal `+` in `model+context` escaped so the switch to ERE
+  doesn't turn it into a quantifier); FR-009's two-run diff could not catch
+  a no-op generator that ignores its input (added an input-sensitivity
+  check requiring output to change when input does). A ninth issue —
+  bare foreign `C-0xx` charter-citation tokens colliding with this
+  mission's own numbering in a way that would confuse `finalize-tasks`'s
+  whole-document ID scan — was found and fixed during the same pass (see
+  the "IDs are unique" item above).
