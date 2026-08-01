@@ -351,3 +351,4 @@ spec-kitty agent action implement WP01 --agent claude
 ## Activity Log
 
 - 2026-08-01T22:07:54Z – claude – T001: DIR-012 tracker check — https://github.com/MOES-Media/spec-kitty/issues/25 was unassigned at check time; assigned to MOES-Media (login resolves to Jeroen Nouws, Human-in-Charge) via gh issue edit. Confirmed via gh issue view: assignees=[MOES-Media].
+- 2026-08-01T22:09:22Z – claude – T002: ATDD RED committed at 961245751943722b92fe1d9192fe7723d155f5b1 (placeholder-queries.yaml, 1 entry/axis). Inline shape check (throwaway python3, mirrors trigger.ts:403-422 MIN_QUERIES_PER_AXIS=8 gate) exits 1 against this commit, reporting shouldTrigger=1 nearMiss=1. Verified check is not vacuous: same check against a constructed 8/8 valid fixture exits 0.

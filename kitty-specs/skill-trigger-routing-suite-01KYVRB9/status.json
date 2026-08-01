@@ -22,7 +22,11 @@
       "force_count": 0,
       "lane": "planned",
       "last_event_id": "01KYW71F5AF6MM6RTAM752Z0NA",
-      "last_transition_at": "2026-07-31T13:50:23.914606+00:00"
+      "last_transition_at": "2026-07-31T13:50:23.914606+00:00",
+      "subtasks": {
+        "T001": "done",
+        "T002": "done"
+      }
     },
     "WP02": {
       "actor": "finalize-tasks",
