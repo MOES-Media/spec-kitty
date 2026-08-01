@@ -116,3 +116,41 @@
   mission's own numbering in a way that would confuse `finalize-tasks`'s
   whole-document ID scan — was found and fixed during the same pass (see
   the "IDs are unique" item above).
+- **Post-plan remediation pass** (this pass): the plan phase (`plan.md`)
+  found seven further defects by reading the rubric doc and hand-tracing
+  muster's runtime, re-verified here directly against muster `main@8ce12906`
+  and this checkout, not merely restated: (1) FR-004 tested tool
+  authorization, which `docs/rubric/spec-kitty-behavioral-axes.md` §2.1
+  states plainly is "not decidable by any judge" — reframed to grade §2's
+  real domain-scope-containment axis, and the Dependencies section's
+  previously-silent exclusion of FR-004 made explicit and resolved; (2)
+  FR-006's blanket `passThreshold: ceil(k/2)` guidance could never legally
+  apply to a `pass-k` row (`manifest.ts:299-306`'s validator) and, if
+  `passThreshold` were omitted instead, silently degrades to majority-vote
+  grading at runtime (`runner.ts:305,566`) — corrected to a matched-pair
+  rule per aggregation tier, and the pass-k/safety-critical tier extended to
+  `CAPABILITY-CONTAINMENT-*` per the rubric doc's own Aggregation Summary
+  table. **Fixing (2) surfaced a tenth broken verification command**: the
+  plan's own proposed `yq` check for this, `(.passThreshold // .k) == .k`,
+  is a vacuous tautology that reads `true`/exit `0` even when
+  `passThreshold` is omitted entirely — verified empirically against a
+  constructed fixture before being replaced with a `has(...)`-gated form.
+  (3) added C-005 (Integration Contract excerpt), a rubric-binding
+  requirement no FR-001..004 verification cell previously checked; its
+  exemplar command as originally proposed also had two bugs (jq bracket
+  syntax for the hyphenated `avoidance-boundary` key, and a missing `-r` for
+  raw output), both caught and fixed the same way, an **eleventh** broken
+  command. (4) FR-007's script path collided with lane-a's write_scope —
+  relocated to a new lane-b-owned `conformance/behavioral/scripts/`
+  directory, and the Lanes section (which had gone stale relative to
+  `plan.md`) updated to match. (5) FR-009's generator has a demonstrated
+  (reproduced live against this checkout, not hypothetical) import-shadowing
+  risk — added the `sys.path`-prepend and direct-`AgentProfile`-construction
+  requirements to FR-009's own text. (6) C-002's `ls` file-set cross-check
+  cannot run inside either lane's own worktree — made explicit, alongside
+  the existing SC-006 live-run gate's same post-merge timing. (7) a
+  precision note on `buildSopClient`'s actual no-op-fallback gating variable
+  (`MUSTER_ENDPOINT` alone). None of the seven change an FR's stated
+  user-observable behavior. `plan.md`'s own Verification Strategy table
+  carried copies of the same two broken commands from items (2) and (3);
+  both fixed there as well during this pass.
