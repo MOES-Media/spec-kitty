@@ -8,10 +8,10 @@
       "criterion_id": "FR-001",
       "description": "Verify FR-001 is satisfied",
       "proof_type": "automated_test",
-      "evidence": "conformance/scripts/check-trigger-queryset-shape.mjs (commit 9c6980327). GREEN: node conformance/scripts/check-trigger-queryset-shape.mjs conformance/skills/trigger-queries/*.yaml exits 0 on all 14 real files (10 WP01 duplicate-pair + 3 WP02 run-family + 1 WP02 control), naming 'trigger-queryset-shape: OK (14 file(s) checked)'. RED (falsification condition per spec.md): 7-entry shouldTrigger axis constructed via yaml.safe_dump mutation of spk-run-next-duplicate-pair-queries.yaml exits 1, naming the exact file and 'shouldTrigger has 7 entries, need >= 8'; file restored, git diff --exit-code confirms no residue. Additional falsification: zero-argument invocation and empty-glob passthrough both exit 1 (not a vacuous pass on empty input, WP01-review F1 fix). This reproduces WP01/WP02's own inline shape-check results exactly against the same real files. Both the content (WP01/WP02) and the canonical verification script (WP03) now exist; FR-001 is fully discharged.",
+      "evidence": "same",
       "pass_fail": "pass",
       "verified_by": "claude",
-      "verified_at": "2026-08-01T22:48:32.234887+00:00",
+      "verified_at": "2026-08-01T23:54:10.546566+00:00",
       "notes": "TODO: replace with a real acceptance criterion"
     },
     {
