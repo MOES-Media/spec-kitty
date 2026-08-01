@@ -1,0 +1,5 @@
+id: placeholder-run-family
+source: "docs/rubric/skills-trigger-taxonomy.md"
+threshold: 0.5
+shouldTrigger: ["a","b","c","d","e","f","g","h"]
+nearMiss: ["unrelated filler 1","unrelated filler 2","unrelated filler 3","unrelated filler 4","unrelated filler 5","unrelated filler 6","unrelated filler 7","unrelated filler 8"]
