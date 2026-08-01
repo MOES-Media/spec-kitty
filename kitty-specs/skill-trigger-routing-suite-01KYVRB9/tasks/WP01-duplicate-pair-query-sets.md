@@ -347,3 +347,7 @@ self-check reports OK for all 5 pairs.
 ```sh
 spec-kitty agent action implement WP01 --agent claude
 ```
+
+## Activity Log
+
+- 2026-08-01T22:07:54Z – claude – T001: DIR-012 tracker check — https://github.com/MOES-Media/spec-kitty/issues/25 was unassigned at check time; assigned to MOES-Media (login resolves to Jeroen Nouws, Human-in-Charge) via gh issue edit. Confirmed via gh issue view: assignees=[MOES-Media].
