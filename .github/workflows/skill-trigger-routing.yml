@@ -46,6 +46,21 @@ jobs:
       - name: Verify twin-phrasing cross-references (FR-002)
         run: node conformance/scripts/check-twin-phrasing.mjs conformance/skills/trigger-queries/
 
+      # `npx --offline` (below) resolves from npm's local package cache --
+      # never the network -- and a `ubuntu-latest` runner's cache starts
+      # cold on every job (no `actions/cache`/`setup-node` `cache:` wiring
+      # populates it, and none should: caching an *installed* copy across
+      # runs would silently let a stale, unpinned muster version outlive a
+      # `package.json` bump). Verified against a genuinely empty
+      # `~/.npm/_cacache`: `npx --offline @garrison-hq/muster@1.2.1 --version`
+      # fails there with `npm error code ENOTCACHED ... cache mode is
+      # 'only-if-cached'`, exit 1 -- so this step must warm the cache first,
+      # online, every run. This mirrors this suite's own README quickstart
+      # (`npm install --no-save` before `npx --offline`), just wired into CI
+      # rather than only documented for local use.
+      - name: Warm npm cache for pinned muster CLI (C-003)
+        run: npm install --no-save @garrison-hq/muster@1.2.1
+
       # C-003: muster pinned exactly 1.2.1, never a range. This step is the
       # only one in this workflow that requires the live MUSTER_ENDPOINT/
       # MUSTER_API_KEY secrets; it always runs against a real,
