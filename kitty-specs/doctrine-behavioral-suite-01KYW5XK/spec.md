@@ -229,8 +229,8 @@ a distractor-tools capability the pinned CLI cannot provide.
 SOPRunVerdict[]`, where `SOPRunVerdict.error?: string`
 (`src/adapters/openclaw-sop/manifest.ts:156-192`, muster `main@6e0840b27`).
 There is no `SOPSuiteReport.runsErrored` field. The check this mission ships
-(a small script, `conformance/behavioral/tools/check_runs_errored.sh` or
-equivalent) must compute:
+(a small script, `conformance/behavioral/scripts/check-runs-errored.sh`) must
+compute:
 
 ```
 jq '[.verdicts[].runs[] | select(.error != null)] | length' <report.json>
@@ -247,6 +247,18 @@ dead-endpoint companion run in FR-007's Verification cell is a one-time
 falsification proof performed during spec/implementation validation, not a
 step that runs on every cadence execution (it would require the operator's
 endpoint to be intentionally killed, which is not the cadence job's job).
+
+**Path note**: an earlier draft of this elaboration named
+`conformance/behavioral/tools/check_runs_errored.sh or equivalent` —
+`conformance/behavioral/tools/**` is lane-a's exclusive write_scope (Lanes
+section below), while FR-007 is lane-b's requirement; a script living there
+would require lane-b's WP to open a path inside lane-a's own write_scope,
+violating this mission's own "no WP in either lane opens a file under the
+other lane's write_scope" rule (Lanes section, below). Relocated to a new,
+lane-b-owned `conformance/behavioral/scripts/` directory (reflected in the
+Lanes section below) — the script's filename is also normalized to
+`check-runs-errored.sh` (hyphen, matching this mission's other new
+filenames) rather than the underscore form from the earlier draft.
 
 **The same `runsErrored` computation is required on the main-suite job too,
 not only control-suite.** As originally drafted this elaboration and the
@@ -589,13 +601,18 @@ this mission's creation.
 
 ## Lanes & Work Packages (outline — full detail at `/spec-kitty.tasks`)
 
-Two lanes, mirroring the source issue's split (unchanged — verified disjoint
-against this mission's own FR set, no collision found):
+Two lanes, mirroring the source issue's split, verified disjoint against
+this mission's own FR set (one path collision was found and fixed — FR-007's
+`check-runs-errored.sh`, see the Path note in "FR-007 elaboration" above and
+lane-b's `scripts/**` entry below):
 
 - **lane-a** — `conformance/behavioral/profiles/**`, `conformance/behavioral/tools/**`,
   `conformance/behavioral/projected/**`, `conformance/behavioral/README.md`.
   Covers FR-001..004, FR-006, FR-008, FR-009.
 - **lane-b** — `conformance/doctrine/**` (edits only, no new files), `conformance/behavioral/control-manifest.yaml`,
+  `conformance/behavioral/scripts/**` (FR-007's `check-runs-errored.sh` —
+  relocated off lane-a's `tools/**`, see the FR-007 elaboration's Path note
+  above),
   `conformance/behavioral/evidence/**`, `.github/workflows/behavioral.yml`.
   Covers FR-005, FR-007, C-001, C-002.
 
