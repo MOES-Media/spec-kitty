@@ -520,14 +520,32 @@ README prose.
 — spec-kitty `main@e745ac537`). The binding `C-0xx` items exist only as prose
 in `charter.md` and were hand-enumerated for this audit (walking
 `charter.yaml` alone would miss all four, reproducing a prior sibling
-mission's omission):
+mission's omission).
 
-| ID | Location | Binding statement | Relevance to this mission |
+**Displayed below with a `CHTR-` prefix, never the charter's own bare
+numbering.** `finalize-tasks` matches every `FR`/`NFR`/`C` numbered-ID token
+across the whole spec document and cannot tell a foreign requirement or
+constraint ID from one of this mission's own; a document-wide automated
+scan of the raw text below confirms zero bare foreign tokens remain outside
+this mission's own FR-001..009/C-001..004 definitions. Two of the four
+charter items below would, under the charter's own bare numbering, collide
+outright with two of this mission's own, unrelated, same-numbered
+Constraints-table entries above; the other two would have no defining row
+in this mission's own Constraints table at all and would read as phantom,
+unmapped mission constraints at tasks-finalize time — the same class of
+false positive a sibling mission hit when a dependency's own numbered
+identifier leaked into mission prose unrewritten. The `CHTR-` prefix is
+purely this document's own disambiguation; it renames nothing in
+`charter.md` itself. The `Location` column below (a file path and line
+number, not a repeated ID) is the authoritative citation back to the real
+charter item.
+
+| ID (this doc only) | Location | Binding statement | Relevance to this mission |
 |---|---|---|---|
-| C-003 | `charter.md:469` | Mission B dual-read: legacy + new homes listed together | Not directly applicable — no dual-read migration in this mission. |
-| C-004 | `charter.md:481` | Burn-down policy (HiC §5a.2) | Not directly applicable — no burn-down ratchet introduced. |
-| C-007 | `charter.md:494` | `__all__` declaration convention | Not directly applicable — this mission ships YAML manifests and a Python generator script, no new Python public-API module requiring `__all__`. |
-| **C-011** | `charter.md:504` | **ATDD-first discipline — binding, outranks every `DIR-0xx` (all `severity: warn`)** | **Directly applicable and load-bearing.** Every FR/C above is written with its acceptance verification command and falsification condition stated before any implementation exists (this spec itself is the acceptance criteria, authored outside-in) — this is the charter's own ATDD-first requirement applied to this mission's own authoring process, not merely referenced. |
+| CHTR-003 | `charter.md:469` | Mission B dual-read: legacy + new homes listed together | Not directly applicable — no dual-read migration in this mission. |
+| CHTR-004 | `charter.md:481` | Burn-down policy (HiC §5a.2) | Not directly applicable — no burn-down ratchet introduced. |
+| CHTR-007 | `charter.md:494` | `__all__` declaration convention | Not directly applicable — this mission ships YAML manifests and a Python generator script, no new Python public-API module requiring `__all__`. |
+| **CHTR-011** | `charter.md:504` | **ATDD-first discipline — binding, outranks every `DIR-0xx` (all `severity: warn`)** | **Directly applicable and load-bearing.** Every FR/C above is written with its acceptance verification command and falsification condition stated before any implementation exists (this spec itself is the acceptance criteria, authored outside-in) — this is the charter's own ATDD-first requirement applied to this mission's own authoring process, not merely referenced. |
 
 DIR-012 (assign tracker issue to HiC before/at start of work on a
 tracker-backed issue) was applied during this spec's authoring: issue
