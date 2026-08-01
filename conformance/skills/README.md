@@ -192,9 +192,57 @@ indexed here by full URL:
   threshold: `spk-doctrine-profile-load` (0.625), `spec-kitty-runtime-next`
   (0.625), `spk-run-next` (0.625), `spec-kitty-runtime-review` (0.542),
   `spk-run-review-wp` (0.500), `spk-run-implement-review` (0.625),
-  `spec-kitty-git-workflow` (0.625), and `spk-admin-git-workflow` (0.625) —
-  real confusion between legacy and `spk-*` naming on all 5 of the 5
-  duplicate pairs (some pairs show one-sided confusion, others show it in
-  both directions). The three-member run-family cluster itself (siblings
-  distinguishing themselves from each other, not from a legacy twin) showed
-  no cross-contamination in this run.
+  `spec-kitty-git-workflow` (0.625), and `spk-admin-git-workflow` (0.625).
+  This 8-of-13 finding is real (the same run's rigged-impossible control
+  shows `passed: false, runsErrored: 0` — the grader is discriminating
+  correctly) and is the first substantive thing this suite's checks have
+  said about their subject. The three-member run-family cluster itself
+  (siblings distinguishing themselves from each other, not from a legacy
+  twin) showed a lower near-miss rate in this run (`spk-run-next-run-family`
+  0.375, `spk-run-review-wp-run-family` 0.250,
+  `spk-run-implement-review-run-family` 0.250, none over threshold).
+
+  **What the data does not support**: attributing this split to legacy-vs-
+  `spk-*` **naming** overstates what a single-tool grading run (see
+  `[LIMITATION]` above) can separate from two confounds. First,
+  `0.625 = 15/24`, and only **one** of `spk-run-next`'s eight near-miss
+  queries is its borrowed twin phrase (`"run the next step"`,
+  `spk-run-next-duplicate-pair-queries.yaml`) — its maximum possible
+  contribution is `3/24 = 0.125`; at least `12/24` of the observed rate
+  comes from the other seven, unrelated filler near-miss queries. Under
+  this suite's own documented single-tool bias, a model given one
+  action-shaped tool and an action-shaped filler query will tend to call
+  it regardless of naming. Second, `spk-run-next` appears twice against the
+  same tool with different near-miss sets and different rates —
+  duplicate-pair `0.625` vs. run-family `0.375` — and that split tracks
+  **query genre** (the duplicate-pair set's near-miss queries are
+  imperative workflow actions; the run-family set's are mostly explanatory
+  questions), not pair membership. The run-family cluster's lower rate is
+  therefore weaker evidence of "no naming confusion among siblings" than it
+  looks: it may just be asking gentler questions.
+
+  **A genuinely contaminated fixture**:
+  `spk-admin-git-workflow-duplicate-pair-queries.yaml:23` uses `"git
+  workflow"` as its twin-borrowed near-miss phrase (correctly borrowed,
+  per the `[CONVENTION]` above, from `spec-kitty-git-workflow`'s own
+  `shouldTrigger` set) — but `"git workflow"` is also a verbatim substring
+  of `spk-admin-git-workflow`'s **own** tool description (`"Operate Spec
+  Kitty git workflows, worktrees, safe commits, merge preflights, stale
+  state checks, and recovery."`). A query drawn from the target tool's own
+  description cannot discriminate anything; this probe should be fixed or
+  excluded, not read as evidence. The finding survives its removal:
+  crediting it with the most generous plausible outcome (all 3 of its runs
+  triggered) and recomputing over the remaining 7 near-miss queries still
+  gives `spk-admin-git-workflow` a `(15-3)/(24-3) = 12/21 = 0.571` near-miss
+  rate — still over the `0.5` threshold.
+
+  **The claim the data does support, and that is falsifiable**: in both of
+  this run's one-sided pairs, the side that passed is the verbose legacy
+  skill carrying an explicit `Does NOT handle:` clause in its description,
+  and the side that failed is the terse `spk-*` twin without one —
+  `ad-hoc-profile-load` (0.208, pass) vs. `spk-doctrine-profile-load`
+  (0.625, fail); `spec-kitty-implement-review` (0.250, pass) vs.
+  `spk-run-implement-review` (0.625, fail). This is bounded by the same
+  `[LIMITATION]` above (a real multi-tool routing decision might score
+  differently), but it is a specific, checkable claim about description
+  content that the naming attribution was not.
