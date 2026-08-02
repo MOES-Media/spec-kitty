@@ -161,6 +161,20 @@ jobs:
 
           errored="$(conformance/behavioral/scripts/check-runs-errored.sh "${report}")"
 
+          # F2 fix: write runs_errored immediately after computing it, before
+          # any exit path below. The previous placement (only on the final
+          # success path) meant both the muster_exit!=1 branch and the
+          # errored>0 branch exited 1 without ever setting this output --
+          # GitHub Actions reads an unset step output as '', and this job's
+          # evidence step does `${{ steps.control_suite.outputs.runs_errored
+          # || 0 }}`, so a dead-endpoint run (muster_exit==1, errored==6)
+          # fell through the errored>0 branch below, exited 1 with
+          # runs_errored never written, and the evidence artifact recorded
+          # the placeholder `runsErrored: 0` -- indistinguishable from a
+          # genuinely clean control run, in exactly the case FR-007 exists
+          # to make distinguishable.
+          echo "runs_errored=${errored}" >> "${GITHUB_OUTPUT}"
+
           echo "control-suite: muster exit=${muster_exit} runsErrored=${errored}"
 
           # FR-007: never treat the control suite's own exit 1 as a build
@@ -182,7 +196,6 @@ jobs:
 
           echo "control-suite: both controls failed as designed with zero errored runs -- genuine discrimination confirmed"
           echo "report_file=${report}" >> "${GITHUB_OUTPUT}"
-          echo "runs_errored=${errored}" >> "${GITHUB_OUTPUT}"
           exit 0
 
       - name: Write evidence artifact (control-suite)
