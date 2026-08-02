@@ -1,0 +1,22 @@
+name: Behavioral Conformance Cadence
+
+# RED (T011, CHTR-011): workflow_dispatch-only trigger is correct, but the
+# job bodies below are echo-only placeholders. C-002 explicitly calls this
+# shape out as insufficient -- "satisfies the trigger constraint's letter
+# while doing nothing" -- and this commit is deliberately that shape, so the
+# GREEN commit's diff makes the gap visible. Replaced by real muster sop run
+# invocations against every profiles/*.yaml and doctrine/*.yaml manifest
+# (main-suite) and control-manifest.yaml (control-suite).
+on:
+  workflow_dispatch: {}
+
+jobs:
+  main-suite:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "main-suite placeholder -- invokes no manifest yet"
+
+  control-suite:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "control-suite placeholder -- invokes no manifest yet"
