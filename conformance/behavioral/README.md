@@ -187,6 +187,53 @@ exit `1`, never exit `0` and never exit `2`, for a dead or unset endpoint.
 | `1` | At least one lint error, or at least one probe case failed (includes: a genuinely non-compliant model; a dead/unset `MUSTER_ENDPOINT`; a weak model). |
 | `2` | The manifest file itself could not be read or was structurally invalid — never an endpoint condition. |
 
+## Verifying `rubricText`
+
+Every `rubricText` field in `conformance/behavioral/profiles/*.yaml` must be
+byte-identical to the corresponding `<RUBRIC>...</RUBRIC>` block's body in
+muster's `docs/rubric/spec-kitty-behavioral-axes.md` (§1 avoidance-boundary,
+§2 domain-scope containment, §3 handoff discipline, §4 canonical-verb usage,
+in that document order) — `judge.ts:62-67` injects `rubricText` verbatim
+between fresh `<RUBRIC>` tags at grading time, so the manifest's copy must
+carry only the tag body, never the tags themselves.
+
+**Use the committed extractor, not a hand-rolled `awk` one-liner.**
+`conformance/behavioral/tools/extract-rubric-section.sh <n> <muster-checkout>`
+extracts the Nth block's body by anchoring on the tag appearing *alone on
+its own line* (`^<RUBRIC>$` / `^</RUBRIC>$`). A naive substring-counting
+form (`awk '/<RUBRIC>/{c++} ...'`, matching the bare substring anywhere on
+a line) over-counts: the rubric doc's own Introduction and Integration
+Contract prose mentions the literal substring `<RUBRIC>` **nine** times
+before the four real fenced blocks even start (each occurrence embedded
+mid-sentence, e.g. "...between `<RUBRIC>` tags..."), so counting
+*occurrences of the substring* lands inside prose, not inside the Nth real
+block, for every `n`. That broken form only ever existed in prose (a task
+file's Validation section, a commit message) — never as a committed,
+runnable artifact — until this script.
+
+`conformance/behavioral/tools/verify-rubric-text.sh <n> <rule-id-prefix>
+<profile-manifest> <muster-checkout>` wraps the extractor with the
+manifest-side `yq` extraction and diffs the two, **with a non-emptiness
+guard (`test -s`) on both sides before diffing** — without that guard, an
+out-of-range `n` or a non-matching `rule-id-prefix` can each independently
+produce zero bytes, and `diff` on two empty files exits `0`, reporting a
+vacuous "match" that verified nothing:
+
+```bash
+conformance/behavioral/tools/verify-rubric-text.sh \
+  2 CAPABILITY-CONTAINMENT \
+  conformance/behavioral/profiles/architect-alphonso.yaml \
+  <muster-checkout>
+```
+
+Exits `0` and prints nothing on a byte-identical match; exits non-zero
+(printing the diff, or a diagnostic for a missing/empty side) otherwise.
+Repeat for `n` in `1..4` against `AVOIDANCE-BOUNDARY`,
+`CAPABILITY-CONTAINMENT`, `HANDOFF-DISCIPLINE`, `CANONICAL-VERBS`
+respectively, and for each of the five profile manifests — this is exactly
+how all 20 `rubricText` fields in this suite were verified byte-identical
+to muster's rubric doc.
+
 ## `sopFileHash` / content-hash citation
 
 Every manifest under `conformance/behavioral/profiles/*.yaml` carries a
