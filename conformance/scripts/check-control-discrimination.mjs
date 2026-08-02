@@ -40,6 +40,30 @@
 // healthy-mode proof -- this is the exact bug this script exists to
 // prevent (data-model.md "Trigger Verdict").
 //
+// SECOND vacuity, on the opposite side of the same conjunction: `passed:
+// false` with `runsErrored: 0` is ALSO what a PERMANENTLY-TRIGGERING
+// model+prompt combination produces -- the precise failure mode FR-004's
+// control was written to catch ("a permanently-triggering model+prompt
+// combination would look like a healthy suite", MOES-Media/spec-kitty#25
+// section 8). `TriggerVerdict.passed` is the conjunction of two axes whose
+// predicates run in OPPOSITE directions over the same rate (trigger.ts:242-250
+// and :468, same SHA): should-trigger needs `rate >= threshold`, near-miss
+// needs `rate < threshold`. A model that calls the single offered tool
+// (`runBehavioralSkillCase` builds exactly one) on every query therefore
+// drives should-trigger to rate 1.0 (axis PASSES) and near-miss to rate 1.0
+// (axis FAILS), and the conjunction is again `passed: false, runsErrored: 0`
+// -- indistinguishable from a healthy run through those two fields alone.
+// gpt-4o-mini is measurably prone to exactly this bias: the live run behind
+// this suite's committed evidence artifact scored should-trigger 1.000 on
+// all 13 real cases (conformance/skills/README.md, "[LIMITATION]"). So this
+// script additionally requires `nearMissAxis.passed === true` -- the model
+// declined the rigged tool on the near-miss axis, which is what "the grader
+// discriminates" actually means. Combined with `passed !== true`, that
+// implies `shouldTriggerAxis.passed === false`, so the pair of axis facts is
+// fully pinned. The condition holds in BOTH modes: a dead endpoint drives
+// every run to error, so near-miss rate is 0 and its axis passes there too.
+// The real healthy control measured should-trigger 0.083 / near-miss 0.000.
+//
 // Scope note this script's own README/handoff text must not overstate:
 // `runBehavioralSkillCase` (src/cli/index.ts:1414-1465) builds exactly ONE
 // tool per case -- the target skill only (a fixed-length-1 array literal,
@@ -65,7 +89,8 @@
 //   observed shape does not match the given mode's expectation -- naming
 //   which condition failed (this is the FR-004 both-condition sequencing
 //   itself: cross-wiring the mode against the wrong condition's data must
-//   land here, never exit 0).
+//   land here, never exit 0). A permanently-triggering control
+//   (nearMissAxis.passed:false) lands here in EITHER mode.
 // Exit 2: the script could not run its check at all -- missing/invalid CLI
 //   arguments (including an omitted --mode: NEVER a silent default to
 //   either mode), an unreadable/unparseable report file, zero or more than
@@ -155,10 +180,29 @@ function computeRunsErrored(controlCase) {
   return shouldTriggerErrored + nearMissErrored;
 }
 
+/** Formats a rate the way muster's own run summary does (trigger.ts:477). */
+function rate(value) {
+  return typeof value === "number" ? value.toFixed(3) : String(value);
+}
+
 /** Applies the --mode healthy|dead-endpoint assertion. Returns an error string, or null if satisfied. */
 function checkMode(mode, controlCase, runsErrored) {
   if (controlCase.passed === true) {
     return "passed=true -- the model unexpectedly invoked the rigged tool";
+  }
+  const nearMiss = controlCase.nearMissAxis;
+  if (nearMiss.passed !== true) {
+    return (
+      `nearMissAxis.passed=${nearMiss.passed}, expected true ` +
+      `(observed near-miss triggerRate ${rate(nearMiss.triggerRate)} against threshold ` +
+      `${rate(nearMiss.threshold)}, which that axis passes only when strictly below; ` +
+      `should-trigger triggerRate ${rate(controlCase.shouldTriggerAxis.triggerRate)}, ` +
+      `runsErrored=${runsErrored}) -- the control's passed=false here comes from the ` +
+      `model invoking the rigged tool too OFTEN, not from it declining to; a ` +
+      `permanently-triggering model+prompt combination produces exactly this ` +
+      `passed=false, runsErrored=0 shape and is not discrimination proof ` +
+      `(MOES-Media/spec-kitty#25 section 8)`
+    );
   }
   if (mode === "healthy" && runsErrored !== 0) {
     return `runsErrored=${runsErrored}, expected 0 -- endpoint may be unhealthy`;
@@ -195,7 +239,9 @@ function main() {
 
   console.log(
     `control-discrimination (--mode ${mode}): OK (case '${controlCase.id}', ` +
-      `passed=${controlCase.passed}, runsErrored=${runsErrored})`,
+      `passed=${controlCase.passed}, runsErrored=${runsErrored}, ` +
+      `shouldTriggerRate=${rate(controlCase.shouldTriggerAxis.triggerRate)}, ` +
+      `nearMissRate=${rate(controlCase.nearMissAxis.triggerRate)} (axis passed))`,
   );
   process.exit(0);
 }

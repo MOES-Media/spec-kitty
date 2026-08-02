@@ -178,6 +178,45 @@ the same way D-1's rubric addendum is tracked: as a dependency note for a
 future mission, not this mission's own diff (no code under `src/core/` or
 `src/adapters/` is touched here, per this mission's own scope guard).
 
+### The same bias would have defeated the discrimination control
+
+The bias above is not confined to the 13 real cases. Left unchecked it also
+neuters FR-004's rigged-impossible control, which is the one check whose
+whole job is to notice it (MOES-Media/spec-kitty#25, section 8: "a
+permanently-triggering model+prompt combination would look like a healthy
+suite").
+
+muster computes a case verdict as the conjunction of two axes,
+`passed = shouldTriggerAxis.passed && nearMissAxis.passed`
+(`src/adapters/skills/trigger.ts:468`, same `16f0d34c` / `v1.2.1` pin), and
+the two axes run opposite predicates over the same rate (`:242-250`):
+should-trigger passes at `rate >= threshold`, near-miss passes at
+`rate < threshold`. A model that calls the single offered tool on every
+query therefore scores should-trigger `1.000` (that axis **passes**) and
+near-miss `1.000` (that axis **fails**), and the conjunction is
+`passed: false` with `runsErrored: 0`. That is byte for byte the shape a
+healthy, well-discriminating run produces. Read through `passed` and
+`runsErrored` alone, the control reports success in exactly the scenario it
+was written to catch, and `gpt-4o-mini` is demonstrably capable of
+producing it: it scored should-trigger `1.000` on all 13 real cases in the
+run recorded below.
+
+What closes the hole is the **near-miss axis verdict**.
+`check-control-discrimination.mjs` additionally requires
+`nearMissAxis.passed === true` on the control case, in both `--mode healthy`
+and `--mode dead-endpoint`. The real healthy control measured should-trigger
+`0.083` and near-miss `0.000`
+(`conformance/skills/trigger-evidence/2026-08-01T23-16-10.435Z.json`), so it
+satisfies the stronger condition comfortably; a permanently-triggering run
+at near-miss `1.000` does not, and now exits 1 naming the observed rates.
+Because `passed !== true` and `nearMissAxis.passed === true` together imply
+`shouldTriggerAxis.passed === false`, both axis verdicts are pinned rather
+than just their conjunction. A dead endpoint errors every run, which leaves
+the near-miss rate at `0.000` and that axis passing, so the added condition
+costs the `--mode dead-endpoint` half of FR-004's proof nothing.
+`tests/cross_cutting/test_check_control_discrimination.py` pins all of this
+against a real live capture of the raw report plus mutations of it.
+
 ## Findings
 
 Duplicate-pair/run-family cases whose near-miss axis trigger rate meets or
@@ -194,9 +233,14 @@ indexed here by full URL:
   `spk-run-review-wp` (0.500), `spk-run-implement-review` (0.625),
   `spec-kitty-git-workflow` (0.625), and `spk-admin-git-workflow` (0.625).
   This 8-of-13 finding is real (the same run's rigged-impossible control
-  shows `passed: false, runsErrored: 0` — the grader is discriminating
-  correctly) and is the first substantive thing this suite's checks have
-  said about their subject. The three-member run-family cluster itself
+  shows `passed: false, runsErrored: 0` at should-trigger `0.083` and
+  near-miss `0.000`, so the grader is discriminating correctly) and is the
+  first substantive thing this suite's checks have said about their subject.
+  The two axis rates are load-bearing in that parenthesis, not decoration:
+  `passed: false, runsErrored: 0` on its own is also what a
+  permanently-triggering model produces, which is why the control check
+  reads the near-miss axis verdict as well (see the `[LIMITATION]` section
+  above). The three-member run-family cluster itself
   (siblings distinguishing themselves from each other, not from a legacy
   twin) showed a lower near-miss rate in this run (`spk-run-next-run-family`
   0.375, `spk-run-review-wp-run-family` 0.250,

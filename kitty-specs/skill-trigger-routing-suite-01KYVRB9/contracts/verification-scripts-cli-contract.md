@@ -111,12 +111,34 @@ node conformance/scripts/check-control-discrimination.mjs <report.json> --mode d
      discrimination-control finding.
   2. Compute `runsErrored(case)` per the derived-sum formula in
      `data-model.md` (Trigger Verdict section).
-  3. `--mode healthy`: exit `0` iff `case.passed === false` **and**
-     `runsErrored(case) === 0`; otherwise exit `1` naming which condition
-     failed (e.g. `runsErrored=12, expected 0 -- endpoint may be unhealthy`
-     or `passed=true -- the model unexpectedly invoked the rigged tool`).
-  4. `--mode dead-endpoint`: exit `0` iff `case.passed === false` **and**
-     `runsErrored(case) > 0`; otherwise exit `1` (e.g.
+  3. **Both modes**: exit `1` unless `case.passed === false` **and**
+     `case.nearMissAxis.passed === true`. The second half is not
+     redundant with the first. muster computes
+     `passed = shouldTriggerAxis.passed && nearMissAxis.passed`
+     (`src/adapters/skills/trigger.ts:468`, commit `16f0d34c` / `v1.2.1`)
+     over two axes with opposite predicates on the same rate (`:242-250`),
+     so a model that calls the single offered tool on every query scores
+     should-trigger `1.000` (axis passes) and near-miss `1.000` (axis
+     fails) and yields `passed: false, runsErrored: 0` — the same shape a
+     healthy discriminating run produces. Reading `passed` and
+     `runsErrored` alone therefore accepts the exact scenario FR-004's
+     control exists to catch (MOES-Media/spec-kitty#25 §8, "a
+     permanently-triggering model+prompt combination would look like a
+     healthy suite"). Requiring the near-miss axis verdict, combined with
+     `passed !== true`, pins both axis facts: it also implies
+     `shouldTriggerAxis.passed === false`. A dead endpoint errors every
+     run, leaving near-miss at rate `0` and that axis passing, so this
+     condition is mode-independent and costs the dead-endpoint proof
+     nothing. The real healthy control measured should-trigger `0.083` /
+     near-miss `0.000`.
+  4. `--mode healthy`: additionally requires `runsErrored(case) === 0`;
+     otherwise exit `1` naming which condition failed (e.g.
+     `runsErrored=12, expected 0 -- endpoint may be unhealthy`, or
+     `passed=true -- the model unexpectedly invoked the rigged tool`, or
+     `nearMissAxis.passed=false, expected true (observed near-miss
+     triggerRate 1.000 ...)`).
+  5. `--mode dead-endpoint`: additionally requires `runsErrored(case) > 0`;
+     otherwise exit `1` (e.g.
      `runsErrored=0 -- endpoint did not actually fail, this is not a valid
      dead-endpoint proof run`).
 - **Rejection cases** (both directions, this is the FR-004 both-condition
@@ -133,6 +155,18 @@ node conformance/scripts/check-control-discrimination.mjs <report.json> --mode d
      silently default to either mode (an unflagged default is exactly the
      kind of ambiguity `[ ]`-with-empty-operand and ungated `grep`
      one-liners have produced elsewhere in this programme).
+  4. Run either mode against a report whose control case is
+     permanently-triggering (both axes at rate `1.000`, hence
+     `passed: false, runsErrored: 0`, `nearMissAxis.passed: false`) → must
+     exit `1`. This is the rejection case that distinguishes "the grader
+     discriminates" from "the model calls everything"; without it the
+     control reports success in precisely the situation it was written to
+     detect. Pinned by
+     `tests/cross_cutting/test_check_control_discrimination.py`, which
+     mutates a genuine live raw report
+     (`tests/fixtures/skill_trigger_routing/report-healthy-live.json`)
+     rather than hand-building a fixture in the shape the check happens to
+     look for.
 
 ## Exit-code reservation across all four scripts
 
