@@ -34,8 +34,9 @@ scenario appended to each of three of M3's already-shipped
 `conformance/doctrine/*.yaml` directive manifests; and a
 `workflow_dispatch`-only cadence workflow that runs `muster sop run` against
 all of the above and commits a structured evidence artifact. No new runtime:
-`muster sop run` (`@garrison-hq/muster@1.2.1`, exact pin) is the entire
-grading engine, consumed as an external, published CLI.
+`muster sop run` (`@garrison-hq/muster@1.2.2`, exact pin — corrected from an
+earlier `@1.2.1` pin; see "muster pin correction" in Technical Context below)
+is the entire grading engine, consumed as an external, published CLI.
 
 This plan corrects three points where the spec's design does not survive
 direct contact with muster's actual rubric document and runtime, beyond what
@@ -59,9 +60,18 @@ projected profile bodies. No `.py` file under `src/` is touched — this
 mission's only Python is a standalone `conformance/` script that *imports*
 `specify_cli`/`doctrine`/`charter` (this repository's own installed
 packages) rather than modifying them.
-**Primary Dependencies**: `@garrison-hq/muster@1.2.1` (external, published
-npm CLI, exact pin — confirmed against muster's own source tree at
-`main@8ce12906`, read-only). This repository's own `spec-kitty-cli` package
+**Primary Dependencies**: `@garrison-hq/muster@1.2.2` (external, published
+npm CLI, exact pin — **muster pin correction**: an earlier draft of this
+plan and of spec.md pinned `@1.2.1`, which is stale and actively harmful:
+`db80a4295` ("fix(openclaw-sop): stop applying the k-run passThreshold to a
+single run's judge vote", `garrison-hq/muster#89`, closing
+`garrison-hq/muster#88`) is not an ancestor of `v1.2.1` but is an ancestor of
+`v1.2.2` (confirmed via `git merge-base --is-ancestor db80a4295 v1.2.2`);
+`1.2.1` reintroduces the exact defect this plan's own Findings/Dependencies
+text documents — every judge-graded rule with a resolved threshold `≥ 2` was
+permanently unpassable. Always specify `@1.2.2` in every command this
+mission's manifests, README, or workflow reference; confirmed against
+muster's own source tree at `main@8ce12906`, read-only). This repository's own `spec-kitty-cli` package
 (editable-installed, confirmed via `pip show` → `spec-kitty-cli 3.2.5`),
 specifically `charter.profiles.AgentProfile` and
 `specify_cli.tool_surface.profiles.renderers.ClaudeCodeProfileRenderer` —
@@ -201,7 +211,7 @@ conformance/behavioral/profiles/<id>.yaml   (FR-001..004/006 — 4 rules per pro
         │  promptTemplate embeds the verbatim profile-field excerpt the
         │  rubric's Integration Contract requires — see Finding 3)
         │  MUSTER_ENDPOINT=... MUSTER_MODEL=... MUSTER_API_KEY=... \
-        │      npx @garrison-hq/muster@1.2.1 sop run <manifest> --json
+        │      npx @garrison-hq/muster@1.2.2 sop run <manifest> --json
         ▼
 doSopRun → buildSopClient()|SOP_NOOP_CLIENT → runSopManifestSuite
         │  runComplianceProbeEntry × k runs per rule, each try/caught
@@ -243,7 +253,7 @@ shape) this spec's own remediation pass found and fixed five times.
 | FR-003 | Canonical-verb judge rule (k-of-n) | Same, filtered to `CANONICAL-VERBS-*` | `passed: true`, `passCount ≥ 3` of 5 | Mock fixture: every reply uses generic verbs, zero canonical-verb overlap → `passed: false` |
 | FR-004 | Domain-scope/capability-containment judge rule — **rubricText and scenario design corrected, see Finding 1** | Same, filtered to `CAPABILITY-CONTAINMENT-*` | `passed: true` for a reply that declines/redirects and whose declined action's *subject matter* stays outside the profile's declared `capabilities` domains | Mock fixture: reply narrates performing the disallowed action → `passed: false` |
 | FR-005 | Directive manifests carry ≥1 judge verdict | `muster sop run conformance/doctrine/010-specification-fidelity-requirement.yaml --json` | exit `0`/`1` (model-conditional) with ≥1 `assertionKind: "judge"` verdict | `jq -e '[.verdicts[].runs[].grades[] \| select(.assertionKind == "judge")] \| length > 0'` against a static-only fixture report → exit `1` (spec.md's own corrected predicate, re-verified here) |
-| FR-006 | `k ≥ 5`; pass^k rows (`AVOIDANCE-BOUNDARY-*`, **and `CAPABILITY-CONTAINMENT-*` — Finding 2a**) set `aggregation: pass-k` **and `passThreshold` equal to `k`** (Finding 2b); k-of-n rows set `passThreshold: ceil(k/2)` | `yq -e '[.rules[] \| select(.ruleId \| test("^(AVOIDANCE-BOUNDARY\|CAPABILITY-CONTAINMENT)")) \| has("passThreshold") and (.passThreshold == .k)] \| all' conformance/behavioral/profiles/architect-alphonso.yaml` (deliberately `has(...)`-gated, not `(.passThreshold // .k) == .k` — that defaulted form is a vacuous tautology that reads `true` even when `passThreshold` is missing entirely, verified empirically against a fixture with `CAPABILITY-CONTAINMENT-*`'s `passThreshold` omitted: the naive form returned `true`/exit `0`, a false pass on exactly the omission this check exists to catch, before being replaced) | `true`, exit `0` | Fixture with `aggregation: pass-k, k: 5, passThreshold: 3` → manifest load throws (`manifest.ts:299-306`'s own validator); implementers must still write `passThreshold: <k>` explicitly in every committed manifest — never rely on omission, because `runner.ts:305,566`'s *runtime* default is `ceil(k/2)`, not `k`, regardless of `aggregation`, and this `yq` check only audits the committed YAML, not the runtime path. Verified for real: the `has(...)`-gated command returns `false`/exit `1` against both the explicit-wrong-value fixture and the omitted-field fixture, and `true`/exit `0` against a fully-compliant fixture. |
+| FR-006 | `k ≥ 5`; pass^k rows (`AVOIDANCE-BOUNDARY-*`, **and `CAPABILITY-CONTAINMENT-*` — Finding 2a**) set `aggregation: pass-k` **and `passThreshold` equal to `k`** (Finding 2b); k-of-n rows set `passThreshold: ceil(k/2)` | `yq -e '[.rules[] \| select(.ruleId \| test("^(AVOIDANCE-BOUNDARY\|CAPABILITY-CONTAINMENT)")) \| has("passThreshold") and (.passThreshold == .k)] \| all' conformance/behavioral/profiles/architect-alphonso.yaml` (deliberately `has(...)`-gated, not `(.passThreshold // .k) == .k` — that defaulted form is a vacuous tautology that reads `true` even when `passThreshold` is missing entirely, verified empirically against a fixture with `CAPABILITY-CONTAINMENT-*`'s `passThreshold` omitted: the naive form returned `true`/exit `0`, a false pass on exactly the omission this check exists to catch, before being replaced) | `true`, exit `0` | Fixture with `aggregation: pass-k, k: 5, passThreshold: 3` → manifest load throws (`manifest.ts:299-306`'s own validator); implementers must still write `passThreshold: <k>` explicitly in every committed manifest for manifest hygiene and validator self-consistency — `runner.ts:566`'s *runtime* default is `ceil(k/2)`, computed regardless of `aggregation`, but only actually consumed by the k-of-n branch (`aggregateKofN`); the pass-k branch's `aggregatePassK` takes no threshold argument at `@garrison-hq/muster@1.2.2`, so omission is not runtime-load-bearing on these pass-k rows specifically (it is on the k-of-n rows below). This `yq` check only audits the committed YAML, not the runtime path, either way. Verified for real: the `has(...)`-gated command returns `false`/exit `1` against both the explicit-wrong-value fixture and the omitted-field fixture, and `true`/exit `0` against a fully-compliant fixture. |
 | FR-007 | Both grader classes fail under two distinguishable conditions | Healthy: `MUSTER_ENDPOINT=<ep> MUSTER_MODEL=<m> MUSTER_API_KEY=<k> muster sop run conformance/behavioral/control-manifest.yaml --json > /tmp/h.json; echo $?` then `conformance/behavioral/scripts/check-runs-errored.sh /tmp/h.json` | exit `1` (both controls fail), `runsErrored == 0` | Dead endpoint (`MUSTER_ENDPOINT=http://127.0.0.1:9/v1`, same manifest) → exit `1` again (same!), but `runsErrored > 0`; cross-wiring the two reports through the wrong expectation must itself be shown failing during implementation validation |
 | FR-008 | README carries endpoint matrix, env-var table, trivial-refusal semantics, model+context caveat | `test -f conformance/behavioral/README.md && command grep -Eq "MUSTER_ENDPOINT" ... && command grep -Eq "trivial.refusal\|TRIVIAL_REFUSAL" ... && command grep -Eqi "model.*not.*harness\|model\+context" ...` (portable `grep -E`, per spec.md's own corrected form) | exit `0` | Pre-mission tree (file absent) → exit `1`; unescaped `model+context` literal against a fixture containing only that phrase → exit `1` (proves the escape is load-bearing) |
 | FR-009 | Determinism + **input-sensitivity** (Finding 5 governs *how*, not *whether*, this passes) | `render_profile.py <architect.yaml> > a.md; render_profile.py <architect.yaml> > b.md; diff a.md b.md` (exit `0`) **and** `render_profile.py <architect.yaml> > a.md; render_profile.py <reviewer.yaml> > c.md; ! diff -q a.md c.md` (exit `0`) | Both exit `0` | Hand-edited committed projected file, re-diff → exit `1`; a no-op stand-in generator (ignores argv, echoes a constant) passes the determinism check but fails the input-sensitivity check (`diff -q` on its two outputs is empty, so `!` inverts to exit `1`) |
@@ -426,7 +436,8 @@ of either WP's own acceptance criteria. It runs in three ordered phases:
   (FR-007 elaboration's extended scope — main-suite too, not only
   control-suite); `control-suite`'s own step asserts nonzero exit and
   `runsErrored == 0`, never treating that job's exit `1` as a build
-  failure; muster invoked pinned exactly `@1.2.1`.
+  failure; muster invoked pinned exactly `@1.2.2` (corrected from an earlier
+  `@1.2.1` pin — see Technical Context's "muster pin correction").
 - **Relevant requirements**: FR-007, C-001, C-002.
 - **Affected surfaces**: `.github/workflows/behavioral.yml` (new).
 - **Sequencing/depends-on**: IC-05 (needs `check-runs-errored.sh` to exist
@@ -585,18 +596,31 @@ through `spk-mission-specify` before `/spec-kitty.tasks` runs.*
    `CAPABILITY-CONTAINMENT-<profile>` is left unstated. This plan extends
    the pass-k requirement to both safety-critical `ruleId` prefixes.
    (b) `manifest.ts:299-306`'s own validator throws when a `pass-k` rule
-   declares `passThreshold !== k`; but `runner.ts:305,566` resolves the
-   *runtime* default as `entry.passThreshold ?? Math.ceil(entry.k / 2)`
-   **regardless of `aggregation`** when `passThreshold` is omitted — there
-   is no runtime special-case that defaults an omitted pass-k threshold to
-   `k`. Spec.md's Live-Model Plan states "`passThreshold: ceil(k / 2)`...
-   explicit in every manifest" as a blanket rule; applied literally to a
-   pass-k row this either throws at load time (if also declared pass-k with
-   `passThreshold: 3, k: 5`) or, if `passThreshold` is omitted to dodge that
-   error, silently weakens "all runs must pass" to a majority vote at
-   runtime. This plan corrects the guidance: pass-k rows set
-   `passThreshold` **equal to `k`**, explicitly; k-of-n rows set
-   `ceil(k/2)`, explicitly.
+   declares `passThreshold !== k`. `runner.ts:566`'s `dispatchProbeVerdicts`
+   computes `entry.passThreshold ?? Math.ceil(entry.k / 2)` **on every row,
+   regardless of `aggregation`**, but only the `k-of-n` branch (`aggregateKofN`)
+   actually *consumes* that computed value — the `pass-k` branch calls
+   `aggregatePassK(runVerdicts)`, which takes no threshold argument at all and
+   never has (verified against `graders.ts` both before and after
+   `garrison-hq/muster#89`/`db80a4295`, the passThreshold-defect fix described
+   in spec.md's Dependencies section — that fix touched a different call site,
+   `runComplianceProbeEntry`'s *inner* single-run judge vote, not this outer
+   aggregation). **Correction (was: "silently weakens 'all runs must pass' to
+   a majority vote at runtime" for an omitted pass-k `passThreshold`) — that
+   claim is stale/was never accurate**: omitting `passThreshold` on a
+   `pass-k` row has no runtime effect on the outer aggregation, because
+   `aggregatePassK` ignores the field either way; the row still requires
+   every one of the `k` runs to pass. The downgrade-to-majority-vote risk is
+   real, and runtime-load-bearing, only on **k-of-n** rows. Spec.md's
+   Live-Model Plan states "`passThreshold: ceil(k / 2)`... explicit in every
+   manifest" as a blanket rule; applied literally to a pass-k row this
+   either throws at load time (if also declared pass-k with `passThreshold:
+   3, k: 5`) or, if `passThreshold` is omitted to dodge that error, is
+   merely inconsistent with `manifest.ts`'s own self-documentation intent —
+   not a runtime weakening. This plan corrects the guidance: pass-k rows set
+   `passThreshold` **equal to `k`**, explicitly (manifest hygiene /
+   validator self-consistency); k-of-n rows set `ceil(k/2)`, explicitly
+   (runtime-load-bearing).
 
 3. **No FR-001..004 verification cell checks the rubric document's own
    binding Integration Contract requirement.** `docs/rubric/
@@ -674,6 +698,10 @@ None of the seven items above changes an FR's stated user-observable
 behavior; all are verification-design, path-layout, or
 integration-fidelity clarifications this plan supplies. Items 1-3 are the
 highest-value: without them, FR-004's grading is testing something other
-than what its own text describes, FR-006's safety-critical rows can
-silently degrade to majority-vote grading, and every judge rule in the
-suite risks asking the model to comply with a field it was never shown.
+than what its own text describes, FR-006's **k-of-n** (stylistic) rows can
+silently degrade below their intended `ceil(k/2)` majority threshold if
+`passThreshold` is left implicit and the default drifts from what this
+plan's guidance intends (the pass-k/safety-critical rows do not carry this
+particular risk — `aggregatePassK` never consumes `passThreshold`, see
+Finding 2b's correction above), and every judge rule in the suite risks
+asking the model to comply with a field it was never shown.
