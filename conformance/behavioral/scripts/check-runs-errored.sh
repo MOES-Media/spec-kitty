@@ -1,18 +1,31 @@
 #!/usr/bin/env bash
-# check-runs-errored.sh -- FR-007's runsErrored computation (T010, RED).
+# check-runs-errored.sh -- FR-007's runsErrored computation, packaged once so
+# local falsification runs and the cadence workflow (.github/workflows/
+# behavioral.yml) never duplicate the inline jq logic and drift apart.
 #
-# RED per CHTR-011: this version counts case-level failures
-# (`verdicts[].passed == false`), not per-run errors. That does not
-# distinguish "the control correctly fired" from "the endpoint was dead" --
-# a genuinely non-compliant-but-reachable case has `passed: false` too, so
-# this version reports a nonzero count for BOTH the healthy-endpoint control
-# run (which has zero real errors) and the dead-endpoint run, laundering a
-# dead endpoint through as if it were a legitimate discrimination proof.
-# Replaced by the GREEN version below, which walks the nested
-# verdicts[].runs[].error field instead.
+# muster's own exit code and `report.passed` are identical between "the
+# control correctly fired" and "the endpoint was unreachable" (both are
+# exit 1 / passed: false). The only field that distinguishes them is the
+# per-run error, nested at verdicts[].runs[].error -- there is no top-level
+# SOPSuiteReport.runsErrored convenience field (confirmed against
+# src/adapters/openclaw-sop/manifest.ts:156-192, @garrison-hq/muster@1.2.2).
 #
 # Usage: check-runs-errored.sh <report.json>
+# Prints the count of runs across every verdict whose `error` field is set
+# (non-null) to stdout. Exit 0 on success; exit 1 if the report path is
+# missing or unreadable; exit 2 if `jq` is not installed.
+#
+# Pin note: this script has no muster invocation of its own -- it only reads
+# a `--json` report already produced by `muster sop run`. Callers must pin
+# @garrison-hq/muster@1.2.2 (never @1.2.1, which has a live pass-k/k-of-n
+# judge-threshold defect fixed by garrison-hq/muster#89, commit db80a4295)
+# when producing that report.
 set -euo pipefail
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "check-runs-errored.sh: jq is required but not found on PATH" >&2
+  exit 2
+fi
 
 report_path="${1:-}"
 if [ -z "${report_path}" ] || [ ! -f "${report_path}" ]; then
@@ -20,4 +33,4 @@ if [ -z "${report_path}" ] || [ ! -f "${report_path}" ]; then
   exit 1
 fi
 
-jq '[.verdicts[] | select(.passed == false)] | length' "${report_path}"
+jq '[.verdicts[].runs[] | select(.error != null)] | length' "${report_path}"
