@@ -19,21 +19,39 @@ only in an issue tracker a future contributor might not think to search.
    correctly in both trials. No error, no warning, no diagnostic
    distinguishing the dropped call's output from a genuinely successful one.
 
-2. **`spec-kitty agent status materialize`'s human-readable `event_count`
-   counts WP-lane-transition events only, not the raw line count of
-   `status.events.jsonl`** (`src/specify_cli/status/reducer.py:366`,
-   `event_count=len(sorted_events)`, where `sorted_events` is
-   `EventStream.transitions`, `src/specify_cli/status/store.py:741`) — a
-   confusing label regardless of the specific figures involved. An earlier
-   pass over this mission additionally reported the more concerning shape
-   `"0 events -> 1 WPs"` against a log that already had 2 `WPCreated`
-   events; independent re-verification during this remediation pass, on
-   this mission's current 8-line/2-`WPCreated` event log, produced
-   `event_count: 2` with both WPs correctly present — internally
-   consistent under the transitions-only scoping and **not** a
-   reproduction of the original `0`/`1 WPs` figures. Filed as an open
-   question for the maintainer (see the issue for the full reasoning), not
-   asserted as a confirmed root cause.
+2. **`spec-kitty agent status materialize`'s human-readable `"N events ->
+   M WPs"` line presents two differently-populated counts as one arrow —
+   confirmed by construction, not an open question.** `event_count` is
+   `len(EventStream.transitions)` (`src/specify_cli/status/reducer.py:366`)
+   — **lane transitions only**. `wp_count` is
+   `len(snapshot.work_packages)`, and `reducer.py:333-341` materialises a
+   runtime-only WP entry for an annotation with no prior transition of its
+   own. These are different populations: a surface with zero lane
+   transitions and at least one annotation for a given `wp_id` prints
+   exactly `"0 events -> 1 WPs"`, which reads like an integrity violation
+   (a WP existing with zero events) but is actually two counters over
+   disjoint event categories displayed side by side.
+
+   Built from this mission's own coord log, varying only which lines are
+   present:
+
+   | Surface | transitions | annotations | printed line |
+   |---|---|---|---|
+   | A. coord log as-is (12 lines) | 2 | 10 | `2 events -> 2 WPs` |
+   | B. annotations only, WP01 only | 0 | 6 | `0 events -> 1 WPs` (the original observation) |
+   | C. annotations only, both WPs | 0 | 10 | `0 events -> 2 WPs` |
+   | D. main-worktree surface | 0 | 0 | `0 events -> 0 WPs` |
+
+   The original `"0 events -> 1 WPs"` observation (row B) and this
+   remediation pass's independent re-verification (`event_count: 2`, both
+   WPs present, matching row A's shape) are **both correct** — they were
+   run against different starting states, not a failed reproduction of the
+   same input. Reframed accordingly: not "could not reproduce / open
+   question for the maintainer," but a **confirmed defect** — the
+   human-readable line should disambiguate the two counts (e.g. "N lane
+   transitions across M work packages") rather than presenting them as a
+   single before/after arrow, which invites reading `wp_count` as if it
+   were bounded by `event_count`.
 
 Both are filed as further instances of the "reports success while silently
 dropping/misreporting content" family previously identified in this
