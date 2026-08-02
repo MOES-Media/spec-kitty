@@ -33,9 +33,18 @@ jobs:
 
       # npx --offline fails on a cold runner cache (ENOTCACHED) -- warm the
       # cache with one online resolution before every --offline invocation
-      # below.
+      # below. Also captures the resolved version as a step output: an
+      # artifact that cannot self-certify which muster version produced it
+      # cannot prove it wasn't produced by @1.2.1's live pass-k/k-of-n
+      # judge-threshold defect (the exact shape a resolved-threshold->=2
+      # judge control -- like this workflow's own control-manifest.yaml --
+      # would report as permanently failing regardless of endpoint health).
       - name: Warm up muster npx cache
-        run: npx --yes "${MUSTER_PIN}" --version
+        id: muster_version
+        run: |
+          version="$(npx --yes "${MUSTER_PIN}" --version)"
+          echo "${version}"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
 
       - name: Run main-suite manifests (profiles/*.yaml + FR-005 doctrine files)
         id: main_suite
@@ -134,10 +143,16 @@ jobs:
             # ${errored} count and a ::warning:: naming only the manifest,
             # not the axis -- losing exactly the per-axis "endpoint failed
             # vs model failed" disambiguation FR-007 exists to preserve.
-            # per_case_errored is an array of {ruleId, runsErrored} objects,
-            # one per verdict in this manifest's own report.
+            # per_case_errored is an array of {ruleId, passCount, totalRuns,
+            # runsErrored} objects, one per verdict in this manifest's own
+            # report. `passCount`/`totalRuns` are read directly off each
+            # verdict (SOPCaseVerdict sets both unconditionally, per
+            # @garrison-hq/muster@1.2.2's report shape) -- the Acceptance
+            # Gate's item 2 requires each axis entry to show `totalRuns`
+            # matching FR-006's `runs >= 5`, and the Evidence Artifact shape
+            # requires `passCount`; neither was present here before.
             per_case_errored="$(jq -c \
-              '[.verdicts[] | {ruleId: .ruleId, runsErrored: ([.runs[] | select(.error != null)] | length)}]' \
+              '[.verdicts[] | {ruleId: .ruleId, passCount: .passCount, totalRuns: .totalRuns, runsErrored: ([.runs[] | select(.error != null)] | length)}]' \
               "${report}")"
 
             if [ "${errored}" -gt 0 ]; then
@@ -164,36 +179,43 @@ jobs:
           echo "cases_file=/tmp/behavioral-reports/main-suite-cases.json" >> "${GITHUB_OUTPUT}"
           exit "${overall_status}"
 
-      # F4/F5 decision record: spec.md's Evidence Artifact section specifies
-      # ONE committed evidence/<ISO-date>-<mid8>.json with an `endpointHost`
-      # field and a `perProfile.<id>.{avoidanceBoundary,handoffDiscipline,
-      # canonicalVerbs,capabilityContainment}.{passCount,totalRuns,
-      # runsErrored}` shape, and describes the artifact as "committed" (git,
-      # not only a CI upload). Actual, as of F4: two separate files (this
-      # job's + control-suite's), `endpointHost` present (added here) but
-      # `perProfile`/axis-keyed nesting absent -- cases are a flat array
-      # keyed by manifest path, each carrying a `perCase` array of
-      # {ruleId, runsErrored} (F4) rather than axis-named object keys -- and
-      # neither file is committed by this workflow, only uploaded via
-      # actions/upload-artifact.
+      # F4/F5 decision record (corrected): spec.md's Evidence Artifact
+      # section specifies ONE committed evidence/<ISO-date>-<mid8>.json with
+      # an `endpointHost` field and a `perProfile.<id>.{avoidanceBoundary,
+      # handoffDiscipline,canonicalVerbs,capabilityContainment}.{passCount,
+      # totalRuns,runsErrored}` shape, and describes the artifact as
+      # "committed" (git, not only a CI upload), plus raw `--json` reports
+      # attached to acceptance evidence (bullets 2 and 4 of that section).
+      # Actual, as of this fix: two separate files (this job's +
+      # control-suite's); `endpointHost` present; each case's `perCase`
+      # entry now carries `passCount`/`totalRuns` alongside `runsErrored`
+      # (was runsErrored-only); the raw per-manifest `--json` reports under
+      # /tmp/behavioral-reports/ are now uploaded (see the
+      # `behavioral-main-suite-raw-reports` artifact below), so a run's
+      # non-byte-identical transcripts across a case's runs survive the
+      # runner. `perProfile`/axis-keyed nesting is still absent -- cases
+      # remain a flat array keyed by manifest path rather than axis-named
+      # object keys -- and neither evidence file is committed by this
+      # workflow, only uploaded via actions/upload-artifact.
       #
-      # Decision (recorded explicitly, not left implicit, per the mission's
-      # own repeated lesson about silent divergence): F4's per-case
-      # granularity is the correctness-critical half of this gap -- it is
-      # what prevents a dead endpoint mid-run from being misread as a model
-      # failing a specific axis -- and is implemented. Reshaping the flat
-      # `perCase` array into spec.md's exact `perProfile.<id>.<axis>` object
-      # keys, merging this job's evidence with control-suite's into one
-      # file (a cross-job merge, since the two run as separate GitHub
-      # Actions jobs/runners), and having the workflow `git commit` its own
-      # output back to the branch are all mechanical/structural changes,
-      # not correctness fixes, and the git-commit-back piece in particular
-      # (identity, push conflict handling, branch protection interaction)
+      # An earlier version of this note additionally claimed the
+      # `perProfile.<id>.<axis>` reshape was "a pure transform" because
+      # "the underlying per-axis data ... already exists in
+      # `perCase`/`endpointHost` today" -- that was wrong: `perCase` did NOT
+      # carry `passCount`/`totalRuns` (fixed above), so the reshape was not
+      # in fact a pure transform of already-present data until this commit.
+      # Corrected: only the git-commit-back of the evidence file to the
+      # branch remains genuinely deferred. Reshaping the flat `perCase`
+      # array into spec.md's exact `perProfile.<id>.<axis>` object keys and
+      # merging this job's evidence with control-suite's into one file (a
+      # cross-job merge, since the two run as separate GitHub Actions
+      # jobs/runners) are mechanical/structural changes that do not require
+      # live CI and are left for a follow-up commit, not because they need
+      # verification this pass lacks. The git-commit-back piece (identity,
+      # push conflict handling, branch protection interaction) genuinely
       # cannot be verified without a live GitHub Actions run, which this
-      # review pass has no access to. Deferred as a follow-up rather than
-      # implemented un-verified; the underlying per-axis data this reshape
-      # would consume already exists in `perCase`/`endpointHost` today, so
-      # the deferred work is a pure transform, not new data collection.
+      # review pass has no access to, and is the only piece still deferred
+      # on that basis.
       - name: Write evidence artifact (main-suite cases)
         if: always() && steps.main_suite.outputs.cases_file != ''
         # F11: pass the prior step's output through env:, never interpolated
@@ -205,6 +227,7 @@ jobs:
         # is exploitable.
         env:
           CASES_FILE: ${{ steps.main_suite.outputs.cases_file }}
+          MUSTER_VERSION: ${{ steps.muster_version.outputs.version }}
         run: |
           set -euo pipefail
           mkdir -p conformance/behavioral/evidence
@@ -217,9 +240,10 @@ jobs:
           jq -n \
             --arg model "${MUSTER_MODEL:-gpt-4o-mini}" \
             --arg endpointHost "${endpoint_host}" \
+            --arg musterVersion "${MUSTER_VERSION:-}" \
             --arg ranAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --slurpfile cases "${CASES_FILE}" \
-            '{model: $model, endpointHost: $endpointHost, ranAt: $ranAt, mainSuiteCases: $cases[0]}' \
+            '{model: $model, endpointHost: $endpointHost, musterVersion: $musterVersion, ranAt: $ranAt, mainSuiteCases: $cases[0]}' \
             > "${evidence_file}"
           echo "Wrote ${evidence_file}"
 
@@ -228,6 +252,18 @@ jobs:
         with:
           name: behavioral-main-suite-evidence
           path: conformance/behavioral/evidence/*.json
+          if-no-files-found: warn
+
+      # Evidence Artifact section bullets 2 and 4: the raw `muster sop run
+      # --json` reports (non-byte-identical transcripts across a case's
+      # runs; reports attached to acceptance evidence) previously died with
+      # the runner -- only the reshaped `mainSuiteCases` summary above was
+      # ever uploaded. Upload the raw per-manifest reports too.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: behavioral-main-suite-raw-reports
+          path: /tmp/behavioral-reports/*.json
           if-no-files-found: warn
 
   control-suite:
@@ -246,7 +282,11 @@ jobs:
           node-version: "22"
 
       - name: Warm up muster npx cache
-        run: npx --yes "${MUSTER_PIN}" --version
+        id: muster_version
+        run: |
+          version="$(npx --yes "${MUSTER_PIN}" --version)"
+          echo "${version}"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
 
       - name: Run control-manifest.yaml and assert genuine discrimination
         id: control_suite
@@ -358,6 +398,7 @@ jobs:
         # `${{ }}` interpolated directly into the run: body.
         env:
           REPORT_FILE: ${{ steps.control_suite.outputs.report_file }}
+          MUSTER_VERSION: ${{ steps.muster_version.outputs.version }}
         run: |
           set -euo pipefail
           mkdir -p conformance/behavioral/evidence
@@ -366,14 +407,16 @@ jobs:
           jq \
             --arg model "${MUSTER_MODEL:-gpt-4o-mini}" \
             --arg endpointHost "${endpoint_host}" \
+            --arg musterVersion "${MUSTER_VERSION:-}" \
             --arg ranAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             '{
               model: $model,
               endpointHost: $endpointHost,
+              musterVersion: $musterVersion,
               ranAt: $ranAt,
               controlManifest: {
-                judgeControl: (.verdicts[] | select(.ruleId | startswith("CONTROL-JUDGE")) | {passed, runsErrored: ([.runs[] | select(.error != null)] | length)}),
-                behavioralControl: (.verdicts[] | select(.ruleId | startswith("CONTROL-BEHAVIORAL")) | {passed, runsErrored: ([.runs[] | select(.error != null)] | length)})
+                judgeControl: (.verdicts[] | select(.ruleId | startswith("CONTROL-JUDGE")) | {passed, passCount, totalRuns, runsErrored: ([.runs[] | select(.error != null)] | length)}),
+                behavioralControl: (.verdicts[] | select(.ruleId | startswith("CONTROL-BEHAVIORAL")) | {passed, passCount, totalRuns, runsErrored: ([.runs[] | select(.error != null)] | length)})
               }
             }' \
             "${REPORT_FILE}" \
@@ -385,4 +428,15 @@ jobs:
         with:
           name: behavioral-control-suite-evidence
           path: conformance/behavioral/evidence/*control-suite.json
+          if-no-files-found: warn
+
+      # Evidence Artifact section bullets 2 and 4 (control-suite half): the
+      # raw control-manifest.json report -- the one that FR-007's runsErrored
+      # walk and the C-002 acceptance evidence both cite -- previously died
+      # with the runner. Upload it alongside the reshaped evidence file.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: behavioral-control-suite-raw-reports
+          path: /tmp/behavioral-reports/*.json
           if-no-files-found: warn
