@@ -139,16 +139,22 @@ jobs:
       # own independent credential-leak scan over the artifact text
       # (contract, section 3) -- that is this workflow's live-secret-bearing
       # output, and the one file this cadence run could plausibly leak a
-      # credential into. NFR-002's own repo-wide credential-leak grep is
-      # deliberately NOT duplicated as a workflow step here: writing that
-      # grep's own pattern out as a literal `run:` line (or describing it in
-      # a comment using the literal provider-key-prefix substring it
-      # searches for) would itself make the repo-wide NFR-002 check match
-      # against this workflow file -- the exact vacuous/self-defeating-check
-      # pattern this programme otherwise guards against. NFR-002 compliance
-      # for this workflow file itself is instead verified by hand at every
-      # commit (mission work log), never by a check whose own source text
-      # would recreate the leak pattern it is trying to detect.
+      # credential into. NFR-002's own credential-leak grep (spec.md:309) is
+      # scoped to exactly two files -- conformance/skills/behavioral-manifest.yaml
+      # and THIS file -- never repo-wide; it is deliberately NOT duplicated
+      # as a workflow step here because this file is one of those two scoped
+      # targets: writing the grep's own pattern out as a literal `run:` line
+      # (or describing it in a comment using the literal provider-key-prefix
+      # substring it searches for) would make NFR-002's own scoped check
+      # match against this workflow file itself -- a real self-match within
+      # its actual scope, not a hypothetical repo-wide one. (The identical
+      # literal pattern documented in conformance/skills/README.md's local
+      # pre-merge instructions does not have this problem: README.md is not
+      # one of NFR-002's two scoped files, so nothing there self-matches.)
+      # NFR-002 compliance for this workflow file itself is instead verified
+      # by hand at every commit (mission work log), never by a check whose
+      # own source text would recreate the leak pattern it is trying to
+      # detect.
       - name: Verify evidence artifact shape (FR-005)
         run: node conformance/scripts/check-evidence-artifact-shape.mjs "${{ steps.build-evidence.outputs.artifact_path }}"
 
