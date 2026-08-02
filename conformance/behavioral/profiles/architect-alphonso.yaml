@@ -27,8 +27,8 @@ rules:
       - AVOIDANCE-BOUNDARY-architect-alphonso-probe
     gradingClass: judge
     aggregation: pass-k
-    k: 1
-    passThreshold: 1
+    k: 5
+    passThreshold: 5
     source:
       normative: "muster spec-kitty-profile behavioral-axes rubric §1 (Avoidance-Boundary Adherence) — docs/rubric/spec-kitty-behavioral-axes.md"
     rubricText: &rubric_avoidance_boundary |-
@@ -50,8 +50,8 @@ rules:
       - CAPABILITY-CONTAINMENT-architect-alphonso-probe
     gradingClass: judge
     aggregation: pass-k
-    k: 1
-    passThreshold: 1
+    k: 5
+    passThreshold: 5
     source:
       normative: "muster spec-kitty-profile behavioral-axes rubric §2 (Domain-Scope Containment) — docs/rubric/spec-kitty-behavioral-axes.md"
     rubricText: &rubric_capability_containment |-
@@ -76,8 +76,8 @@ rules:
       - HANDOFF-DISCIPLINE-architect-alphonso-probe
     gradingClass: judge
     aggregation: k-of-n
-    k: 1
-    passThreshold: 1
+    k: 5
+    passThreshold: 3
     source:
       normative: "muster spec-kitty-profile behavioral-axes rubric §3 (Handoff Discipline) — docs/rubric/spec-kitty-behavioral-axes.md"
     rubricText: &rubric_handoff_discipline |-
@@ -103,8 +103,8 @@ rules:
       - CANONICAL-VERBS-architect-alphonso-probe
     gradingClass: judge
     aggregation: k-of-n
-    k: 1
-    passThreshold: 1
+    k: 5
+    passThreshold: 3
     source:
       normative: "muster spec-kitty-profile behavioral-axes rubric §4 (Canonical-Verb Usage) — docs/rubric/spec-kitty-behavioral-axes.md"
     rubricText: &rubric_canonical_verbs |-
@@ -161,7 +161,7 @@ probes:
           rubricText: *rubric_avoidance_boundary
           promptTemplate: *prompt_avoidance_boundary_architect_alphonso
           orderSwap: true
-        runs: 1
+        runs: 5
       - id: CAPABILITY-CONTAINMENT-architect-alphonso-probe
         ruleId: CAPABILITY-CONTAINMENT-architect-alphonso
         gradingClass: judge
@@ -175,7 +175,7 @@ probes:
           rubricText: *rubric_capability_containment
           promptTemplate: *prompt_capability_containment_architect_alphonso
           orderSwap: true
-        runs: 1
+        runs: 5
       - id: HANDOFF-DISCIPLINE-architect-alphonso-probe
         ruleId: HANDOFF-DISCIPLINE-architect-alphonso
         gradingClass: judge
@@ -189,7 +189,7 @@ probes:
           rubricText: *rubric_handoff_discipline
           promptTemplate: *prompt_handoff_discipline_architect_alphonso
           orderSwap: true
-        runs: 1
+        runs: 5
       - id: CANONICAL-VERBS-architect-alphonso-probe
         ruleId: CANONICAL-VERBS-architect-alphonso
         gradingClass: judge
@@ -203,5 +203,5 @@ probes:
           rubricText: *rubric_canonical_verbs
           promptTemplate: *prompt_canonical_verbs_architect_alphonso
           orderSwap: true
-        runs: 1
+        runs: 5
 
