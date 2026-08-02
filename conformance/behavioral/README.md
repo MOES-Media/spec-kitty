@@ -52,6 +52,18 @@ can silently resolve `1.2.1` instead. **Never "fix" a permanently-failing
 pass-k row by weakening its `passThreshold` to `1`** — that masks the
 defect above rather than avoiding it; pin the corrected version instead.
 
+## Endpoint matrix
+
+This suite is BYOM: it never ships or depends on a hosted model. Point
+`MUSTER_ENDPOINT` at any OpenAI-compatible chat completions endpoint.
+
+| Endpoint kind | Example `MUSTER_ENDPOINT` | Notes |
+|---|---|---|
+| Local Ollama | `http://localhost:11434/v1` | No API key required in practice, but `MUSTER_API_KEY` must still be set to a dummy non-empty value — an empty/unset key falls back to reading `OPENAI_API_KEY` from the environment, which can silently authenticate against a *different*, unintended endpoint. |
+| DGX (self-hosted, OpenAI-compatible) | `http://<dgx-host>:<port>/v1` | Same API-key caveat as Ollama. |
+| NVIDIA Inference Microservice (NIM) | `https://<nim-host>/v1` | Real API key required; NIM's own OpenAI-compatible chat completions surface. |
+| Hosted (OpenAI-compatible) | `https://api.openai.com/v1` | Real API key required; billed per the provider's own pricing (see Cost below). |
+
 ## Environment variables
 
 | Variable | Required | Default | Purpose |
@@ -72,6 +84,22 @@ npx @garrison-hq/muster@1.2.2 sop run conformance/behavioral/profiles/architect-
 Never create a `.env` file for these credentials in this repository —
 project convention scans the whole tree, including gitignored files, for
 accidentally committed secrets.
+
+## Cost
+
+Each profile-axis manifest ships 4 judge-graded rules at `k: 5`. A judge
+call is always an order-swap pair (2 calls per run). One full manifest run
+therefore issues, per rule: 5 generation calls (the scenario turn against
+the model under test) plus up to 10 judge calls (2 per run x 5 runs) — a
+worst case of roughly 15 completions per rule, 60 per profile manifest,
+300 across all 5 profile manifests. Against a small hosted model
+(`gpt-4o-mini`-class pricing), a full 5-profile run costs a few cents to
+low tens of cents in API spend and typically completes in well under ten
+minutes; a self-hosted Ollama/DGX/NIM endpoint has no per-call API cost at
+all, only local compute time. `MUSTER_MODEL` and endpoint choice are the
+two levers that move this cost — pick a small, fast model for iteration
+and reserve a larger "competent model" run for the mission's post-merge
+Acceptance Gate.
 
 ## Trivial-refusal guard
 
