@@ -38,12 +38,18 @@
 #   1  usage error -- the report path argument is missing, or the path does
 #      not exist / is not a regular file.
 #   2  `jq` is not installed on PATH.
-#   3  the report exists but is not valid JSON, including a zero-byte file
-#      (F3: fail-closed check via `jq empty`). Before this check existed, a
-#      zero-byte report -- the shape produced when `muster sop run` exits 1
-#      having written nothing -- made `jq` print nothing and exit 0, which
-#      a caller could misread as "0 errored runs" on a report that in fact
-#      never ran at all.
+#   3  the report is not exactly one JSON document, including: a zero-byte
+#      file; a file containing only whitespace; malformed/non-JSON content;
+#      or two or more concatenated JSON documents (F3, tightened again after
+#      the original `jq empty` guard proved bypassable: `jq empty` treats
+#      zero documents as vacuously valid -- exit 0, no stdout -- on both a
+#      zero-byte file AND a whitespace-only file, and treats two
+#      concatenated JSON documents as vacuously valid too, printing nothing
+#      useful either way (a caller could misread the resulting empty/`"0\n0"`
+#      stdout as "0 errored runs" on a report that in fact never ran, or ran
+#      twice). Checked via `jq -s 'length'` (slurp mode counts documents),
+#      which also rejects a file containing only whitespace or trailing
+#      garbage after a single valid document.
 #   5  the report is valid JSON but does not have the expected
 #      `verdicts[].runs[]` shape (e.g. `verdicts` absent, or a verdict has
 #      no `runs` array) -- this is jq's own runtime-error exit code,
@@ -67,13 +73,16 @@ if [ -z "${report_path}" ] || [ ! -f "${report_path}" ]; then
   exit 1
 fi
 
-# F3: fail closed on a report that is not valid JSON at all. A zero-byte
-# file -- the shape muster leaves behind when `sop run` exits 1 before
-# writing any output -- is the case that most needs this: `jq empty` alone
-# treats zero documents as vacuously valid and exits 0 on an empty file, so
-# the emptiness check must come first.
-if [ ! -s "${report_path}" ] || ! jq empty "${report_path}" 2>/dev/null; then
-  echo "check-runs-errored.sh: ${report_path} is not valid JSON (zero-byte or malformed report) -- refusing to report a count" >&2
+# F3 (tightened): fail closed unless the report is exactly one JSON
+# document. `jq -s 'length'` slurps the whole input into an array and counts
+# how many top-level JSON values it contains -- 0 for a zero-byte or
+# whitespace-only file, 2+ for concatenated documents, and errors (captured
+# below, not left to `set -e`) on genuinely malformed content. A single
+# scalar/whitespace-free document, including the pathological empty object
+# `{}`, is the only shape that reports "1" here.
+doc_count="$(jq -s 'length' "${report_path}" 2>/dev/null || echo "invalid")"
+if [ "${doc_count}" != "1" ]; then
+  echo "check-runs-errored.sh: ${report_path} is not exactly one valid JSON document (got: ${doc_count}) -- zero-byte, whitespace-only, malformed, or multiple concatenated documents; refusing to report a count" >&2
   exit 3
 fi
 

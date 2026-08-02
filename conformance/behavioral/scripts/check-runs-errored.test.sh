@@ -78,6 +78,32 @@ assert_case "malformed report -> exit 3 (fail closed, F3)" "malformed.json" 3
 # jq's own runtime-error exit code (5), propagated unchanged.
 assert_case "missing verdicts key -> exit 5 (jq's own runtime error)" "missing-verdicts.json" 5
 
+# Case 8: whitespace-only report -- the original `jq empty` guard treated
+# zero JSON documents as vacuously valid (exit 0, empty stdout) on this
+# exact shape, silently contradicting the header's own fail-closed contract.
+# Must fail closed (exit 3), same as a true zero-byte file.
+assert_case "whitespace-only report -> exit 3 (fail closed, not vacuously valid)" "whitespace-only.json" 3
+
+# Case 9: two concatenated JSON documents -- `jq empty` also treated this as
+# vacuously valid (exit 0, stdout "0\n0"), and the un-slurped final `jq`
+# query would have printed one count per document rather than failing.
+# Must fail closed (exit 3): a report is exactly one document or it is not
+# trustworthy.
+assert_case "concatenated JSON documents -> exit 3 (fail closed, not two valid reports)" "concatenated.json" 3
+
+# Case 10: `jq` absent from PATH -- the one documented exit path (2) with no
+# prior committed test case. Run with a PATH containing no `jq` binary.
+set +e
+actual_stdout="$(PATH=/nonexistent-bin "$(command -v bash)" "${SUT}" "${FIXTURES}/healthy.json" 2>/dev/null)"
+actual_exit=$?
+set -e
+if [ "${actual_exit}" -ne 2 ]; then
+  echo "FAIL: jq absent from PATH -> expected exit 2, got ${actual_exit} (stdout: '${actual_stdout}')"
+  failures=$((failures + 1))
+else
+  echo "PASS: jq absent from PATH -> exit 2"
+fi
+
 if [ "${failures}" -gt 0 ]; then
   echo "check-runs-errored.test.sh: ${failures} case(s) failed"
   exit 1
