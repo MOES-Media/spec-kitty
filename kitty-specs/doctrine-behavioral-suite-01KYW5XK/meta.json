@@ -25,6 +25,7 @@
   "purpose_context": "M3 shipped 13 directive-mapped SOP manifests that check an AGENTS.md document statically. This mission adds the behavioral layer: live-model scenarios that embed a profile's deployed system-prompt body and grade, via muster sop run against any OpenAI-compatible endpoint, whether the agent actually respects its avoidance boundary, hands off work at phase boundaries, uses its canonical verbs, stays within its declared tool capabilities, and follows the M3 directive rules under pressure -- with a rigged-impossible control proving each grader can fail, run on a manual cadence, never on pull requests.",
   "purpose_tldr": "Behavioral compliance probes over a bring-your-own model endpoint, proving profiles and directives are followed in practice, not just declared.",
   "slug": "doctrine-behavioral-suite-01KYW5XK",
+  "status_phase": "1",
   "target_branch": "kitty/mission-doctrine-behavioral-suite",
   "topology": "coord"
 }
