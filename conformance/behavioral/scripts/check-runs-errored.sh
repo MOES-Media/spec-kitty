@@ -5,10 +5,29 @@
 #
 # muster's own exit code and `report.passed` are identical between "the
 # control correctly fired" and "the endpoint was unreachable" (both are
-# exit 1 / passed: false). The only field that distinguishes them is the
-# per-run error, nested at verdicts[].runs[].error -- there is no top-level
-# SOPSuiteReport.runsErrored convenience field (confirmed against
+# exit 1 / passed: false). The per-run error, nested at verdicts[].runs[].
+# error, distinguishes those two conditions from each other -- there is no
+# top-level SOPSuiteReport.runsErrored convenience field (confirmed against
 # src/adapters/openclaw-sop/manifest.ts:156-192, @garrison-hq/muster@1.2.2).
+#
+# F8 precision (an earlier commit, ca28c71b1, overstated this in both
+# directions -- restated here precisely, since this claim is cited
+# downstream): the runs[].error walk is not the *only* field capable of
+# distinguishing "correctly fired" from "endpoint unreachable" -- measured
+# against this WP's own committed evidence
+# (conformance/behavioral/evidence/2026-08-02-01KYW5XK-control-*.json), the
+# healthy run has 9 grades across 6 runs and 12 transcript entries, while
+# both the dead-endpoint and stripped-env runs have 0 grades and 6
+# transcript entries; `[.verdicts[].runs[] | select((.grades|length)==0)] |
+# length` gives 0 vs 6, a second, independent discriminator this script
+# does not compute. Conversely, this script's own count does NOT separate
+# a dead endpoint from a stripped/unset one: both conditions produce
+# runsErrored == 6 in this WP's captured evidence; only the `runs[].error`
+# message string differs ("chat request to ... failed: fetch failed" vs
+# "muster sop: MUSTER_ENDPOINT not set ..."). What this script's count
+# reliably distinguishes is exit code / report.passed / passCount, none of
+# which differ between a healthy control run and either broken-endpoint
+# condition -- not dead from stripped, and not the sole possible signal.
 #
 # Usage: check-runs-errored.sh <report.json>
 # Prints the count of runs across every verdict whose `error` field is set
