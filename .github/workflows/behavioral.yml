@@ -198,24 +198,26 @@ jobs:
       # object keys -- and neither evidence file is committed by this
       # workflow, only uploaded via actions/upload-artifact.
       #
-      # An earlier version of this note additionally claimed the
-      # `perProfile.<id>.<axis>` reshape was "a pure transform" because
-      # "the underlying per-axis data ... already exists in
-      # `perCase`/`endpointHost` today" -- that was wrong: `perCase` did NOT
-      # carry `passCount`/`totalRuns` (fixed above), so the reshape was not
-      # in fact a pure transform of already-present data until this commit.
-      # Corrected: only the git-commit-back of the evidence file to the
-      # branch remains genuinely deferred. Reshaping the flat `perCase`
-      # array into spec.md's exact `perProfile.<id>.<axis>` object keys and
-      # merging this job's evidence with control-suite's into one file (a
-      # cross-job merge, since the two run as separate GitHub Actions
-      # jobs/runners) are mechanical/structural changes that do not require
-      # live CI and are left for a follow-up commit, not because they need
-      # verification this pass lacks. The git-commit-back piece (identity,
-      # push conflict handling, branch protection interaction) genuinely
-      # cannot be verified without a live GitHub Actions run, which this
-      # review pass has no access to, and is the only piece still deferred
-      # on that basis.
+      # Status after the follow-up commit that added the `merge-evidence`
+      # job below: the `perProfile.<id>.<axis>` reshape and the cross-job
+      # merge into one `<ISO-date>-<mid8>.json` are DONE, and the reshape was
+      # confirmed to be a pure transform -- every field spec.md's shape names
+      # is derivable from what the two jobs already write (see
+      # conformance/behavioral/scripts/build-evidence-artifact.sh's header
+      # for the field-by-field derivation). This file's two per-job evidence
+      # files are now intermediates consumed by that job, not the deliverable.
+      #
+      # An earlier version of this note claimed the reshape was already a
+      # pure transform when `perCase` did NOT yet carry
+      # `passCount`/`totalRuns`; that was wrong at the time and was corrected
+      # by adding those two fields above. It is true now, and executable
+      # rather than asserted.
+      #
+      # Still not verifiable outside a live GitHub Actions run: the
+      # git-commit-back's identity, push-conflict handling and branch
+      # protection interaction. The merge job attempts the push and fails
+      # LOUDLY if it cannot, and uploads the merged artifact BEFORE
+      # attempting it, so a gate reviewer has the file either way.
       - name: Write evidence artifact (main-suite cases)
         if: always() && steps.main_suite.outputs.cases_file != ''
         # F11: pass the prior step's output through env:, never interpolated
@@ -247,12 +249,20 @@ jobs:
             > "${evidence_file}"
           echo "Wrote ${evidence_file}"
 
+      # Glob narrowed from `*.json` to this run's own file: the evidence
+      # directory also holds three previously committed control reports
+      # (2026-08-02-01KYW5XK-control-{healthy,dead-endpoint,stripped-env}.json),
+      # which `*.json` swept into the artifact -- leaving the merge job below
+      # unable to tell this run's main-suite evidence from committed history.
+      # `error` rather than `warn`: an empty evidence artifact is the exact
+      # silent-success shape the merge job would then fail on with an opaque
+      # message.
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: behavioral-main-suite-evidence
-          path: conformance/behavioral/evidence/*.json
-          if-no-files-found: warn
+          path: conformance/behavioral/evidence/*-main-suite.json
+          if-no-files-found: error
 
       # Evidence Artifact section bullets 2 and 4: the raw `muster sop run
       # --json` reports (non-byte-identical transcripts across a case's
@@ -449,8 +459,8 @@ jobs:
         if: always()
         with:
           name: behavioral-control-suite-evidence
-          path: conformance/behavioral/evidence/*control-suite.json
-          if-no-files-found: warn
+          path: conformance/behavioral/evidence/*-control-suite.json
+          if-no-files-found: error
 
       # Evidence Artifact section bullets 2 and 4 (control-suite half): the
       # raw control-manifest.json report -- the one that FR-007's runsErrored
@@ -462,3 +472,125 @@ jobs:
           name: behavioral-control-suite-raw-reports
           path: /tmp/behavioral-reports/*.json
           if-no-files-found: warn
+
+  # Acceptance Gate item 2, first sub-bullet: ONE committed artifact at
+  # conformance/behavioral/evidence/<ISO-date>-<mid8>.json whose `perProfile`
+  # object is keyed by profile id then by axis. main-suite and control-suite
+  # run on two separate runners and can only write half of it each, so the
+  # merge has to be a third job that downloads both halves.
+  #
+  # `if: always()`: main-suite exits 1 whenever any behavioral case fails,
+  # which is a normal, expected cadence outcome -- gating the evidence on a
+  # green main-suite would mean the runs most worth recording are the ones
+  # that leave no evidence. control-suite likewise exits 1 on a broken
+  # control, and that run's evidence is exactly what diagnoses it.
+  merge-evidence:
+    runs-on: ubuntu-latest
+    needs: [main-suite, control-suite]
+    if: always()
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      # No `continue-on-error`: a missing half means the merged artifact
+      # cannot be built, and a merge job that quietly succeeds having built
+      # nothing is worse than a red one.
+      - uses: actions/download-artifact@v4
+        with:
+          name: behavioral-main-suite-evidence
+          path: /tmp/evidence-in/main
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: behavioral-control-suite-evidence
+          path: /tmp/evidence-in/control
+
+      - name: Merge both jobs' evidence into the gate artifact
+        id: merge
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          # Resolve exactly one file per half. `nullglob` (as in main-suite)
+          # makes an unmatched glob expand to nothing rather than to the
+          # literal pattern, so the count check below is the only thing
+          # standing between a renamed upload and a merge against a path that
+          # does not exist.
+          main_files=(/tmp/evidence-in/main/*-main-suite.json)
+          control_files=(/tmp/evidence-in/control/*-control-suite.json)
+
+          if [ "${#main_files[@]}" -ne 1 ]; then
+            echo "::error::expected exactly 1 main-suite evidence file in the downloaded artifact, found ${#main_files[@]}"
+            exit 1
+          fi
+          if [ "${#control_files[@]}" -ne 1 ]; then
+            echo "::error::expected exactly 1 control-suite evidence file in the downloaded artifact, found ${#control_files[@]}"
+            exit 1
+          fi
+
+          mkdir -p conformance/behavioral/evidence
+
+          # --require-axes 4 lives at the call site, not in the script: four
+          # behavioral axes is spec.md's design (FR-001..004), so a profile
+          # that silently contributed three would otherwise produce a
+          # complete-looking artifact the gate reviewer reads as four.
+          artifact="$(conformance/behavioral/scripts/build-evidence-artifact.sh \
+            --main "${main_files[0]}" \
+            --control "${control_files[0]}" \
+            --mission 01KYW5XK \
+            --out-dir conformance/behavioral/evidence \
+            --require-axes 4)"
+
+          echo "Wrote ${artifact}"
+          echo "artifact=${artifact}" >> "${GITHUB_OUTPUT}"
+          jq '{model, endpointHost, ranAt, profiles: (.perProfile | keys)}' "${artifact}"
+
+      # Uploaded BEFORE the commit-back is attempted: branch protection or a
+      # push race must never be the reason a gate reviewer cannot find the
+      # artifact.
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.merge.outputs.artifact != ''
+        with:
+          name: behavioral-gate-evidence
+          path: ${{ steps.merge.outputs.artifact }}
+          if-no-files-found: error
+
+      # spec.md's Evidence Artifact section says each cadence run *commits*
+      # this file (git, not only a CI upload), and the Acceptance Gate reads
+      # it as "the committed evidence artifact". This step is the one part of
+      # this workflow that cannot be exercised outside a live GitHub Actions
+      # run -- so it is written to fail loudly rather than to look like it
+      # worked: an unpushable branch produces a red job with the artifact
+      # still uploaded above, never a green job with nothing committed.
+      - name: Commit the gate artifact back to the branch
+        if: steps.merge.outputs.artifact != ''
+        env:
+          ARTIFACT: ${{ steps.merge.outputs.artifact }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "${ARTIFACT}"
+
+          if git diff --cached --quiet -- "${ARTIFACT}"; then
+            echo "${ARTIFACT} is byte-identical to the committed copy -- nothing to commit"
+            exit 0
+          fi
+
+          git commit -m "chore(behavioral): cadence evidence ${ARTIFACT##*/}"
+
+          # Rebase before pushing so a concurrent commit on the branch is a
+          # retry, not a lost artifact. A push that still fails (branch
+          # protection, permissions) is reported as an error, not swallowed.
+          if ! git pull --rebase --autostash origin "${GITHUB_REF_NAME}"; then
+            echo "::error::could not rebase onto origin/${GITHUB_REF_NAME}; the gate artifact is uploaded as the behavioral-gate-evidence artifact but was NOT committed"
+            exit 1
+          fi
+          if ! git push origin "HEAD:${GITHUB_REF_NAME}"; then
+            echo "::error::could not push the gate artifact to ${GITHUB_REF_NAME} (branch protection or missing contents:write?); it is uploaded as the behavioral-gate-evidence artifact but was NOT committed"
+            exit 1
+          fi
+          echo "Committed and pushed ${ARTIFACT} to ${GITHUB_REF_NAME}"
