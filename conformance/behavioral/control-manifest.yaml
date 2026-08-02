@@ -9,9 +9,18 @@ rules:
     probeIds:
       - CONTROL-JUDGE-IMPOSSIBLE-probe
     gradingClass: judge
-    aggregation: pass-k
+    # F10: this rule's cited normative source's own two-tier table (source
+    # below, "## Aggregation Rules") puts judge-required classes 6-7 at
+    # k-of-n ("Stylistic"), never pass-k -- pass-k is reserved for the
+    # binary/trace-decidable classes 1-5 ("Safety-critical"). This rule is
+    # gradingClass: judge, so aggregation must be k-of-n to match its own
+    # citation, even though this control's own rigging (a zero-word rubric
+    # no real reply can satisfy) makes every run fail regardless of which
+    # aggregation tier is declared -- not observable in results, but the
+    # declaration must not contradict what it cites.
+    aggregation: k-of-n
     k: 3
-    passThreshold: 3
+    passThreshold: 2
     source:
       normative: docs/rubric/sop-rule-taxonomy.md#discrimination-controls-policy
       supporting: https://github.com/garrison-hq/muster/blob/6e0840b27/docs/rubric/sop-rule-taxonomy.md
