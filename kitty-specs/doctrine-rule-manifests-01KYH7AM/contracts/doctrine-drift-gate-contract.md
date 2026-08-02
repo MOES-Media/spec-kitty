@@ -209,3 +209,51 @@ New job `sop-doctrine-conformance` in `.github/workflows/conformance.yml`
 - Does not check rule *count* completeness (a manifest missing an entire
   rule entry produces no finding at all — see
   `contracts/doctrine-manifest-completeness-contract.md` for that guard).
+
+---
+
+## Amendment A1 — behavioral rules on the credential-free static path (mission `doctrine-behavioral-suite-01KYW5XK`, FR-005, 2026-08-02)
+
+M4's FR-005 appends behavioral (judge-graded, inline-probe) rules to
+`010`, `039` and `044` — same manifests, same `sopFile:`, same existing
+rule IDs. That makes Phase 1's "must be clean" structurally unreachable for
+those three, for two independent reasons, both reproduced against the real
+pinned CLI before the gate was changed:
+
+1. **No endpoint, no probe.** With `MUSTER_ENDPOINT` unset the CLI falls
+   back to `SOP_NOOP_CLIENT`, whose `chat()` throws. Every run is recorded
+   as errored, the verdict is `passed: false`, and muster exits 1. muster's
+   own `sop run --help` says probes are "skipped gracefully when absent"
+   and its source comment says errored verdicts "won't affect `passed`" —
+   neither describes the shipped behaviour at 1.1.0 or 1.2.2.
+2. **A behavioral rule's `ruleText` is authored, not quoted.**
+   `checkRuleTextPresence()` requires every rule entry's `ruleText` to
+   appear verbatim in the SOP file, regardless of grading class, so each
+   behavioral rule emits one permanent `RULE_DRIFT` (severity `warning`).
+   This one is **not** a credentials artifact: a live credentialed run of
+   `010` at 1.2.2 exits 0 with `passed: true` and still carries the
+   `RULE_DRIFT` finding, which Phase 1's jq filter would still reject.
+
+**Amended Phase 1.** A finding or a failing verdict is set aside only when
+it belongs to a behavioral rule, bounded four ways:
+
+| Clause | Rule | Why |
+|---|---|---|
+| (a) | A rule is behavioral **iff muster's own report contains a probe verdict for it** (`.verdicts[].ruleId`). | Derived from the report under test, not a second manifest parse and not a name pattern. All 45 of M3's rules have `probeIds: []`, produce no verdict, and are never set aside. |
+| (b) | The discriminator is never `gradingClass`. | 22 of M3's 45 quoted rules are judge-graded with no probes; filtering on grading class would stop drift-checking half the corpus, including `044`'s fragment `ruleText`s. |
+| (c) | Only `RULE_DRIFT` is ever excused. `MISSING_SOURCE`, `MANIFEST_ERROR` and `STRUCTURAL_ABSENCE` still fail on every rule, behavioral ones included. | "`ruleText` is authored, not quoted" excuses verbatim-presence and nothing else. A malformed or unsourced behavioral rule is a real defect. |
+| (d) | A failing verdict is excused only when **every** run errored with muster's no-endpoint marker, and a non-zero muster exit still fails unless at least one excused verdict accounts for it. | A behavioral probe that actually executes and fails still fails this gate; exit 1 with nothing to explain it is a named failure. If muster rewords the marker the match stops holding and the gate fails closed, never green. |
+
+The complementary hole — a quoted directive rule buying a drift-lint
+exemption by gaining a probe — is closed by
+`contracts/doctrine-manifest-completeness-contract.md`'s Amendment A1, not
+by this gate. The two are an interlock.
+
+**Pin unchanged at `@garrison-hq/muster@1.1.0`.** This gate is
+credential-free, so muster's live pass-k/k-of-n judge-threshold defect
+(garrison-hq/muster#88, fixed in 1.2.2) cannot reach CI — no probe ever
+executes here. It does reach a developer who runs the script locally with
+`MUSTER_ENDPOINT` set: at 1.1.0 a verdict whose individual judge grades all
+pass is still reported `passed: false` (reproduced against `gpt-4o-mini`:
+5/5 runs graded PASS, verdict `passCount: 0`), and clause (d) correctly
+refuses to excuse that.
