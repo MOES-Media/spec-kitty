@@ -134,3 +134,42 @@ otherwise matter — disjoint checks, same pattern as M1's step ordering).
   copy-pasted twice) — muster's own loader already throws on duplicate
   `ruleId` (`MANIFEST_ERROR`, caught by the drift gate), so this script
   does not re-implement that check.
+
+---
+
+## Amendment A1 — behavioral rule entries (mission `doctrine-behavioral-suite-01KYW5XK`, FR-005, 2026-08-02)
+
+M3 shipped this contract when every manifest rule entry was
+directive-derived and `probeIds:` was `[]` everywhere (C-003). M4's FR-005
+appends behavioral rules — judge-graded entries carrying an inline
+`probes:` scenario — to `010`, `039` and `044`, in the same manifests, with
+the same `sopFile:` and the same existing rule IDs. A behavioral rule has
+no corresponding `integrity_rules` bullet, so under the unamended Algorithm
+§2 the three manifests reported `missing: -1`: the guard was counting a
+category it was never written to count.
+
+**Amended Algorithm §2.** The actual count is the number of
+**directive-derived** rule entries — those whose `probeIds:` is the empty
+list. Behavioral entries (non-empty `probeIds:`) are counted separately and
+reported, never compared against the directive's bullet count.
+
+Everything else is unchanged, deliberately:
+
+- The comparison stays **exact**, not `>=`. A dropped directive integrity
+  rule still lands as `actual < expected` and still fails. Verified by
+  mutation on both the M3 tree and the M4 tree.
+- The discriminator is **`probeIds`, never `gradingClass`**. 22 of M3's 45
+  directive-derived rules are `gradingClass: judge` with `probeIds: []`
+  (all 3 of `001`'s, all 11 of `039`'s, 3 of `044`'s, one each in `030`,
+  `033`, `034`, `035`, `045`); excluding judge-graded entries would drop
+  `001` to expected-3/actual-0 and blind the guard across half the
+  corpus.
+- An entry whose `probeIds:` cannot be classified is a **named failure**,
+  never defaulted to either class.
+
+**Interlock with the drift gate (new, load-bearing).** The drift gate
+excuses a behavioral rule from the verbatim-`ruleText` lint (see that
+contract's Amendment A1). Attaching a probe to one of M3's quoted rules
+would therefore buy it a drift-lint exemption — except that doing so also
+removes it from this guard's directive-derived count, which then fails with
+`actual < expected`. Neither half may be weakened alone.
