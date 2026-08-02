@@ -342,6 +342,28 @@ jobs:
             exit 1
           fi
 
+          # The step's success path below prints "both controls failed as
+          # designed" having asserted only `muster_exit == 1` and
+          # `errored == 0`. Neither is sensitive to ONE control silently
+          # passing: muster still exits 1 (the other control failed), the
+          # errored count is still 0 (a passing run is not an errored run),
+          # and no error-severity lint finding is produced -- so the step
+          # accepted a half-broken discrimination control and printed a
+          # message that was simply false. Assert the count directly.
+          # `totalRuns >= 3` is asserted alongside it because a control
+          # collapsed to a single run cannot support pass^k discrimination
+          # at all, and would otherwise satisfy the count.
+          # Guard on the VALUE, not jq's exit status: jq on a report with no
+          # `verdicts` key errors and coincidentally exits 1, which would
+          # satisfy a status-based check for entirely the wrong reason.
+          # Tested by conformance/behavioral/scripts/control-discrimination-guard.test.sh,
+          # which extracts the marked lines below verbatim and runs them
+          # against committed real-endpoint report fixtures.
+          # >>> both-controls-failed assertion (extracted verbatim by control-discrimination-guard.test.sh)
+          both_failed="$(jq '[.verdicts[] | select(.passed == false and .totalRuns >= 3)] | length' "${report}" 2>/dev/null || echo "")"
+          [ "${both_failed}" = "2" ] || { echo "::error::expected 2 failing controls with >=3 runs each, got ${both_failed:-<unreadable>}"; echo "report_file=${report}" >> "${GITHUB_OUTPUT}"; exit 1; }
+          # <<< both-controls-failed assertion
+
           # F2 fix: write runs_errored immediately after computing it, before
           # any exit path below. The previous placement (only on the final
           # success path) meant both the muster_exit!=1 branch and the
