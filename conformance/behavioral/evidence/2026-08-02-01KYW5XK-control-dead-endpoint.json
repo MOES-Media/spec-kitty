@@ -22,7 +22,7 @@
     {
       "probeId": "CONTROL-JUDGE-IMPOSSIBLE-probe",
       "ruleId": "CONTROL-JUDGE-IMPOSSIBLE",
-      "aggregation": "pass-k",
+      "aggregation": "k-of-n",
       "passed": false,
       "passCount": 0,
       "totalRuns": 3,
@@ -157,5 +157,5 @@
     }
   ],
   "passed": false,
-  "ranAt": "2026-08-02T01:09:50.657Z"
+  "ranAt": "2026-08-02T01:20:50.542Z"
 }
