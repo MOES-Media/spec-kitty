@@ -86,6 +86,29 @@ jobs:
             errored="$(conformance/behavioral/scripts/check-runs-errored.sh "${report}")"
             passed="$(jq -r '.passed' "${report}")"
 
+            # F3: validate both values before using them anywhere below.
+            # With `set +e` (required above so a genuinely failing manifest
+            # doesn't abort this step), an unreadable/zero-byte report used
+            # to make check-runs-errored.sh print nothing (empty `errored`),
+            # which made `[ "${errored}" -gt 0 ]` throw a swallowed
+            # `integer expected` error, and made the `jq --argjson passed
+            # "${passed}"` call below fail on an empty/non-JSON literal --
+            # which empties its own stdout, so `cases_json="$(...)"`
+            # silently became "" and destroyed every case accumulated in
+            # earlier loop iterations, unrecoverable for the rest of the
+            # run. Reject early and skip this manifest instead.
+            if [[ ! "${errored}" =~ ^[0-9]+$ ]]; then
+              echo "::error::${manifest}: check-runs-errored.sh did not return a valid integer ('${errored}') -- report may be unreadable or malformed; treating as an infrastructure failure for this manifest"
+              overall_status=1
+              continue
+            fi
+
+            if [[ "${passed}" != "true" && "${passed}" != "false" ]]; then
+              echo "::error::${manifest}: report's .passed field is not a valid boolean ('${passed}') -- report may be unreadable or malformed; treating as an infrastructure failure for this manifest"
+              overall_status=1
+              continue
+            fi
+
             if [ "${errored}" -gt 0 ]; then
               echo "::warning::${manifest} had ${errored} errored run(s) -- this case's result is endpoint-inconclusive, not necessarily a model non-compliance signal (FR-007)"
             fi
