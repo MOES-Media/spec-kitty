@@ -125,8 +125,26 @@ jobs:
               continue
             fi
 
+            # F4: spec.md requires runsErrored computed PER CASE (per rule,
+            # i.e. per axis -- AVOIDANCE-BOUNDARY-<profile>,
+            # HANDOFF-DISCIPLINE-<profile>, etc.) and written into that
+            # case's own field, not collapsed into one manifest-wide total.
+            # A manifest whose avoidance-boundary case errored while its
+            # other three ran clean previously collapsed to a single
+            # ${errored} count and a ::warning:: naming only the manifest,
+            # not the axis -- losing exactly the per-axis "endpoint failed
+            # vs model failed" disambiguation FR-007 exists to preserve.
+            # per_case_errored is an array of {ruleId, runsErrored} objects,
+            # one per verdict in this manifest's own report.
+            per_case_errored="$(jq -c \
+              '[.verdicts[] | {ruleId: .ruleId, runsErrored: ([.runs[] | select(.error != null)] | length)}]' \
+              "${report}")"
+
             if [ "${errored}" -gt 0 ]; then
-              echo "::warning::${manifest} had ${errored} errored run(s) -- this case's result is endpoint-inconclusive, not necessarily a model non-compliance signal (FR-007)"
+              failing_rule_ids="$(jq -r \
+                '[.[] | select(.runsErrored > 0) | .ruleId] | join(", ")' \
+                <<<"${per_case_errored}")"
+              echo "::warning::${manifest} had ${errored} errored run(s) across case(s) [${failing_rule_ids}] -- this axis's result is endpoint-inconclusive, not necessarily a model non-compliance signal (FR-007)"
             fi
 
             if [ "${passed}" != "true" ]; then
@@ -137,7 +155,8 @@ jobs:
               --arg manifest "${manifest}" \
               --argjson passed "${passed}" \
               --argjson runsErrored "${errored}" \
-              '. + [{"manifest": $manifest, "passed": $passed, "runsErrored": $runsErrored}]' \
+              --argjson perCase "${per_case_errored}" \
+              '. + [{"manifest": $manifest, "passed": $passed, "runsErrored": $runsErrored, "perCase": $perCase}]' \
               <<<"${cases_json}")"
           done
 
