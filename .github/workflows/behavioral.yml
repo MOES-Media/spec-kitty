@@ -264,6 +264,44 @@ jobs:
 
           errored="$(conformance/behavioral/scripts/check-runs-errored.sh "${report}")"
 
+          # F3 (control-suite): the same integer/shape validation main-suite
+          # already applies per case (see main-suite's own F3 comment above)
+          # was missing here entirely -- this job is the ONE thing whose
+          # purpose is proving the endpoint was alive, so a report this job
+          # cannot actually read must never fall through to the success
+          # path below. Reproduced: a single-character corruption of
+          # control-manifest.yaml (an invalid YAML key) makes `muster sop
+          # run` exit 1 having written a lint-only, zero-verdict report;
+          # `check-runs-errored.sh` on that report still prints `0` (zero
+          # runs[].error, because there are zero runs at all), which used to
+          # sail through every check below and print "both controls failed
+          # as designed with zero errored runs -- genuine discrimination
+          # confirmed" on a manifest that graded nothing.
+          if [[ ! "${errored}" =~ ^[0-9]+$ ]]; then
+            echo "::error::check-runs-errored.sh did not return a valid integer ('${errored}') -- control report unreadable/malformed"
+            echo "report_file=${report}" >> "${GITHUB_OUTPUT}"
+            exit 1
+          fi
+
+          verdict_count="$(jq '.verdicts | length' "${report}" 2>/dev/null || echo "")"
+          if [ "${verdict_count}" != "2" ]; then
+            echo "::error::control-manifest.yaml produced ${verdict_count:-<none>} verdict(s), expected 2 -- the manifest did not load/lint; a zero-verdict report can never prove discrimination"
+            echo "report_file=${report}" >> "${GITHUB_OUTPUT}"
+            exit 1
+          fi
+
+          # A broken `sopFile:` path (or other lint-triggering manifest
+          # defect) can still produce exit 1 with the expected 2 verdicts --
+          # the verdict_count check alone does not catch that shape. An
+          # error-severity lint finding means the manifest itself is
+          # malformed, independent of how many verdicts happened to survive.
+          error_lint_count="$(jq '[.lintFindings[]? | select(.severity == "error")] | length' "${report}" 2>/dev/null || echo "")"
+          if [ "${error_lint_count}" != "0" ]; then
+            echo "::error::control-manifest.yaml produced ${error_lint_count:-<unreadable>} error-severity lint finding(s) -- manifest is malformed; see lintFindings in the report"
+            echo "report_file=${report}" >> "${GITHUB_OUTPUT}"
+            exit 1
+          fi
+
           # F2 fix: write runs_errored immediately after computing it, before
           # any exit path below. The previous placement (only on the final
           # success path) meant both the muster_exit!=1 branch and the
