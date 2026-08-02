@@ -164,17 +164,53 @@ jobs:
           echo "cases_file=/tmp/behavioral-reports/main-suite-cases.json" >> "${GITHUB_OUTPUT}"
           exit "${overall_status}"
 
+      # F4/F5 decision record: spec.md's Evidence Artifact section specifies
+      # ONE committed evidence/<ISO-date>-<mid8>.json with an `endpointHost`
+      # field and a `perProfile.<id>.{avoidanceBoundary,handoffDiscipline,
+      # canonicalVerbs,capabilityContainment}.{passCount,totalRuns,
+      # runsErrored}` shape, and describes the artifact as "committed" (git,
+      # not only a CI upload). Actual, as of F4: two separate files (this
+      # job's + control-suite's), `endpointHost` present (added here) but
+      # `perProfile`/axis-keyed nesting absent -- cases are a flat array
+      # keyed by manifest path, each carrying a `perCase` array of
+      # {ruleId, runsErrored} (F4) rather than axis-named object keys -- and
+      # neither file is committed by this workflow, only uploaded via
+      # actions/upload-artifact.
+      #
+      # Decision (recorded explicitly, not left implicit, per the mission's
+      # own repeated lesson about silent divergence): F4's per-case
+      # granularity is the correctness-critical half of this gap -- it is
+      # what prevents a dead endpoint mid-run from being misread as a model
+      # failing a specific axis -- and is implemented. Reshaping the flat
+      # `perCase` array into spec.md's exact `perProfile.<id>.<axis>` object
+      # keys, merging this job's evidence with control-suite's into one
+      # file (a cross-job merge, since the two run as separate GitHub
+      # Actions jobs/runners), and having the workflow `git commit` its own
+      # output back to the branch are all mechanical/structural changes,
+      # not correctness fixes, and the git-commit-back piece in particular
+      # (identity, push conflict handling, branch protection interaction)
+      # cannot be verified without a live GitHub Actions run, which this
+      # review pass has no access to. Deferred as a follow-up rather than
+      # implemented un-verified; the underlying per-axis data this reshape
+      # would consume already exists in `perCase`/`endpointHost` today, so
+      # the deferred work is a pure transform, not new data collection.
       - name: Write evidence artifact (main-suite cases)
         if: always() && steps.main_suite.outputs.cases_file != ''
         run: |
           set -euo pipefail
           mkdir -p conformance/behavioral/evidence
           evidence_file="conformance/behavioral/evidence/$(date -u +%Y-%m-%d)-01KYW5XK-main-suite.json"
+          # Host-only extraction (F5's `endpointHost` field): strip scheme,
+          # any userinfo (credentials embedded in the URL), and everything
+          # from the first `/` or `:` onward -- never the full URL, path,
+          # or key.
+          endpoint_host="$(printf '%s\n' "${MUSTER_ENDPOINT:-}" | sed -E 's#^[a-zA-Z][a-zA-Z0-9+.-]*://##; s#^[^/@]*@##; s#[/:].*##')"
           jq -n \
             --arg model "${MUSTER_MODEL:-gpt-4o-mini}" \
+            --arg endpointHost "${endpoint_host}" \
             --arg ranAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --slurpfile cases "${{ steps.main_suite.outputs.cases_file }}" \
-            '{model: $model, ranAt: $ranAt, mainSuiteCases: $cases[0]}' \
+            '{model: $model, endpointHost: $endpointHost, ranAt: $ranAt, mainSuiteCases: $cases[0]}' \
             > "${evidence_file}"
           echo "Wrote ${evidence_file}"
 
@@ -256,17 +292,35 @@ jobs:
           echo "report_file=${report}" >> "${GITHUB_OUTPUT}"
           exit 0
 
+      # F5: split controlManifest into judgeControl/behavioralControl, per
+      # spec.md's Evidence Artifact shape, keyed by this file's own stable
+      # ruleId naming convention (CONTROL-JUDGE-IMPOSSIBLE,
+      # CONTROL-BEHAVIORAL-FORBIDDEN-ACTION -- control-manifest.yaml is this
+      # WP's own file, so the prefix match is not a guess about foreign
+      # content). Each branch computes its own passed/runsErrored directly
+      # from that verdict's own runs, independent of the step-level
+      # `runs_errored` output (which remains the whole-manifest total used
+      # for this job's own pass/fail gate above).
       - name: Write evidence artifact (control-suite)
         if: always() && steps.control_suite.outputs.report_file != ''
         run: |
           set -euo pipefail
           mkdir -p conformance/behavioral/evidence
           evidence_file="conformance/behavioral/evidence/$(date -u +%Y-%m-%d)-01KYW5XK-control-suite.json"
+          endpoint_host="$(printf '%s\n' "${MUSTER_ENDPOINT:-}" | sed -E 's#^[a-zA-Z][a-zA-Z0-9+.-]*://##; s#^[^/@]*@##; s#[/:].*##')"
           jq \
             --arg model "${MUSTER_MODEL:-gpt-4o-mini}" \
+            --arg endpointHost "${endpoint_host}" \
             --arg ranAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            --argjson runsErrored "${{ steps.control_suite.outputs.runs_errored || 0 }}" \
-            '{model: $model, ranAt: $ranAt, controlManifest: {passed: .passed, runsErrored: $runsErrored}}' \
+            '{
+              model: $model,
+              endpointHost: $endpointHost,
+              ranAt: $ranAt,
+              controlManifest: {
+                judgeControl: (.verdicts[] | select(.ruleId | startswith("CONTROL-JUDGE")) | {passed, runsErrored: ([.runs[] | select(.error != null)] | length)}),
+                behavioralControl: (.verdicts[] | select(.ruleId | startswith("CONTROL-BEHAVIORAL")) | {passed, runsErrored: ([.runs[] | select(.error != null)] | length)})
+              }
+            }' \
             "${{ steps.control_suite.outputs.report_file }}" \
             > "${evidence_file}"
           echo "Wrote ${evidence_file}"
