@@ -9,6 +9,12 @@
       "passCount": 0,
       "totalRuns": 3,
       "runsErrored": 0
+    },
+    "judgePositiveControl": {
+      "passed": true,
+      "passCount": 3,
+      "totalRuns": 3,
+      "runsErrored": 0
     }
   }
 }

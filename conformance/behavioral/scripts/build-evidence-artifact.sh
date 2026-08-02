@@ -148,6 +148,18 @@ jq_bool '(.controlManifest.judgeControl | type) == "object"' "${control_file}" \
   || die_shape "--control '${control_file}' has no .controlManifest.judgeControl object"
 jq_bool '(.controlManifest.behavioralControl | type) == "object"' "${control_file}" \
   || die_shape "--control '${control_file}' has no .controlManifest.behavioralControl object"
+# F1: the positive judge control is required, not optional. judgeControl and
+# behavioralControl are both NEGATIVE controls, and the impossible-rubric one
+# fails identically under a healthy judge and under a judge stuck at FAIL --
+# measured, by running the committed control-manifest.yaml against a real
+# endpoint under @garrison-hq/muster@1.2.1 (judge-threshold defect
+# garrison-hq/muster#88) and getting a report indistinguishable from the
+# healthy @1.2.2 one on every field the guard read. A gate artifact carrying
+# only those two therefore cannot tell a reviewer whether perProfile's judge
+# results mean the model failed or the grader did, which is the whole of
+# FR-007. Accepting the two-key shape would let a future revert pass silently.
+jq_bool '(.controlManifest.judgePositiveControl | type) == "object"' "${control_file}" \
+  || die_shape "--control '${control_file}' has no .controlManifest.judgePositiveControl object -- the two negative controls alone cannot distinguish a healthy judge from one stuck at FAIL"
 jq_bool '(.model | type) == "string" and (.endpointHost | type) == "string"' "${control_file}" \
   || die_shape "--control '${control_file}' is missing a string .model or .endpointHost"
 

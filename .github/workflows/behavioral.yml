@@ -42,8 +42,34 @@ jobs:
       - name: Warm up muster npx cache
         id: muster_version
         run: |
+          set -euo pipefail
           version="$(npx --yes "${MUSTER_PIN}" --version)"
           echo "${version}"
+          # >>> muster-version pin assertion (extracted verbatim by control-discrimination-guard.test.sh)
+          # F4: the resolved version used to be captured, echoed, and written
+          # into the evidence artifact -- and never compared to anything. The
+          # comment above called that "self-certifying"; self-certifying is
+          # not asserting. Nothing went red if npx resolved 1.2.1, whose
+          # judge-threshold defect (garrison-hq/muster#88, fixed by
+          # db80a4295/#89) makes every resolved-threshold->=2 judge rule
+          # permanently unpassable -- a judge stuck at FAIL, which is exactly
+          # the condition control-manifest.yaml's two NEGATIVE controls cannot
+          # see (both of them fail under a stuck judge just as they do under a
+          # healthy one). Assert the pin, and assert it HERE, so the job dies
+          # before spending a credentialed run rather than after producing a
+          # report nobody can trust. This region is duplicated verbatim in the
+          # other job's warm-up step; control-discrimination-guard.test.sh
+          # extracts both copies and requires them byte-identical.
+          expected_version="${MUSTER_PIN##*@}"
+          if [[ ! "${expected_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::MUSTER_PIN '${MUSTER_PIN}' does not end in @<major.minor.patch> -- a range or an unversioned spec cannot be asserted, so it is not a pin"
+            exit 1
+          fi
+          if [ "${version:-}" != "${expected_version}" ]; then
+            echo "::error::npx resolved muster '${version:-<none>}' but MUSTER_PIN demands '${expected_version}' -- refusing to run: @1.2.1's judge-threshold defect (garrison-hq/muster#88) is a judge stuck at FAIL, and on every field the control-suite guard reads it is indistinguishable from a healthy endpoint"
+            exit 1
+          fi
+          # <<< muster-version pin assertion
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
 
       - name: Run main-suite manifests (profiles/*.yaml + FR-005 doctrine files)
@@ -291,11 +317,43 @@ jobs:
         with:
           node-version: "22"
 
+      # Same warm-up, and the same F4 pin assertion, as main-suite: the marked
+      # region below is byte-identical to that job's copy by requirement, not
+      # by coincidence -- control-discrimination-guard.test.sh extracts both
+      # and fails if they have drifted apart, because a version guard present
+      # in one job and absent (or weaker) in the other leaves the unguarded
+      # job free to certify a run produced by a stuck-FAIL judge.
       - name: Warm up muster npx cache
         id: muster_version
         run: |
+          set -euo pipefail
           version="$(npx --yes "${MUSTER_PIN}" --version)"
           echo "${version}"
+          # >>> muster-version pin assertion (extracted verbatim by control-discrimination-guard.test.sh)
+          # F4: the resolved version used to be captured, echoed, and written
+          # into the evidence artifact -- and never compared to anything. The
+          # comment above called that "self-certifying"; self-certifying is
+          # not asserting. Nothing went red if npx resolved 1.2.1, whose
+          # judge-threshold defect (garrison-hq/muster#88, fixed by
+          # db80a4295/#89) makes every resolved-threshold->=2 judge rule
+          # permanently unpassable -- a judge stuck at FAIL, which is exactly
+          # the condition control-manifest.yaml's two NEGATIVE controls cannot
+          # see (both of them fail under a stuck judge just as they do under a
+          # healthy one). Assert the pin, and assert it HERE, so the job dies
+          # before spending a credentialed run rather than after producing a
+          # report nobody can trust. This region is duplicated verbatim in the
+          # other job's warm-up step; control-discrimination-guard.test.sh
+          # extracts both copies and requires them byte-identical.
+          expected_version="${MUSTER_PIN##*@}"
+          if [[ ! "${expected_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::MUSTER_PIN '${MUSTER_PIN}' does not end in @<major.minor.patch> -- a range or an unversioned spec cannot be asserted, so it is not a pin"
+            exit 1
+          fi
+          if [ "${version:-}" != "${expected_version}" ]; then
+            echo "::error::npx resolved muster '${version:-<none>}' but MUSTER_PIN demands '${expected_version}' -- refusing to run: @1.2.1's judge-threshold defect (garrison-hq/muster#88) is a judge stuck at FAIL, and on every field the control-suite guard reads it is indistinguishable from a healthy endpoint"
+            exit 1
+          fi
+          # <<< muster-version pin assertion
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
 
       - name: Run control-manifest.yaml and assert genuine discrimination
@@ -333,49 +391,8 @@ jobs:
             exit 1
           fi
 
-          verdict_count="$(jq '.verdicts | length' "${report}" 2>/dev/null || echo "")"
-          if [ "${verdict_count}" != "2" ]; then
-            echo "::error::control-manifest.yaml produced ${verdict_count:-<none>} verdict(s), expected 2 -- the manifest did not load/lint; a zero-verdict report can never prove discrimination"
-            echo "report_file=${report}" >> "${GITHUB_OUTPUT}"
-            exit 1
-          fi
-
-          # A broken `sopFile:` path (or other lint-triggering manifest
-          # defect) can still produce exit 1 with the expected 2 verdicts --
-          # the verdict_count check alone does not catch that shape. An
-          # error-severity lint finding means the manifest itself is
-          # malformed, independent of how many verdicts happened to survive.
-          error_lint_count="$(jq '[.lintFindings[]? | select(.severity == "error")] | length' "${report}" 2>/dev/null || echo "")"
-          if [ "${error_lint_count}" != "0" ]; then
-            echo "::error::control-manifest.yaml produced ${error_lint_count:-<unreadable>} error-severity lint finding(s) -- manifest is malformed; see lintFindings in the report"
-            echo "report_file=${report}" >> "${GITHUB_OUTPUT}"
-            exit 1
-          fi
-
-          # The step's success path below prints "both controls failed as
-          # designed" having asserted only `muster_exit == 1` and
-          # `errored == 0`. Neither is sensitive to ONE control silently
-          # passing: muster still exits 1 (the other control failed), the
-          # errored count is still 0 (a passing run is not an errored run),
-          # and no error-severity lint finding is produced -- so the step
-          # accepted a half-broken discrimination control and printed a
-          # message that was simply false. Assert the count directly.
-          # `totalRuns >= 3` is asserted alongside it because a control
-          # collapsed to a single run cannot support pass^k discrimination
-          # at all, and would otherwise satisfy the count.
-          # Guard on the VALUE, not jq's exit status: jq on a report with no
-          # `verdicts` key errors and coincidentally exits 1, which would
-          # satisfy a status-based check for entirely the wrong reason.
-          # Tested by conformance/behavioral/scripts/control-discrimination-guard.test.sh,
-          # which extracts the marked lines below verbatim and runs them
-          # against committed real-endpoint report fixtures.
-          # >>> both-controls-failed assertion (extracted verbatim by control-discrimination-guard.test.sh)
-          both_failed="$(jq '[.verdicts[] | select(.passed == false and .totalRuns >= 3)] | length' "${report}" 2>/dev/null || echo "")"
-          [ "${both_failed}" = "2" ] || { echo "::error::expected 2 failing controls with >=3 runs each, got ${both_failed:-<unreadable>}"; echo "report_file=${report}" >> "${GITHUB_OUTPUT}"; exit 1; }
-          # <<< both-controls-failed assertion
-
           # F2 fix: write runs_errored immediately after computing it, before
-          # any exit path below. The previous placement (only on the final
+          # any exit path below. The original placement (only on the final
           # success path) meant both the muster_exit!=1 branch and the
           # errored>0 branch exited 1 without ever setting this output --
           # GitHub Actions reads an unset step output as an empty string,
@@ -390,40 +407,158 @@ jobs:
           # from consuming this output at all, computing runsErrored
           # directly from the report instead -- this output remains written
           # for its own diagnostic value in the job log above.)
+          #
+          # F1 hoisted it to HERE, above the verdict_count and lint branches
+          # it had still been sitting below. That the comment's own claim --
+          # "before any exit path below" -- was false of its own placement was
+          # not spotted by reading it; it was spotted by running the whole
+          # step body against a fixture that exits at the verdict_count branch
+          # and observing GITHUB_OUTPUT come back with no runs_errored line.
           echo "runs_errored=${errored}" >> "${GITHUB_OUTPUT}"
+
+          # Three, not two, since F1 added the POSITIVE judge control
+          # CONTROL-JUDGE-TRIVIAL to control-manifest.yaml.
+          verdict_count="$(jq '.verdicts | length' "${report}" 2>/dev/null || echo "")"
+          if [ "${verdict_count}" != "3" ]; then
+            echo "::error::control-manifest.yaml produced ${verdict_count:-<none>} verdict(s), expected 3 -- the manifest did not load/lint; a zero-verdict report can never prove discrimination"
+            echo "report_file=${report}" >> "${GITHUB_OUTPUT}"
+            exit 1
+          fi
+
+          # A broken `sopFile:` path (or other lint-triggering manifest
+          # defect) can still produce exit 1 with the expected 3 verdicts --
+          # the verdict_count check alone does not catch that shape. An
+          # error-severity lint finding means the manifest itself is
+          # malformed, independent of how many verdicts happened to survive.
+          error_lint_count="$(jq '[.lintFindings[]? | select(.severity == "error")] | length' "${report}" 2>/dev/null || echo "")"
+          if [ "${error_lint_count}" != "0" ]; then
+            echo "::error::control-manifest.yaml produced ${error_lint_count:-<unreadable>} error-severity lint finding(s) -- manifest is malformed; see lintFindings in the report"
+            echo "report_file=${report}" >> "${GITHUB_OUTPUT}"
+            exit 1
+          fi
 
           echo "control-suite: muster exit=${muster_exit} runsErrored=${errored}"
 
           # FR-007: never treat the control suite's own exit 1 as a build
-          # failure -- exit 1 IS the expected, correct outcome. This job's
-          # pass condition is instead: (a) the suite failed as designed
-          # (exit 1, both controls rigged-impossible), AND (b) zero runs
-          # errored (proving genuine discrimination, not a dead endpoint).
+          # failure -- exit 1 IS the expected, correct outcome. Two of the
+          # three controls are rigged to fail, so the manifest as a whole
+          # fails, so muster exits 1. (Confirmed live under @1.2.2 with the
+          # positive control passing 3/3: still exit 1.)
           if [ "${muster_exit}" -ne 1 ]; then
             echo "::error::control-manifest.yaml did not fail as designed (exit ${muster_exit}, expected 1) -- a discrimination control may be broken or accidentally satisfiable"
             echo "report_file=${report}" >> "${GITHUB_OUTPUT}"
             exit 1
           fi
 
+          # --------------------------------------------------------------
+          # The verdict assertions. Tested by
+          # conformance/behavioral/scripts/control-discrimination-guard.test.sh,
+          # which extracts the marked lines below VERBATIM and runs them
+          # against committed real-endpoint report fixtures -- including a
+          # real @1.2.1 stuck-FAIL-judge report and a real dead-endpoint
+          # report, not synthesised ones.
+          #
+          # Guard on the VALUE everywhere below, never on jq's exit status:
+          # jq on a report with no `verdicts` key errors and coincidentally
+          # exits 1, which would satisfy a status-based check for entirely
+          # the wrong reason.
+          # --------------------------------------------------------------
+          # >>> control-verdict assertions (extracted verbatim by control-discrimination-guard.test.sh)
+          # The dead-endpoint check leads, and that ordering is load-bearing
+          # rather than stylistic. Under a dead endpoint every run errors, so
+          # ALL THREE controls read as "failed" -- including the positive one.
+          # If the positive-control assertion ran first it would report a
+          # judge outage, and "dead endpoint" versus "the grader is stuck" are
+          # precisely the two conditions FR-007 exists to keep apart.
           if [ "${errored}" -gt 0 ]; then
             echo "::error::control-manifest.yaml had ${errored} errored run(s) -- cannot prove genuine discrimination this cycle (endpoint may be unreachable); see runs[].error in the report"
             echo "report_file=${report}" >> "${GITHUB_OUTPUT}"
             exit 1
           fi
 
-          echo "control-suite: both controls failed as designed with zero errored runs -- genuine discrimination confirmed"
+          # F3: nothing here used to inspect ruleId at all -- the guard
+          # counted verdicts and the evidence step selected them by
+          # `startswith(...)` prefix. Renaming a verdict (CONTROL-JUDGE-
+          # IMPOSSIBLE -> CTRL-JUDGE-IMPOSSIBLE) therefore produced: this
+          # guard printing "genuine discrimination confirmed" and exiting 0;
+          # the evidence step's jq matching nothing and writing ZERO BYTES,
+          # which `set -euo pipefail` cannot see because a jq no-match is not
+          # an error; the upload's `if-no-files-found: error` satisfied
+          # because the file exists; and finally death two steps later in
+          # merge-evidence as "not exactly one valid JSON document (got: 0)",
+          # a message pointing at file corruption rather than at a rename.
+          # Assert the exact expected set so drift fails at its origin.
+          expected_rule_ids="CONTROL-BEHAVIORAL-FORBIDDEN-ACTION CONTROL-JUDGE-IMPOSSIBLE CONTROL-JUDGE-TRIVIAL"
+          actual_rule_ids="$(jq -r '[.verdicts[].ruleId] | sort | join(" ")' "${report}" 2>/dev/null || echo "")"
+          [ "${actual_rule_ids}" = "${expected_rule_ids}" ] || { echo "::error::control-manifest.yaml produced ruleIds [${actual_rule_ids:-<none>}], expected [${expected_rule_ids}] -- a renamed or missing control silently empties the evidence step's per-ruleId selection"; echo "report_file=${report}" >> "${GITHUB_OUTPUT}"; exit 1; }
+
+          # The two NEGATIVE controls, selected BY NAME so the positive one
+          # can neither be counted here nor excluded from here by accident.
+          #
+          # `passCount == 0` (F2) is asserted alongside `passed == false`
+          # because both ruleTexts claim a healthy endpoint "must observe this
+          # rule failing EVERY run", and `passed` alone does not say that:
+          # CONTROL-JUDGE-IMPOSSIBLE is k-of-n with passThreshold 2, so 1 of 3
+          # spurious PASSes still aggregates to passed == false, and
+          # CONTROL-BEHAVIORAL-FORBIDDEN-ACTION is pass-k with k=3/threshold 3,
+          # satisfied by the forbidden string appearing in only 1 run of 3.
+          # Both live-measure 0/3, so this closes slack rather than tightening
+          # a real result, and passCount is already in the report.
+          #
+          # `totalRuns >= 3` is asserted because a control collapsed to a
+          # single run cannot support pass^k discrimination at all, and would
+          # otherwise satisfy the count.
+          negative_failed="$(jq '[.verdicts[] | select(.ruleId == "CONTROL-JUDGE-IMPOSSIBLE" or .ruleId == "CONTROL-BEHAVIORAL-FORBIDDEN-ACTION") | select(.passed == false and .passCount == 0 and .totalRuns >= 3)] | length' "${report}" 2>/dev/null || echo "")"
+          [ "${negative_failed}" = "2" ] || { echo "::error::expected 2 negative controls (CONTROL-JUDGE-IMPOSSIBLE, CONTROL-BEHAVIORAL-FORBIDDEN-ACTION) each failing with passCount 0 over >=3 runs, got ${negative_failed:-<unreadable>}"; echo "report_file=${report}" >> "${GITHUB_OUTPUT}"; exit 1; }
+
+          # F1: the POSITIVE control. This is the only assertion in the whole
+          # job that a judge stuck at FAIL cannot satisfy. The two negatives
+          # above fail under a healthy judge AND under a stuck one, so they
+          # certify nothing about the judge path; measured live, a real
+          # @1.2.1 run (judge-threshold defect garrison-hq/muster#88) produced
+          # a report identical to a healthy @1.2.2 run on every field the
+          # guard read before this line existed, and the guard passed it.
+          # passCount is deliberately NOT pinned to 3 here: the rubric is
+          # formal ("the reply contains at least one word") but the judge is
+          # still a model, and `passed` already encodes the declared k-of-n
+          # threshold of 2. Requiring 3/3 would make this control flaky in the
+          # one direction that matters -- a false red on a healthy endpoint
+          # teaches the next reader to ignore it.
+          positive_passed="$(jq '[.verdicts[] | select(.ruleId == "CONTROL-JUDGE-TRIVIAL") | select(.passed == true and .totalRuns >= 3)] | length' "${report}" 2>/dev/null || echo "")"
+          [ "${positive_passed}" = "1" ] || { echo "::error::positive control CONTROL-JUDGE-TRIVIAL did not pass over >=3 runs (matched ${positive_passed:-<unreadable>} verdict(s)) -- its rubric is satisfied by any non-empty reply, so a failure here means the JUDGE path is broken (unreachable, stuck at FAIL, or a bad muster pin), not that the model misbehaved; without this assertion a total judge outage certifies as 'genuine discrimination confirmed'"; echo "report_file=${report}" >> "${GITHUB_OUTPUT}"; exit 1; }
+          # <<< control-verdict assertions
+
+          echo "control-suite: both negative controls failed as designed (0/3 each), the positive control passed, zero errored runs -- genuine discrimination confirmed in both directions"
           echo "report_file=${report}" >> "${GITHUB_OUTPUT}"
           exit 0
 
       # F5: split controlManifest into judgeControl/behavioralControl, per
       # spec.md's Evidence Artifact shape, keyed by this file's own stable
-      # ruleId naming convention (CONTROL-JUDGE-IMPOSSIBLE,
-      # CONTROL-BEHAVIORAL-FORBIDDEN-ACTION -- control-manifest.yaml is this
-      # WP's own file, so the prefix match is not a guess about foreign
-      # content). Each branch computes its own passed/runsErrored directly
-      # from that verdict's own runs, independent of the step-level
-      # `runs_errored` output (which remains the whole-manifest total used
-      # for this job's own pass/fail gate above).
+      # ruleId naming convention -- control-manifest.yaml is this WP's own
+      # file, so matching on ruleId is not a guess about foreign content.
+      # Each branch computes its own passed/runsErrored directly from that
+      # verdict's own runs, independent of the step-level `runs_errored`
+      # output (which remains the whole-manifest total used for this job's
+      # own pass/fail gate above).
+      #
+      # F1/F3, two changes here:
+      #
+      #  * a third key, judgePositiveControl, carrying CONTROL-JUDGE-TRIVIAL.
+      #    Recording only the two negative controls would leave the gate
+      #    artifact unable to distinguish a healthy run from a stuck-FAIL
+      #    judge, which is the whole point of adding the positive control.
+      #
+      #  * selection by EXACT ruleId through a `one_verdict` helper that
+      #    error()s, replacing `startswith("CONTROL-JUDGE")`. The prefix match
+      #    would now match two verdicts, and `.verdicts[] | select(...)`
+      #    inside an object constructor emits one document PER match -- two
+      #    matches would write two concatenated JSON documents, which
+      #    build-evidence-artifact.sh rejects with an opaque "not exactly one
+      #    valid JSON document (got: 2)". Zero matches were worse: jq emits
+      #    NOTHING, `set -euo pipefail` cannot see a no-match, and the
+      #    zero-byte file survived the upload's `if-no-files-found: error`
+      #    (the file exists) to die two steps later in merge-evidence. Both
+      #    shapes now fail loudly, here, naming the ruleId.
       - name: Write evidence artifact (control-suite)
         if: always() && steps.control_suite.outputs.report_file != ''
         # F11: same env: pass-through as main-suite's evidence step, never
@@ -436,23 +571,33 @@ jobs:
           mkdir -p conformance/behavioral/evidence
           evidence_file="conformance/behavioral/evidence/$(date -u +%Y-%m-%d)-01KYW5XK-control-suite.json"
           endpoint_host="$(printf '%s\n' "${MUSTER_ENDPOINT:-}" | sed -E 's#^[a-zA-Z][a-zA-Z0-9+.-]*://##; s#^[^/@]*@##; s#[/:].*##')"
+          # >>> control evidence reshape (extracted verbatim by control-discrimination-guard.test.sh)
           jq \
             --arg model "${MUSTER_MODEL:-gpt-4o-mini}" \
             --arg endpointHost "${endpoint_host}" \
             --arg musterVersion "${MUSTER_VERSION:-}" \
             --arg ranAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            '{
+            'def one_verdict($id):
+               [.verdicts[]? | select(.ruleId == $id)]
+               | if length == 1 then .[0]
+                 else error("control report has \(length) verdict(s) with ruleId \($id), expected exactly 1 -- refusing to write an evidence file that silently omits or duplicates a discrimination control")
+                 end;
+             def control_shape:
+               {passed, passCount, totalRuns, runsErrored: ([.runs[] | select(.error != null)] | length)};
+             {
               model: $model,
               endpointHost: $endpointHost,
               musterVersion: $musterVersion,
               ranAt: $ranAt,
               controlManifest: {
-                judgeControl: (.verdicts[] | select(.ruleId | startswith("CONTROL-JUDGE")) | {passed, passCount, totalRuns, runsErrored: ([.runs[] | select(.error != null)] | length)}),
-                behavioralControl: (.verdicts[] | select(.ruleId | startswith("CONTROL-BEHAVIORAL")) | {passed, passCount, totalRuns, runsErrored: ([.runs[] | select(.error != null)] | length)})
+                judgeControl: (one_verdict("CONTROL-JUDGE-IMPOSSIBLE") | control_shape),
+                behavioralControl: (one_verdict("CONTROL-BEHAVIORAL-FORBIDDEN-ACTION") | control_shape),
+                judgePositiveControl: (one_verdict("CONTROL-JUDGE-TRIVIAL") | control_shape)
               }
             }' \
             "${REPORT_FILE}" \
             > "${evidence_file}"
+          # <<< control evidence reshape
           echo "Wrote ${evidence_file}"
 
       - uses: actions/upload-artifact@v4

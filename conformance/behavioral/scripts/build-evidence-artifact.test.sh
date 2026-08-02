@@ -192,6 +192,19 @@ assert_jq "controlManifest.behavioralControl merged in" \
   '.controlManifest.behavioralControl | {passed, runsErrored}' \
   '{"passed":false,"runsErrored":0}'
 
+# F1: the positive judge control. The two controls above are both NEGATIVE,
+# and the impossible-rubric one fails under a stuck-FAIL judge exactly as it
+# does under a healthy one -- so a gate artifact carrying only those two
+# cannot distinguish a healthy run from a total judge outage, which is the
+# condition that turns every judge-graded rule in perProfile red.
+assert_jq "controlManifest.judgePositiveControl merged in (passed: true)" \
+  '.controlManifest.judgePositiveControl | {passed, passCount, totalRuns, runsErrored}' \
+  '{"passed":true,"passCount":3,"totalRuns":3,"runsErrored":0}'
+
+assert_jq "all three controls survive the merge" \
+  '.controlManifest | keys' \
+  '["behavioralControl","judgeControl","judgePositiveControl"]'
+
 assert_jq "model/endpointHost/ranAt carried to the top level" \
   '{model, endpointHost, ranAt}' \
   '{"model":"gpt-4o-mini","endpointHost":"api.openai.com","ranAt":"2026-08-02T09:15:00Z"}'
@@ -260,6 +273,15 @@ assert_rejects "control evidence missing controlManifest -> rejected" \
 
 assert_rejects "control evidence missing behavioralControl -> rejected" \
   "main-live.json" "control-half.json" 4
+
+# F1: a control evidence file carrying only the two NEGATIVE controls is
+# exactly the pre-fix shape. It is structurally valid and reads as a complete
+# discrimination record, and it is the one shape a stuck-FAIL judge produces
+# indistinguishably from a healthy endpoint -- so the merge must refuse it
+# rather than hand the gate reviewer an artifact that cannot answer the
+# question it exists to answer.
+assert_rejects "control evidence missing judgePositiveControl -> rejected" \
+  "main-live.json" "control-no-positive.json" 4
 
 assert_rejects "ranAt that is not an ISO date -> rejected (filename would be garbage)" \
   "main-bad-ranat.json" "control-live.json" 4
