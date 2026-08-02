@@ -1,22 +1,208 @@
 name: Behavioral Conformance Cadence
 
-# RED (T011, CHTR-011): workflow_dispatch-only trigger is correct, but the
-# job bodies below are echo-only placeholders. C-002 explicitly calls this
-# shape out as insufficient -- "satisfies the trigger constraint's letter
-# while doing nothing" -- and this commit is deliberately that shape, so the
-# GREEN commit's diff makes the gap visible. Replaced by real muster sop run
-# invocations against every profiles/*.yaml and doctrine/*.yaml manifest
-# (main-suite) and control-manifest.yaml (control-suite).
+# C-002: workflow_dispatch only, never pull_request or schedule (schedule is
+# out of scope for this mission -- M8). This suite exercises a live,
+# credentialed, bring-your-own model endpoint on every run (C-001), so it
+# must never gate a pull request.
 on:
   workflow_dispatch: {}
+
+env:
+  # Pin @garrison-hq/muster@1.2.2 everywhere -- @1.2.1 has a live pass-k/
+  # k-of-n judge-threshold defect (garrison-hq/muster#88, fixed by commit
+  # db80a4295 / #89) that makes every resolved-threshold->=2 judge rule
+  # permanently unpassable.
+  MUSTER_PIN: "@garrison-hq/muster@1.2.2"
 
 jobs:
   main-suite:
     runs-on: ubuntu-latest
+    # C-001: endpoint config comes from repository secrets only -- never a
+    # manifest value or an argv literal. Job-level so every step (including
+    # the evidence-writing step, which reports the model name) sees it.
+    env:
+      MUSTER_ENDPOINT: ${{ secrets.MUSTER_ENDPOINT }}
+      MUSTER_MODEL: ${{ secrets.MUSTER_MODEL }}
+      MUSTER_API_KEY: ${{ secrets.MUSTER_API_KEY }}
     steps:
-      - run: echo "main-suite placeholder -- invokes no manifest yet"
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # npx --offline fails on a cold runner cache (ENOTCACHED) -- warm the
+      # cache with one online resolution before every --offline invocation
+      # below.
+      - name: Warm up muster npx cache
+        run: npx --yes "${MUSTER_PIN}" --version
+
+      - name: Run main-suite manifests (profiles/*.yaml + FR-005 doctrine files)
+        id: main_suite
+        run: |
+          # GitHub Actions runs `run:` blocks as `bash -eo pipefail {0}` by
+          # default. `set -e` alone would abort this step the instant
+          # `muster sop run` exits 1 (which it does by design whenever any
+          # case fails, including every discrimination control) -- before
+          # `muster_exit=$?` below ever executes. Explicitly disable `-e`
+          # here; every exit code this script cares about is captured and
+          # checked by hand instead.
+          set +e
+          set -u -o pipefail
+          shopt -s nullglob
+
+          mkdir -p /tmp/behavioral-reports
+
+          # C-002: glob-driven for the profiles (WP01's output, unknown at
+          # authoring time), literal for the three FR-005-edited doctrine
+          # files T006-T008 actually touched -- never a hardcoded profile
+          # list.
+          manifests=(
+            conformance/behavioral/profiles/*.yaml
+            conformance/doctrine/010-specification-fidelity-requirement.yaml
+            conformance/doctrine/039-lynn-cole-engineering-culture.yaml
+            conformance/doctrine/044-canonical-sources-and-unification.yaml
+          )
+
+          overall_status=0
+          cases_json="[]"
+
+          for manifest in "${manifests[@]}"; do
+            name="$(basename "${manifest}" .yaml)"
+            report="/tmp/behavioral-reports/${name}.json"
+
+            # muster exits 1 whenever any case in the manifest fails, and a
+            # genuinely non-compliant model or a control is *expected* to
+            # fail -- do not let that abort this step (no `set -e` above).
+            npx --yes --offline "${MUSTER_PIN}" sop run "${manifest}" --json > "${report}"
+            muster_exit=$?
+
+            if [ "${muster_exit}" -ne 0 ] && [ "${muster_exit}" -ne 1 ]; then
+              echo "::error::muster sop run against ${manifest} exited ${muster_exit} (neither pass=0 nor fail=1) -- treating as an infrastructure failure"
+              overall_status=1
+              continue
+            fi
+
+            errored="$(conformance/behavioral/scripts/check-runs-errored.sh "${report}")"
+            passed="$(jq -r '.passed' "${report}")"
+
+            if [ "${errored}" -gt 0 ]; then
+              echo "::warning::${manifest} had ${errored} errored run(s) -- this case's result is endpoint-inconclusive, not necessarily a model non-compliance signal (FR-007)"
+            fi
+
+            if [ "${passed}" != "true" ]; then
+              overall_status=1
+            fi
+
+            cases_json="$(jq -c \
+              --arg manifest "${manifest}" \
+              --argjson passed "${passed}" \
+              --argjson runsErrored "${errored}" \
+              '. + [{"manifest": $manifest, "passed": $passed, "runsErrored": $runsErrored}]' \
+              <<<"${cases_json}")"
+          done
+
+          echo "${cases_json}" > /tmp/behavioral-reports/main-suite-cases.json
+          echo "cases_file=/tmp/behavioral-reports/main-suite-cases.json" >> "${GITHUB_OUTPUT}"
+          exit "${overall_status}"
+
+      - name: Write evidence artifact (main-suite cases)
+        if: always() && steps.main_suite.outputs.cases_file != ''
+        run: |
+          set -euo pipefail
+          mkdir -p conformance/behavioral/evidence
+          evidence_file="conformance/behavioral/evidence/$(date -u +%Y-%m-%d)-01KYW5XK-main-suite.json"
+          jq -n \
+            --arg model "${MUSTER_MODEL:-gpt-4o-mini}" \
+            --arg ranAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --slurpfile cases "${{ steps.main_suite.outputs.cases_file }}" \
+            '{model: $model, ranAt: $ranAt, mainSuiteCases: $cases[0]}' \
+            > "${evidence_file}"
+          echo "Wrote ${evidence_file}"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: behavioral-main-suite-evidence
+          path: conformance/behavioral/evidence/*.json
+          if-no-files-found: warn
 
   control-suite:
     runs-on: ubuntu-latest
+    # C-001: same secrets-only sourcing as main-suite; job-level so the
+    # evidence-writing step also sees the model name.
+    env:
+      MUSTER_ENDPOINT: ${{ secrets.MUSTER_ENDPOINT }}
+      MUSTER_MODEL: ${{ secrets.MUSTER_MODEL }}
+      MUSTER_API_KEY: ${{ secrets.MUSTER_API_KEY }}
     steps:
-      - run: echo "control-suite placeholder -- invokes no manifest yet"
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Warm up muster npx cache
+        run: npx --yes "${MUSTER_PIN}" --version
+
+      - name: Run control-manifest.yaml and assert genuine discrimination
+        id: control_suite
+        run: |
+          # Same `-e` hazard as main-suite: control-manifest.yaml is
+          # designed to exit 1, so `-e` must be off before that command
+          # runs, or this step would abort before its own assertions below.
+          set +e
+          set -u -o pipefail
+          mkdir -p /tmp/behavioral-reports
+          report="/tmp/behavioral-reports/control-manifest.json"
+
+          npx --yes --offline "${MUSTER_PIN}" sop run conformance/behavioral/control-manifest.yaml --json > "${report}"
+          muster_exit=$?
+
+          errored="$(conformance/behavioral/scripts/check-runs-errored.sh "${report}")"
+
+          echo "control-suite: muster exit=${muster_exit} runsErrored=${errored}"
+
+          # FR-007: never treat the control suite's own exit 1 as a build
+          # failure -- exit 1 IS the expected, correct outcome. This job's
+          # pass condition is instead: (a) the suite failed as designed
+          # (exit 1, both controls rigged-impossible), AND (b) zero runs
+          # errored (proving genuine discrimination, not a dead endpoint).
+          if [ "${muster_exit}" -ne 1 ]; then
+            echo "::error::control-manifest.yaml did not fail as designed (exit ${muster_exit}, expected 1) -- a discrimination control may be broken or accidentally satisfiable"
+            echo "report_file=${report}" >> "${GITHUB_OUTPUT}"
+            exit 1
+          fi
+
+          if [ "${errored}" -gt 0 ]; then
+            echo "::error::control-manifest.yaml had ${errored} errored run(s) -- cannot prove genuine discrimination this cycle (endpoint may be unreachable); see runs[].error in the report"
+            echo "report_file=${report}" >> "${GITHUB_OUTPUT}"
+            exit 1
+          fi
+
+          echo "control-suite: both controls failed as designed with zero errored runs -- genuine discrimination confirmed"
+          echo "report_file=${report}" >> "${GITHUB_OUTPUT}"
+          echo "runs_errored=${errored}" >> "${GITHUB_OUTPUT}"
+          exit 0
+
+      - name: Write evidence artifact (control-suite)
+        if: always() && steps.control_suite.outputs.report_file != ''
+        run: |
+          set -euo pipefail
+          mkdir -p conformance/behavioral/evidence
+          evidence_file="conformance/behavioral/evidence/$(date -u +%Y-%m-%d)-01KYW5XK-control-suite.json"
+          jq \
+            --arg model "${MUSTER_MODEL:-gpt-4o-mini}" \
+            --arg ranAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --argjson runsErrored "${{ steps.control_suite.outputs.runs_errored || 0 }}" \
+            '{model: $model, ranAt: $ranAt, controlManifest: {passed: .passed, runsErrored: $runsErrored}}' \
+            "${{ steps.control_suite.outputs.report_file }}" \
+            > "${evidence_file}"
+          echo "Wrote ${evidence_file}"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: behavioral-control-suite-evidence
+          path: conformance/behavioral/evidence/*control-suite.json
+          if-no-files-found: warn
