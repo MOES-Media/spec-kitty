@@ -1,5 +1,4 @@
 {
-  "accept_commit": "98e8ec7c1a2a16d1027d4125eda1d0cb3f14a917",
   "acceptance_history": [
     {
       "accept_commit": "98e8ec7c1a2a16d1027d4125eda1d0cb3f14a917",
@@ -7,12 +6,18 @@
       "accepted_at": "2026-08-02T03:16:49.697305+00:00",
       "accepted_by": "jeroennouws",
       "accepted_from_commit": "3d34bb35a9eee9bf4052e722b233dfb0a3294e45"
+    },
+    {
+      "acceptance_mode": "pr",
+      "accepted_at": "2026-08-02T04:11:16.423026+00:00",
+      "accepted_by": "jeroennouws",
+      "accepted_from_commit": "b76ac7cffde598fce7804adcaa8c26f1a7852be5"
     }
   ],
   "acceptance_mode": "pr",
-  "accepted_at": "2026-08-02T03:16:49.697305+00:00",
+  "accepted_at": "2026-08-02T04:11:16.423026+00:00",
   "accepted_by": "jeroennouws",
-  "accepted_from_commit": "3d34bb35a9eee9bf4052e722b233dfb0a3294e45",
+  "accepted_from_commit": "b76ac7cffde598fce7804adcaa8c26f1a7852be5",
   "coordination_branch": "kitty/mission-doctrine-behavioral-suite-01KYW5XK",
   "created_at": "2026-07-31T13:30:49.134903+00:00",
   "flattened": false,
