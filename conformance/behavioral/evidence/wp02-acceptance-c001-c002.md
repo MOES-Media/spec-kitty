@@ -46,9 +46,9 @@ discarded immediately after:
 
 ```
 $ cp .github/workflows/behavioral.yml /tmp/behavioral-scratch.yml
-$ echo '# planted: nvapi-ABCD1234' >> /tmp/behavioral-scratch.yml
+$ echo '# planted: nvapi-XXXXXXXX' >> /tmp/behavioral-scratch.yml
 $ command grep -rE '(nvapi-[A-Za-z0-9]{8}|\bsk-[A-Za-z0-9_-]{20})' /tmp/behavioral-scratch.yml
-# planted: nvapi-ABCD1234
+# planted: nvapi-XXXXXXXX
 $ echo $?
 0
 $ rm -f /tmp/behavioral-scratch.yml
