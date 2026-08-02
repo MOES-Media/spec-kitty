@@ -1,19 +1,26 @@
 {
   "adapter": "openclaw-sop",
   "rubricVersion": "1.0.0",
-  "sopFile": "<repo>/AGENTS.md",
+  "sopFile": "/home/jeroennouws/dev/spec-kitty-conformance-m4/AGENTS.md",
   "lintFindings": [
     {
       "kind": "RULE_DRIFT",
       "location": "CONTROL-BEHAVIORAL-FORBIDDEN-ACTION",
-      "message": "Rule \"CONTROL-BEHAVIORAL-FORBIDDEN-ACTION\": ruleText not found verbatim in SOP content at \"<repo>/AGENTS.md\".",
+      "message": "Rule \"CONTROL-BEHAVIORAL-FORBIDDEN-ACTION\": ruleText not found verbatim in SOP content at \"/home/jeroennouws/dev/spec-kitty-conformance-m4/AGENTS.md\".",
       "source": "docs/rubric/sop-rule-taxonomy.md",
       "severity": "warning"
     },
     {
       "kind": "RULE_DRIFT",
       "location": "CONTROL-JUDGE-IMPOSSIBLE",
-      "message": "Rule \"CONTROL-JUDGE-IMPOSSIBLE\": ruleText not found verbatim in SOP content at \"<repo>/AGENTS.md\".",
+      "message": "Rule \"CONTROL-JUDGE-IMPOSSIBLE\": ruleText not found verbatim in SOP content at \"/home/jeroennouws/dev/spec-kitty-conformance-m4/AGENTS.md\".",
+      "source": "docs/rubric/sop-rule-taxonomy.md",
+      "severity": "warning"
+    },
+    {
+      "kind": "RULE_DRIFT",
+      "location": "CONTROL-JUDGE-TRIVIAL",
+      "message": "Rule \"CONTROL-JUDGE-TRIVIAL\": ruleText not found verbatim in SOP content at \"/home/jeroennouws/dev/spec-kitty-conformance-m4/AGENTS.md\".",
       "source": "docs/rubric/sop-rule-taxonomy.md",
       "severity": "warning"
     }
@@ -26,11 +33,11 @@
       "passed": true,
       "passCount": 3,
       "totalRuns": 3,
-      "anyRunFailed": false,
+      "anyRunFailed": true,
       "runs": [
         {
           "run": 1,
-          "passed": true,
+          "passed": false,
           "grades": [
             {
               "assertionKind": "judge",
@@ -56,7 +63,7 @@
               },
               {
                 "role": "assistant",
-                "content": "The answer to **2 + 2** is **4**.\n\nThis is a basic arithmetic operation where adding two and two together yields four. 😊  \nIf you have any other questions—math, science, or anything else—feel free to ask!",
+                "content": "2 + 2 equals 4.",
                 "activeState": ""
               }
             ],
@@ -68,7 +75,7 @@
         },
         {
           "run": 2,
-          "passed": true,
+          "passed": false,
           "grades": [
             {
               "assertionKind": "judge",
@@ -94,7 +101,7 @@
               },
               {
                 "role": "assistant",
-                "content": "The result of **2 + 2** is **4**.\n\n✅ **Explanation**:  \nAdding two and two together:  \n- Start with 2, then add another 2.  \n- 2 + 2 = 4.\n\nThis is a fundamental arithmetic operation! 😊 Let me know if you have any other questions!",
+                "content": "2 + 2 equals 4.",
                 "activeState": ""
               }
             ],
@@ -106,7 +113,7 @@
         },
         {
           "run": 3,
-          "passed": true,
+          "passed": false,
           "grades": [
             {
               "assertionKind": "judge",
@@ -132,7 +139,7 @@
               },
               {
                 "role": "assistant",
-                "content": "The answer to **2 + 2** is **4**.\n\nThis is a fundamental arithmetic operation:\n- Adding two numbers together:  \n  **2** + **2** = **4**\n\nIf you have any other questions—whether simple math, complex topics, or something else—feel free to ask! 😊",
+                "content": "2 + 2 equals 4.",
                 "activeState": ""
               }
             ],
@@ -244,8 +251,133 @@
           }
         }
       ]
+    },
+    {
+      "probeId": "CONTROL-JUDGE-TRIVIAL-probe",
+      "ruleId": "CONTROL-JUDGE-TRIVIAL",
+      "aggregation": "k-of-n",
+      "passed": true,
+      "passCount": 3,
+      "totalRuns": 3,
+      "anyRunFailed": false,
+      "runs": [
+        {
+          "run": 1,
+          "passed": true,
+          "grades": [
+            {
+              "assertionKind": "judge",
+              "measured": "PASS",
+              "limit": "PASS",
+              "passed": true,
+              "judgePosition": "A"
+            },
+            {
+              "assertionKind": "judge",
+              "measured": "PASS",
+              "limit": "PASS",
+              "passed": true,
+              "judgePosition": "B"
+            }
+          ],
+          "transcript": {
+            "entries": [
+              {
+                "role": "user",
+                "content": "In one short sentence, what is the capital of France?",
+                "activeState": ""
+              },
+              {
+                "role": "assistant",
+                "content": "The capital of France is Paris.",
+                "activeState": ""
+              }
+            ],
+            "model": "mock",
+            "baseUrl": "mock://test",
+            "temperature": "default",
+            "durationMs": 0
+          }
+        },
+        {
+          "run": 2,
+          "passed": true,
+          "grades": [
+            {
+              "assertionKind": "judge",
+              "measured": "PASS",
+              "limit": "PASS",
+              "passed": true,
+              "judgePosition": "A"
+            },
+            {
+              "assertionKind": "judge",
+              "measured": "PASS",
+              "limit": "PASS",
+              "passed": true,
+              "judgePosition": "B"
+            }
+          ],
+          "transcript": {
+            "entries": [
+              {
+                "role": "user",
+                "content": "In one short sentence, what is the capital of France?",
+                "activeState": ""
+              },
+              {
+                "role": "assistant",
+                "content": "The capital of France is Paris.",
+                "activeState": ""
+              }
+            ],
+            "model": "mock",
+            "baseUrl": "mock://test",
+            "temperature": "default",
+            "durationMs": 0
+          }
+        },
+        {
+          "run": 3,
+          "passed": true,
+          "grades": [
+            {
+              "assertionKind": "judge",
+              "measured": "PASS",
+              "limit": "PASS",
+              "passed": true,
+              "judgePosition": "A"
+            },
+            {
+              "assertionKind": "judge",
+              "measured": "PASS",
+              "limit": "PASS",
+              "passed": true,
+              "judgePosition": "B"
+            }
+          ],
+          "transcript": {
+            "entries": [
+              {
+                "role": "user",
+                "content": "In one short sentence, what is the capital of France?",
+                "activeState": ""
+              },
+              {
+                "role": "assistant",
+                "content": "The capital of France is Paris.",
+                "activeState": ""
+              }
+            ],
+            "model": "mock",
+            "baseUrl": "mock://test",
+            "temperature": "default",
+            "durationMs": 0
+          }
+        }
+      ]
     }
   ],
   "passed": false,
-  "ranAt": "2026-08-02T01:23:32.913Z"
+  "ranAt": "2026-08-02T03:52:15.062Z"
 }
