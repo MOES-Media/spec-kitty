@@ -21,3 +21,13 @@ rules:
     source:
       normative: docs/rubric/sop-rule-taxonomy.md#5-output-format
       supporting: https://github.com/Priivacy-ai/spec-kitty/blob/fa80fa0f96d37d9fa3ce5e9679c05fb0bdc74982/src/doctrine/directives/built-in/010-specification-fidelity-requirement.directive.yaml
+  - ruleId: 010-behavioral-1
+    ruleText: A deviation from the approved spec must be flagged and documented before the work is treated as ready to merge.
+    probeIds: []
+    gradingClass: binary
+    aggregation: pass-k
+    k: 3
+    passThreshold: 3
+    source:
+      normative: docs/rubric/sop-rule-taxonomy.md#5-output-format
+      supporting: https://github.com/Priivacy-ai/spec-kitty/blob/fa80fa0f96d37d9fa3ce5e9679c05fb0bdc74982/src/doctrine/directives/built-in/010-specification-fidelity-requirement.directive.yaml
