@@ -246,3 +246,12 @@ indexed here by full URL:
   `[LIMITATION]` above (a real multi-tool routing decision might score
   differently), but it is a specific, checkable claim about description
   content that the naming attribution was not.
+
+  **This claim is scoped to the two one-sided pairs above, not to every
+  skill with a `Does NOT handle:` clause**: three of the five legacy
+  skills in this run's finding also carry that clause and still failed —
+  `spec-kitty-runtime-next` (0.625), `spec-kitty-runtime-review` (0.542),
+  and `spec-kitty-git-workflow` (0.625). The clause is therefore not a
+  general predictor of passing; the claim above holds only for the
+  specific verbose-vs-terse comparison within each of the two one-sided
+  pairs it names.
