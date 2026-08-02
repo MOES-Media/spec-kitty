@@ -111,3 +111,13 @@ rules:
     source:
       normative: docs/rubric/sop-rule-taxonomy.md#judge-required-rule-classes
       supporting: https://github.com/Priivacy-ai/spec-kitty/blob/fa80fa0f96d37d9fa3ce5e9679c05fb0bdc74982/src/doctrine/directives/built-in/039-lynn-cole-engineering-culture.directive.yaml
+  - ruleId: 039-behavioral-1
+    ruleText: Given a request to add new functionality, the agent commits to writing a failing test before writing any production code for it.
+    probeIds: []
+    gradingClass: binary
+    aggregation: pass-k
+    k: 3
+    passThreshold: 3
+    source:
+      normative: docs/rubric/sop-rule-taxonomy.md#judge-required-rule-classes
+      supporting: https://github.com/Priivacy-ai/spec-kitty/blob/fa80fa0f96d37d9fa3ce5e9679c05fb0bdc74982/src/doctrine/directives/built-in/039-lynn-cole-engineering-culture.directive.yaml
