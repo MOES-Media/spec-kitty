@@ -31,3 +31,13 @@ rules:
     source:
       normative: docs/rubric/sop-rule-taxonomy.md#judge-required-rule-classes
       supporting: https://github.com/Priivacy-ai/spec-kitty/blob/45a451a163e89046a3ee079077d4cfab57fa2444/src/doctrine/directives/built-in/044-canonical-sources-and-unification.directive.yaml
+  - ruleId: 044-behavioral-1
+    ruleText: "When a documented CLI command is absent from the running tool, the agent declines to hand-roll a local substitute and instead directs tracing the command's source and filing an upstream gap issue."
+    probeIds: []
+    gradingClass: binary
+    aggregation: pass-k
+    k: 3
+    passThreshold: 3
+    source:
+      normative: docs/rubric/sop-rule-taxonomy.md#judge-required-rule-classes
+      supporting: https://github.com/Priivacy-ai/spec-kitty/blob/45a451a163e89046a3ee079077d4cfab57fa2444/src/doctrine/directives/built-in/044-canonical-sources-and-unification.directive.yaml
