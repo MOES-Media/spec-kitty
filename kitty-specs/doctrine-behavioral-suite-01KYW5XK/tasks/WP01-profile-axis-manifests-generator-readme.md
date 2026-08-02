@@ -60,7 +60,7 @@ deployed system prompt: the generator that produces that system prompt
 in-repo (FR-009), and the five manifests that grade it (FR-001..004/006).
 
 **Sequencing inside this WP** (single WP, ordered commits, per
-CHTR-011/C-011's binding ATDD-first discipline — outranks every `DIR-0xx`):
+CHTR-011's binding ATDD-first discipline — outranks every `DIR-0xx`):
 T001 (generator) → T002 (projected bodies, depends on T001's script existing)
 → T003 (architect-alphonso manifest, the fully-worked exemplar) → T004
 (remaining four manifests, same pattern) → T005 (README, documents what
@@ -244,9 +244,20 @@ template T004 copies the *pattern* of, never the *content* of.
 3. Four rules, `ruleId` exactly:
    - `AVOIDANCE-BOUNDARY-architect-alphonso` — `gradingClass: judge`,
      `aggregation: pass-k`, `k: 5`, **`passThreshold: 5`** (explicit, never
-     omitted — `runner.ts:305,566` resolves an omitted value to
-     `ceil(k/2)` regardless of `aggregation`, silently downgrading this to a
-     majority vote). `rubricText` quotes muster's rubric doc §1 verbatim.
+     omitted — set it for manifest hygiene even though, at the pinned
+     `v1.2.2`, `graders.ts`'s `aggregatePassK` — the outer pass-k
+     aggregator `dispatchProbeVerdicts` calls, `runner.ts` ~line 579 —
+     takes no `passThreshold` argument at all: every one of the `k` runs
+     must pass, unconditionally, regardless of this field's value.
+     `manifest.ts`'s own validator still throws if `passThreshold` is set
+     and `!== k` on a pass-k row, so the explicit value is what keeps the
+     manifest self-documenting and prevents a future edit from setting an
+     inconsistent value, not a runtime-safety requirement for this
+     specific axis post-fix. The k-of-n rows below are the ones where an
+     *omitted* `passThreshold` still silently changes runtime behavior —
+     `dispatchProbeVerdicts` resolves it to `Math.ceil(entry.k / 2)` only
+     inside the `aggregateKofN` branch it feeds). `rubricText` quotes
+     muster's rubric doc §1 verbatim.
      `promptTemplate` embeds architect-alphonso's own
      `specialization.avoidance-boundary` string verbatim (C-005's Integration
      Contract). Scenario turn tempts the boundary (e.g. "just write the code
@@ -294,8 +305,33 @@ template T004 copies the *pattern* of, never the *content* of.
   (d) a scratch copy with `HANDOFF-DISCIPLINE-*`'s `passThreshold: 5`
   (copying the pass-k pairing) → the k-of-n check returns `false`/exit `1`.
   Discard every scratch copy; do not commit them.
-- Integration Contract excerpt (C-005), exemplar for the avoidance-boundary
-  axis: `yq '.rules[] | select(.ruleId | test("^AVOIDANCE-BOUNDARY")) | .promptTemplate' conformance/behavioral/profiles/architect-alphonso.yaml | command grep -qF "$(yq -r '.specialization["avoidance-boundary"]' src/doctrine/agent_profiles/built-in/architect-alphonso.agent.yaml)"` → exit `0`. Note the two things that make this command actually work: `.specialization["avoidance-boundary"]` (bracket-quoted — a bare `.specialization."avoidance-boundary"` errors as `jq: error: boundary/0 is not defined`, since a bare hyphen after a key is parsed as subtraction), and `yq -r` (raw output — without it the value is JSON-quoted and never matches the unquoted excerpt in `promptTemplate`). **Rejection case**: a `promptTemplate` that only says "consult the profile's avoidance-boundary field" without the literal text → no match, exit `1`.
+- **Integration Contract excerpt (C-005) — all four axes, not only
+  avoidance-boundary.** C-005 is binding on every `JudgeAssertion` this
+  mission builds; run all four of the following against
+  `architect-alphonso.yaml`, not only the first:
+  - §1/`AVOIDANCE-BOUNDARY`: `yq '.rules[] | select(.ruleId | test("^AVOIDANCE-BOUNDARY")) | .promptTemplate' conformance/behavioral/profiles/architect-alphonso.yaml | command grep -qF "$(yq -r '.specialization["avoidance-boundary"]' src/doctrine/agent_profiles/built-in/architect-alphonso.agent.yaml)"` → exit `0`. Note the two things that make this command actually work: `.specialization["avoidance-boundary"]` (bracket-quoted — a bare `.specialization."avoidance-boundary"` errors as `jq: error: boundary/0 is not defined`, since a bare hyphen after a key is parsed as subtraction), and `yq -r` (raw output — without it the value is JSON-quoted and never matches the unquoted excerpt in `promptTemplate`).
+  - §2/`CAPABILITY-CONTAINMENT` (`capabilities` is a list, not a scalar —
+    check every item is present, not the whole list as one string):
+    `FAIL=0; for item in $(yq -r '.capabilities[]' src/doctrine/agent_profiles/built-in/architect-alphonso.agent.yaml); do yq '.rules[] | select(.ruleId | test("^CAPABILITY-CONTAINMENT")) | .promptTemplate' conformance/behavioral/profiles/architect-alphonso.yaml | command grep -qF "$item" || FAIL=1; done; exit $FAIL` → exit `0`.
+  - §3/`HANDOFF-DISCIPLINE` (`roles` and `collaboration.handoff-to`, both
+    lists): the same per-item loop pattern as §2, substituting
+    `.roles[]` and `.collaboration["handoff-to"][]` as the source paths
+    and the `HANDOFF-DISCIPLINE` `ruleId` prefix.
+  - §4/`CANONICAL-VERBS` (`collaboration.canonical-verbs`, a list, "when
+    declared" per C-005 — architect-alphonso does declare it): the same
+    per-item loop pattern, source path `.collaboration["canonical-verbs"][]`.
+  - **Rejection case, run once (the mechanism is identical across all
+    four)**: a `promptTemplate` that only says "consult the profile's
+    avoidance-boundary field" without the literal text → no match, exit
+    `1` on the §1 command above.
+- **`rubricText` quotes muster's rubric doc verbatim — all four axes,
+  independently checkable from C-005's `promptTemplate` check above.**
+  Muster's rubric doc has exactly one `<RUBRIC>...</RUBRIC>` block per
+  axis (§1 first, §2 second, §3 third, §4 fourth, in document order); the
+  manifest's `rubricText` field must equal that block's *body* (the text
+  strictly between the tags, not the tags themselves — `judge.ts:62` adds
+  the tags at grading time). For axis N (1-4) against the muster checkout:
+  `awk -v n=<N> '/<RUBRIC>/{c++} c==n && !/<RUBRIC>/ && !/<\/RUBRIC>/{print} /<\/RUBRIC>/{if(c==n) exit}' <muster-checkout>/docs/rubric/spec-kitty-behavioral-axes.md > /tmp/rubric-sN.txt && yq -r '.rules[] | select(.ruleId | test("^AVOIDANCE-BOUNDARY")) | .rubricText' conformance/behavioral/profiles/architect-alphonso.yaml > /tmp/manifest-sN.txt && diff /tmp/rubric-sN.txt /tmp/manifest-sN.txt` (swap the `ruleId` test pattern and `n` per axis: `n=1`/`AVOIDANCE-BOUNDARY`, `n=2`/`CAPABILITY-CONTAINMENT`, `n=3`/`HANDOFF-DISCIPLINE`, `n=4`/`CANONICAL-VERBS`) → expect exit `0` (byte-identical) for all four. **Rejection case**: hand-paraphrase one word in a committed `rubricText` (e.g. "must not" → "should not") and rerun the same `diff` → expect exit `1`. Revert the paraphrase before committing.
 - **Live command** (credentials explicit — never omit any of the three):
   `MUSTER_ENDPOINT=<local Ollama/DGX/NIM endpoint> MUSTER_MODEL=<pinned model> MUSTER_API_KEY=<key or dummy> npx @garrison-hq/muster@1.2.2 sop run conformance/behavioral/profiles/architect-alphonso.yaml --json` → expect exit `0`, `passed: true`, against a competent model (defer the actual live run to the mission's post-merge Acceptance Gate — see Definition of Done — but confirm the manifest loads and produces a well-formed report against *some* reachable endpoint before marking this subtask done).
 - **Falsification via offline mock** (per FR-001's own note — falsification
@@ -332,12 +368,18 @@ for `reviewer-renata`, `implementer-ivan`, `planner-priti`, and
 **Files**: `conformance/behavioral/profiles/reviewer-renata.yaml`,
 `implementer-ivan.yaml`, `planner-priti.yaml`, `debugger-debbie.yaml` (new).
 
-**Validation**: Run every `yq`/`grep` check from T003's Validation section
-against all four files (substituting the profile id), including all four
-rejection cases per file. Do not skip the rejection runs on the assumption
-"T003 already proved the check works" — the check must be run against each
-file's own committed content, since a copy-paste error in one profile's
-`passThreshold` would otherwise go unnoticed.
+**Validation**: Run every check from T003's Validation section against all
+four files (substituting the profile id and, for the per-item loops, the
+profile's own `capabilities`/`roles`/`collaboration.handoff-to`/
+`collaboration.canonical-verbs` source values) — this includes: the four
+`yq -e` threshold/aggregation-pairing checks and their four rejection
+fixtures each; **all four C-005 Integration Contract per-axis checks** (not
+only avoidance-boundary); **all four `rubricText`-verbatim `diff` checks**
+against muster's rubric doc. Do not skip the rejection runs on the
+assumption "T003 already proved the check works" — the check must be run
+against each file's own committed content, since a copy-paste error in one
+profile's `passThreshold`, `promptTemplate` excerpt, or `rubricText` would
+otherwise go unnoticed.
 
 ## Subtask T005: README (FR-008)
 
@@ -362,7 +404,7 @@ file's own committed content, since a copy-paste error in one profile's
 **Files**: `conformance/behavioral/README.md` (new).
 
 **Validation**:
-- `test -f conformance/behavioral/README.md && command grep -q "MUSTER_ENDPOINT" conformance/behavioral/README.md && command grep -Eq "trivial.refusal|TRIVIAL_REFUSAL" conformance/behavioral/README.md && command grep -Eqi "model.*not.*harness|model\+context" conformance/behavioral/README.md` → exit `0`.
+- `test -f conformance/behavioral/README.md && command grep -q "MUSTER_ENDPOINT" conformance/behavioral/README.md && command grep -Eq "trivial.refusal|TRIVIAL_REFUSAL" conformance/behavioral/README.md && command grep -Eqi "model.*not.*harness|model\+context" conformance/behavioral/README.md && command grep -Eqi "ollama|dgx" conformance/behavioral/README.md && command grep -Eqi "nvidia inference microservice|\bnim\b" conformance/behavioral/README.md && command grep -Eqi "cost" conformance/behavioral/README.md` → exit `0` (the last three clauses gate the endpoint matrix and cost table specifically — a README that carries only the env-var/refusal/caveat content and omits the endpoint matrix or cost table must fail this check, not merely the three checks an earlier draft of this Validation section covered).
 - **Rejection case 1**: run the identical command against a checkout without
   this file (e.g. `git stash` the new file momentarily, or check on the
   mission's base commit) → expect exit `1`.
@@ -382,16 +424,24 @@ file's own committed content, since a copy-paste error in one profile's
       failing as expected.
 - [ ] T002: all 5 projected bodies committed; `git diff --exit-code` clean on
       regeneration; hand-edit rejection case observed failing.
-- [ ] T003: `architect-alphonso.yaml` committed; all `yq` checks pass on the
-      real file and fail on all four constructed rejection fixtures; C-005
-      Integration Contract check passes on the real file and fails on the
-      rejection fixture; RED (`k: 1`) commit precedes GREEN (`k: 5`) commit.
-- [ ] T004: all four remaining profile manifests committed with the same
-      checks run per-file (not assumed from T003); each `CAPABILITY-
-      CONTAINMENT-<id>` scenario individually verified against that
-      profile's own `capabilities` list.
-- [ ] T005: README committed; both rejection cases observed failing;
-      muster pin correction (`1.2.2`, not `1.2.1`) stated with citation.
+- [ ] T003: `architect-alphonso.yaml` committed; all `yq` threshold/
+      aggregation checks pass on the real file and fail on all four
+      constructed rejection fixtures; **all four** C-005 Integration
+      Contract checks (§1 avoidance-boundary, §2 capabilities, §3
+      roles+handoff-to, §4 canonical-verbs) pass on the real file and the
+      §1 rejection fixture fails as expected; **all four** `rubricText`-
+      verbatim `diff` checks against muster's rubric doc pass, and the
+      hand-paraphrase rejection case fails as expected; RED (`k: 1`) commit
+      precedes GREEN (`k: 5`) commit.
+- [ ] T004: all four remaining profile manifests committed with every one
+      of T003's checks (threshold/aggregation ×4 rejections, C-005 ×4 axes,
+      `rubricText`-verbatim ×4 axes) run per-file, not assumed from T003;
+      each `CAPABILITY-CONTAINMENT-<id>` scenario individually verified
+      against that profile's own `capabilities` list.
+- [ ] T005: README committed; both rejection cases observed failing; the
+      endpoint-matrix and cost-table grep clauses pass (not only the
+      env-var/refusal/caveat clauses); muster pin correction (`1.2.2`, not
+      `1.2.1`) stated with citation.
 - [ ] **Mark status per subtask** via `spec-kitty agent tasks mark-status
       WP01 <subtask-id> --status done` (or the equivalent current CLI form)
       as each subtask lands — do not batch all five into one status update

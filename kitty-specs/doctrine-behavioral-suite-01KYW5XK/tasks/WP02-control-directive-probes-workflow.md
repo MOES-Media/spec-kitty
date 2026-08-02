@@ -76,7 +76,7 @@ nothing).
 T009–T011 and of each other — any order. T010 depends on T009 existing
 (`check-runs-errored.sh` is exercised against `control-manifest.yaml`'s own
 report). T011 depends on T009+T010 (the workflow invokes both). RED-before-
-GREEN per CHTR-011/C-011 applies per subtask exactly as in WP01 — e.g. a
+GREEN per CHTR-011 applies per subtask exactly as in WP01 — e.g. a
 `control-manifest.yaml` where both controls are accidentally *satisfiable*
 (a rubric that isn't actually impossible) is a valid RED state to commit
 before the real, correctly-rigged version.
@@ -283,7 +283,7 @@ only, two jobs (`main-suite`, `control-suite`), both computing
 
 **Validation**:
 - **C-001**: `command grep -rE '(nvapi-[A-Za-z0-9]{8}|\bsk-[A-Za-z0-9_-]{20})' conformance/behavioral/*.yaml conformance/behavioral/profiles/*.yaml .github/workflows/behavioral.yml` → expect exit `1` (no match — this WP's own `conformance/behavioral/*.yaml`/`profiles/*.yaml` glob will only match files that exist in *this WP's own worktree*, i.e. `control-manifest.yaml`; do not attempt to glob WP01's `profiles/*.yaml` content from inside this WP's isolated worktree — see the post-merge note below). **Rejection case**: plant a fake key matching one of the two regexes in a scratch copy → expect exit `0` (match found), confirming the grep fires; discard the scratch copy, never commit it.
-- **C-002 (trigger half only — the file-set cross-check is post-merge, see below)**: parse the committed `on:` block and confirm no `pull_request` or `schedule` key is present. **Rejection case**: a scratch copy with `pull_request:` added → the same parse/assertion fires. Discard the scratch copy.
+- **C-002 (trigger half only — the file-set cross-check is post-merge, see below)**: `yq -e '.on | has("pull_request") or has("schedule") | not' .github/workflows/behavioral.yml` → expect `true`, exit `0`. **Rejection case**: on a scratch copy, `yq -i '.on.pull_request.branches = ["main"]' /tmp/behavioral-scratch.yml` then rerun the same check against the scratch copy → expect `false`, exit `1`. Discard the scratch copy; never commit it.
 - **C-002 (file-set cross-check — post-merge only, not this WP's own acceptance criterion)**: this WP's isolated worktree never contains WP01's committed `conformance/behavioral/profiles/*.yaml` files until both lanes merge onto `kitty/mission-doctrine-behavioral-suite`. **Do not attempt this check inside this WP's own worktree — it will fail for the wrong reason (missing files, not a real defect) and must not be treated as a rejection of this WP.** Record in this WP's Definition of Done that the check is deferred to the mission's post-merge Acceptance Gate (spec.md's Acceptance Gate Sequencing, phase 2): `ls conformance/behavioral/profiles/*.yaml conformance/behavioral/control-manifest.yaml` must match the workflow's referenced globs/paths exactly, run only after both lanes are on the shared target branch.
 - **FR-007 main-suite `runsErrored` population**: review (procedural, not a
   one-liner — the main-suite job's exit code is intentionally not gated on
