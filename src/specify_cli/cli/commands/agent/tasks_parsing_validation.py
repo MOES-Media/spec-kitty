@@ -44,8 +44,10 @@ from specify_cli.core.constants import (
 )
 from specify_cli.lanes._git import lane_has_commit_beyond_base
 from specify_cli.missions._read_path_resolver import resolve_planning_read_dir
-from specify_cli.status import Lane, StatusEvent
+from specify_cli.review.artifacts import latest_review_artifact_verdict
+from specify_cli.status import Lane, ReviewOverride, StatusEvent, StatusSnapshot
 from specify_cli.status import is_dossier_snapshot as _is_dossier_snapshot
+from specify_cli.status import resolve_materialized_review
 from specify_cli.task_utils import extract_scalar, split_frontmatter
 
 logger = logging.getLogger(__name__)
@@ -283,43 +285,131 @@ def _review_cycle_number(path: Path) -> int:
     return int(match.group(1)) if match else 0
 
 
-def _get_latest_review_cycle_verdict(wp_dir: Path) -> tuple[str | None, Path | None]:
-    """Return (verdict_value, artifact_path) for the latest review-cycle-N.md.
+def _latest_review_cycle_path(wp_dir: Path) -> Path | None:
+    """Resolve only the highest-numbered ``review-cycle-N.md`` path (no parse).
 
-    Scans *wp_dir* for ``review-cycle-<N>.md`` files, picks the highest-numbered
-    one, and returns the ``verdict`` frontmatter value together with the artifact
-    path so callers can name the file in error messages.
-
-    Returns (None, None) when no review-cycle artifacts exist.
-    Returns (None, artifact_path) when the artifact exists but verdict is absent
-    or malformed.
-
-    If the verdict is present but not in :data:`_VALID_VERDICTS`, a warning is
-    logged (but the value is still returned — callers decide what to do with it).
+    Path-only resolution mirrors the schema-error path lookup the post-merge
+    consistency gate already performs ahead of its canonical call
+    (``post_merge/review_artifact_consistency._latest_review_artifact_path``),
+    which research.md Decision 1 (row 8) excludes from the In-Scope Rule
+    because it selects a *file*, not a verdict. Used here only for the degrade
+    branch of :func:`_get_latest_review_cycle_verdict`, so a malformed artifact
+    can still be named in the ``(verdict, path)`` contract.
     """
-    cycles = sorted(
-        wp_dir.glob("review-cycle-*.md"),
-        key=_review_cycle_number,
-    )
-    if not cycles:
-        return None, None
-    artifact = cycles[-1]
+    cycles = sorted(wp_dir.glob("review-cycle-*.md"), key=_review_cycle_number)
+    return cycles[-1] if cycles else None
+
+
+def _warn_if_unrecognized_verdict(artifact_name: str, verdict: str) -> None:
+    """Log the legacy out-of-vocabulary warning (pre-WP02 behaviour, preserved)."""
+    if verdict not in _VALID_VERDICTS:
+        logger.warning(
+            "Warning: %s has unrecognized verdict '%s' — expected one of %s",
+            artifact_name,
+            verdict,
+            sorted(_VALID_VERDICTS),
+        )
+
+
+def _raw_frontmatter_verdict(artifact: Path) -> tuple[str | None, bool]:
+    """Best-effort ``(verdict, has_override)`` read for a schema-rejected artifact.
+
+    :func:`~specify_cli.review.artifacts.ReviewCycleArtifact.from_dict` enforces
+    the canonical schema (``wp_id``/``cycle_number``/``reviewed_at`` field names,
+    ``verdict in {"approved", "rejected"}``) and raises ``ValueError`` on
+    anything else. Two classes of real, already-committed artifacts fail that
+    schema without being malformed:
+
+    1. A verdict in :data:`_VALID_VERDICTS` but outside the canonical
+       ``{"approved", "rejected"}`` pair (e.g. ``approved_after_orchestrator_fix``).
+    2. A pre-schema artifact using older frontmatter field names
+       (``work_package_id``/``review_cycle``/``reviewed_commit`` instead of
+       ``wp_id``/``cycle_number``/``reviewed_at``).
+
+    This mirrors the pre-WP02 raw-scalar parser (``extract_scalar`` over
+    ``split_frontmatter``, which never validated field names) so both classes
+    still yield a verdict instead of collapsing to ``None`` — the schema
+    validator's failure decides parseability, not the return value. Never
+    raises: any read/parse failure (missing frontmatter delimiters, unparseable
+    YAML-ish content) degrades to ``(None, False)``, matching the pre-WP02
+    bare-except fail-open posture.
+    """
     try:
         text = artifact.read_text(encoding="utf-8")
         frontmatter_str, _, _ = split_frontmatter(text)
         if not frontmatter_str:
-            return None, artifact
+            return None, False
         verdict = extract_scalar(frontmatter_str, "verdict")
-        if verdict is not None and verdict not in _VALID_VERDICTS:
-            logger.warning(
-                "Warning: %s has unrecognized verdict '%s' — expected one of %s",
-                artifact.name,
-                verdict,
-                sorted(_VALID_VERDICTS),
-            )
-        return verdict, artifact
+        override_actor = extract_scalar(frontmatter_str, "review_artifact_override_actor")
+        override_reason = extract_scalar(frontmatter_str, "review_artifact_override_reason")
+        has_override = bool((override_actor or "").strip() and (override_reason or "").strip())
     except Exception:  # noqa: BLE001 — review-cycle artifact may be malformed; fail-open
-        return None, artifact
+        return None, False
+    return verdict, has_override
+
+
+def _get_latest_review_cycle_verdict(
+    wp_dir: Path,
+    *,
+    override: ReviewOverride | None = None,
+) -> tuple[str | None, Path | None]:
+    """Return (effective_verdict, artifact_path) for the latest review-cycle-N.md.
+
+    FR-004 (WP02/T008): delegates verdict derivation to the canonical
+    :func:`~specify_cli.review.artifacts.latest_review_artifact_verdict`
+    instead of globbing and parsing frontmatter itself, so exactly one
+    implementation computes "current review verdict" (INV-1) for artifacts
+    that conform to the canonical schema.
+
+    *override* is the event-sourced :class:`~specify_cli.status.models.ReviewOverride`
+    for this work package, if any. It is **optional** so the existing
+    ``tasks_move_task.py`` caller (WP03's surface) keeps compiling and running
+    unchanged — passing ``None`` still honours the legacy artifact-frontmatter
+    override fallback the canonical read retains for the migration window
+    (research.md Decision 3); WP03 adopts the explicit stream-sourced override
+    separately.
+
+    The returned verdict is the **effective** verdict (data-model.md "Effective
+    verdict" projection): a ``rejected`` record superseded by a complete
+    override reports ``"approved"``. This lets both consumers' plain
+    ``verdict == "rejected"`` checks stay correct without widening this
+    function's 2-tuple contract to also carry ``has_override``.
+
+    Returns (None, None) when no review-cycle artifacts exist.
+
+    When the latest artifact fails the canonical schema, this falls back to a
+    raw-frontmatter read (:func:`_raw_frontmatter_verdict`) rather than letting
+    the schema failure alone decide the outcome — see that function's
+    docstring for why this is reachable against real on-disk data, not a
+    defensive dead branch. Only a genuinely unparseable artifact (no
+    frontmatter delimiters, unreadable file) degrades to ``(None,
+    artifact_path)`` — never raises; INV-5 tolerant degradation.
+
+    If the verdict is present but not in :data:`_VALID_VERDICTS`, a warning is
+    logged (the value is still returned — callers decide what to do with it).
+    """
+    try:
+        result = latest_review_artifact_verdict(wp_dir, snapshot_override=override)
+    except ValueError:
+        artifact = _latest_review_cycle_path(wp_dir)
+        if artifact is None:
+            return None, None
+        raw_verdict, raw_has_override = _raw_frontmatter_verdict(artifact)
+        if raw_verdict is None:
+            return None, artifact
+        _warn_if_unrecognized_verdict(artifact.name, raw_verdict)
+        override_active = raw_has_override or (override is not None and override.complete)
+        effective_verdict = (
+            "approved" if raw_verdict == "rejected" and override_active else raw_verdict
+        )
+        return effective_verdict, artifact
+    if result is None:
+        return None, None
+    _warn_if_unrecognized_verdict(result.path.name, result.verdict)
+    effective_verdict = (
+        "approved" if result.verdict == "rejected" and result.has_override else result.verdict
+    )
+    return effective_verdict, result.path
 
 
 def _review_artifact_dir_for_wp(tasks_dir: Path, wp: dict[str, object]) -> Path | None:
@@ -353,8 +443,27 @@ def _apply_review_status_flags(
     tasks_dir: Path,
     events: list[StatusEvent],
     stall_threshold_minutes: int,
+    snapshot: StatusSnapshot | None = None,
 ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
-    """Annotate status rows with stale verdict and stalled-review warnings."""
+    """Annotate status rows with stale verdict and stalled-review warnings.
+
+    *snapshot* is the mission's single already-reduced, annotation-aware
+    :class:`~specify_cli.status.models.StatusSnapshot` (WP02/T007: the caller
+    reads and reduces the event stream exactly ONCE per invocation — NFR-002).
+    Optional so existing direct callers/tests that omit it keep passing
+    unchanged; without it the per-WP verdict falls back to whatever the
+    legacy artifact-frontmatter override fallback in the canonical read
+    provides (no event-sourced override recognized).
+
+    Per work package the override lookup is
+    :func:`~specify_cli.status.wp_review.resolve_materialized_review`, an O(1)
+    index into the already-materialized snapshot — it performs NO reduction
+    and NO filesystem access, so this loop stays a single-reduction read
+    regardless of work-package count. Do NOT swap this for
+    ``resolve_event_stream_review``/``resolve_snapshot_review`` here — both
+    re-reduce the whole stream on every call, which would cost N reductions
+    for an N-work-package mission (research.md Decision 8).
+    """
     stale_verdicts: list[dict[str, object]] = []
     stalled_wps: list[dict[str, object]] = []
     now = datetime.now(UTC)
@@ -368,7 +477,12 @@ def _apply_review_status_flags(
         if lane in (Lane.APPROVED, Lane.DONE):
             wp_dir = _review_artifact_dir_for_wp(tasks_dir, wp)
             if wp_dir is not None:
-                verdict, artifact = _get_latest_review_cycle_verdict(wp_dir)
+                override = (
+                    resolve_materialized_review(snapshot, wp_id)
+                    if snapshot is not None
+                    else None
+                )
+                verdict, artifact = _get_latest_review_cycle_verdict(wp_dir, override=override)
                 if verdict == "rejected" and artifact is not None:
                     stale_warning: dict[str, object] = {
                         "wp_id": wp_id,

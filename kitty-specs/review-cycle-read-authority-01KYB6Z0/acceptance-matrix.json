@@ -1,0 +1,79 @@
+{
+  "mission_slug": "review-cycle-read-authority-01KYB6Z0",
+  "mission_number": "",
+  "mission_type": "software-dev",
+  "overall_verdict": "pass",
+  "criteria": [
+    {
+      "criterion_id": "FR-001",
+      "description": "Status verdict honours the approval override",
+      "proof_type": "automated_test",
+      "evidence": "WP01 status.py:177-179 reads the annotation-aware stream (read_event_stream + reduce(transitions, annotations)); override applied via resolve_materialized_review at :289. WP02 same on tasks-status. Proven by tests driving the override through a REAL event log (append_annotations_atomic_verified + InnerStateChanged), never a hand-built snapshot. WP01 suite 11 passed; combined scope 1562 passed / 0 failed.",
+      "pass_fail": "pass",
+      "verified_by": "reviewer-renata (per-WP independent review)",
+      "verified_at": "2026-07-26T00:00:00+00:00",
+      "notes": "Verified at per-WP review; all five WPs approved."
+    },
+    {
+      "criterion_id": "FR-002",
+      "description": "Status view and merge gate agree",
+      "proof_type": "automated_test",
+      "evidence": "All in-scope consumers delegate to the canonical latest_review_artifact_verdict with the override supplied, so agreement is structural. WP02 T010 parity matrix; WP03 guard consumes the same shared function. Reviewer independently confirmed one construction body at wp_review.py with the other entry points delegating.",
+      "pass_fail": "pass",
+      "verified_by": "reviewer-renata (per-WP independent review)",
+      "verified_at": "2026-07-26T00:00:00+00:00",
+      "notes": "Verified at per-WP review; all five WPs approved."
+    },
+    {
+      "criterion_id": "FR-003",
+      "description": "Genuine rejections still reported",
+      "proof_type": "automated_test",
+      "evidence": "No false negative introduced. WP01/WP02: unoverridden rejection and all four incomplete-override permutations (at/actor/wp_id/reason each blanked) still report. WP03 T015: three refusal arms assert EXACT message text against tasks_transition_core.py:373-382, so a projection bug converting one refusal into another cannot pass.",
+      "pass_fail": "pass",
+      "verified_by": "reviewer-renata (per-WP independent review)",
+      "verified_at": "2026-07-26T00:00:00+00:00",
+      "notes": "Verified at per-WP review; all five WPs approved."
+    },
+    {
+      "criterion_id": "FR-004",
+      "description": "Override-blind verdict reads retired",
+      "proof_type": "automated_test",
+      "evidence": "WP04 deleted _snapshot_review_override outright (not deprecated) and collapsed wp_review to a single construction body (_review_override_from_state) with resolve_materialized_review / resolve_event_stream_review / resolve_snapshot_review as thin wrappers. ReviewOverride.from_dict now appears at exactly 2 sites in src/: the canonical body and the model's own decoder.",
+      "pass_fail": "pass",
+      "verified_by": "reviewer-renata (per-WP independent review)",
+      "verified_at": "2026-07-26T00:00:00+00:00",
+      "notes": "Verified at per-WP review; all five WPs approved."
+    },
+    {
+      "criterion_id": "FR-005",
+      "description": "Every verdict-input site has a recorded disposition",
+      "proof_type": "automated_test",
+      "evidence": "WP05 two-pass gate: Pass 1 (glob record readers, 9 sites) and Pass 2 (override-slot readers, 13 sites), each with an explicit CANONICAL/IN_SCOPE/EXCLUDED disposition and stated reason matching research.md Decision 1. Reviewer recounted independently: 9 and 13, matching the tables 1:1.",
+      "pass_fail": "pass",
+      "verified_by": "reviewer-renata (per-WP independent review)",
+      "verified_at": "2026-07-26T00:00:00+00:00",
+      "notes": "Verified at per-WP review; all five WPs approved."
+    },
+    {
+      "criterion_id": "FR-006",
+      "description": "Tolerant degradation preserved",
+      "proof_type": "automated_test",
+      "evidence": "Absent event log, malformed event log, unparseable artifact frontmatter and missing WP directory each degrade to a partial/absent verdict without raising. WP01 narrowed a blanket 'except Exception' to (ValueError, OSError). WP02 preserved the existing swallow-and-degrade posture at tasks_status_cmd.py:283.",
+      "pass_fail": "pass",
+      "verified_by": "reviewer-renata (per-WP independent review)",
+      "verified_at": "2026-07-26T00:00:00+00:00",
+      "notes": "Verified at per-WP review; all five WPs approved."
+    },
+    {
+      "criterion_id": "FR-007",
+      "description": "An override is asserted once, not repeatedly",
+      "proof_type": "automated_test",
+      "evidence": "WP03 wires the event-sourced override into MoveTaskRequest.review_verdict via read_event_stream_transactional (same primitive as the merge gate) inside the lane-read transactional boundary. Red-first proven by reverting to f393c0aa4: the permit case and the no-duplicate-evidence case both fail red without the fix. tasks_transition_core.py shows ZERO diff (C-002).",
+      "pass_fail": "pass",
+      "verified_by": "reviewer-renata (per-WP independent review)",
+      "verified_at": "2026-07-26T00:00:00+00:00",
+      "notes": "Verified at per-WP review; all five WPs approved."
+    }
+  ],
+  "negative_invariants": []
+}

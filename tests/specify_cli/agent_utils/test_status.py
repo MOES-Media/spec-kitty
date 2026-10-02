@@ -23,9 +23,10 @@ from rich.console import Console
 from specify_cli.agent_utils.status import (
     _analyze_parallelization,
     _get_last_event_time,
-    _get_wp_review_verdict,
+    _resolve_wp_review_state,
     show_kanban_status,
 )
+from specify_cli.review.artifacts import ReviewCycleArtifact
 from specify_cli.status.models import Lane, StatusEvent
 from specify_cli.status.wp_state import wp_state_for
 
@@ -395,47 +396,77 @@ def _make_status_event(
 
 
 # ---------------------------------------------------------------------------
-# T023 / T024: _get_wp_review_verdict helper
+# T023 / T024 (retired) / WP01 T003: _resolve_wp_review_state helper
+#
+# `_get_wp_review_verdict` (an independent glob+YAML-parse implementation
+# that could never see an approval override) is retired by WP01
+# (review-cycle-read-authority). Its replacement, `_resolve_wp_review_state`,
+# delegates verdict *selection* entirely to the canonical
+# `review.artifacts.latest_review_artifact_verdict` — cycle-number-wins
+# selection and frontmatter-shape validation are that function's own
+# responsibility and are covered by its own test suite
+# (tests/review/test_artifacts.py). These tests pin only what
+# `_resolve_wp_review_state` itself owns: delegation and tolerant
+# degradation for an unparseable frontmatter / missing directory (T004).
+# Override-awareness (the actual point of WP01) is pinned end-to-end,
+# through a real event log, by test_status_review_override.py.
 # ---------------------------------------------------------------------------
 
-def test_get_wp_review_verdict_returns_rejected(tmp_path: Path) -> None:
-    """_get_wp_review_verdict returns 'rejected' when latest review cycle has it."""
+
+def _write_review_cycle(
+    wp_dir: Path,
+    *,
+    cycle_number: int = 1,
+    verdict: str = "rejected",
+    wp_id: str = "WP01",
+) -> Path:
+    """Write a schema-valid review-cycle-N.md via the production writer."""
+    artifact = ReviewCycleArtifact(
+        cycle_number=cycle_number,
+        wp_id=wp_id,
+        mission_slug="test-feature",
+        reviewer_agent="reviewer-renata",
+        verdict=verdict,
+        reviewed_at="2026-07-20T10:00:00+00:00",
+        body=f"# Review\n\nVerdict: {verdict}.\n",
+    )
+    path = wp_dir / f"review-cycle-{cycle_number}.md"
+    artifact.write(path)
+    return path
+
+
+def test_resolve_wp_review_state_returns_rejected(tmp_path: Path) -> None:
+    """No override -> the raw record verdict passes through, has_override False."""
+    _write_review_cycle(tmp_path, verdict="rejected")
+
+    state = _resolve_wp_review_state(tmp_path, None)
+
+    assert state is not None
+    assert state.verdict == "rejected"
+    assert state.has_override is False
+
+
+def test_resolve_wp_review_state_no_files_returns_none(tmp_path: Path) -> None:
+    """No review-cycle files at all -> None (no verdict), not an error."""
+    assert _resolve_wp_review_state(tmp_path, None) is None
+
+
+def test_resolve_wp_review_state_missing_directory_returns_none(tmp_path: Path) -> None:
+    """T004 case 4: a work-package directory that does not exist on disk -> None."""
+    missing_dir = tmp_path / "does-not-exist"
+    assert _resolve_wp_review_state(missing_dir, None) is None
+
+
+def test_resolve_wp_review_state_unparseable_frontmatter_returns_none(
+    tmp_path: Path,
+) -> None:
+    """T004 case 3: a present review-cycle file with unparseable frontmatter
+    degrades to "no verdict" rather than raising."""
     (tmp_path / "review-cycle-1.md").write_text(
-        "---\nverdict: rejected\n---\n# Review\n", encoding="utf-8"
+        "# No frontmatter delimiters here\n", encoding="utf-8"
     )
-    assert _get_wp_review_verdict(tmp_path) == "rejected"
 
-
-def test_get_wp_review_verdict_returns_approved(tmp_path: Path) -> None:
-    """_get_wp_review_verdict returns 'approved' for an approved verdict."""
-    (tmp_path / "review-cycle-1.md").write_text(
-        "---\nverdict: approved\n---\n# Review\n", encoding="utf-8"
-    )
-    assert _get_wp_review_verdict(tmp_path) == "approved"
-
-
-def test_get_wp_review_verdict_latest_cycle_wins(tmp_path: Path) -> None:
-    """_get_wp_review_verdict returns verdict from the highest-numbered cycle."""
-    (tmp_path / "review-cycle-1.md").write_text(
-        "---\nverdict: rejected\n---\n", encoding="utf-8"
-    )
-    (tmp_path / "review-cycle-2.md").write_text(
-        "---\nverdict: approved\n---\n", encoding="utf-8"
-    )
-    assert _get_wp_review_verdict(tmp_path) == "approved"
-
-
-def test_get_wp_review_verdict_no_files_returns_none(tmp_path: Path) -> None:
-    """_get_wp_review_verdict returns None when no review-cycle files exist."""
-    assert _get_wp_review_verdict(tmp_path) is None
-
-
-def test_get_wp_review_verdict_no_frontmatter_returns_none(tmp_path: Path) -> None:
-    """_get_wp_review_verdict returns None when the review file has no frontmatter."""
-    (tmp_path / "review-cycle-1.md").write_text(
-        "# No frontmatter here\n", encoding="utf-8"
-    )
-    assert _get_wp_review_verdict(tmp_path) is None
+    assert _resolve_wp_review_state(tmp_path, None) is None
 
 
 # ---------------------------------------------------------------------------
@@ -569,12 +600,12 @@ def test_stale_verdict_warning_shown_in_done_lane(
 
     # Write review-cycle-1.md with rejected verdict in the WP slug directory.
     # Review artifacts live beside the WP markdown file under tasks/<WP-slug>/,
-    # not tasks/<WP_ID>/.
+    # not tasks/<WP_ID>/. Schema-valid frontmatter: latest_review_artifact_verdict
+    # delegates to ReviewCycleArtifact.from_file, which hard-requires the full
+    # field set (cycle_number/wp_id/mission_slug/reviewer_agent/reviewed_at).
     wp_dir = tasks_dir / "WP01-stub"
     wp_dir.mkdir()
-    (wp_dir / "review-cycle-1.md").write_text(
-        "---\nverdict: rejected\n---\n# Review\n", encoding="utf-8"
-    )
+    _write_review_cycle(wp_dir, verdict="rejected")
 
     # Event: WP01 is done
     events = [
@@ -619,9 +650,7 @@ def test_stale_verdict_clean_no_warning(
 
     wp_dir = tasks_dir / "WP01-stub"
     wp_dir.mkdir()
-    (wp_dir / "review-cycle-1.md").write_text(
-        "---\nverdict: approved\n---\n# Review\n", encoding="utf-8"
-    )
+    _write_review_cycle(wp_dir, verdict="approved")
 
     events = [
         {

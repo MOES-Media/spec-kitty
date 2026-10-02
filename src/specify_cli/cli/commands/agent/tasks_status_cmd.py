@@ -276,11 +276,24 @@ def _st_load_work_packages(st: _StatusState) -> None:
     """
     from specify_cli.cli.commands.agent import tasks as _tasks
     try:
-        from specify_cli.status import read_events as _st_read_events
+        from specify_cli.status import read_event_stream as _st_read_event_stream
         from specify_cli.status import reduce as _st_reduce
 
-        st.events = _st_read_events(st.feature_dir)
-        st.snapshot = _st_reduce(st.events) if st.events else None
+        # WP02/T007 (research.md D3, D8): the annotation-aware stream read.
+        # ``read_events`` + ``reduce(events)`` deliberately partitions
+        # ``InnerStateChanged`` annotations OUT (status/store.py:717), so the
+        # reduced snapshot's per-WP ``review`` slot is always absent — the
+        # stale-verdict check below would never see a recorded approval
+        # override. Reading the stream and reducing WITH annotations exactly
+        # once here (never per-WP; NFR-002) makes the ``review`` slot reachable
+        # via ``resolve_materialized_review`` inside ``_apply_review_status_flags``.
+        _event_stream = _st_read_event_stream(st.feature_dir)
+        st.events = _event_stream.transitions
+        st.snapshot = (
+            _st_reduce(_event_stream.transitions, _event_stream.annotations)
+            if _event_stream.transitions
+            else None
+        )
     except Exception:
         st.events = []
 
@@ -351,6 +364,7 @@ def _st_apply_review_flags(st: _StatusState) -> None:
         tasks_dir=st.tasks_dir,
         events=st.events,
         stall_threshold_minutes=st.review_stall_threshold,
+        snapshot=st.snapshot,
     )
 
 
