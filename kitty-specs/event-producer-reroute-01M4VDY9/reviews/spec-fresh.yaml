@@ -1,0 +1,185 @@
+schema: review-findings/v1
+complete: true
+phase: spec
+lens_group: fresh
+mission: event-producer-reroute-01M4VDY9
+findings:
+  - id: SPEC-FRESH-001
+    lens: acceptance-testability
+    severity: 4
+    title: AC-008 floor of seven fixtures cannot be met; the new source tie-break has no fixture
+    evidence:
+      - artifact: "spec.md § AC-008 ('six examples plus the counter-example; floor: all seven')"
+      - artifact: "data-model.md § 4 Worked examples (examples 1-6; example 4 IS the counter-example)"
+    claim: >
+      data-model section 4 holds six worked examples, one of which is the naive counter-example, so
+      the floor "all seven" is unsatisfiable (the gate fails on correct fixtures) or forces an invented
+      seventh. None of the six examples exercises the newly appended s(r) tie-break (two rows equal on
+      h, c, t, i but different source), so a comparator that omits s passes every fixture and the
+      "total across sources" claim has no falsifier. The floor-rule self-mutation case for AC-008 is
+      not stated either.
+    remediation: >
+      Fix the count (six, floor all six) or add the missing example; add a seventh worked example with
+      identical (h,c,t,i) and differing source (and state its expected order), and a mutation case that
+      drops s and must fail.
+  - id: SPEC-FRESH-002
+    lens: contradiction
+    severity: 3
+    title: Dedupe on raw (source, id) leaves ties in the order key, breaking the totality/antisymmetry claim
+    evidence:
+      - artifact: "data-model.md § 4 (dedupe 'of duplicate (source, id) rows'; key uses normalized i(r); 'total, antisymmetric, input-order independent')"
+      - artifact: "data-model.md § 2 (Dedupe key (source, id))"
+      - code: ".venv spec_kitty_events/models.py::normalize_event_id (hyphenated UUID and 32-hex normalize to the same string; ULIDs are upper-cased)"
+    claim: >
+      Two rows with the same source whose raw ids differ only by spelling (lower- vs upper-case ULID,
+      hyphenated vs 32-hex UUID) are distinct under the raw (source, id) dedupe key but equal under
+      the order key (h,c,t,i,s) when clock and time also match. They tie, the order depends on input
+      position, and the invariants "antisymmetric, input-order independent" fail. Also, for upcast
+      diary and 3.0.0 rows no source exists (the upcaster is #92's) and a missing source is not an
+      error-row class, so s(r) is undefined for them.
+    remediation: >
+      State dedupe on (source, normalized id), and define s(r) for upcast legacy rows (or add a missing
+      source to the error-row list); add a fixture for two spellings of one id.
+  - id: SPEC-FRESH-003
+    lens: scope
+    severity: 3
+    title: 'The blanket claim "every requirement holds under every option" is false for several new or re-scoped ODs'
+    evidence:
+      - artifact: "spec.md § 10 intro and OD-SINK (b), OD-SCHEMA-DELIVERY (c), OD-JOURNAL (b), OD-CLOCK (b), OD-NODEID (b)"
+      - artifact: "spec.md § 1 Out of scope (committed-ledger writes) ; FR-011 ; FR-017 ; FR-026 ; FR-035 ; FR-039 ; AC-022 ; AC-027 ; AC-039"
+    claim: >
+      OD-SINK (b) writes the committed ledgers, which section 1 puts out of scope and C-004/FR-020
+      contradict. OD-SCHEMA-DELIVERY (c) commits a schema copy, which FR-039 and AC-027 forbid.
+      OD-JOURNAL (b) defers run-journal rows, contradicting FR-017, FR-035, AC-003(c) and AC-022.
+      OD-CLOCK (b) "relaxes FR-011" and OD-NODEID (b) is "a stated exception to FR-026". The header
+      sentence is therefore untrue and a planner cannot tell which options are legal without
+      re-opening requirements.
+    remediation: >
+      Drop the blanket sentence; for each option that contradicts an FR, mark it as requiring a named
+      spec amendment (or remove it from the option list).
+  - id: SPEC-FRESH-004
+    lens: contradiction
+    severity: 3
+    title: AC-005 and the warning rule conflict with OD-MISSIONID recommended option (b)
+    evidence:
+      - artifact: "spec.md § AC-005 ('rejected for ... the OD-MISSIONID case')"
+      - artifact: "spec.md § FR-009 (warning once per Mission, not per event) vs § FR-023 ('One warning per event') and AC-005 ('one stderr warning')"
+      - artifact: "spec.md § OD-MISSIONID (b) recommended: project source, no missionid; data-model.md § 1 missionid 'Mission-scoped' required"
+      - code: "src/specify_cli/status/emit.py::_load_mission_id"
+    claim: >
+      AC-005 tests the OD-MISSIONID case as class `rejected`, but the recommended option (b)
+      publishes the row (nothing refused), and FR-009 says the event is never lost. FR-009 asks for a
+      warning once per Mission while FR-023/AC-005 demand exactly one warning per event. The envelope
+      table marks missionid required for Mission-scoped rows, which (b) omits.
+    remediation: >
+      Make AC-005's OD-MISSIONID case conditional on option (a); state which warning rule wins for the
+      id-less Mission case; make `missionid` "Mission-scoped, except under OD-MISSIONID (b)".
+  - id: SPEC-FRESH-005
+    lens: contradiction
+    severity: 3
+    title: Data member `actorbinding` is not a persisted row member; breaks "verbatim" and AC-029
+    evidence:
+      - artifact: "data-model.md § 3 (lane.transitioned and wp.innerstate.changed data lists `actorbinding`; `actor` lifted)"
+      - artifact: "spec.md § FR-005, AC-029 (data keys subset of persisted row keys plus lifted-member rules); FR-018"
+      - code: "src/specify_cli/status/models.py::StatusEvent.actor / InnerStateChanged.actor (ActorField = str | dict); no actorbinding member"
+    claim: >
+      The persisted rows carry a single `actor` (a string or a dict). The type table has `actor`
+      lifted to an attribute AND a new data member `actorbinding`, a rename that no stated rule
+      covers; AC-029's subset check fails for it. For a plain-string actor there is no "full object".
+    remediation: >
+      State the rename and the string-actor case in the lifted-member rule (e.g. data.actorbinding is
+      present only for dict actors, copied from row `actor`) and let AC-029 cite that rule.
+  - id: SPEC-FRESH-006
+    lens: contradiction
+    severity: 3
+    title: Clock state under OD-CLOCK (a) cannot satisfy the git check-ignore gate of FR-019/AC-023
+    evidence:
+      - artifact: "spec.md § FR-019, AC-023 ('git check-ignore succeeds for ... clock state'); OD-CLOCK (a) 'anchored at the git common directory'"
+      - artifact: "data-model.md § 7 LamportState 'Gitignored state'"
+    claim: >
+      A file in the git common directory is not a working-tree path; `git check-ignore` reports it
+      as not ignored (exit 1), so the recommended option makes the gate fail or become meaningless.
+    remediation: >
+      Word the gate as "not tracked and not reachable by git add" for state under the common directory,
+      or require clock state at a working-tree path that is ignored by an existing rule.
+  - id: SPEC-FRESH-007
+    lens: requirement-ambiguity
+    severity: 3
+    title: Who writes the fault log, and where, is left out of the client's permitted capabilities
+    evidence:
+      - artifact: "spec.md § FR-023 (append-only gitignored fault log), FR-024 (doctor), FR-026 ('may only' list), FR-004 (the PRODUCER resolves the root)"
+      - artifact: "data-model.md § 7 FaultLogRow"
+    claim: >
+      binary-missing, crash, timeout, malformed-reply and busy faults occur when no producer ran, so
+      the Python client must write the fault row, yet FR-026's closed list has no fault-log write and
+      FR-004 gives root resolution to the producer. An unresolvable root has no location for the log
+      either, while AC-005 demands a fault-log row for that case.
+    remediation: >
+      Add "append a fault-log row" and "resolve the canonical root for the fault log only" to FR-026
+      (and to the AC-012 mutation allowances), and AC-005 should exempt root-unresolvable from the
+      fault-log row (stderr only).
+  - id: SPEC-FRESH-008
+    lens: acceptance-testability
+    severity: 3
+    title: AC-010 kill case demands a recorded fault that FR-012 allows to be absent
+    evidence:
+      - artifact: "spec.md § AC-010 ('Kill between stamp and append, rerun: ... a recorded fault')"
+      - artifact: "spec.md § FR-012 ('a kill leaves no advance and no line, or a gap ...')"
+    claim: >
+      If the kill leaves no advance and no line, there is nothing to detect and no fault to record;
+      the AC is unsatisfiable for that permitted outcome, and a killed process cannot record anything
+      itself. The rerun would need a defined detection (gap vs log).
+    remediation: >
+      Drop "a recorded fault" or define the detection rule (state advanced beyond log highest clock
+      on the next stamp) and restrict the fault to that outcome.
+  - id: SPEC-FRESH-009
+    lens: requirement-ambiguity
+    severity: 3
+    title: AC-026 and FR-021 require "readers" to name a malformed line, but no reader exists in scope
+    evidence:
+      - artifact: "spec.md § FR-021, AC-026; FR-026 (client must not read the log); FR-036 (Python readers untouched)"
+    claim: >
+      The only candidate readers are the events conformance reader (not in this repo) or `doctor`;
+      neither is assigned, so AC-026's last assertion cannot be written against any code.
+    remediation: >
+      Name the reader (e.g. the producer's own torn-line check, or the events fixture reader) or
+      reduce the assertion to the fault-log flag.
+  - id: SPEC-FRESH-010
+    lens: acceptance-testability
+    severity: 2
+    title: AC-004 census universe excludes run-journal kinds, and AC-008 needs an executable comparator not delivered here
+    evidence:
+      - artifact: "spec.md § AC-004 (derived from AUTHORITATIVE_NON_LANE_EVENT_TYPES, retrospective, lane, annotation); data-model.md § 3 closing paragraph"
+      - code: "src/specify_cli/status/lifecycle_events.py::AUTHORITATIVE_NON_LANE_EVENT_TYPES"
+      - artifact: "spec.md § FR-013, AC-008 ('the naive comparator, run in the same test')"
+    claim: >
+      Run-journal kinds are not in the ledger set, so a new journal kind escapes the census although
+      the table claims any unlisted persisted kind fails it. Separately, FR-013 delivers a comparator
+      "specification" in the events repo while AC-008 runs a permutation test in this repo with no
+      stated executable comparator.
+    remediation: >
+      Add the journal event-type set to the AC-004 universe; state where the reference comparator
+      executes (events package at the bumped floor, or a test-local reference with the spec as oracle).
+  - id: SPEC-FRESH-011
+    lens: terminology
+    severity: 2
+    title: Floor rule claims AC-029, AC-037 and AC-039 carry a floor and self-mutation case; their rows have none
+    evidence:
+      - artifact: "spec.md § 6 Floor rule list (AC-004, 012, 014, 015, 019, 020, 024, 029, 030, 037, 039) vs rows AC-029, AC-037, AC-039"
+    claim: >
+      The rows for AC-029, AC-037 and AC-039 state neither what they must find first nor a mutation
+      that must fail, so the blanket rule is unverifiable there (and AC-008/AC-009 are enumerations
+      not on the list).
+    remediation: >
+      Add the floor and mutation to those rows or remove them from the list.
+  - id: SPEC-FRESH-012
+    lens: public-hygiene
+    severity: 2
+    title: Spec cites SK-NNN tooling-ledger ids that are not defined anywhere in this public repository
+    evidence:
+      - artifact: "spec.md § 7 ('Tooling defects (SK-350, SK-311, SK-331, SK-319, SK-339, SK-328, SK-320)'); plan-carryover.md § T"
+    claim: >
+      The ids resolve only in an external operator ledger; in this repo they are dangling references
+      (a grep finds them only in this mission's own files), so a reader cannot act on them.
+    remediation: >
+      Replace with the concrete defect statement already in carryover section T, or an upstream issue number.
