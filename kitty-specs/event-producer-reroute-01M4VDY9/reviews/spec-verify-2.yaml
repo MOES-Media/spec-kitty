@@ -1,0 +1,146 @@
+schema: review-verify/v1
+complete: true
+phase: spec
+round: 2
+results:
+  - id: SPEC-FRESH-001
+    status: resolved
+    reason: "AC-008 now names eight fixtures (floor all eight); data-model s4 holds eight with example 7 (source tie-break) and 8 (two spellings); AC-008 names three mutations (naive, no source, raw-id dedupe) that must fail."
+  - id: SPEC-FRESH-002
+    status: resolved
+    reason: "Dedupe is on (s, normalized id) in s4 and spec s3; s(r) is the empty string for source-less upcast rows and is not an error row (s2); example 8 fixture covers two spellings."
+  - id: SPEC-FRESH-003
+    status: resolved
+    reason: "s10 intro replaced: options marked 'amends' name the requirement they contradict (OD-SINK b, JOURNAL b, SCHEMA-DELIVERY c, CLOCK b, NODEID b) and are legal only with a spec amendment; blanket sentence gone."
+  - id: SPEC-FRESH-004
+    status: resolved
+    reason: "AC-005 makes the OD-MISSIONID rejected case conditional on (a) and states (b) publishes with no fault; per-event warning is the single rule; data-model missionid is required 'except under OD-MISSIONID (b)'."
+  - id: SPEC-FRESH-005
+    status: resolved
+    reason: "Data-model actor rule states data.actorbinding exists only for an object actor, equal to the row actor (the one rename, no member for a string actor); FR-005, FR-018 and AC-029 cite it."
+  - id: SPEC-FRESH-006
+    status: resolved
+    reason: "FR-019 and AC-023 now test clock state by git check-ignore for a working-tree path or, under the common directory (OD-CLOCK a), outside the working tree and unreachable by git add."
+  - id: SPEC-FRESH-007
+    status: resolved
+    reason: "FR-026 permits appending a fault-log row and resolving the canonical root for that location only; AC-012 lets the real client pass those; AC-005 and FR-023 make an unresolvable root stderr-only."
+  - id: SPEC-FRESH-008
+    status: resolved
+    reason: "AC-010 kill case now says the next stamp is above every logged clock and equals none ever written, and that a gap is permitted with no fault required, consistent with FR-012."
+  - id: SPEC-FRESH-009
+    status: resolved
+    reason: "AC-026 asserts the fault-log torn-line row (repo-relative path, line position); FR-021 assigns detection to the producer reply and recording to the client; no reader is invoked; readers unchanged."
+  - id: SPEC-FRESH-010
+    status: resolved
+    reason: "AC-004 universe now includes the run-journal kinds of runtime/next/_internal_runtime/events.py; AC-008 runs a test-local reference comparator implementing s4, cross-checked against the events comparator once released."
+  - id: SPEC-FRESH-011
+    status: resolved
+    reason: "Rows AC-004, 008, 009, 012, 014, 015, 019, 020, 024, 029, 030, 037, 039 each state a floor and a named must-fail mutation (AC-029, 037, 039 now carry both); AC-008 and 009 are on the list."
+  - id: SPEC-FRESH-012
+    status: resolved
+    reason: "No SK-NNN ids remain in spec.md, data-model.md or plan-carryover.md; carryover T states the defects self-contained and spec s7 points to it."
+  - id: SPEC-GOV-001
+    status: resolved
+    reason: "s9 item 3 records D-1, D-2 and D-3 departures; FR-045 and AC-033 require the amendment to name all three; present in spec itself."
+  - id: SPEC-GOV-002
+    status: resolved
+    reason: "FR-014 is now the closed list including comparator spec and fixtures, Lane alignment and conditional envelope subset; s7 events#92 row lists each for acknowledgement."
+  - id: SPEC-GOV-004
+    status: resolved
+    reason: "C-004 in the spec is per artifact: Python writes the ledger row, the producer the publish-log row; at #6193/#6195 Java writes both and the publish log becomes the ledger or is retired; FR-020/AC-030 test it."
+  - id: SPEC-GOV-005
+    status: resolved
+    reason: "OD-SCHEMA-DELIVERY added (recommend a, plan-blocking); FR-039 forbids committed schema source; AC-027 and G-11 gate it."
+  - id: SPEC-ARCH-001
+    status: resolved
+    reason: "FR-004 and ProduceRequest.start_path: the seam hands a starting path (E14) and the producer resolves the canonical root; unresolvable is rejected (root-unresolvable), stderr only; AC-001 tests worktree and subdirectory."
+  - id: SPEC-ARCH-003
+    status: resolved
+    reason: "FR-002 now covers RuntimeMomentProducer._publish dropping its drain read, registering outside the moment_handlers_disabled_reason branch, ignoring kill switches, reset helpers and the pin; AC-003 (c) to (e) test them."
+  - id: SPEC-ARCH-004
+    status: resolved
+    reason: "FR-023 makes the client the outermost catch and routes seam busy-skip and TimeoutError to its recorder; FR-025 sets timeout strictly below the seam bound, applying when the bound is disabled, plus a per-process breaker; AC-006 tests each."
+  - id: SPEC-ARCH-005
+    status: resolved
+    reason: "FR-003 registers on status and lifecycle only; ProduceRequest.slot enum has no resolved-binding; AC-004 asserts one annotation row yields one client invocation."
+  - id: SPEC-ARCH-006
+    status: resolved
+    reason: "FR-032 and data-model s8 define legacy-row form as generated from the single data schema plus the lifted-member list (FR-014); AC-019 validates persisted lines of each cleared marker with floors and mutation."
+  - id: SPEC-ARCH-011
+    status: resolved
+    reason: "FR-011 and data-model s1 cite identity/project.py::generate_node_id, producer derives from same inputs and hash, golden test per OS in AC-039 with live and injected strings; OD-NODEID."
+  - id: SPEC-ARCH-013
+    status: resolved
+    reason: "Retrospective rows are in the data-model s3 type table as in scope; AC-004 derives its universe from AUTHORITATIVE_NON_LANE_EVENT_TYPES, retrospective, lane, annotation and journal kinds; unlisted kind fails."
+  - id: SPEC-COMPLETE-001
+    status: resolved
+    reason: "FR-012 and LamportState scope the counter to every worktree of one repository under one nodeid (OD-CLOCK); AC-010 has primary plus two worktrees with concurrent stamping."
+  - id: SPEC-COMPLETE-002
+    status: resolved
+    reason: "AC-004 requires derivation from the type table and persisted row kinds (no hand list), a floor of the in-scope writers, and an injected-writer mutation."
+  - id: SPEC-COMPLETE-003
+    status: resolved
+    reason: "AC-005 makes disabled conditional on OD-OPTOUT b with an enum-equality test otherwise; FR-022/023 carry it conditionally."
+  - id: SPEC-COMPLETE-004
+    status: resolved
+    reason: "AC-013 reworded to at least newest keep_runs and anything within max_age_days; AC-031 covers invalid retention config; FR-029 defines open Mission and unfinished step in the spec."
+  - id: SPEC-COMPLETE-005
+    status: resolved
+    reason: "FR-007 and data-model s2: only a 26-char ULID is accepted, any UUID form is rejected, normalization is reader/order-key only."
+  - id: SPEC-COMPLETE-007
+    status: resolved
+    reason: "FR-023 puts stderr in every mode and keeps the command succeeding when the fault log is unwritable; AC-005 includes the unwritable case and a stderr warning in human and --json mode."
+  - id: SPEC-COMPLETE-008
+    status: resolved
+    reason: "FR-023 words crash/timeout as 'may not have been produced'; FR-012 states permitted kill outcomes; AC-010 has the injected kill between stamp and append."
+  - id: SPEC-COMPLETE-009
+    status: resolved
+    reason: "AC-029 (data keys subset of persisted row plus lifted rules) and AC-030 (no Python open-for-write of the publish log) added with floors and mutations; G-11 lists the single-writer gate."
+  - id: SPEC-COMPLETE-010
+    status: resolved
+    reason: "AC-032 (FR-042), AC-033 (FR-044/045/046), AC-034 (NFR-003/004), AC-035 (NFR-006) added with observables and falsifiers; G-8 renamed provenance and pinned toolchain."
+  - id: SPEC-COMPLETE-011
+    status: resolved
+    reason: "AC-024 enumerates built wheels, requires the three minimum tags and has a removed-tag mutation; AC-037 and G-12 pin the set."
+  - id: SPEC-COMPLETE-012
+    status: resolved
+    reason: "AC-019 floor (schemas resolved, cleared-marker count, one line per type) and AC-020 floor (census lists of data-model s9 found) with mutations."
+  - id: SPEC-COMPLETE-016
+    status: resolved
+    reason: "FR-024 defines the count as fault-log rows in the retention window, not reset by success; FR-029 defines open Mission and unfinished step; both in the spec itself."
+  - id: SPEC-RELEASE-001
+    status: resolved
+    reason: "s8 Per-wheel rule stays in the spec (every release step, script and test becomes per-wheel; binary at one known path under a known prefix or deliberate prefix amendment); AC-037 fails fixtures that pick fewer wheels. Only the file-name machinery moved to carryover G/Z."
+  - id: SPEC-RELEASE-002
+    status: resolved
+    reason: "G-9 (per-OS build stage feeding one assembling job, publish needs the set-checked artifact) and G-12 plus AC-037 (dist set equals pinned list, one wheel removed must fail) are in the spec."
+  - id: SPEC-RELEASE-003
+    status: resolved
+    reason: "G-3 in the spec requires the per-OS native build and clean-venv by-path wheel smoke in the nightly, on PRs touching the Java tree, packaging config or client, and in release.yml before publish."
+  - id: SPEC-RELEASE-004
+    status: resolved
+    reason: "G-7 restated to the FR-043 outcome only; OD-FALLBACK decided with recommendation (a) and plan-blocking; C-007 and AC-038 forbid needing the binary for sdist or editable builds."
+  - id: SPEC-RELEASE-008
+    status: resolved
+    reason: "AC-036 sets a per-command overhead ceiling through tests/_perf_helpers.py over the largest multi-row command, with a planted slow stub; OD-SPAWN (b) is the fallback and is flagged now."
+  - id: SPEC-RELEASE-009
+    status: resolved
+    reason: "AC-032 recomputes the build checksum from the member in each published wheel; FR-042 states no bit-reproducibility claim; G-8 renamed provenance and pinned toolchain."
+  - id: SPEC-RELEASE-010
+    status: resolved
+    reason: "G-6 names only uv lock --check; G-5 requires the SBOM to list Java dependencies and embedded toolchain (AC-040); G-13 adds Java dependency checksum verification."
+  - id: SPEC-ORDER-003
+    status: resolved
+    reason: "FR-012 requires the first stamp after state loss to exceed the log's highest clock and state never pruned while its log exists; AC-010 has log-deleted and state-deleted cases; carryover W records the residual no-state-no-log case."
+  - id: SPEC-ORDER-006
+    status: resolved
+    reason: "Example 5 uses full 26-char ULIDs differing in case; s4 states normalize_event_id rules, non-normalizing id is an error row, comparison by ASCII code point; FR-007 and s2 state ULID-only and reader-only normalization."
+  - id: SPEC-ORDER-008
+    status: resolved
+    reason: "s4 Domain: order applies to upcast-form rows after dedupe, id-less legacy journal outside it; count identity includes collapsed; AC-009 fixture has a duplicate and example 6 shows 4 = 2+1+1."
+  - id: SPEC-ORDER-009
+    status: resolved
+    reason: "s4: dedupe first on (s, i), smallest key kept, differing payload a named conflict; s is in the key as final tie-break so cross-source ties vanish; example 7."
+  - id: SPEC-ORDER-011
+    status: resolved
+    reason: "FR-009 and OD-MISSIONID decide the id-less Mission case explicitly (a refuse with per-event warning, b ADR fallback, recommended); AC-005 states both outcomes; command never fails."

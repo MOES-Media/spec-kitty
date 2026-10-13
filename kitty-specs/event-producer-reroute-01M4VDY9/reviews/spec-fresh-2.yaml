@@ -1,0 +1,317 @@
+schema: review-findings/v1
+complete: true
+phase: spec
+lens_group: fresh
+mission: event-producer-reroute-01M4VDY9
+findings:
+- id: SPEC-FRESH2-001
+  lens: testability
+  severity: 3
+  title: 'AC-008 ''one result for every permutation'' cannot hold for examples 6 and 8: the surviving
+    duplicate is undefined'
+  evidence:
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/data-model.md section 4 Domain: ''Of duplicates the smallest
+    key is kept'' while the dedupe key is (s, normalized i), so two duplicates differ only in raw id spelling
+    or position and have EQUAL keys'
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/data-model.md example 8: ''ordered [A or B, C], collapsed
+    one of A/B'''
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/data-model.md example 6: expected ''collapsed [D]'' and
+    ''errors [B at line 2 ...]'', both functions of input position'
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/spec.md AC-008: ''one result for every permutation''
+    over all eight fixtures (floor: all eight)'
+  - 'Read-only run of a reference comparator (dedupe on (source, normalize_event_id), sort by the section
+    4 key) over all permutations of example 8: result set {(A,C),(B,C)}; the winner of the A/B tie depends
+    on input order.'
+  claim: The spec's own fixtures contradict its own acceptance rule. 'Smallest key' does not choose between
+    two rows whose keys are equal by construction, and example 6 names a specific loser (D) and a line
+    position that a permutation of the input changes. A test author must either weaken the permutation
+    assertion or invent a tie-break, and two implementers will invent different ones (raw id order, first
+    occurrence, payload bytes), so the Java and Python comparators can disagree on which spelling is kept.
+  remediation: 'State a total tie-break among equal-key duplicates (for example: smallest raw id by code
+    point, then canonical payload bytes) and say that the permutation assertion compares the ordered list
+    and the collapsed set by that rule. Say that error rows carry the line position of the file as read
+    and are excluded from the permutation-equality assertion (or compare them as a set keyed by the row,
+    not by position). Update examples 6 and 8 to match.'
+- id: SPEC-FRESH2-002
+  lens: false-claim-about-code
+  severity: 3
+  title: FR-003 says the resolved-binding slot only projects rows that already reach the client; binding
+    annotation rows are persisted separately and reach no other slot
+  evidence:
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/spec.md FR-003: ''a plain InnerStateChanged annotation
+    gets its own seam call ... the resolved-binding slot projects rows that already reach the client'''
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/data-model.md section 6 ProduceRequest: ''the resolved-binding
+    slot is not registered, FR-003'''
+  - src/specify_cli/status/emit.py:844-847 and 1173-1174 persist the InnerStateChanged annotation (its
+    own ULID event_id) together with the transition event
+  - 'src/specify_cli/status/emit.py:1028-1035 and 1196-1207: after persistence only _saas_fan_out(event,
+    ...) reaches the status slot; the annotation goes through _resolved_binding_fan_out only'
+  - 'src/specify_cli/status/emit.py:1283-1285 and 1499: the standalone binding annotation also fans out
+    only through _resolved_binding_fan_out'
+  claim: A resolved-binding annotation is a distinct ledger row of an in-scope type (wp.innerstate.changed.v1)
+    with its own event_id. It is fanned out through the resolved-binding slot alone, and that slot is
+    deliberately not registered. So it does NOT 'already reach the client'. The word 'plain' in FR-003
+    and the rationale for not registering the slot steer an implementer to add a seam call only for plain
+    annotations, leaving transition-bundled binding annotations unpublished while the transition row itself
+    is published. AC-004 would catch it only if the forced-row census exercises the transition writers'
+    annotation.
+  remediation: 'Rewrite FR-003: every persisted InnerStateChanged row, plain or resolved-binding, including
+    those persisted as part of emit_status_transition and emit_status_transition_batch, gets exactly one
+    status-slot (or new) seam call carrying that row. Drop the ''projects rows that already reach the
+    client'' rationale or restrict it to what is true (the slot carries the same facts, not the same row).
+    Add the transition-bundled annotation to the AC-004 floor.'
+- id: SPEC-FRESH2-003
+  lens: ac-weakened
+  severity: 3
+  title: AC-010 kill case exercises only the advance-without-line window; the line-without-advance (reuse)
+    window is untested and FR-012 dropped its wording
+  evidence:
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/spec.md FR-012 now: ''a kill leaves no advance and no
+    line, or a gap, never a reused value'' (round-1 text: ''or a gap with or without a line'')'
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/spec.md AC-010: ''Kill (injected between stamp and append),
+    rerun: the next stamp is above every clock in the log and equals none ever written to a line (a gap
+    is permitted, no fault is required, FR-012)''; round-1 text required ''a recorded fault'''
+  - kitty-specs/event-producer-reroute-01M4VDY9/plan-carryover.md section Z, FR-012 tail (original wording
+    kept there, no longer binding in the spec)
+  claim: 'The reuse hazard lives in the OTHER crash window: if the implementation appends first and persists
+    the counter second, a kill after the append leaves a line with clock N and state at N-1, so the next
+    stamp repeats N. The AC fixes the kill point ''between stamp and append'' and so passes for a state-first
+    implementation while saying nothing about an append-first one. The spec does not fix the order, so
+    the AC does not cover every implementation FR-012 allows. Separately, ''no fault is required'' is
+    ambiguous: a killed PRODUCER must still surface as a recorded `crash` fault under FR-023/NFR-007;
+    only a killed whole CLI process cannot.'
+  remediation: 'Name every kill point in AC-010 (before state write, between state write and append, between
+    append and state flush) or fix the write order in FR-012, and require the next stamp to exceed the
+    highest clock in the log AND the state in each. State which process is killed: producer kill yields
+    a `crash` fault per AC-005; whole-process kill is the only case where no fault is possible. Restore
+    ''with or without a line'' (or equivalent) in FR-012.'
+- id: SPEC-FRESH2-004
+  lens: contradiction
+  severity: 3
+  title: Torn-line row in the fault log has no reason class, but FaultLogRow, doctor and FR-023 are all
+    class-based
+  evidence:
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/spec.md FR-021: ''the client records it in the fault
+    log with the repo-relative log path and line position'''
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/spec.md FR-023: reason class enum is closed (binary-missing
+    | crash | timeout | malformed-reply | clock-overflow | rejected | busy, plus disabled under OD-OPTOUT
+    b); ''Each fault records a warning ... on stderr in EVERY mode'''
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/data-model.md section 6: ProduceReply.notice ''torn-line'';
+    ProducerFault fields = class, event_type, event_id, message, at; section 7 FaultLogRow = ProducerFault
+    fields plus a relative root marker'
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/spec.md FR-024/AC-007: doctor reports fault-log rows
+    in the window and ''the last fault by class''; AC-026 expects ''a torn-line row'' in the fault log'
+  claim: 'Round 2 moved fault-log ownership to the client and made the torn line a producer ''notice''.
+    The resulting torn-line row fits no defined shape: it has no class from the closed enum, usually no
+    event_type or event_id, and it is not stated whether it also produces the FR-023 stderr warning or
+    counts toward the FR-024 fault total and ''last class''. Implementers will either invent a class (breaking
+    the enum-equality test of AC-005) or write a row doctor cannot classify.'
+  remediation: Add `torn-line` as an explicit row kind of the fault log (a notice, not a ProducerFault
+    class), say whether it emits a stderr line, and state whether doctor counts it; or add it to the class
+    enum and the FR-023 sentence table. Update FaultLogRow and AC-007/AC-026 accordingly.
+- id: SPEC-FRESH2-005
+  lens: false-claim-about-code
+  severity: 3
+  title: The 'Lifecycle rule' mapping is stated for _build_envelope rows but its type set is undefined;
+    decision rows and run-journal moments have different shapes
+  evidence:
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/data-model.md section 3 Lifecycle rule: ''For those types
+    data is payload verbatim; timestamp is time; aggregate_id is subject for work package types'''
+  - 'src/specify_cli/decisions/emit.py:254-262 and 337-343: persisted decision row is {event_id, at, event_type,
+    payload}; no timestamp, aggregate_id, aggregate_type or project_uuid'
+  - 'src/specify_cli/decisions/emit.py:158-190: _queue_decision_fanout hands the seam a SYNTHESIZED envelope
+    (timestamp=at, aggregate_id=mission_slug), not the persisted row'
+  - 'src/specify_cli/events/runtime_moments.py:154-157 and 260-267: the run-journal seam envelope uses
+    a deterministic uuid5 event_id (a UUID, refused by FR-007) and payload stamped with mission identity
+    by _with_mission_identity (members the journal row lacks, cf. FR-005)'
+  - 'src/runtime/next/_internal_runtime/engine.py:107-114: persisted journal row is {event_type,
+    timestamp, payload}, no event_id'
+  claim: Only twelve lifecycle types are _build_envelope rows (LIFECYCLE_EVENT_TYPES). Decision and run-journal
+    types are in the same table and the same 'lifecycle slot', but their persisted shape differs, and
+    the existing seam call for both passes a derived envelope whose id (run journal) is a UUID that FR-007
+    would reject. The data-model never says which types the Lifecycle rule covers, how decision rows map
+    `at`, or that those seam calls must be changed to carry the persisted row (FR-004) rather than the
+    envelope they carry today. An implementer following FR-004 literally and the Lifecycle rule literally
+    will mis-map decision rows (no `timestamp`) and could reuse the uuid5 moment id.
+  remediation: 'List the types covered by the Lifecycle rule (the twelve LIFECYCLE_EVENT_TYPES) and add
+    one sentence for decision rows ({event_id, at, event_type, payload}: id, time from at, data = payload,
+    mission-scoped source from payload.mission_id) and for run-journal rows (time from timestamp, id from
+    the FR-035 ULID, never the uuid5 moment id; mission identity from journal context). State in FR-004
+    or FR-035 that the decision and runtime-moment seam calls hand the persisted row, not their derived
+    envelope.'
+- id: SPEC-FRESH2-006
+  lens: coverage-gap
+  severity: 3
+  title: The census universe (AUTHORITATIVE_NON_LANE_EVENT_TYPES) holds DecisionPointDeferred and DecisionPointCanceled,
+    which are in neither the type table nor the two deferred rows
+  evidence:
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/spec.md AC-004: writers ''derive from data-model section
+    3 and the persisted row kinds: the ledger''s non-lane set (AUTHORITATIVE_NON_LANE_EVENT_TYPES) ...;
+    no hand list'''
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/data-model.md section 3: ''a kind in neither this table
+    nor the two deferred rows fails it''; deferred rows are glossary and DecisionPointWidened only; the
+    resolved row says ''(resolved, deferred, canceled)'' meaning outcomes'
+  - 'src/specify_cli/status/lifecycle_events.py:138-149: _DECISION_POINT_EVENT_TYPES = Opened, Resolved,
+    Deferred, Canceled, Widened; AUTHORITATIVE_NON_LANE_EVENT_TYPES includes all five'
+  - grep of src/ finds no writer of DecisionPointDeferred or DecisionPointCanceled (decisions/emit.py
+    writes deferred/canceled as event_type DecisionPointResolved with terminal_outcome)
+  claim: A gate that derives its universe from the registry will find two persisted-kind names that the
+    table neither maps nor defers. As written the census either fails on day one or the implementer silently
+    special-cases the two names, which is the hand list AC-004 forbids. The same gap would hit Widened's
+    sibling names if the registry grows.
+  remediation: 'Add DecisionPointDeferred and DecisionPointCanceled to the deferred rows (reason: no emitter;
+    outcomes travel as DecisionPointResolved with terminal_outcome) and make the census treat ''registered,
+    no emitter'' as a named deferral that fails when an emitter appears.'
+- id: SPEC-FRESH2-007
+  lens: false-claim-about-code
+  severity: 3
+  title: FR-025 bounds the client against the constant _DEFAULT_SAAS_FANOUT_TIMEOUT_S, but the effective
+    seam bound is environment-configurable
+  evidence:
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/spec.md FR-025: ''strictly below the seam bound `_DEFAULT_SAAS_FANOUT_TIMEOUT_S`,
+    and still applying when the seam bound is disabled (<= 0)'''
+  - 'src/specify_cli/status/adapters.py:51-72: the effective bound is _saas_fanout_timeout_s(), read from
+    SPEC_KITTY_SAAS_FANOUT_TIMEOUT; the constant (10.0 s) is only its default'
+  - 'src/specify_cli/status/adapters.py:100-128: on TimeoutError the daemon worker thread is abandoned;
+    in a one-shot CLI the process then exits'
+  claim: If an operator lowers the seam bound below the client's default timeout, the seam abandons the
+    handler thread first, the CLI process exits, and the spawned producer is orphaned with no client left
+    to terminate it or record `timeout`. AC-006 ('no child remains') passes only for the default configuration.
+    The spec covers the disabled case but not the lowered case.
+  remediation: Require the client timeout to be strictly below the EFFECTIVE seam bound (the value _saas_fanout_timeout_s()
+    returns), or have the client clamp itself to it, and add the lowered-bound case to AC-006. Say what
+    happens to a child when the seam abandons the thread (client-side watchdog or the child's own deadline_ms).
+- id: SPEC-FRESH2-008
+  lens: charter-violation
+  severity: 3
+  title: Retention eligibility is Java domain code (NFR-005) but the cleanup command and doctor fault
+    count have no owner inside the thin-client allowlist or the protocol
+  evidence:
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/spec.md NFR-005: ''Java domain code (ids, clock, mapping,
+    order, retention eligibility)'''
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/spec.md FR-026: the client ''may only'' locate, spawn,
+    pass the seam''s arguments and the FR-004 row, enforce the timeout, read one reply, map failures,
+    append a fault-log row, register itself'
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/data-model.md section 6: ProduceRequest slot is `status`
+    | `lifecycle`; no retention or listing operation exists'
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/spec.md FR-024, FR-030: `doctor` reports the fault count
+    and hosts the dry-run-first cleanup command'
+  - 'Operator decision 2: Python only for the thin pass-through shim'
+  claim: Either the cleanup and doctor logic is new Python (breaking the Java-only rule and the FR-026/FR-027
+    gate, which the retention code cannot satisfy because it must read configs, Mission state and lock
+    files), or it is Java and the client needs a second request type that FR-026 and ProduceRequest do
+    not define. Neither reading is stated, so the work package that implements FR-024/FR-028 to FR-031
+    cannot be scoped without a decision the spec should make.
+  remediation: 'Add an OD (or a requirement) that fixes the owner: a Java retention subcommand reached
+    through a second ProduceRequest operation (with FR-026 amended to allow ''spawn the producer for a
+    retention or status query''), with Python limited to passing arguments and rendering the reply; and
+    say how doctor obtains the fault count (client reads its own fault log) without a Python eligibility
+    implementation.'
+- id: SPEC-FRESH2-009
+  lens: contradiction
+  severity: 3
+  title: OD-SPAWN option (b) is unmarked as an amendment but needs a client-side buffer or a new batch
+    seam call, both outside FR-003/FR-026
+  evidence:
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/spec.md section 10: ''every unmarked option satisfies
+    every requirement''; OD-SPAWN (b) ''one per command batch'', unmarked'
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/data-model.md section 6: ProduceRequest.row ''a list
+    under OD-SPAWN (b)'''
+  - 'src/specify_cli/status/emit.py:1186-1207: emit_status_transition_batch fans out PER EVENT (_saas_fan_out
+    in a loop), so the seam is called once per row'
+  - kitty-specs/event-producer-reroute-01M4VDY9/spec.md FR-003 ('every in-scope row reaches the seam exactly
+    once'), FR-026 (no logic beyond the listed steps), AC-004 ('one forced row yields one seam call')
+  claim: With a per-row seam, one spawn per batch means the thin client accumulates rows across seam calls
+    and flushes later (state and a flush hook, not in the FR-026 list, and a lost-row hazard on exit),
+    or the seam gains a batch call (changes FR-003 and AC-004). The section 10 rule says an option that
+    contradicts a requirement carries an 'amends' mark; this one does not.
+  remediation: Mark OD-SPAWN (b) as amending FR-026 (and FR-003/AC-004 if a batch seam call is added),
+    and say in the option which mechanism it uses and where a failed flush is recorded (FR-023).
+- id: SPEC-FRESH2-010
+  lens: contradiction
+  severity: 2
+  title: FR-012 states global uniqueness of (nodeid, lamportclock) but the recommended OD-CLOCK (a) leaves
+    it violated for separate clones on one machine
+  evidence:
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/spec.md FR-012: ''... so no two events share a (nodeid,
+    lamportclock) pair'''
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/spec.md OD-CLOCK recommendation: ''(a); separate clones
+    on one machine stay a residual'''
+  - 'src/specify_cli/identity/project.py:240-249: nodeid = sha256(hostname:username)[:12], identical for
+    every clone of the same user on a machine'
+  claim: Two clones keep two counters under one nodeid, so their publish logs can carry the same pair.
+    The unmarked option (a) therefore does not 'satisfy every requirement' as section 10 claims, and AC-010
+    only proves one repository's worktrees.
+  remediation: Scope FR-012 to one repository (including its linked worktrees) and name the cross-clone
+    case as an accepted residual in FR-012 or section 11, or mark (a) accordingly.
+- id: SPEC-FRESH2-011
+  lens: contradiction
+  severity: 2
+  title: Attribute `executionmode` is scoped to lane rows in data-model section 1 but lifted from retrospective
+    rows in section 3, with a different value vocabulary
+  evidence:
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/data-model.md section 1: executionmode ''extension (INTERIM)
+    ... lane rows'''
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/data-model.md section 3 retrospective row: lifted `execution_mode`'
+  - 'src/specify_cli/retrospective/lifecycle_events.py:155,210,272: execution_mode is Literal[''worktree'',
+    ''main''] (default ''main''); src/specify_cli/status/models.py:448: lane rows use ''worktree'' or
+    ''direct_repo'''
+  - 'src/specify_cli/retrospective/lifecycle_events.py:151,206,268: mission_id defaults to the empty string,
+    which the ''absent value is omitted'' rule (FR-010) does not address'
+  claim: One attribute would carry two vocabularies, and the Req column says lane rows only while the
+    type table lifts it from retrospective rows too. A consumer filtering on `executionmode` cannot tell
+    'main' from 'direct_repo' semantics, and an empty-string mission_id has no stated treatment (omit
+    and fall back to meta.json, or carry as is).
+  remediation: Either restrict the lift to lane rows and keep `execution_mode` in retrospective `data`,
+    or widen section 1 and add the vocabulary to the registry entry. State that an empty-string `mission_id`
+    counts as absent and falls back to meta.json.
+- id: SPEC-FRESH2-012
+  lens: testability
+  severity: 2
+  title: FR-019 clock-state gate says 'outside the working tree', which is false for the primary checkout's
+    own git directory
+  evidence:
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/spec.md FR-019: ''under the git common directory (OD-CLOCK
+    a), that it lies outside the working tree and git add cannot reach it'''
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/data-model.md section 7 LamportState: ''under the git
+    common directory, outside the working tree (FR-019)'''
+  claim: In the primary checkout the common directory is <root>/.git, which is inside the checkout's directory
+    tree. A literal path-containment assertion 'outside the working tree' fails there, while the lane
+    worktrees pass; the gate author must guess the intended test.
+  remediation: 'State the test as: the resolved path is under the output of `git rev-parse --git-common-dir`,
+    and `git add -f` of the path is refused or the path is inside a git metadata directory; drop ''outside
+    the working tree''.'
+- id: SPEC-FRESH2-013
+  lens: charter-violation
+  severity: 2
+  title: NFR-006 covers every 'log row', but FR-005 forces verbatim copying of operator-authored ledger
+    members that can contain paths or an email
+  evidence:
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/spec.md NFR-006: ''No absolute home paths, usernames
+    or credentials in any shipped file, fixture, log row or fault record'''
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/spec.md FR-005 and data-model section 3: row members
+    (reason, evidence, review_ref, policy_metadata, actor) are moved verbatim'
+  - 'src/specify_cli/status/lifecycle_events.py:733-800: MissionCreated actor defaults to the git user.email
+    via _resolve_local_actor'
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/spec.md AC-035: scans ''fixtures, produced rows and fault
+    records'''
+  claim: The producer cannot satisfy NFR-006 on real data without altering members FR-005 forbids it to
+    alter; AC-035 passes only because its inputs are clean fixtures. The requirement is either unmet in
+    practice or the producer silently rewrites content.
+  remediation: Scope NFR-006 to producer-authored content (fault records, producer-minted fields, shipped
+    fixtures) and state that verbatim ledger members keep whatever the operator wrote, noting the log
+    is local and gitignored.
+- id: SPEC-FRESH2-014
+  lens: cross-reference
+  severity: 1
+  title: 'Dangling pointers: ''(Y)'' in the type table and ''section 3, data-model'' in scope item 4'
+  evidence:
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/data-model.md section 3: ''row members verbatim (Y)''
+    appears in twelve rows with no legend; Y exists only as plan-carryover.md section Y'
+  - 'kitty-specs/event-producer-reroute-01M4VDY9/spec.md section 1 in-scope item 4: ''The defined total
+    order ... (section 3, data-model)''; the spec section 3 holds the requirement and data-model section
+    4 holds the formal key (data-model section 3 is the type table)'
+  claim: A reader of data-model.md alone cannot resolve (Y), and 'section 3, data-model' points at the
+    type table rather than the order.
+  remediation: 'Write ''verbatim, member list: carryover Y'' once under the table heading and change item
+    4 to ''(spec section 3; data-model section 4)''.'
