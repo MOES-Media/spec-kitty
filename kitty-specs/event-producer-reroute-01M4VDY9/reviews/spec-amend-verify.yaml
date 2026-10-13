@@ -1,0 +1,68 @@
+complete: true
+mission: event-producer-reroute-01M4VDY9
+subject: "spec amendment fb4218613..890becfd8 (spec.md, data-model.md)"
+verdict: PASS
+verdict_note: "All 17 rulings applied exactly; no semantic change outside the rulings except the items listed as findings (none above severity 3). Severity-3 finding F-1 should be folded in the plan phase."
+profile_directives_applied: "reviewer-renata: DIRECTIVE_024 Locality of Change (every hunk checked against a ruling), 032 Conceptual Alignment (terminology: clockless, Mission, work package), 001 Architectural Integrity (thin-client boundary vs rulings), tactic code-review-incremental (intent first, then risk by category), adversarial-squad findings-disposition (each of the four fixer points given an explicit disposition). Anti-laziness: restatement-only fixes treated as unresolved; ex. 9 re-derived (7 = 2+4+1), cross-references and C-ids checked by script."
+checks:
+  size_bytes: {spec: 43884, data_model: 20296, total: 64180, limit_about: 65000, ok: true}
+  working_tree_matches_890becfd8: true
+  dangling_FR_NFR_AC_refs: none
+  OD_refs_all_in_section_10: true
+  leftover_branch_text: "none ('(b)' hits: only AC-003 case label, legitimate)"
+  every_C_id_in_an_AC: "yes, C-001..C-008 each in >=1 AC row"
+  public_hygiene: "clean: no absolute home paths, usernames or barred terms in either file or in added diff lines"
+rulings:
+  - {id: OD-SINK, status: applied, evidence: "spec D-SINK 'ruled: OD-SINK', section 10; FR-001/FR-020/C-004 unchanged"}
+  - {id: OD-SCHEMA-DELIVERY, status: applied, evidence: "FR-039: released artifact, pinned and checksummed, nothing committed, events release a prerequisite"}
+  - {id: OD-RETAIN, status: applied, evidence: "FR-030 Java operation, doctor thin pass-through; data-model section 6 Retain operation; FR-026 permits pass-through"}
+  - {id: OD-RETAIN-FACTS, status: applied, evidence: "option (ii): FR-029/FR-039/D-REDUCER/out-of-scope carve-out; ProduceRequest never carries facts; AC-013 uses fixture ledgers"}
+  - {id: OD-JAVA, status: applied, evidence: "FR-039 standalone module absorbable by #6192/#6193"}
+  - {id: OD-FALLBACK, status: applied, evidence: "FR-043, AC-024, AC-037 unconditional pure wheel"}
+  - {id: OD-MISSIONID, status: applied, evidence: "FR-009 refuse as rejected, doctor names migrate backfill-identity; data-model section 2/3 rows; AC-005 (opposite of old table recommendation honoured)"}
+  - {id: OD-CLOCK, status: applied, evidence: "FR-012, FR-019, AC-023, LamportState anchored at git common dir; check-ignore alternative removed"}
+  - {id: OD-NODEID, status: applied, evidence: "FR-011 Java derives, request does not carry it"}
+  - {id: OD-SPAWN, status: applied, evidence: "FR-001 one spawn per row measured by AC-036; NFR-002 batching only as plan contingency; ProduceRequest 'list' removed"}
+  - {id: OD-OPTOUT, status: applied, evidence: "FR-022/FR-023/ProducerFault: no disabled class; AC-005 enum-equality test; G-11 gate"}
+  - {id: OD-RETENTION, status: applied, evidence: "FR-028 and RetentionPolicy defaults 20/30"}
+  - {id: OD-SIGN, status: applied, evidence: "section 8 Omitted; data-model wheel record signed=false"}
+  - {id: OD-MATRIX, status: applied, evidence: "FR-041 floor only; section 8"}
+  - {id: OD-EVENTS, status: applied, evidence: "C-008 new constraint plus section 10 line; source tie-break goes to events PR to confirm"}
+  - {id: OD-JOURNAL, status: applied, evidence: "FR-035 flagged as ONE narrow Python exception, stamping only; scope item 7; operator-decision-2 line; section 11 detail"}
+  - {id: example-9-clockless-wording, status: applied, evidence: "data-model section 4 h-definition rewritten ('no lamportclock member'), explicit clockless definition, example 9 states M is an error row not clockless; counts 7=2+4+1 re-derived and consistent"}
+findings:
+  - id: F-1
+    severity: 3
+    claim: "FR-027 says the gate 'fails on other new Python logic' beyond the thin client, seam wiring (FR-002..004) and FR-035 stamping. But the spec also requires other Python changes: lane-list consolidation (FR-034), init/upgrade gitignore entries (AC-023/FR-019), marker clearing (FR-032), doctor retention wiring and migrate/doctor message (FR-009, FR-030), packaging scripts and release gates (FR-041..044). An implementer cannot satisfy FR-027 literally, and 'new Python logic' is undefined and not mechanically testable."
+    evidence: "spec.md FR-027, AC-012, G-11 versus FR-019, FR-032, FR-034, FR-009"
+    remediation: "Plan phase: define the gate's allowed surface as an explicit path/symbol list (client module, seam wiring, FR-035 stamping, plus named non-logic edits: lane-list consolidation, init/upgrade ignore entries, marker comments, doctor pass-through, packaging scripts) and make the gate detect new modules or functions outside that list in the status/emission area, not any Python change. Add one sentence to FR-027. No operator ruling needed."
+  - id: F-2
+    severity: 2
+    claim: "Retention policy ownership is unspecified. data-model section 6 says the retain request carries the FR-028 policy keys, which implies Python reads .kittify/config.yaml; the keys are validated with a named error (AC-031) but the spec does not say who validates. If Python parses and validates, that is logic in the thin client."
+    evidence: "data-model.md section 6 Retain operation and RetentionPolicy; spec.md FR-026, FR-028, AC-031"
+    remediation: "Add to FR-028/section 6: Python forwards the raw config values uninterpreted (or none), Java applies defaults 20/30 and validates, returning the named policy error that doctor renders. Acceptable without a ruling."
+  - id: F-3
+    severity: 2
+    claim: "C-008 says the events PR follows #92 for 'type names', which could be read to override operator rulings 4 (prefix ai.spec-kitty, lane.transitioned interim). OD-EVENTS original wording was the same, so no new meaning, but as a constraint it is now stronger."
+    evidence: "spec.md C-008; operator-inputs decision 4"
+    remediation: "Reword C-008: type names follow #92 except the operator-ruled prefix and interim names, which #92 is asked to adopt. Acceptable without a ruling."
+  - id: F-4
+    severity: 1
+    claim: "Clockless definition covers a present out-of-range value but not a present non-integer lamportclock (null, string); classification as error row is implied by 'outside 0..2^31-1' but not stated."
+    evidence: "data-model.md section 4, clockless definition and error rows"
+    remediation: "Say 'a present value that is not an integer in 0..2^31-1'."
+  - id: F-5
+    severity: 1
+    claim: "The OD-SIGN text now states macOS/Windows binaries ship unsigned and may trigger Gatekeeper/SmartScreen. This is a true consequence of 'no signing' but wording not itself ruled; harmless addition."
+    evidence: "spec.md section 8 Omitted"
+    remediation: "Keep, or trim to 'unsigned in this mission'."
+  - id: F-6
+    severity: 1
+    claim: "The retain operation reply has no fault/exit semantics stated (ProducerFault classes are event-oriented; retain failures, e.g. unreadable ledger for Mission-open, should fail closed, not delete)."
+    evidence: "data-model.md section 6 Retain operation; AC-013, AC-031"
+    remediation: "Plan: state that an unreadable or unparseable ledger makes that Mission's items 'kept: facts unavailable' (fail closed), tested under AC-013."
+fixer_points:
+  - {point: "(a) who reads/validates ledger.retention.*", disposition: "acceptable with clarification", finding: F-2, operator_ruling_needed: false}
+  - {point: "(b) listing seam wiring FR-002..004 as allowed Python", disposition: "acceptable: seam wiring is part of the thin client shim under ruling 2 and #6117 pattern; but the list is incomplete (see F-1). Operator can be told in one line; not a new ruling.", finding: F-1, operator_ruling_needed: false}
+  - {point: "(c) new gate behaviour FR-027/AC-012", disposition: "acceptable in intent, needs a testable definition", finding: F-1, operator_ruling_needed: false}
+  - {point: "(d) new C-008", disposition: "acceptable; records the OD-EVENTS ruling; reword per F-3; appears in AC-027 and one more AC row", finding: F-3, operator_ruling_needed: false}
