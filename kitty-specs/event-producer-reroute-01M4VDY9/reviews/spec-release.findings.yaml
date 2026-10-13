@@ -219,7 +219,7 @@ findings:
     claim: >
       AC-028 makes ArchUnit and Java unit tests release-relevant and NFR-005 defers coverage floors to the plan, while the charter's quality gates
       (ruff, mypy, 90% diff-cover, Sonar) are Python-only. Section 9 flags this correctly; it is recorded here only so the plan does not invent
-      thresholds the charter never ratified, and so AC-028's Java checks are not mistaken for CI-enforced gates: no workflow today runs Java tests for
+      thresholds the charter never approved, and so AC-028's Java checks are not mistaken for CI-enforced gates: no workflow today runs Java tests for
       this build, and the router has no group for it (see SPEC-RELEASE-003).
     remediation: >
       No spec change beyond section 9. Ensure the plan routes the governance question to the operator and wires AC-028's Java checks into a named CI
