@@ -17,7 +17,7 @@ Names match `^[a-z0-9]{1,20}$`; CloudEvents attribute types only; absent is omit
 | `datacontenttype` | optional | String | yes here | constant `application/json` |
 | `dataschema` | optional | URI | yes here | base URI (events#92) + type suffix |
 | `schemaversion` | extension | String | yes here | constant from events#92 |
-| `missionid` | extension | String | Mission-scoped, except under OD-MISSIONID (b) | row (an empty string counts as absent), else `meta.json` (never a slug); see OD-MISSIONID |
+| `missionid` | extension | String | Mission-scoped | row (an empty string counts as absent), else `meta.json` (never a slug); neither: the row is refused (FR-009, OD-MISSIONID) |
 | `missionslug` | extension | String | when known | row `mission_slug` |
 | `actor` | extension (INTERIM) | String | lane, annotation, retrospective rows, when derivable | row `actor` per the actor rule (section 3) |
 | `executionmode` | extension (INTERIM) | String | lane rows | row `execution_mode` |
@@ -30,7 +30,7 @@ Names match `^[a-z0-9]{1,20}$`; CloudEvents attribute types only; absent is omit
 
 - **`id`**: the ledger row's `event_id`, never replaced, accepted only as a 26-character ULID (written upper-case). Any UUID form (hyphenated, or the 32-hex fallback of `lifecycle_events._generate_event_id`) is `rejected`. UUID normalization (`normalize_event_id`) is reader-only: the comparator applies it to legacy rows.
 - **`time`**: the row's own instant (`at` on lane, annotation, decision and retrospective rows; `timestamp` on lifecycle and run-journal rows), RFC 3339, never synthesized; unparseable or absent is `rejected`.
-- **`source`**: Mission-scoped rows `/spec-kitty/missions/<missionid>`; `ProjectInitialized` `/spec-kitty/projects/<project_uuid>` (INTERIM). `missionid` is a ULID; when neither the row nor `meta.json` yields one, OD-MISSIONID decides.
+- **`source`**: Mission-scoped rows `/spec-kitty/missions/<missionid>`; `ProjectInitialized` `/spec-kitty/projects/<project_uuid>` (INTERIM). `missionid` is a ULID; when neither the row nor `meta.json` yields one, the row is `rejected` (FR-009, OD-MISSIONID).
 - **Dedupe key** `(source, i)` with `i` the normalized id (INTERIM; section 4). A second append for an existing key is a no-op. A row with no `source` (upcast diary or `3.0.0` rows) has the empty string as `source`; not an error row.
 - **Join invariant**: each publish-log line matches at most one ledger row by normalized `event_id`, and each in-scope ledger row has at most one line.
 
@@ -73,7 +73,9 @@ key(r) = ( h(r), c(r), t(r), i(r), s(r) )
   h(r) = 1 if r has a clock else 0      c(r) = clk(r) if r has a clock else 0
 ```
 
-Ascending, lexicographic: `h` (all clockless rows before all clocked), `c`, `t` as an instant, `i` and `s` by ASCII code point (not UTF-16). `s` is a final tie-break, so the order is total across sources; `nodeid` is not in the key (#6193).
+Ascending, lexicographic: `h` (all rows without a `lamportclock` member before all rows with one), `c`, `t` as an instant, `i` and `s` by ASCII code point (not UTF-16). `s` is a final tie-break, so the order is total across sources; `nodeid` is not in the key (#6193).
+
+A **clockless row** has no `lamportclock` member at all; a present value outside 0..2^31-1 is not clockless but an error row (below).
 
 **Domain.** The order applies to upcast-form rows (diary, `3.0.0`, CloudEvents); sources with no id (the legacy run journal) are outside it and read by their own reader. **Error rows** (unparseable `time`, a clock outside 0..2^31-1, an id that does not normalize, a missing id) are set aside first, with named reason and the line position of the file as read: never dropped, never silently sorted, never a survivor. Dedupe then runs on the valid rows only, on `(s(r), i(r))`, so two spellings of one id (case, hyphenation) in one source are one row. Of each group the survivor is the row whose serialization (members sorted, compact, UTF-8) has the smallest bytes, so it never depends on input position; every other row of the group counts as collapsed, and a group whose rows differ in any member other than `id` is also reported as a conflict by its `(s, i)` key (a report on the key, not another bucket). After dedupe `(s, i)` is unique, so no two rows have equal keys. Permutation equality compares the ordered rows, the collapsed count, the conflict keys and the error rows as a multiset (position excluded). Count: ordered + errors + collapsed = rows read.
 
@@ -91,7 +93,7 @@ UTC unless shown. Ids `…A`, `…B`, `…C` are ULIDs with the prefix `01JAAAA0
 6. **Error row and duplicate.** Clockless A `10:00`, B `time: "yesterday"`, C `11:00`, D byte-identical to C: ordered `[A, C]`, errors `{B: unparseable time}`, collapsed count 1; 4 read = 2 + 1 + 1.
 7. **Source tie-break.** Three rows `clock 7`, same time, same id, sources A `/spec-kitty/projects/P1`, B `/spec-kitty/missions/M1`, C none (empty): order **C, B, A** for every permutation (empty < `/spec-kitty/m…` < `/spec-kitty/p…`). Without `s` the permutations differ.
 8. **Two spellings of one id.** Same source, clock 3, same time: A id `01jaaaa0000000000000000abc`, B id `01JAAAA0000000000000000ABC` (identical payload), C `…ABD`: survivor B (`…ABC` sorts before `…abc`), ordered `[B, C]`, collapsed 1; dedupe on raw ids keeps both.
-9. **Conflict, survivor, every error class.** Clockless, same source. G and H share id `…ABA` and differ in a payload member (`x`, `y`); X has id `…ABA` and an empty `time`; K has no id; M id `…ABB` and clock 2^31; N id `nope`; Z `11:00`, id `…ABC`. Ordered `[G, Z]` (G is valid and its bytes sort first; X cannot displace it), errors `{X: unparseable time, K: missing id, M: clock out of range, N: non-normalizing id}`, collapsed 1, conflict `(empty source, …ABA)`; 7 read = 2 + 4 + 1.
+9. **Conflict, survivor, every error class.** Same source; every row except M has no `lamportclock` member (clockless, `h` 0); M carries `lamportclock` 2^31, so it is not clockless but out of range, an error row. G and H share id `…ABA` and differ in a payload member (`x`, `y`); X has id `…ABA` and an empty `time`; K has no id; M id `…ABB`; N id `nope`; Z `11:00`, id `…ABC`. Ordered `[G, Z]` (G is valid and its bytes sort first; X cannot displace it), errors `{X: unparseable time, K: missing id, M: clock out of range, N: non-normalizing id}`, collapsed 1, conflict `(empty source, …ABA)`; 7 read = 2 + 4 + 1.
 
 ## 5 Example lines
 
@@ -99,11 +101,13 @@ Carryover X.
 
 ## 6 Producer protocol entities (fields only)
 
-**ProduceRequest** (client to producer; assembled by the seam, passed through uninterpreted): `row` (the persisted authoritative row, post-sanitization, FR-004; a list under OD-SPAWN (b)); `slot` (`status` or `lifecycle`; the resolved-binding slot is not registered, FR-003); `seam_args` (the existing keyword arguments, as given); `start_path` (the call site's path, E14; the producer resolves the canonical root from it, never from the process working directory); `deadline_ms` (the client's effective timeout, FR-025; the producer exits by it on its own).
+**ProduceRequest** (client to producer; assembled by the seam, passed through uninterpreted): `operation` (`produce` or `retain`); for `produce`, `row` (the persisted authoritative row, post-sanitization, FR-004); `slot` (`status` or `lifecycle`; the resolved-binding slot is not registered, FR-003); `seam_args` (the existing keyword arguments, as given); `start_path` (the call site's path, E14; the producer resolves the canonical root from it, never from the process working directory); `deadline_ms` (the client's effective timeout, FR-025; the producer exits by it on its own).
+
+**Retain operation** (FR-030; the second operation of the same request, a Java operation; the Python side passes arguments and renders the reply): the request carries `start_path`, `dry_run` (true by default) and the policy keys of FR-028; it never carries the open-Mission, lock or unfinished-step facts. The producer derives them itself: it reads the committed ledgers read-only and minimally (the lane of each work package) and the lock and run-journal facts; this is not the #5529 read model, and #6193 absorbs it. Its reply lists the files eligible (dry run) or deleted, repo-relative, each with the reason kept or eligible, or a named policy error (AC-031).
 
 **ProduceReply** (producer to client; exactly one): `outcome` (`produced` \| `skipped_duplicate` \| `refused`); `event_id` (normalized; present when the row carries a normalizable id, else omitted); `type` (when produced or skipped); `reason_class` (when refused: `rejected` \| `clock-overflow`); `notice` (optional: `torn-line` with the line position; recorded by the client as a notice row, not a fault); `detail` (one line, repo-relative paths only, NFR-006).
 
-**ProducerFault** (recorded, never raised into the command): `class` (`binary-missing` \| `crash` \| `timeout` \| `malformed-reply` \| `clock-overflow` \| `rejected` \| `busy`, plus `disabled` only under OD-OPTOUT b); `event_type` and `event_id`: the reply's values when one was read; for a fault the client raises alone (`binary-missing`, `crash`, `timeout`, `busy`, `malformed-reply`) the row's own `event_type` and `event_id` members, copied as the seam handed them (no interpretation, no normalization), each omitted when the row has none; `message` (carries the FR-023 sentence); `at` (client clock, never in an envelope).
+**ProducerFault** (recorded, never raised into the command): `class` (`binary-missing` \| `crash` \| `timeout` \| `malformed-reply` \| `clock-overflow` \| `rejected` \| `busy`; no `disabled`, OD-OPTOUT); `event_type` and `event_id`: the reply's values when one was read; for a fault the client raises alone (`binary-missing`, `crash`, `timeout`, `busy`, `malformed-reply`) the row's own `event_type` and `event_id` members, copied as the seam handed them (no interpretation, no normalization), each omitted when the row has none; `message` (carries the FR-023 sentence); `at` (client clock, never in an envelope).
 
 Mapping: an unreadable, truncated, non-JSON or schema-violating reply `malformed-reply`; non-zero exit, signal or empty reply `crash`; no executable `binary-missing`; the deadline `timeout`; a handler already in flight `busy`.
 
@@ -111,11 +115,11 @@ Mapping: an unreadable, truncated, non-JSON or schema-violating reply `malformed
 
 **PublishLogFile.** Gitignored; a new local-tier file class (spec section 9). Unit (per-Mission or per-run file) is a plan decision; it carries an age (newest row `time` or file mtime) and a run or Mission association (FR-028). Complete lines ending LF; single writer: the producer. A final line without LF is preserved and flagged via `notice`; the next row starts on a new line (FR-021), so the fragment is the one non-JSON line, skipped by clock recovery and dedupe. Location: an already-gitignored path (candidate `.kittify/events/`) or the canonical ignore mechanism (AC-023).
 
-**LamportState.** Producer-owned local state, gitignored or (OD-CLOCK a) under the git common directory (FR-019): per-`nodeid` counter, integer 0..2^31-1, shared by every worktree of one repository; kill, loss and bound: FR-012.
+**LamportState.** Producer-owned local state under the git common directory (FR-019, OD-CLOCK): per-`nodeid` counter, integer 0..2^31-1, shared by every worktree of one repository; kill, loss and bound: FR-012.
 
 **FaultLogRow.** Append-only, gitignored, retention applies, written only by the client (FR-023): two row kinds, a ProducerFault (its fields plus a relative root marker) or a `torn-line` notice (path, line position, `at`). `doctor` derives the fault count (fault rows, not notice rows, in the files within the retention window) and last class from the first kind, and counts notices apart.
 
-**RetentionPolicy.** `.kittify/config.yaml` keys `ledger.retention.keep_runs` (positive integer, proposed 20) and `ledger.retention.max_age_days` (positive integer, proposed 30). Invalid values are a named command error (fail closed, AC-031). Eligible: FR-029. Local tier only (publish log, fault log, run journals, `.kittify/events/`); committed files are never candidates. The unit is a whole file (FR-028): retention never rewrites or trims a file with another writer.
+**RetentionPolicy.** `.kittify/config.yaml` keys `ledger.retention.keep_runs` (positive integer, default 20) and `ledger.retention.max_age_days` (positive integer, default 30). Invalid values are a named command error (fail closed, AC-031). Eligible: FR-029, facts derived by the Java retain operation (section 6). Local tier only (publish log, fault log, run journals, `.kittify/events/`); committed files are never candidates. The unit is a whole file (FR-028): retention never rewrites or trims a file with another writer.
 
 ## 8 Exemption ledger (entity `Exemption`)
 
@@ -133,4 +137,4 @@ The schema's persisted lane enumeration = genesis, planned, claimed, in_progress
 
 ## 10 PlatformWheel matrix entity
 
-Per wheel: `platform_tag`; `os_arch` (FR-041, OD-MATRIX); `binary_path`; `binary_checksum` (AC-032); `toolchain_pin`; `smoke_result` (G-3); `signed` (OD-SIGN). The pure wheel (OD-FALLBACK) and sdist hold no binary. Invariants: one binary per platform wheel; `packs/internal/` in no wheel; the expected set is pinned (G-12).
+Per wheel: `platform_tag`; `os_arch` (FR-041, OD-MATRIX); `binary_path`; `binary_checksum` (AC-032); `toolchain_pin`; `smoke_result` (G-3); `signed` (false in this mission, OD-SIGN). The pure wheel (OD-FALLBACK) and sdist hold no binary. Invariants: one binary per platform wheel; `packs/internal/` in no wheel; the expected set is pinned (G-12).
