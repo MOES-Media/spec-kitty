@@ -1,0 +1,29 @@
+schema: review-refute/v1
+complete: true
+phase: spec
+batch: 2
+verdicts:
+  - id: SPEC-ARCH-001
+    verdict: confirmed
+    reason: Code shows the seam passes log_path.parent or the feature directory as repo_root while data-model section 6 calls it the emitting checkout, and no artifact says the producer canonicalises it or what an unresolvable start produces.
+  - id: SPEC-ARCH-002
+    verdict: refuted
+    reason: FR-004 already requires the persisted row as written to the authoritative ledger after sanitization, FR-026 forbids the client from reshaping, and FR-035 gives the journal row its ULID, so the synthesized-envelope reading contradicts the stated requirement and the rest is plan-level HOW.
+  - id: SPEC-ARCH-003
+    verdict: confirmed
+    reason: RuntimeMomentProducer._publish reads drain_posture itself and the adapters import tail registers behind moment_handlers_disabled_reason, neither of which FR-002, AC-003 or OD-OPTOUT addresses, so run-journal rows would never be produced on a default install.
+  - id: SPEC-ARCH-004
+    verdict: confirmed
+    reason: adapters.py really drops a busy-skipped handler and a seam-side TimeoutError with only a logger.warning, and runs inline unbounded at timeout <= 0, so FR-023's never-silent promise has uncovered outcomes the fault enum does not name.
+  - id: SPEC-ARCH-005
+    verdict: confirmed
+    reason: ProduceRequest.slot lists resolved_binding with no type in the type table while the annotation row also gets its own seam call under FR-003, and nothing states which slots the client registers on, so a double call for one annotation is possible.
+  - id: SPEC-ARCH-006
+    verdict: confirmed
+    reason: The legacy-row form is used as the clearance criterion in FR-032 and data-model section 8 but is defined nowhere, and AC-019 validates only publish-log lines rather than the lines the cleared markers' writers persist.
+  - id: SPEC-ARCH-007
+    verdict: refuted
+    reason: NFR-007 already states the at-most-once never-silent guarantee, the join invariant is the reconciliation key, FR-045 already supersedes D-1 for the new rows and D-SINK is a flagged open decision, so the remaining asks are added features or documentation wording.
+  - id: SPEC-ARCH-008
+    verdict: refuted
+    reason: Non-goals, section 7 hand-off rows for the write side and lane cut-over, and the Python-authoritative D-SINK already place the switch of writers with the later missions, so no extra requirement is needed to make C-004 or any AC testable here.

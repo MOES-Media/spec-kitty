@@ -1,0 +1,29 @@
+schema: review-refute/v1
+complete: true
+phase: spec
+batch: 1
+verdicts:
+  - id: SPEC-GOV-001
+    verdict: confirmed
+    reason: Section 9 item 3 and FR-045 cover only ADR D-1, while the publish, fault and clock-state files extend the closed local-tier file list in D-3 (checked in the ADR) and add a new log that integrations read.
+  - id: SPEC-GOV-002
+    verdict: confirmed
+    reason: FR-014 says the events PR adds nothing else, yet FR-013 puts the comparator spec and fixtures in it and data-model section 9 puts the Lane alignment in it, a verified internal contradiction.
+  - id: SPEC-GOV-003
+    verdict: refuted
+    reason: Section 3 decision 2 and the section 7 hand-off table already record the Java departure, and tracker-text reconciliation is process housekeeping that does not make any requirement or AC ambiguous.
+  - id: SPEC-GOV-004
+    verdict: confirmed
+    reason: C-004 and decision 7 say one writer per type while D-SINK gives Python ledger writers and the Java producer each a write per type, and C-004 never defines writer per artifact.
+  - id: SPEC-GOV-005
+    verdict: confirmed
+    reason: FR-015 requires the Java producer to validate against events-repo schemas and section 9 item 2 flags the no-vendoring boundary, but no open decision or FR states how the schemas reach the Java build.
+  - id: SPEC-GOV-006
+    verdict: refuted
+    reason: Charter standing orders 2 and 3 bind every mission and the tracer files are a planning-step procedure, so the spec need not restate them as a constraint.
+  - id: SPEC-GOV-007
+    verdict: refuted
+    reason: Section 13 is literally accurate that the eight new terms are not defined in docs/context, and relating them to Lamport Clock, Event Envelope and Drain is glossary-authoring detail for the plan (carryover section L), not a requirement ambiguity.
+  - id: SPEC-GOV-008
+    verdict: refuted
+    reason: The spec already cites the machinery-fault ruling via decision 6 and the carryover, and a sentence mapping fault classes to the gate-outcome ADR severity model is optional rationale that does not affect any requirement's testability.

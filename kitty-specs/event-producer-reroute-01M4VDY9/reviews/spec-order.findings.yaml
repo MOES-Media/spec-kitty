@@ -1,0 +1,264 @@
+schema: review-findings/v1
+complete: true
+phase: spec
+lens_group: order
+mission: event-producer-reroute-01M4VDY9
+findings:
+  - id: SPEC-ORDER-001
+    lens: compatibility and ordering correctness
+    severity: 3
+    title: Switching readers to instant-based order changes the order of existing archived logs, and the hand-off does not gate it on archive-freeze outcome reproduction
+    evidence:
+      - artifact: "spec.md § 3 D-REDUCER (cites ADR 2026-10-11-1 only to justify not touching the reducer); § 7 hand-off row 'Reducer sort key'"
+      - artifact: "data-model.md § 4 (time compares as a UTC instant, not text); worked example 5"
+      - code: "src/specify_cli/status/reducer.py (sorted(..., key=lambda item: (item.at, item.event_id)) at two sites; StatusEvent.at is str in status/models.py)"
+      - code: "docs/adr/4.x/2026-10-11-1-archive-freeze-verifies-reducer-outcome-not-byte-identity.md"
+    claim: >
+      The shipped reducer orders by the TEXT of `at`; the defined order compares instants. Real ledgers
+      contain `Z`, `+00:00`, fractional and non-fractional spellings. A read-only sort of every
+      kitty-specs/*/status.events.jsonl in this checkout under (text at, event_id) versus (instant at,
+      event_id) gives a different row order for 13 of 601 ledgers. So the hand-off "the switch" is
+      not outcome-neutral for archived Missions, and ADR 2026-10-11-1 (the current reducer must reproduce
+      the archived OUTCOME) is the gate that decides whether the switch may ship. The spec cites that ADR
+      only as a reason not to touch the reducer, so the receiving issues get no precondition.
+    remediation: >
+      In the section 7 hand-off row for the reducer sort key add one clause: the switch (events#92 Phase 2,
+      #6195) is gated on the archive-freeze outcome check over all archived Missions, plus a reducer
+      equivalence test; the 13 text-versus-instant divergent ledgers are the known test inputs
+      (their reduced outcome must be shown unchanged or the divergence ruled).
+  - id: SPEC-ORDER-002
+    lens: compatibility and ordering correctness
+    severity: 3
+    title: Hand-off names three sort sites; the checkout has at least eight, with differing keys, and omits the merge driver's sort
+    evidence:
+      - artifact: "spec.md § 7 rows 'Merge driver status/event_log_merge.py' and 'Reducer sort key'; § 1 out of scope (no change to event_log_merge.py)"
+      - code: "src/specify_cli/status/reducer.py (two sorted() sites on (at, event_id))"
+      - code: "src/specify_cli/status/event_log_merge.py (merge/sort step: sorted by str(at or timestamp), event_id; clockless rows sort first via empty string)"
+      - code: "src/specify_cli/migration/mission_state.py (sorted(events, key=(e.at, e.event_id)))"
+      - code: "src/specify_cli/consolidation/conflict_resolver.py (events.sort by str(e.get('at')))"
+      - code: "src/specify_cli/agent_utils/status.py (max(wp_events, key=e.at))"
+      - code: ".venv spec_kitty_events: status.py::status_event_sort_key = (lamport_clock, timestamp.isoformat(), event_id); diary.py sorts (at, event_id); storage.py sorts (lamport_clock, node_id)"
+      - artifact: "adr.md (spec-kitty-events ADR 0001) § merge driver: 'The sort key reads the upcast form too' as a precondition owned by core"
+    claim: >
+      The spec says who changes the key but lists only reducer.py, an unnamed events-package reducer and the
+      Java read model. The events package already has a Lamport-first key (status_event_sort_key) that
+      compares timestamp TEXT (isoformat), so it is not the defined order either, and storage.py keys on
+      (lamport_clock, node_id) where the spec states nodeid is NOT in the key. The merge driver rewrites
+      the committed ledger in a (text at, event_id) order, and ADR 0001 makes its sort key a precondition
+      of any writer emitting CloudEvents into a committed log; the spec's row for the driver mentions only
+      dedupe and fork detection. An implementer of #6195/#92 Phase 2 gets an incomplete list and a
+      reference comparator that none of the existing sites match.
+    remediation: >
+      Replace the single hand-off row's parenthetical with an enumerated list by symbol (the sites above;
+      the Java read model site is confirmed only in the plan) and add the merge driver's sort key to the
+      driver row. State in data-model section 4 that the reference comparator supersedes status_event_sort_key
+      and the nodeid tie-break of storage.py, and that text-based time comparison is non-conformant.
+  - id: SPEC-ORDER-003
+    lens: compatibility and ordering correctness
+    severity: 3
+    title: Counter monotonicity is not guaranteed across a fresh checkout, a retention prune or a rotated node identity; new rows can then sort before older clocked rows
+    evidence:
+      - artifact: "spec.md § FR-012; data-model.md § 7 LamportState ('clock state is never pruned while the log exists'), RetentionPolicy; AC-010"
+      - artifact: "data-model.md § 4 key (clock outranks time)"
+      - code: "src/specify_cli/status/migrate_lifecycle_envelope.py::_generate_node_id (sha256 of hostname:username, 12 hex)"
+    claim: >
+      The clock is the primary sort field after clocked/clockless, and its state is a gitignored file.
+      A fresh clone, a CI checkout, a worktree, a deleted .kittify state, or a retention run that removes
+      the log (and with it the state, per the stated rule) restarts the counter near zero while rows
+      already consumed downstream carry large values. Under the defined key the new rows then sort BEFORE
+      the older ones, regardless of `time`. Consumers (events#92 read side, later a streaming binding) see
+      the regression; the only ordering fix is the clock itself. The spec guards only "no wrap at 2^31-1".
+    remediation: >
+      Add to FR-012/LamportState: the first stamp for a node after state loss is at least the highest clock
+      the producer can read in the Mission's publish log, else the state is the counter's source of truth
+      and retention never deletes it (it is a few bytes). Add an AC-010 case: delete the publish log,
+      keep state, stamp again, assert strict increase; and a stated behaviour when state is absent but the
+      log is not.
+  - id: SPEC-ORDER-004
+    lens: compatibility and ordering correctness
+    severity: 3
+    title: (nodeid, lamportclock) uniqueness is claimed per node but nodeid is per host-and-user while the counter is per checkout
+    evidence:
+      - artifact: "spec.md § FR-011, FR-012, AC-010; data-model.md § 1 nodeid row, § 7 LamportState"
+      - code: "src/specify_cli/status/migrate_lifecycle_envelope.py::_generate_node_id"
+    claim: >
+      FR-012 forbids two different events sharing the same (nodeid, lamportclock). nodeid is derived from
+      hostname and username only, so every clone and every worktree of the user on one machine has the same
+      nodeid, yet each owns a separate gitignored state file. Two checkouts stamp (n, 1), (n, 2) for
+      different events. AC-010 tests only concurrent processes in ONE scratch repo, so the violation passes
+      the gate. The key excludes nodeid, so ordering still terminates, but the stated uniqueness invariant
+      and any later cross-node merge (#6193) are false for this producer.
+    remediation: >
+      Either scope the invariant to "one state file" in FR-012 and data-model section 7 (and say
+      nodeid is machine identity, not checkout identity), or place the state per user and machine rather
+      than per checkout. Add an AC-010 variant over two checkouts of the same user.
+  - id: SPEC-ORDER-005
+    lens: compatibility and ordering correctness
+    severity: 3
+    title: Lamport-first ordering across nodes is not causal without a receive rule, and the spec says the order binds every reader
+    evidence:
+      - artifact: "spec.md § 3 'The total order' (sink-agnostic, binds every reader); data-model.md § 7 LamportState ('merging with other nodes' clocks is #6193's'); § 4 (nodeid not in key)"
+      - artifact: "arch.md § 5 and ADR 0001 question 1 (C only valid with a defined total order)"
+    claim: >
+      With independent per-node counters and no receive rule, a node with many events outranks a node
+      that started later and is genuinely newer. Clock outranks time, so a reducer applying "latest wins"
+      on such a log can pick the older transition. The data-model calls the result a total order (true) but
+      asserts nothing about its meaning across nodes; the hand-off to the reducer switch carries no
+      precondition. Single-node logs are fine.
+    remediation: >
+      Add to data-model section 4 one sentence: the order is a deterministic total order, and a
+      causal order only within one node; and add to the reducer hand-off row that no log with more than one
+      nodeid is reduced by this key until #6193's receive rule is in force (or a fixture with two nodeids
+      documents the accepted behaviour).
+  - id: SPEC-ORDER-006
+    lens: compatibility and ordering correctness
+    severity: 3
+    title: The id comparison domain is undefined and worked example 5 uses ids that the id rules reject
+    evidence:
+      - artifact: "data-model.md § 4 worked example 5 (ids `01abc` and `01ABD`); § 2 `id` rule; § 4 'i(r) its normalized id'"
+      - artifact: "spec.md § FR-007, AC-008"
+      - code: ".venv spec_kitty_events/models.py::normalize_event_id (raises ValueError for any id that is not a 26-char Crockford ULID, a 36-char or 32-char UUID)"
+    claim: >
+      Example 5 is one of the AC-008 fixtures, but `01abc` is 5 characters; under the shipped normalizer it
+      is an error, under FR-007 it is refused, and under § 4 it is "missing/invalid" only if the comparator
+      validates. Two implementations (Java and Python reference comparator) will diverge on whether it is
+      ordered or an error row. Also unstated: the string comparison (ASCII code-point; Java compareTo
+      is UTF-16, Python is code points) and how a ULID (`01J...` upper-case) compares with a hyphenated
+      lower-case UUID of a legacy row (deterministic but arbitrary, which is fine only if said). Data-model
+      section 2 lists UUID normalization yet FR-007 refuses non-ULID ids without saying whether a valid
+      36-char hyphenated UUID id on a ledger row is accepted by the producer.
+    remediation: >
+      Make example 5 use two full valid ULIDs differing only in letter case (or 26-char strings), state
+      that the comparator normalizes with the normalize_event_id rules and that an id that does not
+      normalize is an error row (named reason), and that comparison is by ASCII code point. In FR-007
+      state that the producer accepts only 26-char ULIDs and that UUID normalization is reader-only.
+  - id: SPEC-ORDER-007
+    lens: compatibility and ordering correctness
+    severity: 3
+    title: Clock acceptance on the read side is under-defined (type, legacy out-of-range values, numeric versus text comparison)
+    evidence:
+      - artifact: "data-model.md § 4 ('a clock outside 0..2^31-1' is an error row); § 1 lamportclock row (Integer); spec.md § FR-012 (Integer-versus-string type change is a plan/events#92 decision, bound holds either way)"
+      - artifact: "adr.md / arch.md § 5: 'bound it, or make it a String-typed extension'"
+      - code: "src/specify_cli/status/lifecycle_events.py::build_saas_lifecycle_queue_event (3.0.0 shape carries lamport_clock; Python int is unbounded)"
+    claim: >
+      Three gaps. (a) A legacy upcast 3.0.0 row whose lamport_clock exceeds 2^31-1 would become an error
+      row under § 4, so a legacy log is partly unreadable, contradicting "existing logs stay readable".
+      (b) The type is unspecified for JSON booleans, floats (5.0), numeric strings and negatives; Java
+      Integer parsing and Python int differ. (c) If events#92 makes the attribute String-typed, comparing
+      it as text ranks "10" before "9"; FR-012 says the bound holds "either way" but the order does not.
+    remediation: >
+      In section 4 state: the clock is a JSON integer (booleans, fractions, strings rejected; if a String
+      type is adopted it is decimal digits without leading zeros and compares numerically); out-of-range or
+      non-integer on any row is an error row with a named reason (and say deliberately that this includes
+      upcast legacy rows, or that legacy out-of-range values are treated as clockless, whichever is chosen).
+      Add one fixture row for each.
+  - id: SPEC-ORDER-008
+    lens: compatibility and ordering correctness
+    severity: 3
+    title: "Missing id is an error row, but legacy rows without an event_id exist by design (run journal); the count identity also omits collapsed duplicates"
+    evidence:
+      - artifact: "data-model.md § 4 error rows ('or a missing id'; 'ordered + errors = rows read (duplicates counted as collapsed, listed)'); spec.md AC-009, AC-022, FR-035 ('rows without them stay legacy')"
+      - code: "src/runtime/next/_internal_runtime/engine.py::_append_event (journal row has timestamp, no event_id)"
+    claim: >
+      The comparator's input domain is not stated. If a reader feeds legacy run-journal rows to it, every
+      pre-upgrade row is an error row and the legacy journal disappears from the ordered view, against
+      AC-022 and the compatibility promise. Separately AC-009 asserts ordered + errors = read, while § 4
+      says duplicates are collapsed and listed, so the identity as written is false whenever a duplicate
+      exists and the test gives no number for that case.
+    remediation: >
+      State in section 4 that the order applies to upcast-form rows only (diary, 3.0.0, CloudEvents) and
+      that sources with no id (legacy journal) are outside it and read by their own reader. Restate the
+      identity as ordered + errors + collapsed = rows read and add one duplicate row to the AC-009 fixture.
+  - id: SPEC-ORDER-009
+    lens: compatibility and ordering correctness
+    severity: 2
+    title: "Equal keys are said to be the same event, but the key omits source; and the survivor of a (source, id) duplicate with a different key is undefined"
+    evidence:
+      - artifact: "data-model.md § 4 ('Equal keys are the same event under the dedupe key and collapse'); § 2 dedupe key (source, id), INTERIM"
+      - code: "src/specify_cli/status/event_log_merge.py (merge keyed on event_id; raises on conflicting payloads for the same id)"
+    claim: >
+      Equal order key means equal id, not equal (source, id): two events with the same id in different
+      sources (a project-scoped and a Mission-scoped log) tie in the order yet are distinct. In the other
+      direction two rows with the same (source, id) but different clock or time (a retry that re-stamped,
+      a hand-copied line) are not equal keys, so ordering keeps both while dedupe says one. Which survives,
+      and what happens when their content differs (the shipped merge driver fails loudly), is unstated.
+      Order-independence of the result therefore depends on an unspecified rule.
+    remediation: >
+      One sentence in section 4: the order is applied after dedupe; of duplicate (source, id) rows the row
+      with the smallest key is kept and any differing payload is reported as a conflict (named reason);
+      rows of different sources are compared by the same key and tie only if identical in all four fields
+      (then input order is irrelevant because they are byte-equal, or add source as a final key component).
+  - id: SPEC-ORDER-010
+    lens: compatibility and ordering correctness
+    severity: 2
+    title: Time parsing leaves naive times, fractional precision and the written UTC form unpinned
+    evidence:
+      - artifact: "data-model.md § 2 time rule; § 4 'time as a UTC instant'; spec.md FR-008, NFR-003"
+      - code: "kitty-specs/*/status.events.jsonl at-forms: microsecond +00:00 (about 41.6k rows), bare Z (376), no-fraction +00:00 (3)"
+      - code: "Python 3.11 datetime.fromisoformat truncates 7-9 fractional digits to microseconds, accepts a naive time, rejects second 60"
+    claim: >
+      RFC 3339 requires an offset, yet the standard Python parser accepts a naive time; readers will differ
+      on whether `2026-10-13T10:00:00` is an instant (assumed UTC), an error row, or `rejected` for the
+      producer. Fractional digits beyond 6 are silently truncated by a Python comparator but compared at
+      nanosecond precision in Java, so two rows distinct to Java tie in Python and fall through to id.
+      The written form (`Z` versus `+00:00`, trailing-zero fractions) is not fixed although NFR-003 requires
+      byte-identical lines (existing ledgers already contain both spellings).
+    remediation: >
+      Add to section 4: an offset is required (a naive time is an unparseable-time error row); instants
+      compare at nanosecond precision (a comparator that truncates is non-conformant); leap second 60 is an
+      error; and to section 2 or the plan fix one written form for `time` (for example UTC `Z`, microseconds
+      only when non-zero). Add a naive-time and a 9-digit-fraction row to the AC-009 fixtures.
+  - id: SPEC-ORDER-011
+    lens: compatibility and ordering correctness
+    severity: 3
+    title: A Mission with no mission_id in meta.json is refused on every event, which conflicts with the aggregate-split rule and with FR-038 for Missions open at upgrade
+    evidence:
+      - artifact: "spec.md § FR-009 ('if neither yields it, the event is refused'), FR-023 (one warning per event), FR-038; data-model.md § 2 source rule, § 1 missionid row"
+      - artifact: "arch.md (aggregate split): a non-ULID mission segment falls under 'any other prefix': source /spec-kitty/projects/<project_uuid>, subject = full aggregate_id, no missionid"
+      - code: "src/specify_cli/status/emit.py::_load_mission_id (returns None for legacy Missions pre-3.1.1)"
+    claim: >
+      The repository's own Missions all carry a mission_id, but the code documents Missions without one.
+      Under FR-009 every lifecycle and status event of such a Mission, open at upgrade, is a fault: a
+      warning per event for the rest of its life, and no integration sees it. ADR 0001's rule for a
+      non-ULID mission segment is the opposite (project source, no missionid), and the spec does not say it
+      deliberately diverges. "A mission open at upgrade keeps working" is true for the command but not for
+      the publication this mission exists for.
+    remediation: >
+      Add one statement to FR-009: either (a) refused, with the warning raised once per Mission and a
+      doctor line naming the repair (and confirm that the upgrade path backfills mission_id for open
+      Missions), or (b) follow the ADR 0001 fallback (project source, subject = the aggregate, no missionid).
+      Add the chosen case to AC-005's `rejected` row or to a new AC.
+  - id: SPEC-ORDER-012
+    lens: compatibility and ordering correctness
+    severity: 2
+    title: The non-ULID event_id fallback in the lifecycle writer is dead in supported installs, so the producer's refusal path guards an unreachable writer defect instead of removing it
+    evidence:
+      - artifact: "spec.md § FR-007, AC-005 (`rejected` for non-ULID id); data-model.md § 2 id rule, § 8 exemption markers 5 and 6"
+      - code: "src/specify_cli/status/lifecycle_events.py::_generate_event_id (uuid4().hex fallback on any import error)"
+      - code: "pyproject.toml dependencies: python-ulid>=3.0 (hard dependency)"
+    claim: >
+      CloudEvents `id` equals the ledger event_id only if every writer emits a ULID. Status and decisions
+      writers do (`_generate_ulid`); the run journal is covered by FR-035; the lifecycle writer keeps a
+      32-hex fallback that cannot fire when python-ulid is installed. Leaving it means a permanently
+      unpublishable ledger row is still reachable by a broken environment, and the mission is already
+      editing that function to clear markers 5 and 6.
+    remediation: >
+      Add to the lifecycle part of FR-032/FR-035: remove the uuid fallback so a ULID failure raises at
+      write time (single authority, charter), keeping the producer's `rejected` path only for rows written
+      before the change.
+  - id: SPEC-ORDER-013
+    lens: compatibility and ordering correctness
+    severity: 2
+    title: The word "Lamport" already names a row-count proxy returned by the decision commands; the new lamportclock vocabulary collides with it
+    evidence:
+      - artifact: "spec.md § 11 (new terms Clocked row, Clockless row); FR-011"
+      - code: "src/specify_cli/decisions/emit.py::_count_rows (docstring: 'the Lamport-clock proxy'), _append_raw_event; src/specify_cli/cli/commands/decision.py (`event_lamport` in --json output)"
+    claim: >
+      Decision rows persist no clock, but their commands return a line number named lamport in the --json
+      body, which FR-022/C-002 forbid changing. An implementer or glossary reader can equate that value with
+      `lamportclock` (or be tempted to reuse it as the stamp), and the glossary entries for Clockless row
+      do not say that decision rows are clockless in the persisted sense.
+    remediation: >
+      Add a line to the glossary term definitions (plan-carryover section L) and to FR-011: the
+      `event_lamport` field is a row-position proxy, unchanged, and is never the value stamped as
+      `lamportclock`.

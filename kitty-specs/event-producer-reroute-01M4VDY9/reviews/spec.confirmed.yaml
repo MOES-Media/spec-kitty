@@ -1,0 +1,602 @@
+schema: review-confirmed/v1
+phase: spec
+findings:
+- id: SPEC-GOV-001
+  lens: Governance-drift honesty
+  severity: 3
+  title: Section 9 flags only ADR D-1 as superseded; the publish log also departs from D-2 and D-3 of the same ADR
+  evidence:
+  - artifact: "spec.md \xA7 9 item 3; \xA7 3 D-SINK; \xA7 10 OD-SINK; data-model.md \xA7 7 PublishLogFile"
+  - code: docs/adr/4.x/2026-10-13-2-the-event-ledger-is-the-publication-seam-default-on-with-local-retention.md::D-2, D-3
+  claim: 'ADR D-2 says a subscriber learns of events "by reading the ledger, never by being called by the CLI" and names the supported read paths (events tail, the Read API); D-3 enumerates the closed list
+    of local-tier files under retention. The spec adds a second persisted artifact (a publish log duplicating ledger content) as an integration read surface and a new local-tier file class, which the ADR
+    does not list. Section 9 records only the D-1 flat-rows supersession (FR-045); the D-2 read-path statement and the D-3 file list are changed in effect but not flagged, and OD-SINK frames the choice
+    as a sink question only. The ADR does allow local adapters on the seam, so this is a flag-and-amend gap, not a violation.
+
+    '
+  remediation: 'Add a section 9 item: the publish log, fault log and clock state extend D-2''s read-path set and D-3''s local-tier list; extend FR-045 so the ADR amendment covers D-2 (new supported read
+    path) and D-3 (new local-tier files), not only D-1.
+
+    '
+  refute_reason: Section 9 item 3 and FR-045 cover only ADR D-1, while the publish, fault and clock-state files extend the closed local-tier file list in D-3 (checked in the ADR) and add a new log that
+    integrations read.
+- id: SPEC-GOV-002
+  lens: Scope
+  severity: 3
+  title: FR-014 says the events PR "adds nothing else" yet FR-013, FR-034/data-model section 9 and FR-035 add more to it
+  evidence:
+  - artifact: "spec.md \xA7 4 FR-013, FR-014, FR-034, FR-035; \xA7 1 in-scope item 3; data-model.md \xA7 9 (spec_kitty_events.Lane aligned in the events PR)"
+  claim: 'FR-014 closes the events PR to schemas, registry entries, dataschema URIs and producer fixtures and says the envelope schema, validator and upcaster are events#92''s. FR-013 adds a reference comparator
+    specification and total-order fixtures to the same PR, data-model section 9 adds a change to the events package''s Lane enumeration, and FR-035 conditionally adds a minimal envelope subset. The allocation
+    against events#92 (whose body lists envelope, registry, schemas, upcaster, compatibility entries, and no ordering comparator or Lane change) is therefore internally inconsistent, which invites parallel-set
+    drift the operator forbade.
+
+    '
+  remediation: 'Restate FR-014 as the closed list of what the events PR carries (data schemas, registry entries, dataschema URIs, producer fixtures, total-order comparator spec and fixtures, Lane alignment,
+    conditional envelope subset) and add the comparator and Lane change to the section 7 hand-off row for events#92 so #92 can acknowledge them.
+
+    '
+  refute_reason: FR-014 says the events PR adds nothing else, yet FR-013 puts the comparator spec and fixtures in it and data-model section 9 puts the Lane alignment in it, a verified internal contradiction.
+- id: SPEC-GOV-004
+  lens: Scope
+  severity: 3
+  title: '"One writer per event type" (C-004, decision 7) is asserted while D-SINK makes two writers per type'
+  evidence:
+  - artifact: "spec.md \xA7 3 D-SINK; \xA7 5 C-004; \xA7 7 rows #6193/#6195/#6196; \xA7 10 OD-SINK"
+  - code: 'issue spec-kitty#6193 (''one writer per event type''); #6195/#6196 (''Python writers deleted in the same release'')'
+  claim: 'Under D-SINK the Python ledger writers and the Java producer both write each in-scope type, to different files. C-004 and decision 7 are encoded as a constraint but never defined per sink, so
+    the constraint is untestable and arguably contradicted. The epic''s migration rule (no event ever has two writers) is satisfied only if "writer" means "writer of a given file", and the cutover story
+    (who stops writing the publish log duplicate when #6195/#6196 move the authoritative write to Java) is left implicit.
+
+    '
+  remediation: 'Define C-004 per artifact: one writer of the authoritative ledger row and one writer of the publish-log row per type, and state in section 7 that at cutover the Java core writes both and
+    the publish log either becomes the ledger or is retired (decision left to #6193/#6195), so no type has two writers of the same file.
+
+    '
+  refute_reason: C-004 and decision 7 say one writer per type while D-SINK gives Python ledger writers and the Java producer each a write per type, and C-004 never defines writer per artifact.
+- id: SPEC-GOV-005
+  lens: Directive
+  severity: 3
+  title: How the Java producer obtains the events-repo data schemas is not decided, and sits across the no-vendoring rule
+  evidence:
+  - artifact: "spec.md \xA7 4 FR-015, FR-039, FR-040; \xA7 9 item 2; \xA7 10 (no matching OD)"
+  - code: '.kittify/charter/charter.md::Architecture: Shared Package Boundaries / External Contract Packages (''Do not vendor their source'')'
+  claim: 'FR-015 makes the Java producer validate every row against the events-repo data schemas, and FR-040 forbids path/git overrides. Section 9 item 2 notes binding generation crosses the no-vendoring
+    line but no open decision names the delivery mechanism (build-time fetch of the released artifact, copy, or generated binding), although the choice is plan-blocking for the Gradle build and is gated
+    in events#92 on a charter amendment not owned here. A plan could pick vendoring unnoticed.
+
+    '
+  remediation: 'Add OD-SCHEMA-DELIVERY to section 10 (options: consume the released events artifact at build time; wait for #92''s Java binding; copy), recommend the first, mark it plan-blocking, and require
+    in FR-039 that no schema source is committed to this repository.
+
+    '
+  refute_reason: FR-015 requires the Java producer to validate against events-repo schemas and section 9 item 2 flags the no-vendoring boundary, but no open decision or FR states how the schemas reach the
+    Java build.
+- id: SPEC-ARCH-001
+  lens: Layering (seam as it really behaves)
+  severity: 4
+  title: ProduceRequest.repo_root is not what the seam carries; the kwarg is a canonicalisation starting point, and an unresolvable one fails closed silently
+  evidence:
+  - artifact: "data-model.md \xA7 6 ProduceRequest (repo_root: 'the emitting checkout as the seam carries it'); spec.md \xA7 FR-004 ('together with the mission directory or repo root the call already carries')"
+  - code: src/specify_cli/status/lifecycle_events.py::fanout_lifecycle_event_hosted (repo_root = log_path.parent)
+  - code: src/specify_cli/events/runtime_moments.py::RuntimeMomentProducer._repo_root (returns self._feature_dir, passed as repo_root)
+  - code: src/specify_cli/core/hosted_posture.py::_resolve_repo_root (documents the value as a starting point, walks up via resolve_canonical_root, returns None on failure)
+  claim: The three fire_* functions take a repo_root keyword, but its value is not a repository root on the lifecycle and run-moment paths. fanout_lifecycle_event_hosted passes the directory that holds
+    the log (a Mission directory, or the project state directory for the project-scoped log), and RuntimeMomentProducer passes the feature directory. hosted_posture._resolve_repo_root exists precisely because
+    callers hand it a subdirectory, and it returns None (treated as "drain off") when it cannot resolve. A producer that takes data-model section 6 at face value would place the publish log, the clock state
+    and the fault log relative to a Mission directory, or under a lane worktree, and an unresolvable start would degrade into the old silent return rather than a recorded fault. Nothing in the spec says
+    which component resolves the canonical root, and AC-004 checks only that a call is made.
+  remediation: 'Reword ProduceRequest.repo_root and FR-004: the seam supplies a starting path (log path, Mission directory or repo root, as each call site gives it) and the PRODUCER resolves the canonical
+    repository root from it (the same canonical-root resolution the lock and posture code use, so a lane worktree, a coordination worktree and the primary checkout all reach one publish log). An unresolvable
+    start is fault class rejected (or a new named class), never a silent return. Add to AC-001/AC-004 one case per slot fired from a lane worktree and from a Mission subdirectory, asserting the same single
+    publish log.'
+  refute_reason: Code shows the seam passes log_path.parent or the feature directory as repo_root while data-model section 6 calls it the emitting checkout, and no artifact says the producer canonicalises
+    it or what an unresolvable start produces.
+- id: SPEC-ARCH-003
+  lens: Layering (registration, drain gating, ADR D-2 encoding)
+  severity: 4
+  title: 'FR-002 omits two of the places that silence the seam: RuntimeMomentProducer''s own drain check and the moment-handler registration kill switch'
+  evidence:
+  - artifact: "spec.md \xA7 FR-001, FR-002, AC-003, OD-OPTOUT; \xA7 2 E2"
+  - code: src/specify_cli/events/runtime_moments.py::RuntimeMomentProducer._publish (reads hosted_posture.drain_posture before any fan-out)
+  - code: 'src/specify_cli/status/adapters.py import tail: ''if moment_handlers_disabled_reason() is None: ensure_zeitgeist_moment_handlers()'''
+  - code: src/specify_cli/core/env.py::moment_handlers_disabled_reason (SPEC_KITTY_NO_MOMENT_HANDLERS, SPEC_KITTY_SYNC_DISABLE, deprecated alias)
+  - code: src/specify_cli/status/adapters.py::reset_handlers and ensure_zeitgeist_moment_handlers (test restore path only re-registers the Zeitgeist handlers)
+  - artifact: docs/adr/4.x/2026-10-13-2-... D-2 (the runtime moment producer drops its own drain check; the registration gate keeps binding only the hosted handlers) and Confirmation (a pin that every ensure_zeitgeist_moment_handlers
+      handler checks drain first)
+  claim: FR-002 speaks only of the three fire_* functions. Run-journal rows reach the seam through RuntimeMomentProducer._publish, which has a fourth, separate drain read; left alone, no run-journal row
+    is ever produced on a default install and FR-001 fails for that kind, while AC-003 (which tests the fire_* functions) stays green. Separately, if the client registers in the same import-tail branch
+    as the Zeitgeist handlers, then setting a hosted kill switch silently removes the local producer, which is a not-produced event with no warning (FR-022/FR-023) and the very coupling the ADR removes.
+    The ADR also names a confirmation test the spec does not carry, and the status test fixtures restore only the Zeitgeist wiring, so seam tests would run without the producer unless the restore path is
+    extended.
+  remediation: 'Extend FR-002 and AC-003: (a) RuntimeMomentProducer._publish drops its drain read and always calls the seam; (b) the client registers outside the moment_handlers_disabled_reason branch and
+    is independent of those variables (state the `disabled` class is then reachable only by an explicit producer setting, or remove it, tying OD-OPTOUT to this); (c) the pin test that every Zeitgeist handler
+    checks drain first moves with the gate; (d) the test reset/restore helpers re-register the client. Add a run-journal case and a kill-switch-set case to AC-003.'
+  refute_reason: RuntimeMomentProducer._publish reads drain_posture itself and the adapters import tail registers behind moment_handlers_disabled_reason, neither of which FR-002, AC-003 or OD-OPTOUT addresses,
+    so run-journal rows would never be produced on a default install.
+- id: SPEC-ARCH-004
+  lens: Layering (handler bounds, "never silent")
+  severity: 3
+  title: Seam-level drops (busy skip, handler TimeoutError, inline mode, per-event multiplication) bypass the fault record the spec promises
+  evidence:
+  - artifact: "spec.md \xA7 FR-022, FR-023, FR-025, AC-005, AC-006"
+  - code: src/specify_cli/status/adapters.py::_run_fanout_handler_bounded (raises _FanoutHandlerBusyError when the handler key is still in flight; TimeoutError after the bound; timeout <= 0 runs inline
+      with no bound)
+  - code: src/specify_cli/status/adapters.py::fire_saas_fanout and fire_lifecycle_saas_fanout (these outcomes are only logger.warning / logger.debug lines)
+  - code: src/specify_cli/status/emit.py::emit_status_transition_batch (one _saas_fan_out per event in the batch)
+  claim: 'The bound lives in the seam, per handler call, not in the client. Three seam outcomes produce no row and no FR-023 warning: a skipped call because a prior invocation of the same handler is still
+    running, a seam-side TimeoutError (the client records `timeout` only if it fires first), and an exception raised before the client''s own try. The fault enum has no class for the busy skip. SPEC_KITTY_SAAS_FANOUT_TIMEOUT
+    <= 0 removes the bound entirely, so FR-025''s "never holds the command beyond the fan-out bound" has no meaning in that mode. A batch of N events pays up to N times the client timeout, which AC-006
+    (one stub) does not bound.'
+  remediation: 'State in FR-023/FR-025 that the client is the outermost catch (a handler that never raises), that its timeout is strictly below the seam bound, and that a busy-skip is recorded as a not-produced
+    fault (add a class, or map it explicitly). Say what FR-025 means when the seam bound is disabled (the client timeout still applies) and add a per-command budget (for example one breaker per process:
+    after the first timeout the rest of the batch records one fault each without spawning). Add a busy-skip and a batch case to AC-005/AC-006.'
+  refute_reason: adapters.py really drops a busy-skipped handler and a seam-side TimeoutError with only a logger.warning, and runs inline unbounded at timeout <= 0, so FR-023's never-silent promise has
+    uncovered outcomes the fault enum does not name.
+- id: SPEC-ARCH-005
+  lens: Layering (slots and coverage)
+  severity: 3
+  title: The resolved-binding slot is not a row source; ProduceRequest.slot and FR-003 invite a second call for the same annotation row
+  evidence:
+  - artifact: "data-model.md \xA7 6 ProduceRequest.slot (status | lifecycle | resolved_binding); \xA7 3 row 'Inner-state annotation'; spec.md \xA7 FR-003, FR-016"
+  - code: src/specify_cli/status/emit.py::_resolved_binding_fan_out (fires only for an annotation whose delta binds role/profile/model/provider; passes causation_id, not a row)
+  - code: src/specify_cli/status/emit.py::emit_status_transition (annotation fan-out follows the lane fan-out for the same prepared transition)
+  claim: A WPResolvedBindingChanged call is a hosted projection of an InnerStateChanged annotation that is itself a persisted row (and of data already inside the lane row's actor binding). If the client
+    is registered on all three slots, the same annotation reaches it twice, once with the annotation row and once as a kwargs-only call with no row; FR-003 "exactly once per persisted row" and FR-016 dedupe
+    hide the problem instead of specifying it. Meanwhile the type table has no type for the slot, so the enum value is dead or ambiguous.
+  remediation: State which slots the client registers on (status and lifecycle only, with the annotation getting its own seam call per FR-003) and drop `resolved_binding` from the ProduceRequest.slot enum,
+    or define what a resolved-binding call produces. Add an AC-004 assertion that one annotation row yields one client invocation.
+  refute_reason: ProduceRequest.slot lists resolved_binding with no type in the type table while the annotation row also gets its own seam call under FR-003, and nothing states which slots the client registers
+    on, so a double call for one annotation is possible.
+- id: SPEC-ARCH-006
+  lens: Contracts (one schema set, FR-032 clearance of markers)
+  severity: 4
+  title: Marker clearance rests on an undefined 'legacy-row form' schema and AC-019 never validates the legacy writers' persisted lines
+  evidence:
+  - artifact: "spec.md \xA7 FR-032, AC-019, AC-002; data-model.md \xA7 8 ('clear' = writer's persisted line validated by the published per-kind schema (legacy-row form)) and \xA7 3 (event_id, at, actor,\
+      \ wp_id lifted out of data)"
+  - artifact: docs/adr/4.x/2026-10-13-2-... Confirmation (every persisted line validates against its row schema in a producer gate); operator decision 7 (one schema set)
+  - code: src/specify_cli/status/lifecycle_events.py::_build_envelope and src/runtime/next/_internal_runtime/engine.py::_append_event (the writers whose markers are to be cleared; their persisted shape
+      is the flat row)
+  claim: The `data` schema excludes the members the type table lifts to attributes, but the legacy persisted rows (the committed ledgers the Python writers keep writing) hold those members inline. Validating
+    such a row needs a second shape, called "legacy-row form", which is neither defined in data-model nor assigned to the events PR (FR-014 adds "nothing else"). If it is a second schema per type, it is
+    the parallel set decisions 7 and C-004 forbid; if it is derived from the `data` schema plus the lifted-attribute set, that derivation must be stated. Independently, FR-032's gate and AC-019 validate
+    PUBLISH-LOG lines, which are the producer's output, not the Python writers' persisted lines, so markers 1, 2, 5, 6 and 8 can be cleared with a green gate that never looked at the lines the markers exempt.
+    That makes the clearance vacuous.
+  remediation: In data-model section 8 define the legacy-row form as generated from the single `data` schema plus the lifted attribute list (one source, in the events PR, FR-014), or drop the clause and
+    clear markers only on the producer-side evidence the producer can give. Rewrite AC-019 so the gate also validates the lines each cleared marker's writer persists (a fixture row per cleared marker, written
+    by the real writer) and fails when one of them is made schema-invalid.
+  refute_reason: The legacy-row form is used as the clearance criterion in FR-032 and data-model section 8 but is defined nowhere, and AC-019 validates only publish-log lines rather than the lines the cleared
+    markers' writers persist.
+- id: SPEC-ARCH-011
+  lens: Canonical source
+  severity: 3
+  title: Node identity cites a non-canonical duplicate, and the cross-language owner of the value is undefined
+  evidence:
+  - artifact: "data-model.md \xA7 1 nodeid row ('_generate_node_id form'); spec.md \xA7 FR-011, E10"
+  - code: 'src/specify_cli/identity/project.py::generate_node_id (canonical: sha256(hostname:username)[:12] via socket.gethostname and getpass.getuser)'
+  - code: src/specify_cli/status/migrate_lifecycle_envelope.py::_generate_node_id (local copy kept for CORE import rules)
+  claim: 'The data model points at the private copy in the migration module instead of the canonical function. More importantly the Java producer cannot call either: FR-026 forbids the client from computing
+    or supplying the value, so Java must re-derive hostname and username on three operating systems and match what Python derives (Java and Python disagree on hostname resolution on macOS and Windows in
+    practice). A mismatched nodeid fragments one machine''s clock domain across Python-produced and Java-produced rows.'
+  remediation: Cite identity/project.py::generate_node_id as the canonical definition, and add to FR-011 that the node id is derived by the producer from the same inputs and the same hash with a golden
+    test per OS against fixtures produced by the Python function; or have the request carry the value (and relax FR-026 for that one pass-through field, stated explicitly).
+  refute_reason: data-model section 1 cites the private migration copy while the canonical function is identity/project.py::generate_node_id, and FR-026 forbids the client from supplying the value so the
+    Java producer's derivation (hostname and username per OS) has no stated owner or test.
+- id: SPEC-ARCH-013
+  lens: Contracts (type table coverage)
+  severity: 3
+  title: Retrospective lifecycle rows are persisted into the ledger but appear nowhere in the type table, the deferral list or the census
+  evidence:
+  - artifact: "spec.md \xA7 FR-003, FR-017 ('rows of types not in this table are never published and never an error'); data-model.md \xA7 3"
+  - code: src/specify_cli/retrospective/lifecycle_events.py (RetrospectiveCaptured, RetrospectiveCaptureFailed, RetrospectiveSkipped appended to status.events.jsonl through append_raw_rows_atomic; a separate
+      drain-gated live-work publish)
+  - code: src/specify_cli/status/lifecycle_events.py::AUTHORITATIVE_NON_LANE_EVENT_TYPES (defines the ledger's non-lane row set)
+  claim: The census gate (FR-003) is defined over "in-scope writers", and in-scope is whatever the table lists, so a ledger row kind that is authoritative and non-lane can be missing without any gate noticing.
+    FR-017's catch-all makes the omission silent by design. Retrospective rows are exactly such a kind, written by a fourth writer outside status/lifecycle_events.py, and they are neither in scope nor on
+    the deferred list.
+  remediation: Add the three retrospective rows to the type table as in scope (seam NEW) or deferred with a named residual, and make the census gate derive its universe from the ledger's non-lane row set
+    (AUTHORITATIVE_NON_LANE_EVENT_TYPES plus the retrospective and lane kinds) so an unlisted persisted kind fails the gate instead of being ignored.
+  refute_reason: retrospective/lifecycle_events.py appends RetrospectiveCaptured, CaptureFailed and Skipped to status.events.jsonl and fans them out, yet the words retrospective appear nowhere in spec.md,
+    data-model.md or the deferral list, and FR-017 silently drops unlisted types.
+- id: SPEC-COMPLETE-001
+  lens: Coverage / Testability
+  severity: 4
+  title: Clock uniqueness is stated per machine identity but the state file and publish log are per checkout
+  evidence:
+  - artifact: "spec.md \xA7 FR-011, FR-012, AC-010"
+  - artifact: "data-model.md \xA7 1 (nodeid), \xA7 7 LamportState"
+  - artifact: "plan-carryover.md \xA7 T (publish log is per resolved checkout, SK-331/SK-319)"
+  - code: 'src/specify_cli/status/migrate_lifecycle_envelope.py::_generate_node_id (SHA-256 of hostname and username: one id per machine and user, not per checkout)'
+  - artifact: "spec.md \xA7 FR-011, FR-012, AC-010; data-model.md \xA7 1 nodeid row, \xA7 7 LamportState"
+  - code: src/specify_cli/status/migrate_lifecycle_envelope.py::_generate_node_id
+  claim: FR-012 promises that no two events share a (nodeid, lamportclock) pair, but nodeid is one value for every checkout on a machine (primary checkout plus each lane worktree) while LamportState is
+    a gitignored file inside a checkout and the publish log is per resolved checkout. Two worktrees of one machine therefore run independent counters under the same nodeid and mint the same pair for different
+    events. AC-010 only exercises N processes on a single scratch repo, so it passes while the invariant is broken in the normal multi-lane setup. The state-file scope is a requirement here (it decides
+    the invariant), not a plan detail.
+  remediation: State the scope of the counter in FR-012 and LamportState (counter shared by every checkout of the same machine identity, for example anchored at the git common directory, or nodeid made
+    unique per checkout). Extend AC-010 with a fixture of one primary checkout plus two worktrees, concurrent stamping, and the falsifier "same (nodeid, lamportclock) for two events".
+  merged_from:
+  - SPEC-ORDER-004
+  refute_reason: nodeid derives from hostname and username (one per machine and user) while the clock state file and publish log are per checkout, so FR-012's no-duplicate-pair guarantee is undefined across
+    a primary checkout plus lane worktrees and AC-010 only tests one scratch repo.
+- id: SPEC-COMPLETE-002
+  lens: Testability
+  severity: 4
+  title: Seam census gate (AC-004) has no discovery rule, floor or self-mutation test
+  evidence:
+  - artifact: "spec.md \xA7 FR-003, AC-004, \xA7 11 risk 'Seam coverage drift: guarded by the census gate (AC-004)'"
+  - artifact: "spec.md \xA7 FR-027 / AC-012 and FR-031 / AC-014 (the same section gives those two gates a floor and a self-mutation test)"
+  claim: The only guard against a later writer bypassing the seam is AC-004, which says "per in-scope writer, one forced row yields one seam call". It does not say how writers are enumerated (hand-written
+    list versus discovery over src/), has no floor (an empty or truncated list passes vacuously) and no self-mutation test (add an in-scope writer that persists without a seam call and the gate must fail).
+    FR-003 says "a census gate fails when an in-scope writer persists a row with no seam call", but a hand list cannot detect a writer it does not list, so the stated drift guard does not guard drift.
+  remediation: 'Amend AC-004 to require (a) the writer set derived from the type table / source discovery, (b) a floor equal to the number of in-scope writers in data-model section 3, and (c) a self-mutation
+    case: an injected writer with no seam call makes the gate fail.'
+  refute_reason: AC-004 says only per in-scope writer one forced row yields one seam call, with no discovery rule, floor or self-mutation case, unlike AC-012 and AC-014 which carry them.
+- id: SPEC-COMPLETE-003
+  lens: Testability / Internal consistency
+  severity: 3
+  title: AC-005 demands a test for fault class disabled while OD-OPTOUT recommends the class never occurs
+  evidence:
+  - artifact: "spec.md \xA7 AC-005 ('one test per class ... disabled')"
+  - artifact: "spec.md \xA7 OD-OPTOUT (recommendation (a): the class stays in the enum, unused)"
+  - artifact: "data-model.md \xA7 6 ProducerFault.class"
+  claim: AC-005 lists disabled in its per-class fault matrix, but under the recommended resolution of OD-OPTOUT no code path can raise it, so the required test either cannot be written or is a vacuous test
+    that forces an artificial path. FR-022 and FR-023 also carry the class in the contract.
+  remediation: In AC-005 make the disabled row conditional on OD-OPTOUT (b), and under (a) require only the enum-equality gate stated in OD-OPTOUT; or drop the class from FR-022, FR-023 and ProducerFault
+    until a kill switch exists.
+  refute_reason: AC-005 requires a test per class including disabled while OD-OPTOUT recommends (a) under which the class never occurs, so the required test is unwritable or vacuous.
+- id: SPEC-COMPLETE-004
+  lens: Testability / Internal consistency
+  severity: 3
+  title: AC-013 contradicts the both-limits eligibility rule and no AC covers invalid retention configuration
+  evidence:
+  - artifact: "spec.md \xA7 AC-013 ('exactly keep_runs newest are kept' and 'an item younger than max_age_days is kept; both limits must be exceeded')"
+  - artifact: "spec.md \xA7 FR-029"
+  - artifact: "data-model.md \xA7 7 RetentionPolicy ('Invalid or non-numeric values are a named command error (fail closed)')"
+  claim: If both limits must be exceeded for eligibility, items younger than max_age_days beyond the newest keep_runs are also kept, so "exactly keep_runs newest are kept" is false for such a fixture (the
+    number kept is at least keep_runs). An implementation satisfying FR-029 would fail the AC as written, or the AC would be satisfied by an implementation that deletes young items. Separately, the fail-closed
+    handling of invalid keys has no AC, and "open Mission" and "no unfinished step" are used without a definition.
+  remediation: 'Reword AC-013 to "at least the newest keep_runs are kept, and any item within max_age_days is kept". Add an AC row: invalid or non-numeric keep_runs / max_age_days yields a named error and
+    deletes nothing (also on a dry run). Define "open Mission" in FR-029 (for example any work package outside done and canceled).'
+  refute_reason: AC-013 requires "exactly keep_runs newest are kept" while also keeping items younger than max_age_days and requiring both limits exceeded (FR-029), which contradict on a fixture, and no
+    AC covers invalid retention values.
+- id: SPEC-COMPLETE-005
+  lens: Internal consistency
+  severity: 3
+  title: FR-007 both normalizes a UUID id and refuses a UUID-form (32-hex) id
+  evidence:
+  - artifact: "spec.md \xA7 FR-007 ('UUID lower-case hyphenated' ... 'stripped-env fallback ... is 32-hex UUID ... refused')"
+  - artifact: "data-model.md \xA7 2 id ('ULID, 26 characters ... for every new event' and 'A non-ULID ledger id (the 32-hex fallback) is refused')"
+  - code: src/specify_cli/status/lifecycle_events.py::_generate_event_id (falls back to uuid.uuid4().hex)
+  claim: The text normalizes a UUID to lower-case hyphenated form and also refuses the 32-hex UUID as non-ULID, and operator decision 2 (Q2) says ULID only for new events. It is not stated whether a hyphenated
+    UUID ledger id is refused or published, nor whether normalization is only for readers and the order key (data-model section 4 uses the normalized id). Two implementers will diverge; a refused id also
+    means a stripped-env install silently loses every lifecycle event (a warning is recorded, but there is no AC that a 32-hex id yields rejected apart from AC-005's list).
+  remediation: 'In FR-007 state: the producer accepts only a ULID ledger id (any UUID form, hyphenated or hex, is refused as rejected) and the UUID normalization belongs to readers / the order key for legacy
+    rows. Remove UUID normalization from the producer''s id rule in data-model section 2.'
+  refute_reason: FR-007 and data-model section 2 both normalize a UUID id (lower-case hyphenated) and refuse any non-ULID ledger id, leaving the producer's treatment of a hyphenated UUID id ambiguous.
+- id: SPEC-COMPLETE-007
+  lens: Silent-success
+  severity: 3
+  title: Warning carriers leave --json runs and fault-log write failures without a guaranteed record
+  evidence:
+  - artifact: "spec.md \xA7 FR-023 ('a stderr line in human mode, plus an append-only gitignored fault log')"
+  - artifact: "spec.md \xA7 AC-005 ('one stderr warning')"
+  - artifact: "data-model.md \xA7 6 FaultLogRow"
+  - artifact: "spec.md \xA7 FR-022, FR-023 ('a stderr line in human mode'), AC-005 ('one stderr warning'), AC-018 (no --json body changes), C-002"
+  - code: src/specify_cli/orchestrator_api/envelope.py::CONTRACT_VERSION (1.15.0; machine consumers of orchestrator-api and --json commands)
+  claim: 'FR-023 puts the stderr line in human mode only, while AC-005 requires one stderr warning for runs whose --json body must be byte-identical; it is unstated whether the stderr line is emitted in
+    --json mode. If it is suppressed, the only record is the fault log. No requirement covers the fault log itself failing (read-only filesystem, full disk, unwritable path, or a fault that occurs before
+    the repo root is known): the event is then not produced with no record at all.'
+  remediation: 'In FR-023 state that stderr carries the warning in every mode (stderr does not alter the --json body) or name the JSON-mode carrier. Add: if the fault log cannot be written, the warning
+    still goes to stderr and the command still succeeds; add a fault-log-unwritable case to AC-005.'
+  merged_from:
+  - SPEC-ARCH-010
+  refute_reason: FR-023 limits the stderr line to human mode while AC-005 demands one stderr warning with byte-identical --json bodies, and no requirement covers the fault log itself being unwritable.
+- id: SPEC-COMPLETE-008
+  lens: Silent-success / Testability
+  severity: 3
+  title: Timeout or crash after the append can make the NOT produced warning false, and the kill-mid-stamp state is untested
+  evidence:
+  - artifact: "spec.md \xA7 FR-012, FR-021, FR-023, FR-025, AC-006, AC-010"
+  - artifact: "data-model.md \xA7 7 LamportState ('stamp and append are one exclusive operation')"
+  claim: The client terminates the producer on timeout and records timeout with the sentence that the event was NOT produced. The producer may have completed the append (or die between the clock persist
+    and the append). Then the log holds the row while the fault log says it does not, and a later re-fire is deduplicated (FR-016). The behaviour of the clock state when the process is killed between the
+    counter update and the line append (duplicate or gap) is not specified, and AC-006 and AC-010 do not cover it. AC-026 covers a torn line but not a kill between the two halves of the exclusive operation.
+  remediation: 'Require that a kill at any point leaves either no clock advance and no line, or a gap in the counter plus a complete line, never a reused clock value (state the permitted outcomes in FR-012).
+    Word the timeout and crash warnings as "the event may not have been produced" or define that doctor reconciles the log against the ledger. Add an AC: kill the producer between stamp and append, then
+    run again; no duplicate (nodeid, lamportclock) and a recorded fault.'
+  refute_reason: FR-012 makes stamp-and-append one exclusive operation but never states the permitted outcome of a kill between the two, and the unconditional "NOT produced" sentence on timeout/crash can
+    be false after a completed append, with no AC for either.
+- id: SPEC-COMPLETE-009
+  lens: Coverage
+  severity: 3
+  title: FR-005 (no widening of disclosure) and FR-020 (single writer) have no acceptance criterion or gate
+  evidence:
+  - artifact: "spec.md \xA7 FR-005, FR-020, \xA7 8 G-11 (gate list), \xA7 6 (no AC cites either)"
+  claim: FR-005 says the producer adds no member the authoritative row lacks, but AC-002 only validates against the data schema (which does not detect an extra member unless the schema forbids additions,
+    and does not compare against the persisted row). FR-020 says no Python code opens the publish log for write, yet FR-027 only constrains the client module, and G-11 lists no gate for it; a Python helper
+    elsewhere could write the file.
+  remediation: 'Add AC rows: (a) for every type, the key set of data is a subset of the persisted row''s key set plus the lifted-member rules of data-model section 3 (falsifier: inject a member from meta.json
+    or the environment into data); (b) an architectural gate with a floor and a self-mutation test that fails when any Python module opens the publish log path for write.'
+  refute_reason: No AC cites FR-005 or FR-020 and the G-11 gate list (client-no-logic, persisted-line schema, lane list, retention, seam census) contains no single-writer gate, so a Python writer elsewhere
+    would pass.
+- id: SPEC-COMPLETE-010
+  lens: Coverage
+  severity: 3
+  title: FR-042, FR-044, FR-045, FR-046 and NFR-003, NFR-004, NFR-006 are not covered by any AC
+  evidence:
+  - artifact: "spec.md \xA7 FR-042, FR-044, FR-045, FR-046, NFR-003, NFR-004, NFR-006, \xA7 6 AC-001..AC-028, \xA7 8 G-8, G-10"
+  claim: FR-042 (pinned toolchain, recorded checksum, provenance attached) maps only to gate G-8, with no AC observable and falsifier; G-8 is also titled reproducibility while FR-042 requires only a pinned
+    toolchain and a recorded checksum. FR-044 maps only to G-10. FR-045 (ADR amendment) and FR-046 (glossary terms, Contextive regeneration) are covered by the terminology guard in AC-028 at most. NFR-003
+    byte-identical output, NFR-004 LF-only on Windows and NFR-006 public hygiene of fixtures, log rows and fault records have no AC, although FR-019's byte rules and NFR-006 are each testable.
+  remediation: 'Add AC rows with observable and falsifier: provenance and checksum present in the release and equal to the built binary (FR-042); packs/internal absent from every wheel (FR-044); ADR amendment
+    file exists and names the superseded decision (FR-045); contextive check passes with the section 13 terms (FR-046); golden byte test on all three OSes with no BOM, LF only (NFR-003, NFR-004, FR-019);
+    a scan of produced rows and fault records for absolute home paths (NFR-006). Rename G-8 or cut the word reproducibility.'
+  refute_reason: NFR-004 and NFR-006 have no AC or gate at all, and FR-045 and FR-046 are not tied to any observable criterion; FR-042 and FR-044 map only to G-8 and G-10 without an AC falsifier.
+- id: SPEC-COMPLETE-011
+  lens: Testability
+  severity: 3
+  title: AC-024 has no floor on the number of wheels, so an empty matrix passes
+  evidence:
+  - artifact: "spec.md \xA7 AC-024 ('Per platform wheel'), FR-041, \xA7 8 G-1, G-3"
+  claim: AC-024 is quantified over the wheels that happen to be built. If the release job builds zero or one wheel (matrix misconfiguration), the criterion passes vacuously. FR-041 sets the minimum of linux
+    x86_64, macOS arm64 and Windows x86_64 but no AC checks that these exist.
+  remediation: 'Add to AC-024 a floor: the verification step enumerates the built wheels and fails unless the three minimum platform tags are present, with a self-mutation case removing one matrix entry.'
+  refute_reason: AC-024 is worded "per platform wheel" with no floor tying it to the FR-041 minimum platform set, so an empty or one-entry matrix passes vacuously.
+- id: SPEC-COMPLETE-012
+  lens: Testability
+  severity: 3
+  title: Persisted-line and lane-list gates (AC-019, AC-020) have no floor
+  evidence:
+  - artifact: "spec.md \xA7 AC-019, AC-020, FR-032, FR-034, \xA7 8 G-11"
+  - artifact: "data-model.md \xA7 9 LaneVocabulary (census of lane literals)"
+  claim: AC-019 mutates a persisted line and requires the gate to fail, but nothing requires the gate to have a non-empty set of persisted lines or of schemas to validate against (an empty publish log or
+    an unresolved schema directory validates vacuously). AC-020's lane-literal gate has a self-mutation case but no floor that the known census lists (data-model section 9) are actually found, so a scan
+    that matches nothing also passes the unmutated run.
+  remediation: 'Add floors: AC-019 asserts the gate validated at least one line per in-scope type from the AC-002 fixtures; AC-020 asserts the gate finds the census lists of data-model section 9 (count
+    at least the number listed) before the self-mutation step.'
+  refute_reason: AC-019 and AC-020 carry no floor (unlike AC-012, AC-014), so an empty persisted log or a scan matching none of the data-model section 9 lists passes vacuously.
+- id: SPEC-COMPLETE-016
+  lens: Coverage
+  severity: 2
+  title: Undefined terms in the doctor and retention contract
+  evidence:
+  - artifact: "data-model.md \xA7 7 FaultLogRow (count_since_clean), spec.md \xA7 FR-024, AC-007"
+  - artifact: "spec.md \xA7 FR-029 ('Mission is not open', 'no step is unfinished')"
+  claim: count_since_clean has no definition of what clears it, so AC-007 ("after N faults doctor reports count and last class; a clean run reports zero") cannot say whether a successful event resets the
+    count or whether pruning by retention can reduce it while the cause persists. "Open Mission" and "unfinished step" are not defined, so AC-013 cannot name its fixtures.
+  remediation: Define in FR-024 that the count is of fault-log rows in the retention window and is not reset by a successful event (or define the reset), and define open Mission and unfinished step in FR-029
+    in terms of lane state and lock files.
+  refute_reason: count_since_clean, open Mission and unfinished step are undefined anywhere in spec, data-model or carryover, so AC-007 and AC-013 cannot name their fixtures.
+- id: SPEC-RELEASE-001
+  lens: release/packaging feasibility (single-wheel assumptions)
+  severity: 4
+  title: Spec names gates as "extending" release.yml but never states that the existing machinery asserts exactly one pure wheel and goes red with several
+  evidence:
+  - artifact: "spec.md \xA7 8 (G-1, G-2, G-4), FR-041, E11"
+  - code: scripts/release/check_exact_install.py::locate_wheel (SystemExit 'Expected exactly one wheel')
+  - code: .github/workflows/release.yml build-release step 'Verify wheel contents' (WHEEL_FILE=$(ls dist/*.whl))
+  - code: tests/_support/shared_build_artifacts.py::published_build_artifacts (wheels[-1] of spec_kitty_cli-*.whl)
+  - code: tests/cross_cutting/packaging/test_packaging_safety.py::test_wheel_contains_only_known_packages (closed prefix tuple)
+  - code: tests/release/test_check_exact_install.py (fixtures build py3-none-any wheels)
+  claim: 'E11 says "one pure wheel today" but FR-041 and section 8 only say the gates extend the existing steps. The existing steps and tests hard-code the single-wheel shape: the exact-install script refuses
+    more than one wheel, the content step runs `ls dist/*.whl` into one variable, the shared test fixture silently picks the lexically last wheel (an arbitrary platform), and the known-prefix test rejects
+    any wheel member outside a closed prefix list, so a binary placed anywhere new fails it. Implemented as written, G-1/G-2 either go red on the first multi-wheel build or, worse, the fixture quietly tests
+    one arbitrary platform wheel and the rest are never opened. The spec also does not say where in the wheel the binary lives, which AC-024 ("binary present") and G-1 both depend on.
+
+    '
+  remediation: 'Add to section 8 a one-line requirement: every release step, script and test that globs or asserts one wheel is made per-wheel (iterates the expected set), and the wheel layout names a single
+    known in-package location for the binary under an existing known prefix (or the prefix list is amended deliberately). Add an AC that fails the packaging fixtures if they pick fewer wheels than the expected
+    platform set.
+
+    '
+  refute_reason: check_exact_install.locate_wheel exits on more than one wheel, release.yml uses WHEEL_FILE=$(ls dist/*.whl), and the shared fixture takes wheels[-1], so G-1 and G-2 as an extension of these
+    go red or test one arbitrary wheel.
+- id: SPEC-RELEASE-002
+  lens: release/packaging feasibility (wheel set completeness / publish atomicity)
+  severity: 4
+  title: No gate asserts the published wheel SET equals the FR-041 matrix, so a missing platform silently degrades to the sdist
+  evidence:
+  - artifact: "spec.md \xA7 8 G-1, G-9; FR-041; FR-043; AC-024"
+  - code: '.github/workflows/release.yml build-release ''if: !cancelled() && ...'' and publish-pypi (downloads one ''release-distributions'' artifact)'
+  claim: 'G-1 checks each wheel that exists. Nothing checks that a wheel exists for every platform in FR-041. A skipped, cancelled or failed matrix leg, or a partial upload, yields a release with fewer
+    wheels; PyPI files are immutable, so a user on the missing platform gets the sdist and, by FR-043 design, a working CLI that warns binary-missing on every event. FR-043''s graceful fallback therefore
+    converts a release defect into a silent, permanent one. G-9 says the matrix is "inside the aggregate gate" but release.yml has no matrix today (one ubuntu job both builds and tests) and the aggregate
+    gate in ci-aggregate.yml is the PR gate, not the tag-time build; the spec does not say what structural change makes a failed leg block publish-pypi.
+
+    '
+  remediation: 'Add a gate: before publish, the dist set must equal exactly the planned platform-tag set plus one sdist (expected list pinned in the repo, self-mutation: remove one wheel and the gate must
+    fail). State that build-release becomes a per-OS build stage feeding one assembling job, and that publish-pypi needs the assembled, set-checked artifact so a failed or cancelled leg blocks it (red-CI-no-release).
+
+    '
+  refute_reason: None of G-1 to G-11 asserts the published wheel set equals the FR-041 matrix, release.yml has no per-OS matrix today, and FR-043 turns a missing platform into a silent binary-missing degrade.
+- id: SPEC-RELEASE-003
+  lens: release/packaging feasibility (gate reality, red-CI-no-release, nightly gate)
+  severity: 4
+  title: The native build and its smoke test first run at tag time; the green-nightly release precondition does not cover them
+  evidence:
+  - artifact: "spec.md \xA7 8 G-3, G-8, G-9; \xA7 11 risk 'native build weight'"
+  - code: .github/workflows/release.yml job nightly-gate -> build-release; scripts/ci/release_nightly_gate.py
+  - code: .github/workflows/ci-windows.yml (path-filtered 'skips when unaffected'; pipx install --editable)
+  - code: .github/workflows/ci-router.yml (acceptance_jvm group gates no job by design; unmatched loop covers src/** only)
+  claim: 'Release proof today is "a green nightly for the exact SHA" plus tag-time build checks. If the Java/native-image build and the per-OS wheel smoke exist only in release.yml, the first time a native-image
+    build is attempted for a SHA is the tag run, after the nightly gate has already passed on a nightly that never built it: a broken toolchain pin, a reflection-config gap or a Windows-only failure is
+    discovered after tagging. G-3 names ci-windows.yml as the extension point, but that workflow is Windows-only, path-filtered, and installs the project editable via pipx, i.e. it cannot prove a built
+    wheel works; the "linux and macOS lanes" it also names do not exist. A new top-level Java directory is also unrouted by the path router (src-only unmatched loop), so a PR that breaks the producer build
+    could run no native job.
+
+    '
+  remediation: 'Require the per-OS native build plus clean-venv wheel-install smoke to run in the nightly (so the nightly-gate covers the SHA) and on PRs that touch the producer''s Java tree, packaging
+    config or the client (a named router group and gate_selection entry), and again in release.yml as the authoritative pre-publish check. State G-3 as "install the built wheel by path into a fresh venv
+    on each OS and run the smoke", not as an extension of ci-windows.yml.
+
+    '
+  refute_reason: G-3 names ci-windows.yml, which is path-filtered, Windows-only and pipx-based, and no linux or macOS lane exists, so the native build first runs at tag time after the nightly gate has already
+    passed.
+- id: SPEC-RELEASE-004
+  lens: release/packaging feasibility (fallback, sdist, hatch build hook)
+  severity: 3
+  title: G-7 permits "sdist builds without the binary OR fails loudly", contradicting FR-043 (install must succeed); the pure-wheel fallback is left undecided
+  evidence:
+  - artifact: "spec.md \xA7 8 G-7 vs FR-043, AC-025, data-model \xA7 10 (sdist row)"
+  - code: pyproject.toml [tool.hatch.build.targets.wheel] / [tool.hatch.build.targets.sdist] / [build-system] requires hatchling==1.31.0
+  - code: tests/cross_cutting/packaging/test_package_bundling.py (sdist and wheel built from the working tree)
+  claim: 'FR-043 says an sdist install must succeed and report binary-missing; G-7 accepts "fails loudly" as an alternative, so the gate can pass an implementation FR-043 forbids. Separately the spec never
+    says whether a pure py3-none-any wheel is still published beside the platform wheels. Without it, every platform outside the matrix (linux aarch64, musl, macOS x86_64 per OD-MATRIX) is forced through
+    an sdist build on the user''s machine; with it, pip and uv fall back to the pure wheel with no build step, and tests/scripts that assume a pure wheel stay valid. Making the wheel platform-specific also
+    needs a hatchling build hook or build_data override that must not run unconditionally: an unconditional one would break `uv sync`/editable installs (they build a wheel through the same backend) and
+    the sdist-to-wheel step on machines with no binary.
+
+    '
+  remediation: 'Reword G-7 to the FR-043 outcome only (install succeeds, binary-missing reported; a test builds the wheel from the extracted sdist with no binary). Decide in the spec (not the plan) whether
+    a pure fallback wheel ships; recommend yes. Add a constraint that building from the sdist or an editable checkout never requires the binary.
+
+    '
+  refute_reason: G-7 ("sdist builds without the binary or fails loudly") does contradict FR-043/AC-025 (install must succeed), and no spec text decides whether a pure fallback wheel ships.
+- id: SPEC-RELEASE-008
+  lens: release/packaging feasibility (2 s budget measurability)
+  severity: 4
+  title: NFR-002 has no acceptance criterion and fixes "once per row" spawning, so the 2 s budget is neither measured nor reachable by design
+  evidence:
+  - artifact: "spec.md NFR-002, FR-001, FR-003, FR-025; \xA7 11 risk; AC list (none for NFR-002)"
+  - code: tests/performance/test_cli_startup_budget_4409.py (ratio-to-fixed-workload, no absolute seconds)
+  - code: tests/architectural/test_perf_limit_authority.py (single authority for limits in tests/_perf_helpers.py)
+  claim: 'NFR-002 says the plan measures spawn cost "and sets the budget from it", which is not a requirement and has no falsifier. The design forces one process spawn per persisted row (FR-001/FR-003),
+    inside the command; a command that persists several rows pays several spawns, and on Windows with unsigned binaries (OD-SIGN) the first-run antivirus scan can dominate. The repo''s established method
+    (relative ratio, limits only in the single authority, nightly performance lane) is not referenced, and an absolute 2 s assertion would be rejected by the existing authority gate.
+
+    '
+  remediation: 'Add an AC: a per-command overhead ceiling expressed through tests/_perf_helpers.py (cold and warm spawn, per OS, with a planted slow stub proving the assertion can fail), summed over the
+    largest in-scope multi-row command. If measurement shows per-row spawn cannot meet it, FR-001 must allow batching rows per command invocation; flag that choice now rather than at implementation.
+
+    '
+  refute_reason: NFR-002 has no acceptance criterion (no AC mentions latency or spawn cost) and its only falsifier is deferred to a plan measurement, leaving the charter 2 s requirement untestable.
+- id: SPEC-RELEASE-009
+  lens: release/packaging feasibility (provenance, checksum, reproducibility)
+  severity: 4
+  title: FR-042 / G-8 have no acceptance criterion; "recorded checksum" proves nothing and "reproducibility" is overclaimed
+  evidence:
+  - artifact: "spec.md FR-042, \xA7 8 G-8, data-model \xA7 10 (binary_checksum), AC list (none for FR-042)"
+  - code: .github/workflows/release.yml 'Record artifact checksums' (sha256sum dist/* of the final dist only)
+  claim: 'FR-042 requires a pinned toolchain, a recorded checksum and attached provenance, but no AC tests any of them. A checksum computed from the same build that produced the wheel cannot detect a binary
+    swapped between the per-OS build job and the job that assembles the wheel; it only proves self-consistency. G-8 is titled "reproducibility" while the requirement states no reproducibility property (native-image
+    output is not bit-reproducible by default). The existing release only checksums the final dist/, so the binary-to-wheel handoff is unverified.
+
+    '
+  remediation: 'Add an AC: the checksum recorded at binary build is re-computed from the member inside each published wheel and must match; self-mutation swaps the binary after build and the gate fails.
+    Either rename G-8 "provenance and pinned toolchain" or state the reproducibility claim being made (for example two builds of one SHA yield the same checksum, or an explicit non-claim).
+
+    '
+  refute_reason: No AC covers FR-042 (checksum, pinned toolchain, provenance) and G-8 is titled reproducibility while FR-042 states no reproducibility property.
+- id: SPEC-RELEASE-010
+  lens: release/packaging feasibility (SBOM, license, dependency audit gates)
+  severity: 4
+  title: G-6 names pip-audit as an existing gate that does not run in CI, and G-5's SBOM extension point cannot see the native toolchain
+  evidence:
+  - artifact: "spec.md \xA7 8 G-5, G-6; \xA7 9 item 1; plan-carryover G-6 row"
+  - code: .github/workflows/release.yml step 'Generate CycloneDX SBOM' (cyclonedx-py environment, Python environment snapshot)
+  - code: .github/workflows/ci-router.yml job 'uv lock --check' (real); pyproject.toml [dependency-groups].lint lists pip-audit and bandit
+  claim: 'A search of workflows, scripts and the Makefile finds no pip-audit or bandit invocation; they are only declared in the lint group. G-6 therefore claims "existing dependency gates" that are not
+    gates (only `uv lock --check` is real), and "Unchanged for Python" would pass vacuously while adding a Java dependency surface with no audit at all. G-5 extends the CycloneDX step, but `cyclonedx-py
+    environment` enumerates the installed Python environment; it cannot see Gradle dependencies, the native-image runtime or statically linked libraries, so the SBOM would be silently unchanged by the new
+    binary.
+
+    '
+  remediation: 'Reword G-6 to name only gates that run (`uv lock --check`) and add an explicit new gate for Java dependency verification reusing the existing Gradle checksum-verification pattern in the
+    contracts build. Reword G-5 as a requirement that the release SBOM lists the Java dependencies and the toolchain/runtime embedded in each binary (a CycloneDX Gradle output merged or attached per platform),
+    with a test that it names a known dependency.
+
+    '
+  refute_reason: A search of .github, Makefile and scripts finds no pip-audit or bandit invocation, so G-6 cites a non-existent gate, and release.yml uses cyclonedx-py environment which only snapshots the
+    Python environment.
+- id: SPEC-ORDER-003
+  lens: compatibility and ordering correctness
+  severity: 3
+  title: Counter monotonicity is not guaranteed across a fresh checkout, a retention prune or a rotated node identity; new rows can then sort before older clocked rows
+  evidence:
+  - artifact: "spec.md \xA7 FR-012; data-model.md \xA7 7 LamportState ('clock state is never pruned while the log exists'), RetentionPolicy; AC-010"
+  - artifact: "data-model.md \xA7 4 key (clock outranks time)"
+  - code: src/specify_cli/status/migrate_lifecycle_envelope.py::_generate_node_id (sha256 of hostname:username, 12 hex)
+  claim: 'The clock is the primary sort field after clocked/clockless, and its state is a gitignored file. A fresh clone, a CI checkout, a worktree, a deleted .kittify state, or a retention run that removes
+    the log (and with it the state, per the stated rule) restarts the counter near zero while rows already consumed downstream carry large values. Under the defined key the new rows then sort BEFORE the
+    older ones, regardless of `time`. Consumers (events#92 read side, later a streaming binding) see the regression; the only ordering fix is the clock itself. The spec guards only "no wrap at 2^31-1".
+
+    '
+  remediation: 'Add to FR-012/LamportState: the first stamp for a node after state loss is at least the highest clock the producer can read in the Mission''s publish log, else the state is the counter''s
+    source of truth and retention never deletes it (it is a few bytes). Add an AC-010 case: delete the publish log, keep state, stamp again, assert strict increase; and a stated behaviour when state is
+    absent but the log is not.
+
+    '
+  refute_reason: FR-012 requires a strictly increasing per-node counter yet LamportState is silent on state loss while the publish log remains (stamping restarts low and sorts before older clocked rows),
+    and AC-010 tests only concurrency and overflow.
+- id: SPEC-ORDER-006
+  lens: compatibility and ordering correctness
+  severity: 3
+  title: The id comparison domain is undefined and worked example 5 uses ids that the id rules reject
+  evidence:
+  - artifact: "data-model.md \xA7 4 worked example 5 (ids `01abc` and `01ABD`); \xA7 2 `id` rule; \xA7 4 'i(r) its normalized id'"
+  - artifact: "spec.md \xA7 FR-007, AC-008"
+  - code: .venv spec_kitty_events/models.py::normalize_event_id (raises ValueError for any id that is not a 26-char Crockford ULID, a 36-char or 32-char UUID)
+  claim: "Example 5 is one of the AC-008 fixtures, but `01abc` is 5 characters; under the shipped normalizer it is an error, under FR-007 it is refused, and under \xA7 4 it is \"missing/invalid\" only if\
+    \ the comparator validates. Two implementations (Java and Python reference comparator) will diverge on whether it is ordered or an error row. Also unstated: the string comparison (ASCII code-point;\
+    \ Java compareTo is UTF-16, Python is code points) and how a ULID (`01J...` upper-case) compares with a hyphenated lower-case UUID of a legacy row (deterministic but arbitrary, which is fine only if\
+    \ said). Data-model section 2 lists UUID normalization yet FR-007 refuses non-ULID ids without saying whether a valid 36-char hyphenated UUID id on a ledger row is accepted by the producer.\n"
+  remediation: 'Make example 5 use two full valid ULIDs differing only in letter case (or 26-char strings), state that the comparator normalizes with the normalize_event_id rules and that an id that does
+    not normalize is an error row (named reason), and that comparison is by ASCII code point. In FR-007 state that the producer accepts only 26-char ULIDs and that UUID normalization is reader-only.
+
+    '
+  refute_reason: Worked example 5 (an AC-008 fixture) uses 5-character ids 01abc and 01ABD that FR-007 and normalize_event_id reject (verified, ValueError for 5 chars), so the fixture contradicts the id
+    rules.
+- id: SPEC-ORDER-008
+  lens: compatibility and ordering correctness
+  severity: 3
+  title: Missing id is an error row, but legacy rows without an event_id exist by design (run journal); the count identity also omits collapsed duplicates
+  evidence:
+  - artifact: "data-model.md \xA7 4 error rows ('or a missing id'; 'ordered + errors = rows read (duplicates counted as collapsed, listed)'); spec.md AC-009, AC-022, FR-035 ('rows without them stay legacy')"
+  - code: src/runtime/next/_internal_runtime/engine.py::_append_event (journal row has timestamp, no event_id)
+  claim: "The comparator's input domain is not stated. If a reader feeds legacy run-journal rows to it, every pre-upgrade row is an error row and the legacy journal disappears from the ordered view, against\
+    \ AC-022 and the compatibility promise. Separately AC-009 asserts ordered + errors = read, while \xA7 4 says duplicates are collapsed and listed, so the identity as written is false whenever a duplicate\
+    \ exists and the test gives no number for that case.\n"
+  remediation: 'State in section 4 that the order applies to upcast-form rows only (diary, 3.0.0, CloudEvents) and that sources with no id (legacy journal) are outside it and read by their own reader. Restate
+    the identity as ordered + errors + collapsed = rows read and add one duplicate row to the AC-009 fixture.
+
+    '
+  refute_reason: AC-009 asserts ordered + errors = rows read while data-model section 4 collapses and lists duplicates, so the identity is false whenever a duplicate exists, and the comparator input domain
+    for id-less legacy journal rows is unstated.
+- id: SPEC-ORDER-009
+  lens: compatibility and ordering correctness
+  severity: 2
+  title: Equal keys are said to be the same event, but the key omits source; and the survivor of a (source, id) duplicate with a different key is undefined
+  evidence:
+  - artifact: "data-model.md \xA7 4 ('Equal keys are the same event under the dedupe key and collapse'); \xA7 2 dedupe key (source, id), INTERIM"
+  - code: src/specify_cli/status/event_log_merge.py (merge keyed on event_id; raises on conflicting payloads for the same id)
+  claim: 'Equal order key means equal id, not equal (source, id): two events with the same id in different sources (a project-scoped and a Mission-scoped log) tie in the order yet are distinct. In the other
+    direction two rows with the same (source, id) but different clock or time (a retry that re-stamped, a hand-copied line) are not equal keys, so ordering keeps both while dedupe says one. Which survives,
+    and what happens when their content differs (the shipped merge driver fails loudly), is unstated. Order-independence of the result therefore depends on an unspecified rule.
+
+    '
+  remediation: 'One sentence in section 4: the order is applied after dedupe; of duplicate (source, id) rows the row with the smallest key is kept and any differing payload is reported as a conflict (named
+    reason); rows of different sources are compared by the same key and tie only if identical in all four fields (then input order is irrelevant because they are byte-equal, or add source as a final key
+    component).
+
+    '
+  refute_reason: data-model section 4 says equal keys are the same event under the (source, id) dedupe key although the key omits source, and the survivor of a differing duplicate is unstated.
+- id: SPEC-ORDER-011
+  lens: compatibility and ordering correctness
+  severity: 3
+  title: A Mission with no mission_id in meta.json is refused on every event, which conflicts with the aggregate-split rule and with FR-038 for Missions open at upgrade
+  evidence:
+  - artifact: "spec.md \xA7 FR-009 ('if neither yields it, the event is refused'), FR-023 (one warning per event), FR-038; data-model.md \xA7 2 source rule, \xA7 1 missionid row"
+  - artifact: 'arch.md (aggregate split): a non-ULID mission segment falls under ''any other prefix'': source /spec-kitty/projects/<project_uuid>, subject = full aggregate_id, no missionid'
+  - code: src/specify_cli/status/emit.py::_load_mission_id (returns None for legacy Missions pre-3.1.1)
+  claim: 'The repository''s own Missions all carry a mission_id, but the code documents Missions without one. Under FR-009 every lifecycle and status event of such a Mission, open at upgrade, is a fault:
+    a warning per event for the rest of its life, and no integration sees it. ADR 0001''s rule for a non-ULID mission segment is the opposite (project source, no missionid), and the spec does not say it
+    deliberately diverges. "A mission open at upgrade keeps working" is true for the command but not for the publication this mission exists for.
+
+    '
+  remediation: 'Add one statement to FR-009: either (a) refused, with the warning raised once per Mission and a doctor line naming the repair (and confirm that the upgrade path backfills mission_id for
+    open Missions), or (b) follow the ADR 0001 fallback (project source, subject = the aggregate, no missionid). Add the chosen case to AC-005''s `rejected` row or to a new AC.
+
+    '
+  refute_reason: FR-009 refuses any event with no resolvable mission id while FR-038 says an open Mission keeps working, and the spec states no rule for Missions lacking mission_id in meta.json.

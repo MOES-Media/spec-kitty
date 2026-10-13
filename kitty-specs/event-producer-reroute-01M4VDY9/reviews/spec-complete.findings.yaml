@@ -1,0 +1,203 @@
+schema: review-findings/v1
+complete: true
+phase: spec
+lens_group: complete
+mission: event-producer-reroute-01M4VDY9
+findings:
+  - id: SPEC-COMPLETE-001
+    lens: Coverage / Testability
+    severity: 4
+    title: >-
+      Clock uniqueness is stated per machine identity but the state file and publish log are per checkout
+    evidence:
+      - artifact: "spec.md § FR-011, FR-012, AC-010"
+      - artifact: "data-model.md § 1 (nodeid), § 7 LamportState"
+      - artifact: "plan-carryover.md § T (publish log is per resolved checkout, SK-331/SK-319)"
+      - code: "src/specify_cli/status/migrate_lifecycle_envelope.py::_generate_node_id (SHA-256 of hostname and username: one id per machine and user, not per checkout)"
+    claim: >-
+      FR-012 promises that no two events share a (nodeid, lamportclock) pair, but nodeid is one value for every checkout on a machine (primary checkout plus each lane worktree) while LamportState is a gitignored file inside a checkout and the publish log is per resolved checkout. Two worktrees of one machine therefore run independent counters under the same nodeid and mint the same pair for different events. AC-010 only exercises N processes on a single scratch repo, so it passes while the invariant is broken in the normal multi-lane setup. The state-file scope is a requirement here (it decides the invariant), not a plan detail.
+    remediation: >-
+      State the scope of the counter in FR-012 and LamportState (counter shared by every checkout of the same machine identity, for example anchored at the git common directory, or nodeid made unique per checkout). Extend AC-010 with a fixture of one primary checkout plus two worktrees, concurrent stamping, and the falsifier "same (nodeid, lamportclock) for two events".
+  - id: SPEC-COMPLETE-002
+    lens: Testability
+    severity: 4
+    title: >-
+      Seam census gate (AC-004) has no discovery rule, floor or self-mutation test
+    evidence:
+      - artifact: "spec.md § FR-003, AC-004, § 11 risk 'Seam coverage drift: guarded by the census gate (AC-004)'"
+      - artifact: "spec.md § FR-027 / AC-012 and FR-031 / AC-014 (the same section gives those two gates a floor and a self-mutation test)"
+    claim: >-
+      The only guard against a later writer bypassing the seam is AC-004, which says "per in-scope writer, one forced row yields one seam call". It does not say how writers are enumerated (hand-written list versus discovery over src/), has no floor (an empty or truncated list passes vacuously) and no self-mutation test (add an in-scope writer that persists without a seam call and the gate must fail). FR-003 says "a census gate fails when an in-scope writer persists a row with no seam call", but a hand list cannot detect a writer it does not list, so the stated drift guard does not guard drift.
+    remediation: >-
+      Amend AC-004 to require (a) the writer set derived from the type table / source discovery, (b) a floor equal to the number of in-scope writers in data-model section 3, and (c) a self-mutation case: an injected writer with no seam call makes the gate fail.
+  - id: SPEC-COMPLETE-003
+    lens: Testability / Internal consistency
+    severity: 3
+    title: >-
+      AC-005 demands a test for fault class disabled while OD-OPTOUT recommends the class never occurs
+    evidence:
+      - artifact: "spec.md § AC-005 ('one test per class ... disabled')"
+      - artifact: "spec.md § OD-OPTOUT (recommendation (a): the class stays in the enum, unused)"
+      - artifact: "data-model.md § 6 ProducerFault.class"
+    claim: >-
+      AC-005 lists disabled in its per-class fault matrix, but under the recommended resolution of OD-OPTOUT no code path can raise it, so the required test either cannot be written or is a vacuous test that forces an artificial path. FR-022 and FR-023 also carry the class in the contract.
+    remediation: >-
+      In AC-005 make the disabled row conditional on OD-OPTOUT (b), and under (a) require only the enum-equality gate stated in OD-OPTOUT; or drop the class from FR-022, FR-023 and ProducerFault until a kill switch exists.
+  - id: SPEC-COMPLETE-004
+    lens: Testability / Internal consistency
+    severity: 3
+    title: >-
+      AC-013 contradicts the both-limits eligibility rule and no AC covers invalid retention configuration
+    evidence:
+      - artifact: "spec.md § AC-013 ('exactly keep_runs newest are kept' and 'an item younger than max_age_days is kept; both limits must be exceeded')"
+      - artifact: "spec.md § FR-029"
+      - artifact: "data-model.md § 7 RetentionPolicy ('Invalid or non-numeric values are a named command error (fail closed)')"
+    claim: >-
+      If both limits must be exceeded for eligibility, items younger than max_age_days beyond the newest keep_runs are also kept, so "exactly keep_runs newest are kept" is false for such a fixture (the number kept is at least keep_runs). An implementation satisfying FR-029 would fail the AC as written, or the AC would be satisfied by an implementation that deletes young items. Separately, the fail-closed handling of invalid keys has no AC, and "open Mission" and "no unfinished step" are used without a definition.
+    remediation: >-
+      Reword AC-013 to "at least the newest keep_runs are kept, and any item within max_age_days is kept". Add an AC row: invalid or non-numeric keep_runs / max_age_days yields a named error and deletes nothing (also on a dry run). Define "open Mission" in FR-029 (for example any work package outside done and canceled).
+  - id: SPEC-COMPLETE-005
+    lens: Internal consistency
+    severity: 3
+    title: >-
+      FR-007 both normalizes a UUID id and refuses a UUID-form (32-hex) id
+    evidence:
+      - artifact: "spec.md § FR-007 ('UUID lower-case hyphenated' ... 'stripped-env fallback ... is 32-hex UUID ... refused')"
+      - artifact: "data-model.md § 2 id ('ULID, 26 characters ... for every new event' and 'A non-ULID ledger id (the 32-hex fallback) is refused')"
+      - code: "src/specify_cli/status/lifecycle_events.py::_generate_event_id (falls back to uuid.uuid4().hex)"
+    claim: >-
+      The text normalizes a UUID to lower-case hyphenated form and also refuses the 32-hex UUID as non-ULID, and operator decision 2 (Q2) says ULID only for new events. It is not stated whether a hyphenated UUID ledger id is refused or published, nor whether normalization is only for readers and the order key (data-model section 4 uses the normalized id). Two implementers will diverge; a refused id also means a stripped-env install silently loses every lifecycle event (a warning is recorded, but there is no AC that a 32-hex id yields rejected apart from AC-005's list).
+    remediation: >-
+      In FR-007 state: the producer accepts only a ULID ledger id (any UUID form, hyphenated or hex, is refused as rejected) and the UUID normalization belongs to readers / the order key for legacy rows. Remove UUID normalization from the producer's id rule in data-model section 2.
+  - id: SPEC-COMPLETE-006
+    lens: Silent-success
+    severity: 3
+    title: >-
+      No stated outcome when the producer receives a row it cannot map to a type
+    evidence:
+      - artifact: "data-model.md § 3 closing line ('Rows of types not in this table are never published and never an error: the seam only hands the producer in-scope rows (FR-017)')"
+      - artifact: "data-model.md § 6 ProduceReply.outcome (produced | skipped_duplicate | refused)"
+      - artifact: "spec.md § FR-023, AC-005"
+    claim: >-
+      The only guard against an unmapped event_type reaching the producer is the assumption that the seam filters. The lifecycle seam slot is shared with rows of other event types (the lifecycle log holds more types than the table, and a newly added type would arrive through the same slot). ProduceReply has no outcome for this, and 'never an error' means a new in-scope-looking row is dropped with no warning: success returned while the event was not produced, which Decision 6 forbids. AC-005's class list has no unmapped-type case.
+    remediation: >-
+      Define the outcome: an unmapped type is refused with reason_class rejected (or a distinct named class), recorded as a fault with the NOT produced sentence, except for the explicitly deferred types (glossary rows, DecisionPointWidened), which are filtered at the seam and listed. Add the case to AC-005.
+  - id: SPEC-COMPLETE-007
+    lens: Silent-success
+    severity: 3
+    title: >-
+      Warning carriers leave --json runs and fault-log write failures without a guaranteed record
+    evidence:
+      - artifact: "spec.md § FR-023 ('a stderr line in human mode, plus an append-only gitignored fault log')"
+      - artifact: "spec.md § AC-005 ('one stderr warning')"
+      - artifact: "data-model.md § 6 FaultLogRow"
+    claim: >-
+      FR-023 puts the stderr line in human mode only, while AC-005 requires one stderr warning for runs whose --json body must be byte-identical; it is unstated whether the stderr line is emitted in --json mode. If it is suppressed, the only record is the fault log. No requirement covers the fault log itself failing (read-only filesystem, full disk, unwritable path, or a fault that occurs before the repo root is known): the event is then not produced with no record at all.
+    remediation: >-
+      In FR-023 state that stderr carries the warning in every mode (stderr does not alter the --json body) or name the JSON-mode carrier. Add: if the fault log cannot be written, the warning still goes to stderr and the command still succeeds; add a fault-log-unwritable case to AC-005.
+  - id: SPEC-COMPLETE-008
+    lens: Silent-success / Testability
+    severity: 3
+    title: >-
+      Timeout or crash after the append can make the NOT produced warning false, and the kill-mid-stamp state is untested
+    evidence:
+      - artifact: "spec.md § FR-012, FR-021, FR-023, FR-025, AC-006, AC-010"
+      - artifact: "data-model.md § 7 LamportState ('stamp and append are one exclusive operation')"
+    claim: >-
+      The client terminates the producer on timeout and records timeout with the sentence that the event was NOT produced. The producer may have completed the append (or die between the clock persist and the append). Then the log holds the row while the fault log says it does not, and a later re-fire is deduplicated (FR-016). The behaviour of the clock state when the process is killed between the counter update and the line append (duplicate or gap) is not specified, and AC-006 and AC-010 do not cover it. AC-026 covers a torn line but not a kill between the two halves of the exclusive operation.
+    remediation: >-
+      Require that a kill at any point leaves either no clock advance and no line, or a gap in the counter plus a complete line, never a reused clock value (state the permitted outcomes in FR-012). Word the timeout and crash warnings as "the event may not have been produced" or define that doctor reconciles the log against the ledger. Add an AC: kill the producer between stamp and append, then run again; no duplicate (nodeid, lamportclock) and a recorded fault.
+  - id: SPEC-COMPLETE-009
+    lens: Coverage
+    severity: 3
+    title: >-
+      FR-005 (no widening of disclosure) and FR-020 (single writer) have no acceptance criterion or gate
+    evidence:
+      - artifact: "spec.md § FR-005, FR-020, § 8 G-11 (gate list), § 6 (no AC cites either)"
+    claim: >-
+      FR-005 says the producer adds no member the authoritative row lacks, but AC-002 only validates against the data schema (which does not detect an extra member unless the schema forbids additions, and does not compare against the persisted row). FR-020 says no Python code opens the publish log for write, yet FR-027 only constrains the client module, and G-11 lists no gate for it; a Python helper elsewhere could write the file.
+    remediation: >-
+      Add AC rows: (a) for every type, the key set of data is a subset of the persisted row's key set plus the lifted-member rules of data-model section 3 (falsifier: inject a member from meta.json or the environment into data); (b) an architectural gate with a floor and a self-mutation test that fails when any Python module opens the publish log path for write.
+  - id: SPEC-COMPLETE-010
+    lens: Coverage
+    severity: 3
+    title: >-
+      FR-042, FR-044, FR-045, FR-046 and NFR-003, NFR-004, NFR-006 are not covered by any AC
+    evidence:
+      - artifact: "spec.md § FR-042, FR-044, FR-045, FR-046, NFR-003, NFR-004, NFR-006, § 6 AC-001..AC-028, § 8 G-8, G-10"
+    claim: >-
+      FR-042 (pinned toolchain, recorded checksum, provenance attached) maps only to gate G-8, with no AC observable and falsifier; G-8 is also titled reproducibility while FR-042 requires only a pinned toolchain and a recorded checksum. FR-044 maps only to G-10. FR-045 (ADR amendment) and FR-046 (glossary terms, Contextive regeneration) are covered by the terminology guard in AC-028 at most. NFR-003 byte-identical output, NFR-004 LF-only on Windows and NFR-006 public hygiene of fixtures, log rows and fault records have no AC, although FR-019's byte rules and NFR-006 are each testable.
+    remediation: >-
+      Add AC rows with observable and falsifier: provenance and checksum present in the release and equal to the built binary (FR-042); packs/internal absent from every wheel (FR-044); ADR amendment file exists and names the superseded decision (FR-045); contextive check passes with the section 13 terms (FR-046); golden byte test on all three OSes with no BOM, LF only (NFR-003, NFR-004, FR-019); a scan of produced rows and fault records for absolute home paths (NFR-006). Rename G-8 or cut the word reproducibility.
+  - id: SPEC-COMPLETE-011
+    lens: Testability
+    severity: 3
+    title: >-
+      AC-024 has no floor on the number of wheels, so an empty matrix passes
+    evidence:
+      - artifact: "spec.md § AC-024 ('Per platform wheel'), FR-041, § 8 G-1, G-3"
+    claim: >-
+      AC-024 is quantified over the wheels that happen to be built. If the release job builds zero or one wheel (matrix misconfiguration), the criterion passes vacuously. FR-041 sets the minimum of linux x86_64, macOS arm64 and Windows x86_64 but no AC checks that these exist.
+    remediation: >-
+      Add to AC-024 a floor: the verification step enumerates the built wheels and fails unless the three minimum platform tags are present, with a self-mutation case removing one matrix entry.
+  - id: SPEC-COMPLETE-012
+    lens: Testability
+    severity: 3
+    title: >-
+      Persisted-line and lane-list gates (AC-019, AC-020) have no floor
+    evidence:
+      - artifact: "spec.md § AC-019, AC-020, FR-032, FR-034, § 8 G-11"
+      - artifact: "data-model.md § 9 LaneVocabulary (census of lane literals)"
+    claim: >-
+      AC-019 mutates a persisted line and requires the gate to fail, but nothing requires the gate to have a non-empty set of persisted lines or of schemas to validate against (an empty publish log or an unresolved schema directory validates vacuously). AC-020's lane-literal gate has a self-mutation case but no floor that the known census lists (data-model section 9) are actually found, so a scan that matches nothing also passes the unmutated run.
+    remediation: >-
+      Add floors: AC-019 asserts the gate validated at least one line per in-scope type from the AC-002 fixtures; AC-020 asserts the gate finds the census lists of data-model section 9 (count at least the number listed) before the self-mutation step.
+  - id: SPEC-COMPLETE-013
+    lens: Internal consistency
+    severity: 2
+    title: >-
+      Trace table mapping is inaccurate for FR-036 to FR-038 and FR-044
+    evidence:
+      - artifact: "data-model.md § 11 (rows 'FR-036 to FR-038 | Rules (2); section 4 invariants' and 'FR-041 to FR-044 | PlatformWheel (10)')"
+      - artifact: "spec.md § FR-036, FR-037, FR-038; data-model.md § 10 (no packs/internal field)"
+    claim: >-
+      FR-036 and FR-037 are about reader compatibility and the upcaster and FR-038 about not writing under kitty-specs; none is governed by the id/time/source rules of section 2 or the order invariants of section 4. FR-044 (packs/internal excluded) is listed against the PlatformWheel entity, whose only mention is an invariant sentence. The trace claims coverage the entities do not provide.
+    remediation: >-
+      Map FR-036 to FR-037 to "no entity (compatibility; spec section 7)" and FR-038 to PublishLogFile location (section 7) plus Rules (2) source; map FR-044 to the PlatformWheel invariants line. Fix at the same time the AC-008 wording "six examples, the counter-example" (the counter-example is example 4 of the six).
+  - id: SPEC-COMPLETE-014
+    lens: Baseline honesty
+    severity: 2
+    title: >-
+      Named gates (AC-028, AC-018, G-11) are stated as any red gate fails with no baseline attribution
+    evidence:
+      - artifact: "spec.md § AC-028 ('Any red gate'), AC-018, § 8 G-11"
+      - artifact: "CLAUDE.md § Test-run baseline-red gotcha; pyproject.toml [tool.mypy]"
+    claim: >-
+      AC-028 names ruff check, ruff format --check, mypy, the terminology guard and AC-018 the orchestrator-api contract tests as pass conditions, but the repository documents pre-existing known reds (nightly p0-repro lane, ratchet-listed format debt, stale-venv and CI-environment failures). An implementer cannot tell whether a pre-existing red on main blocks acceptance, and the gate scope for mypy ("on the client") is not tied to a configured target.
+    remediation: >-
+      Add to AC-028 and AC-018: a gate counts as red for this Mission only if it is red on the branch and green on the merge base; pre-existing reds are recorded in the PR with their issue, never fixed or waived silently. Name the mypy invocation scope for the client module.
+  - id: SPEC-COMPLETE-015
+    lens: Trim-loss
+    severity: 2
+    title: >-
+      Tooling-defect consequences that bind requirements now live only in plan-carryover.md
+    evidence:
+      - artifact: "spec.md § 7 ('Tooling defects ... consequences ... are in plan-carryover.md section T')"
+      - artifact: "plan-carryover.md § T (SK-350/SK-311 lib64 binary lookup; SK-331/SK-319 per-checkout publish log; SK-339 ignore handling)"
+      - artifact: "spec.md § FR-019, FR-028 (location and run definition)"
+    claim: >-
+      Diffing against the pre-trim artifacts, the FR texts, the ACs, the fault matrix, the worked examples, the exemption dispositions and the gate rows survived intact; the loss is limited to the following. The consequences of the five tooling defects were a gating statement (the publish log is per resolved checkout and never unique per Mission; the binary lookup must not assume a plain lib directory; prefer already-ignored paths) and are now only supporting material that the plan is told it may skip. The per-checkout fact is load-bearing for FR-012 (finding 001), FR-016 dedupe scope and FR-028's definition of a run. Smaller drops with no consequence: the note that no events model exists for ReviewerSelfApproval, and the OD-JAVA reason that waiting puts the milestone on the open #5529 stack.
+    remediation: >-
+      Restore one sentence in FR-019 / FR-028: the publish log and clock state are per resolved checkout, never assumed unique per Mission; keep SK-350 and the ignore-handling consequences in the plan carryover.
+  - id: SPEC-COMPLETE-016
+    lens: Coverage
+    severity: 2
+    title: >-
+      Undefined terms in the doctor and retention contract
+    evidence:
+      - artifact: "data-model.md § 7 FaultLogRow (count_since_clean), spec.md § FR-024, AC-007"
+      - artifact: "spec.md § FR-029 ('Mission is not open', 'no step is unfinished')"
+    claim: >-
+      count_since_clean has no definition of what clears it, so AC-007 ("after N faults doctor reports count and last class; a clean run reports zero") cannot say whether a successful event resets the count or whether pruning by retention can reduce it while the cause persists. "Open Mission" and "unfinished step" are not defined, so AC-013 cannot name its fixtures.
+    remediation: >-
+      Define in FR-024 that the count is of fault-log rows in the retention window and is not reset by a successful event (or define the reset), and define open Mission and unfinished step in FR-029 in terms of lane state and lock files.
