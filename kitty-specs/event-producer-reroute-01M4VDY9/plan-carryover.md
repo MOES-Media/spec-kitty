@@ -2,7 +2,7 @@
 
 Mission `event-producer-reroute-01M4VDY9`. This file holds explanatory and implementation-level detail moved out of [`spec.md`](spec.md) and [`data-model.md`](data-model.md) so those stay within the review budget. Nothing here changes a requirement: every FR, NFR, C, AC and OD id, with its testable content and falsifier, stays in the spec. Each section below is referenced from the spec or data model by letter. The plan reads this file as input.
 
-Sections: R rationale per FR; E evidence detail; T tooling defects; G gate rationale; K risk elaboration; M exemption marker reasons; X example lines; L glossary definitions; D governance drift detail; W total-order and worked-example narration; Q open-decision and scope prose; S further moved wording; Y type-table member lists.
+Sections: R rationale per FR; E evidence detail; T tooling defects; G gate rationale; K risk elaboration; M exemption marker reasons; X example lines; L glossary definitions; D governance drift detail; W total-order and worked-example narration; Q open-decision and scope prose; S further moved wording; Y type-table member lists; Z round-2 moved wording.
 
 ## R Rationale per FR
 
@@ -81,7 +81,7 @@ Sections: R rationale per FR; E evidence detail; T tooling defects; G gate ratio
 
 ## T Tooling defects (spec section 7)
 
-Tooling defects (accounted for by number, no detail): SK-350 and SK-311 (a `lib64` symlink in the tool venv breaks startup, so the binary lookup and the merge driver must not assume a plain `lib`); SK-331 and SK-319 (primary and coordination partitions hold different event streams, so the publish log is per resolved checkout and never assumed to be unique per Mission); SK-339 (`GitignoreManager.ensure_entries` is not byte-preserving, so prefer paths already ignored, FR-019); SK-328 and SK-320 (CLI-written event lines left uncommitted: the publish log is never a committed file, so these cannot apply to it).
+Tooling constraints, stated self-contained (no external ledger ids): a `lib64` symlink in the tool venv can break startup, so the binary lookup and the merge driver must not assume a plain `lib`; primary and coordination partitions hold different event streams, so the publish log is per resolved checkout and never assumed unique per Mission; `GitignoreManager.ensure_entries` is not byte-preserving, so prefer paths already ignored (FR-019); CLI-written event lines can be left uncommitted, and the publish log is never a committed file, so that cannot apply to it.
 
 
 
@@ -189,7 +189,11 @@ None of these terms is defined in `docs/context/`: **Producer** (the component t
 
 ## W Total-order narration (data-model section 4)
 
-The formal key and the six worked examples are in data-model section 4; they were checked over all permutations with a reference comparator using the events package's `normalize_event_id`. Notes:
+The formal key and the eight worked examples are in data-model section 4; they were checked over all permutations (and the invariants over all triples) with a read-only script using the events package's `normalize_event_id`. Notes:
+- Known consequences: a clockless row appended after clocked rows sorts first (only pre-cutover writers write clockless rows; #6195 stops old CLIs appending); a checkout with neither clock state nor publish log restarts the counter, so its new rows sort before older consumed rows.
+- Source for rows with none: the empty string (sorts first). The upcaster is #92's; if it supplies a source, the comparator uses it. Not an error row, so a legacy log never loses rows for want of a source.
+- Dedupe uses the same normalized-id domain as the key; otherwise two spellings of one id in one source would be distinct rows with equal keys (example 8), breaking totality.
+- Examples 7 and 8 exist so a comparator that omits `source`, or dedupes on raw ids, fails the permutation test.
 - Example 4: naive means "if both rows have a clock compare `(clock, time, id)`, else `(time, id)`": C<A (clock), A<B (time), B<C (time).
 - Example 5: the shipped normalizer raises for any id that is not a 26-character Crockford ULID or a 36 or 32 character UUID, so ids such as `01abc` are error rows, not ordered rows; the fixture uses full ULIDs. Comparison is by ASCII code point (Java `compareTo` is UTF-16, Python compares code points); a ULID against a hyphenated UUID is deterministic and arbitrary, which is acceptable when stated.
 - Dedupe precedes ordering because equal keys do not imply equal `(source, id)`; the shipped merge driver (`status/event_log_merge.py`) fails loudly on conflicting payloads for one id, and the conflict report mirrors that.
@@ -222,7 +226,7 @@ The formal key and the six worked examples are in data-model section 4; they wer
 
 - **OD-SCHEMA-DELIVERY:** the Java build must validate against the events-repo `data` schemas (FR-015) while the charter forbids vendoring and events#92 gates a Java binding on a charter amendment. (a) a build-time fetch of the released events artifact, pinned by coordinate and checksum, commits nothing; (b) waits on #92; (c) copies and needs the amendment. All three satisfy FR-015; only (a) and (b) satisfy FR-039's no-committed-source rule today.
 - **OD-FALLBACK:** with a pure fallback wheel, pip and uv fall back with no build step and tests that assume a pure wheel stay valid; without it every platform outside the matrix (linux aarch64, musl, macOS x86_64 per OD-MATRIX) builds the sdist on the user's machine. A conditional hatchling hook (or build-data override) must not run for `uv sync`, editable installs or the sdist-to-wheel step.
-- **OD-MISSIONID:** option (a) turns every event of an old Mission into a fault unless the warning is once per Mission and `doctor` names the repair; option (b) follows ADR 0001's aggregate-split rule (a non-ULID mission segment falls under the project source with subject the full aggregate and no `missionid`).
+- **OD-MISSIONID:** option (a) turns every event of an old Mission into a fault (one warning per event, FR-023, which wins over any per-Mission wording) and `doctor` names the repair; option (b) follows ADR 0001's aggregate-split rule (a non-ULID mission segment falls under the project source with subject the full aggregate and no `missionid`).
 - **OD-CLOCK:** (a) one counter anchored at the git common directory is shared by the primary checkout and each worktree; separate clones of one repository under one machine identity remain a residual. (b) a checkout discriminator makes the clock domain per checkout and relaxes FR-011 to its machine part.
 - **OD-NODEID:** (a) needs a per-OS golden test because Java and Python can disagree on hostname resolution; (b) makes the request carry the value, a stated exception to FR-026 for one pass-through field.
 - **OD-SPAWN:** the repository's perf method is relative (ratio to a fixed workload) with limits only in `tests/_perf_helpers.py` (`tests/architectural/test_perf_limit_authority.py`); an absolute 2 s assertion would be rejected. `emit_status_transition_batch` is the largest in-scope multi-row command.
@@ -243,6 +247,9 @@ The earlier wording of the total-order paragraph, data-model sections 6 and 7 (a
 
 ## Y Type-table member lists (data-model section 3)
 
+Emission-point detail moved from the type table: `emit_project_initialized` writes `.kittify/canonical-events.jsonl`; `MissionCreated` is fanned out by the caller through `fanout_lifecycle_event_hosted` (`core/mission_creation_commit.py`); the persist-only path of `emit_artifact_phase` is a census item; decision rows also reach the seam through `_queue_decision_fanout`; the run journal also reaches it through `RuntimeMomentProducer`, and its rows need a ULID `event_id` and version (FR-035).
+
+
 The `data` members of each row, as originally listed (row members moved verbatim except the lifted ones named in the type table; the events PR owns the final schema and lifted-member list, FR-014):
 
 | Legacy row | Type | Members |
@@ -257,3 +264,99 @@ The `data` members of each row, as originally listed (row members moved verbatim
 | `FollowUpRecorded` | `mission.followup.recorded.v1` | `mission_id`, `mission_slug`, `follow_up_type`, `commit_sha`, `pr_number`, `recorded_by`, `recorded_at` |
 | `DecisionPointOpened` | `decision.opened.v1` | `origin_surface`, `decision_point_id`, `mission_id`, `run_id`, `mission_slug`, `mission_type`, `phase`, `origin_flow`, `question`, `options`, `input_key`, `step_id`, `actor_id`, `actor_type`, `state_entered_at`, `recorded_at` |
 | `DecisionPointResolved` (resolved, deferred, canceled) | `decision.resolved.v1` | `origin_surface`, `decision_point_id`, `mission_id`, `run_id`, `mission_slug`, `mission_type`, `terminal_outcome`, `final_answer`, `other_answer`, `rationale`, `summary`, `actual_participants`, `resolved_by`, `closed_locally_while_widened`, `closure_message`, `state_entered_at`, `recorded_at` |
+
+
+## Z Wording moved from spec and data-model (spec phase, round 2)
+
+Original fuller wording of the passages shortened to keep the spec and data model within their size budget; no requirement was dropped.
+
+- spec section 8, per-wheel machinery (original): "**Per-wheel rule.** Every release step, script and test that globs or asserts one wheel becomes per-wheel over the expected set (the `ls dist/*.whl` step, `check_exact_install.py::locate_wheel`, `published_build_artifacts` in `tests/_support/shared_build_artifacts.py`, the `test_check_exact_install.py` fixtures). The binary sits at one known in-package path under an existing known prefix, or the prefix tuple of `test_wheel_contains_only_known_packages` is amended deliberately."
+- spec section 11 (original): "Elaboration: `plan-carryover.md` section K. Critical path: events PR released, floor bump, CLI producer (#6193 blocked by this mission). Main risks: native build weight and spawn cost (NFR-002); unsigned binaries (OD-SIGN); INTERIM choices turn breaking once emitted; seam coverage drift (AC-004); clock ordering consequences (data-model section 4); a missing platform leg is permanent once published (G-12); #6164 conflicts on `status/adapters.py`."
+- spec section 7 trailer (original): "**Writers at cutover (C-004):** Python writes the ledger rows, Java the publish-log rows; at #6193/#6195 Java writes both and the publish log becomes the ledger or is retired. **Merge order with #6164:** whichever lands second rebases; the only shared file is `status/adapters.py`. Tooling constraints the plan must respect (venv layout, per-checkout event streams, non-byte-preserving ignore edits, uncommitted CLI-written lines): `plan-carryover.md` section T."
+- FR-002 tail (original): "the ADR's confirmation pin and the reset helpers (`reset_handlers`) move with the gate and re-register the client. Neither producer nor client reads the drain posture; `hosted.drain` is unchanged."
+- data-model example 5 (original): "5. **Offsets and ids.** Clockless A `2026-10-13T12:00:00+02:00` (= 10:00:00Z), B `2026-10-13T10:00:00.5Z`: A before B (text order says B). At one instant, C `01jaaaa0000000000000000abc` and D `01JAAAA0000000000000000ABD` normalize to `…ABC` < `…ABD`: C before D. A legacy U `0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b` (or its 32-hex spelling) against ULID `01JAAAA0000000000000000ABC`: U first by code point (deterministic, not meaningful)."
+- data-model section 10 (original): "Per wheel: `platform_tag`; `os_arch` (minimum linux x86_64, macOS arm64, Windows x86_64; others OD-MATRIX); `binary_path` (one executable at one known in-package path); `binary_checksum` (recorded at build, equal to the recomputed wheel member, AC-032); `toolchain_pin`; `smoke_result` (G-3); `signed` (OD-SIGN). `fallback`: the pure `py3-none-any` wheel (OD-FALLBACK) and the sdist hold no binary and the producer reports `binary-missing`. Invariants: one binary per platform wheel; `packs/internal/` in no wheel; the expected set is pinned (G-12)."
+- data-model section 6 mapping (original): "Mapping: an unreadable, truncated, non-JSON or schema-violating reply is `malformed-reply`; a non-zero exit, signal or empty reply `crash`; no executable `binary-missing`; the deadline `timeout`; a call skipped because the handler is in flight `busy`."
+- data-model PublishLogFile (original): "Gitignored; a new local-tier file class (spec section 9). Unit (per-Mission or per-run file) is a plan decision; it carries an age (newest row `time` or file mtime) and a run or Mission association, so N-runs/X-days is defined. Complete lines ending LF; single writer: the producer. A final line without LF is preserved, flagged in the fault log (via the reply `notice`), never joined to the next row. Location: an already-gitignored path (candidate `.kittify/events/`) or the canonical ignore mechanism (AC-023)."
+- Per-wheel machinery named in spec section 8: the `ls dist/*.whl` step, `check_exact_install.py::locate_wheel`, `published_build_artifacts` in `tests/_support/shared_build_artifacts.py`, the `test_check_exact_install.py` fixtures.
+- spec section 3 operator decisions (original list form): "1. Taken at the maintainer's request (header).
+2. Strangler shape: Java producer, thin Python client only, as epic #6117 (FR-001, FR-026, FR-027, FR-039).
+3. CloudEvents 1.0 structured JSON now (ADR 0001 q3a, option A); 3b not ruled: legacy rows stay readable, upcast on read, never rewritten (FR-006, FR-036, FR-037).
+4. Ordering option C: `lamportclock` + `nodeid`, ordered Lamport, `time`, `id`, `(time, id)` fallback; ULID-only new ids; prefix `ai.spec-kitty` (FR-007 to FR-013).
+5. Platform wheels bundling the native binary, the ruff/uv model (FR-041 to FR-044).
+6. Fault mode: degrade with a recorded warning, never silent (FR-022 to FR-025).
+7. One schema set, one writer per event type; row schemas ARE the `data` schemas (FR-014, FR-015, FR-034, section 7).
+8. Public hygiene (NFR-006)."
+- spec header assumptions (original): "**Assumptions in force** (open ones: section 10): (1) a Java producer behind a thin Python client (operator decision 2); (2) Python writers stay authoritative for the committed ledgers, the producer appends CloudEvents rows to a gitignored publish log (D-SINK, OD-SINK); (3) either landing order with #6164 works (D-6164); (4) INTERIM marks an adopted-but-unconfirmed ADR 0001 choice."
+- spec section 1 purpose tail (original): "so Mission lifecycle and status events reach no integration on a default install. This mission gives them a local, on-by-default publication path separate from `hosted.drain`, with a versioned per-row-kind contract in `spec-kitty-events` (ADR 2026-10-13-2, D-1, D-2)."
+- data-model section 8 tail (original): "Fixture markers in tests are reviewed in the plan. The producer lint gains a persisted-line mode; its baseline is not widened."
+
+- Spec section 8 gate table, original machinery column wording (each gate extends the machinery named):
+
+| G-1 | Per platform wheel: binary present, executable, platform tag, no extra binary (`release.yml` "Verify wheel contents"; `test_packaging_safety.py`). |
+| G-2 | Exact installability from each built wheel (`release.yml`; `check_exact_install.py`). |
+| G-3 | Install the built wheel by path into a fresh venv on each OS and run the smoke test (one valid row appended): in the nightly, on PRs touching the producer's Java tree, packaging config or client (a named `ci-router.yml` group and `gate_selection.py` entry), and in `release.yml` before publish. New jobs, not `ci-windows.yml`. |
+| G-4 | `twine check` on every wheel (`release.yml`). |
+| G-5 | The release SBOM lists the Java dependencies and the toolchain embedded in each binary (`cyclonedx-py environment` sees only Python). |
+| G-6 | `uv lock --check`, the only dependency gate in CI today (`ci-router.yml`). |
+| G-7 | Sdist and editable builds succeed without the binary; install runs and reports `binary-missing` (FR-043, C-007; `test_package_bundling.py`). |
+| G-8 | Provenance and pinned toolchain; checksum continuity from build to each published wheel (FR-042; `release.yml` "Record artifact checksums"). |
+| G-9 | Red-CI-no-release (Standing Order 9): `build-release` becomes a per-OS build stage feeding one assembling job; `publish-pypi` needs the assembled, set-checked artifact, so a failed or cancelled leg blocks publish. |
+| G-10 | `packs/internal/` still excluded (FR-044; `test_packaging_safety.py`). |
+| G-11 | Producer gates (client-no-logic, persisted-line schema, lane list, retention-no-tracked-write, seam census, single writer, no committed schema source), each under the floor rule, in `tests/architectural/` (targeted files). |
+| G-12 | The dist set equals the pinned expected list (platform tags, one sdist, the pure wheel iff OD-FALLBACK a): a missing platform cannot degrade silently to the sdist (new assembling step). |
+| G-13 | Java dependency checksum verification, reusing the pattern of `contracts/gradle/verification-metadata.xml` (new build step). |
+
+- AC-005 (original): "One test per class (`binary-missing`, `crash`, `timeout`, `malformed-reply`, `clock-overflow`, `busy`; `rejected` for a 32-hex id, a hyphenated UUID id, a bad time, an unresolvable root, a schema-invalid row and, under OD-MISSIONID (a) only, a Mission without `mission_id` (under (b): a published row with project source, no fault); `disabled` only under OD-OPTOUT b, else an enum-equality test): exit code and `--json` body byte-identical to the no-fault run; ledger row present; in human and `--json` mode one stderr warning (type, id, class, FR-023 sentence); one fault-log row (none for an unresolvable root: stderr only); fault log unwritable: stderr still appears, command succeeds."
+- FR-023 head (original): "Each fault records a warning naming event type, event id (if known), reason class (`binary-missing | crash | timeout | malformed-reply | clock-overflow | rejected | busy`, plus `disabled` only under OD-OPTOUT b) and a sentence: "event was NOT produced", except `crash` and `timeout` (the append may have finished): "event may not have been produced"."
+- Out of scope (original): "**Out of scope** (original wording: `plan-carryover.md` section Q). CloudEvents in committed ledgers, retiring the Python writers, lock interop, committed-log appends (#6193, #6195, #6196); any change to `status/reducer.py`, the Java read model or `status/event_log_merge.py`; the envelope schema, validator, upcaster, STRICT types, bindings, events-charter amendment (events#92); glossary rows (#1200); backfill; retiring the `3.0.0` envelope (ADR 3b); renaming the `saas_fanout` slots; any hosted behaviour."
+- E2 (original): "Full table: `plan-carryover.md` section E (E1 to E15, cited by id). Load-bearing: **E2** the seam has three slots, all `fire_*` return unless the drain posture is enabled, handlers run bounded (`_DEFAULT_SAAS_FANOUT_TIMEOUT_S`), a busy handler is skipped, failures are logged not raised; `RuntimeMomentProducer._publish` has its own drain read."
+
+- Data-model section 6 ProduceRequest, original table form:
+
+**ProduceRequest** (client to producer; assembled by the seam, passed through uninterpreted):
+
+| Field | Type | Constraint |
+|---|---|---|
+| `row` | opaque mapping | the persisted authoritative row, post-sanitization (FR-004); a list under OD-SPAWN (b) |
+| `slot` | enum | `status` \| `lifecycle`: the seam slot that fired (the resolved-binding slot is not registered, FR-003) |
+| `seam_args` | opaque mapping | the existing keyword arguments (`wp_id`, `actor`, `mission_slug`, `mission_id`, `metadata`, ...), as given |
+| `start_path` | path | the call site's path (E14); the producer resolves the canonical root from it, never from the process working directory |
+| `deadline_ms` | integer | the client's timeout |
+
+- FR-019 gate (original): "A gate asserts `git check-ignore` for the publish log and the fault log, and for the clock state either `git check-ignore` (a working-tree path) or, when it sits under the git common directory (OD-CLOCK a), that it lies outside the working tree and is not reachable by `git add`."
+- FR-012 tail (original): "Stamp and append are one exclusive operation; a kill leaves no advance and no line, or a gap with or without a line, never a reused value. After state loss the first stamp exceeds the highest clock readable in the publish log; the state is never pruned while its log exists. The clock never exceeds 2^31-1; on overflow the producer fails that event (`clock-overflow`) and never wraps. Merging other nodes' clocks is #6193's."
+- FR-029 (original): "An item is eligible only when outside both limits (not among the newest `keep_runs` AND older than `max_age_days`), its Mission is not open (open: any work package in a lane other than done or canceled), it holds no lock and no step is unfinished (a run journal without a `MissionRunCompleted` row, or a lock file present)."
+- FR-036 (original): "The Python readers are untouched. `3.0.0` `Event` rows and diary rows are read by the events upcaster when it exists; this mission never rewrites a legacy row."
+- FR-010 (original): "Context attribute names match `^[a-z0-9]{1,20}$`; values use only CloudEvents attribute types; absent values are omitted, never `null`. A conformance test enforces it."
+- FR-041 (original): "Release builds produce platform-tagged wheels each bundling exactly one native producer binary, for at least linux x86_64, macOS arm64 and Windows x86_64 (macOS x86_64 and linux aarch64 are plan decisions)."
+- dm time (original): "`time`**: the row's own instant (`at` on lane, annotation, decision and retrospective rows; `timestamp` on lifecycle and run-journal rows), RFC 3339, written in UTC, never synthesized; unparseable or absent is `rejected`."
+- section 9 (original): "1. Charter "Python 3.11+ for all CLI and library code" versus the Java producer: Java build, test, lint, ArchUnit and coverage floors have no charter row; Python only for the shim.
+2. Charter forbids vendoring events source: Java binding generation crosses that line (OD-SCHEMA-DELIVERY).
+3. ADR 2026-10-13-2 is departed from in three places: D-1 (flat rows, superseded by CloudEvents for the new rows), D-2 (the publish and fault logs are an added read path beside the ledger) and D-3 (its closed local-tier file list gains the publish log, fault log and clock state). The amendment is a deliverable (FR-045).
+4. to 7. Events-repo charter wording, Python-only coverage measurements, a stale CLAUDE.md `release.yml` line, no charter row for platform wheels: flagged, not amended (carryover D)."
+- D-SINK (original): "The producer is an adapter on the post-persistence seam; Python writers stay authoritative for committed ledgers; the producer appends to a gitignored publish log."
+- D-6164 (original): "Requirements say "the seam fires the producer irrespective of drain", so both landing orders satisfy them."
+- section 12 (original): "This mission's own events are written by the Python writers; it must not depend on the producer to pass its own status gates. Mid-flight Missions: FR-038, AC-017."
+- lifecycle rule (original): "A lifecycle row is the envelope of `status/lifecycle_events.py::_build_envelope` (`event_id`, `event_type`, `aggregate_id`, `aggregate_type`, `schema_version`, `timestamp`, `payload`, `project_uuid`, `project_slug`). For those types `data` is the row's `payload` verbatim; `event_id` becomes `id`, `timestamp` becomes `time`, `event_type` selects the type, `aggregate_id` becomes `subject` for work package types (else dropped), `aggregate_type` and `schema_version` are dropped, `project_uuid` forms the project `source`, and `project_slug` is dropped. Members of `payload` such as `actor` stay in `data`."
+- FR-004 (original): "The PRODUCER resolves the canonical repository root from it (`core.paths.resolve_canonical_root`), so a lane worktree, a coordination worktree and the primary checkout reach one publish log. The client repeats that resolution only to place the fault log (FR-026). An unresolvable start is fault class `rejected` (`root-unresolvable`), never a silent return; with no root there is no fault-log location, so the warning is stderr only."
+- C-004 (original): "**C-003** Drain gate unchanged in meaning. **C-004** One writer per type and per file: one writer of the authoritative ledger row and one of the publish-log row; at #6193/#6195 Java writes both and the publish log becomes the ledger or is retired (decided there); no type has two writers of one file."
+- OD-MISSIONID b (original): "(b) ADR 0001 fallback: project source, subject = the aggregate, no `missionid`, no fault (data-model section 1: `missionid` omitted)."
+- FR-018 (original): "The `doing` alias is resolved to `in_progress`; `reason_source` is never dropped."
+- G-11 (original): "Producer gates (client-no-logic, persisted-line schema, lane list, retention-no-tracked-write, seam census, single writer, no committed schema source), each under the floor rule, in `tests/architectural/` (targeted files)."
+- AC intro (original): "Tests are committed RED first (ATDD). "
+- FR-024 (original): "A degraded repeated state stays visible: `doctor` reports the fault count (fault-log rows in the retention window; a successful event does not reset it; only retention reduces it) and the last fault by class."
+- s3 heading (original): "**Decisions from repo evidence (flagged for confirmation).**"
+- s9 (original): "Detail: `plan-carryover.md` section D.
+"
+- s11 (original): "Elaboration: `plan-carryover.md` section K. "
+- s4 (original): "Each line is testable; the rationale of each FR is in `plan-carryover.md` section R."
+- dm intro (original): "Entities and invariants for [`spec.md`](spec.md). Wire formats are a plan decision. **INTERIM** marks adopted ADR 0001 choices awaiting confirmation. Envelope schema, registry and upcaster belong to spec-kitty-events#92; a difference is a defect to reconcile, never a parallel set."
+- dm invariants (original): "(checked by script over all permutations of every fixture below, and over all triples for transitivity)"
+- dm inj (original): "the key is a lexicographic product of total orders and is injective after dedupe"
+- dm retention (original): "Invalid or non-numeric values are a named command error (fail closed, AC-031). Eligible: FR-029. Local tier only (publish log, fault log, run journals, `.kittify/events/`); committed files are never candidates."
+- dm lamport (original): "Counter only; merging other nodes' clocks is #6193's."
+- dm 8 (original): "Per-marker reasons: `plan-carryover.md` section M."
+- dm 5 (original): "`plan-carryover.md` section X (real bytes come from the serializer and golden tests)."
+- s13 (original): "Definitions: `plan-carryover.md` section L; then `python scripts/generate_contextive_glossaries.py generate` and `check`."
+- s8 (original): "(machinery list: `plan-carryover.md` section G)"
