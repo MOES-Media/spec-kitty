@@ -1,0 +1,52 @@
+schema: review-verify/v1
+complete: true
+phase: spec
+mission: event-producer-reroute-01M4VDY9
+tree: 8a2941be7
+note: >-
+  Worked examples 1-9 re-run read-only over all permutations; examples 8 and 9 give one result each with the stated
+  counts (7 read = 2 + 4 + 1). No gating statement lives only in plan-carryover.md (AB and R are rationale only).
+results:
+  - id: SPEC-FRESH3-001
+    status: resolved
+    reason: "data-model s4 and AC-009 state every non-survivor is counted as collapsed and a conflict is an additional report on the key; example 9 holds the identity."
+  - id: SPEC-FRESH3-002
+    status: resolved
+    reason: "Example 9 added (every error class, conflicting duplicate, survivor choice); heading says nine fixtures; AC-008 mutations and AC-009 floor name it. Re-run confirmed."
+  - id: SPEC-FRESH3-003
+    status: resolved
+    reason: "Error rows are set aside before dedupe, so an invalid duplicate can never be a survivor (s4, example 9 row X); AC-008 mutation covers it."
+  - id: SPEC-FRESH3-004
+    status: resolved
+    reason: "ProducerFault, FR-023 and AC-005 define client-only faults as the row's own event_type and event_id copied opaquely, omitted when absent; FR-026 lists the copy."
+  - id: SPEC-FRESH3-005
+    status: resolved
+    reason: "FR-026 now enumerates stderr line, bound resolution, child termination, breaker, fault-log append, count/last class; AC-012 names them as permitted."
+  - id: SPEC-FRESH3-006
+    status: resolved
+    reason: "FR-024 says fault rows, not notice rows; AC-026 now asserts the stderr line."
+  - id: SPEC-FRESH3-007
+    status: resolved
+    reason: "ProduceReply.event_id present when the row carries a normalizable id, else omitted."
+  - id: SPEC-FRESH3-008
+    status: resolved
+    reason: "OD-RETAIN-FACTS added in spec s10 with both sides and their amendments; FR-029 points to it. Option (i) lists amending data-model s6 but not FR-026 for the passed facts (nit, folded into the plan)."
+  - id: SPEC-FRESH3-009
+    status: resolved
+    reason: "FR-028 and RetentionPolicy: whole files only, never rewrites or trims; fault-count window is a file age."
+  - id: SPEC-FRESH3-010
+    status: resolved
+    reason: "OD-RETAIN (b) now amends operator decision 2, NFR-005 and FR-026."
+  - id: SPEC-FRESH3-011
+    status: resolved
+    reason: "FR-004 states the lifecycle fire forwards repo_root as the status fire does, a seam change this mission makes; AC-001 falsifier covers it."
+  - id: SPEC-FRESH3-012
+    status: resolved
+    reason: "AC-003 (f) restores the pin clause; AC-008 ends with the released comparator and fixtures run in consumer tests."
+  - id: SPEC-FRESH3-013
+    status: resolved
+    reason: "FR-019 admits the flagged torn fragment; FR-021 and PublishLogFile say clock recovery and dedupe skip it."
+  - id: SPEC-FRESH3-014
+    status: unresolved
+    remaining_severity: 1
+    reason: "Gap wording and 'strictly below' fixed. Size not trimmed in substance: spec.md 43752 + data-model.md 19243 = 62995 bytes, still over 62000 (under 62 KiB). NEW (sev 1): example 9 says 'Clockless' yet row M carries clock 2^31, and G's time is not stated although ordered [G, Z] depends on it being before Z's 11:00."
