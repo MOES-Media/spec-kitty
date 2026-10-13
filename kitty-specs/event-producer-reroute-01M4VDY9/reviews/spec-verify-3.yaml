@@ -1,0 +1,46 @@
+schema: review-verify/v1
+complete: true
+phase: spec
+results:
+- id: SPEC-FRESH2-001
+  status: resolved
+  reason: "data-model section 4 Domain now fixes the survivor as the row with the smallest serialized bytes (position independent), names conflicts by (s,i), and compares error rows as a set with position excluded; AC-008 restates this; examples 6 (D byte-identical to C) and 8 (survivor B) match."
+- id: SPEC-FRESH2-002
+  status: resolved
+  reason: "FR-003 now covers every persisted InnerStateChanged row, plain or resolved-binding, standalone or bundled by either transition writer, each with its own NEW seam call; the false rationale is gone; AC-004 floor includes the bundled annotations for both transition writers."
+- id: SPEC-FRESH2-003
+  status: resolved
+  reason: "FR-012 fixes write order (state first) and restores 'gap with or without a line'; AC-010 names three kill points, requires the next stamp above the log and the state, and separates producer kill (crash fault) from whole-process kill."
+- id: SPEC-FRESH2-004
+  status: resolved
+  reason: "FR-023 and data-model sections 6/7 define torn-line as a second fault-log row kind (not a class): one stderr line, one row, not counted in the FR-024 fault count; AC-007 and AC-026 updated."
+- id: SPEC-FRESH2-005
+  status: resolved
+  reason: "data-model section 3 Lifecycle rule lists the twelve LIFECYCLE_EVENT_TYPES and adds mapping sentences for decision rows and run-journal rows (ULID per FR-035, never the uuid5 id); FR-004 states the producer reads the persisted row, not the derived envelope."
+- id: SPEC-FRESH2-006
+  status: resolved
+  reason: "The deferred row now lists DecisionPointWidened, Deferred and Canceled with the reason; the section 3 census text and AC-004 make a registered kind with no emitter a named exemption that fails once an emitter appears."
+- id: SPEC-FRESH2-007
+  status: resolved
+  reason: "FR-025 binds the client to the effective seam bound via _saas_fanout_timeout_s() with clamping, passes deadline_ms so the child self-exits, and AC-006 adds the lowered-bound case."
+- id: SPEC-FRESH2-008
+  status: resolved
+  reason: "OD-RETAIN fixes the owner (Java retention operation via a second ProduceRequest operation, amending FR-026 and data-model section 6; Python-only alternative needs operator word); FR-026 lets the client count its own fault-log rows for doctor."
+- id: SPEC-FRESH2-009
+  status: resolved
+  reason: "OD-SPAWN (b) now carries an amends mark (FR-003, FR-026, AC-004), states the buffering mechanism and that a lost flush records one fault per row."
+- id: SPEC-FRESH2-010
+  status: resolved
+  reason: "FR-012 scoped to one repository including linked worktrees; separate clones on one machine named an accepted residual in FR-012 and OD-CLOCK."
+- id: SPEC-FRESH2-011
+  status: resolved
+  reason: "executionmode restricted to lane rows; retrospective execution_mode stays in data; section 1 missionid row states an empty string counts as absent."
+- id: SPEC-FRESH2-012
+  status: resolved
+  reason: "FR-019 states the test as the resolved path under git rev-parse --git-common-dir; the 'outside the working tree' wording is gone from FR-019 and section 7; AC-023 refers to the FR-019 test."
+- id: SPEC-FRESH2-013
+  status: resolved
+  reason: "NFR-006 scoped to producer-authored content and fault records; verbatim ledger members keep operator content; log is local and gitignored; AC-035 scans producer-authored members."
+- id: SPEC-FRESH2-014
+  status: resolved
+  reason: "'(Y)' replaced by a legend line ('member lists in carryover Y') and in-scope item 4 now points to spec section 3 and data-model section 4."

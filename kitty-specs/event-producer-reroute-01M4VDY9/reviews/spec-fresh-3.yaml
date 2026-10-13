@@ -1,0 +1,196 @@
+schema: review-findings/v1
+complete: true
+phase: spec
+lens_group: fresh
+mission: event-producer-reroute-01M4VDY9
+findings:
+  - id: SPEC-FRESH3-001
+    lens: order-semantics
+    severity: 3
+    title: Conflicting duplicates have no stated place in the count identity
+    evidence:
+      - "data-model.md section 4 Domain: a duplicate differing in any member other than id is reported as a conflict by its (s, i) key; 'the rest are only counted as collapsed'."
+      - "spec.md AC-009: ordered + errors + collapsed = rows read, with a duplicate of differing payload (named conflict) in the fixture."
+    claim: >-
+      The text can be read two ways. Either a conflicting duplicate is reported and not counted as collapsed
+      ('the rest are only counted'), in which case the identity in AC-009 fails by one for every conflict, or it is
+      both reported and counted. AC-008 compares the collapsed count and the conflict keys, so two conforming
+      comparators can legitimately disagree and the permutation test cannot tell which is right.
+      I reran the rule in a read-only script. Counting the conflicting loser as collapsed makes the identity hold.
+    remediation: >-
+      State that every non-survivor row is counted as collapsed, and that a conflict is an additional report on the
+      key, not an alternative bucket. Say it once in section 4 and mirror it in AC-009.
+  - id: SPEC-FRESH3-002
+    lens: acceptance-testability
+    severity: 3
+    title: The "eight fixtures" claim does not cover what AC-008 and AC-009 require
+    evidence:
+      - "data-model.md section 4 heading: 'the eight fixtures of AC-008 and AC-009'."
+      - "Example 6 holds one error class (unparseable time) and a byte-identical duplicate; examples 1-5, 7, 8 hold no error rows and no differing-payload duplicate."
+      - "spec.md AC-009 floor: one fixture per error class (unparseable time, non-normalizing id, missing id, clock out of range) and a differing-payload duplicate (named conflict)."
+    claim: >-
+      Three of the four error classes and the whole conflict-reporting path appear in no enumerated fixture. The
+      AC-008 mutation list also lacks a case for survivor selection when payloads differ. A comparator that never
+      reports a conflict, or that mishandles a missing id, passes every enumerated example. AC-009 is only
+      testable if its fixtures are named, and the sentence that says the eight cover it is false.
+    remediation: >-
+      Either add worked examples for the missing error classes and for a conflicting duplicate (including which
+      row survives), or reword the heading so AC-009 names its own fixtures and floor.
+  - id: SPEC-FRESH3-003
+    lens: order-semantics
+    severity: 2
+    title: Smallest-bytes survivor can promote an invalid row over a valid duplicate
+    evidence:
+      - "data-model.md section 4: survivor is the row with the smallest serialization; error detection (unparseable time) is described afterwards."
+      - "Read-only rerun: valid row G and duplicate X with an empty time and the same (s, i). X's bytes sort first, so X survives and is listed as an error row. G is counted as collapsed and the key is flagged as a conflict."
+    claim: >-
+      The survivor rule ignores validity, so a malformed duplicate can displace a good row and the ordered list then
+      loses an event that was valid in the log. The result is deterministic but surprising, and the spec is silent
+      on whether dedupe or validation runs first.
+    remediation: >-
+      Say explicitly that survivor choice is by bytes alone and the consequence is intended, or prefer a
+      valid row as survivor before applying the bytes tie-break.
+  - id: SPEC-FRESH3-004
+    lens: charter-and-scope
+    severity: 3
+    title: Fault warnings require the event type and id, but the client may not name types or normalize ids
+    evidence:
+      - "spec.md FR-023: each warning names event type and event id (if known); AC-005 requires type, id, class for binary-missing, crash, timeout and busy, where no producer reply exists."
+      - "data-model.md section 6 ProducerFault fields event_type and event_id."
+      - "spec.md FR-026: the client must not choose type names, normalize ids or interpret the row."
+    claim: >-
+      For the faults raised by the client alone (binary-missing, crash, timeout, busy, malformed-reply) the client is
+      the only party that can fill event_type, yet the type names (lane.transitioned.v1 and so on) are owned by
+      the producer. It must either map legacy kinds to type names, which FR-026 forbids and AC-012 would flag, or
+      print a legacy kind or slot name, which is not the type the warning is specified to carry. Same for
+      event_id spelling (raw versus normalized).
+    remediation: >-
+      Define what the client reports when the producer is silent: for example the row's own legacy event kind and
+      raw event_id, copied without interpretation, with the producer's type only when a reply exists. Reflect that
+      in FR-023, ProducerFault and AC-005.
+  - id: SPEC-FRESH3-005
+    lens: requirements-consistency
+    severity: 2
+    title: The narrowed FR-026 list omits capabilities other requirements give the client
+    evidence:
+      - "spec.md FR-026 'may only' list: locate, spawn, pass, enforce the timeout, read one reply, map failure, append a fault-log row, count rows for doctor, register."
+      - "FR-023 requires the client to write a stderr line in every mode. FR-025 requires it to resolve the effective seam bound and clamp, terminate the child by handle, and run the per-process breaker. FR-024 requires the last fault by class for doctor."
+      - "AC-012 gate: the real client passes and a mutated copy fails; only fault-log append and root resolution are named as permitted extras."
+    claim: >-
+      Taken literally, 'may only' forbids the stderr warning, the breaker, bound resolution and the last-class
+      query. A gate built from this list either fails the real client or gets loosened ad hoc, which defeats the
+      mutation test.
+    remediation: >-
+      Enumerate these in the FR-026 list (emit the FR-023 stderr line, resolve and clamp the bound, terminate its
+      own child, hold the breaker, report count and last class) and name them in AC-012's permitted set.
+  - id: SPEC-FRESH3-006
+    lens: requirements-consistency
+    severity: 2
+    title: FR-024 counts "fault-log rows" but the fault log now holds two row kinds
+    evidence:
+      - "spec.md FR-024: fault count = fault-log rows in the retention window; notices are counted apart."
+      - "FR-023 and data-model.md section 7: the fault log holds ProducerFault rows and torn-line notice rows. Section 7 says 'fault rows'."
+      - "AC-026 checks the notice row but not the stderr line FR-023 says a notice writes."
+    claim: >-
+      Read literally, FR-024 and AC-007 count notice rows as faults. The parenthesis in AC-007 repairs this, but
+      FR-024 does not, so an implementation can follow either. The notice's stderr line is also untested.
+    remediation: >-
+      Say 'fault rows (not notice rows)' in FR-024 and add the stderr line to AC-026.
+  - id: SPEC-FRESH3-007
+    lens: protocol-entities
+    severity: 2
+    title: ProduceReply.event_id is "always present" but a refused request may have no usable id
+    evidence:
+      - "data-model.md section 6 ProduceReply: event_id (normalized, always present)."
+      - "spec.md FR-007, FR-023, AC-005: a missing or non-normalizing id is refused, and event id is recorded 'if known'. data-model.md ProducerFault: event_id (if known)."
+    claim: >-
+      A row without an id, or with a malformed one, cannot yield a normalized id. The reply field contradicts
+      the 'if known' wording, and an implementer must invent a placeholder.
+    remediation: "Make event_id present when the row carries a normalizable id, else omitted."
+  - id: SPEC-FRESH3-008
+    lens: open-decisions
+    severity: 3
+    title: OD-RETAIN (a) puts mission-open evaluation in Java while the read model is out of scope
+    evidence:
+      - "spec.md FR-029: eligibility requires the Mission not open (any work package in a lane other than done or canceled), which needs the reduced lane state of status.events.jsonl."
+      - "OD-RETAIN (a): Java runs eligibility and Python only passes arguments and renders the reply. NFR-005 lists retention eligibility in Java domain code."
+      - "spec.md section 1 out of scope: the Java read model and status/reducer.py; D-REDUCER."
+    claim: >-
+      The recommended option can only be implemented if Java reduces committed ledgers (a read model the mission
+      excludes) or if Python computes lane state and passes it in (logic in the thin client, which the amended FR-026
+      still has to forbid). The decision as written hides that fork, so the plan can pick the wrong half.
+    remediation: >-
+      Add to OD-RETAIN (a) which side derives 'Mission open' and 'unfinished step' facts, and how that is reconciled
+      with the out-of-scope read model. If Python passes facts, state that it must pass them uninterpreted.
+  - id: SPEC-FRESH3-009
+    lens: open-decisions
+    severity: 3
+    title: Retention by the producer collides with the fault log's single writer
+    evidence:
+      - "spec.md FR-023: the client is the fault log's single writer; the fault log is subject to retention."
+      - "OD-RETAIN (a): a Java retention operation performs cleanup. data-model.md section 7 RetentionPolicy lists the fault log, run journals and the publish log as local tier targets."
+      - "C-004: one writer per file; FR-020 and AC-030 only guard the publish log."
+    claim: >-
+      If retention removes or trims rows in the fault log, or deletes run journals written by Python, a second
+      writer acts on a file with a declared single writer. The unit of retention (whole file versus rows) is
+      undecided, which also decides whether the doctor fault count window is a file age or a row age.
+    remediation: >-
+      State that retention deletes whole files only (never rewrites a row in a file with another writer), or carve
+      out retention as an explicit exception to C-004 and the FR-023 sentence.
+  - id: SPEC-FRESH3-010
+    lens: open-decisions
+    severity: 2
+    title: OD-RETAIN option (b) is not marked as amending NFR-005
+    evidence:
+      - "spec.md section 10 preface: an unmarked option satisfies every requirement; a marked one lists what it amends."
+      - "OD-RETAIN (b) marks only operator decision 2. NFR-005 names retention eligibility as Java domain code."
+    claim: >-
+      Option (b), cleanup in Python, contradicts NFR-005 as well, so the amendment list is incomplete and the plan
+      could adopt (b) without the required spec amendment of NFR-005.
+    remediation: "Add NFR-005 to the amends list of option (b)."
+  - id: SPEC-FRESH3-011
+    lens: seam-claims
+    severity: 2
+    title: The lifecycle slot does not forward the start path that FR-004 requires the client to receive
+    evidence:
+      - "src/specify_cli/status/adapters.py::fire_lifecycle_saas_fanout takes repo_root as a keyword and does not re-join it into the kwargs passed to handlers; fire_saas_fanout does (kwargs['repo_root'] = repo_root)."
+      - "spec.md FR-004 and E14: the producer resolves the canonical root from the call site's start path; AC-001 requires one log from a lane worktree and a Mission subdirectory, per slot."
+    claim: >-
+      For the lifecycle slot (and the run-journal calls) the start path reaches the seam but not the registered
+      handler, so FR-004 cannot be met without a seam change that no requirement names.
+    remediation: "Add to FR-002 or FR-004 that the lifecycle fire forwards the start path to handlers as the status fire does."
+  - id: SPEC-FRESH3-012
+    lens: weakened-acceptance
+    severity: 2
+    title: AC-003 and AC-008 dropped checks that their requirements still state
+    evidence:
+      - "Round 2 AC-003 ended with 'the pin test covers every Zeitgeist handler'; round 3 removed it, but FR-002 still says the ADR's confirmation pin and the reset helpers move with the gate."
+      - "Round 2 AC-008 cross-checked the events PR comparator on the same fixtures once released; round 3 removed it. FR-013 and FR-014 still make that comparator and its fixtures an events PR deliverable."
+    claim: >-
+      The pin movement in FR-002 and the delivered comparator of FR-013 are now covered by no acceptance criterion
+      (AC-027 pins schema surface only). The bracket claim that every FR appears in some AC holds only nominally.
+    remediation: >-
+      Restore the pin clause in AC-003 and add a consumer-test clause to AC-008 or AC-027 for the released
+      comparator and fixtures.
+  - id: SPEC-FRESH3-013
+    lens: log-integrity
+    severity: 2
+    title: A torn line left in place leaves a non-JSON line, against FR-019 and the join invariant
+    evidence:
+      - "spec.md FR-021: the torn final line is left in place and the next append must not join it; FR-019: one UTF-8 JSON object per line."
+      - "data-model.md section 7: a final line without LF is preserved, flagged, never joined; section 2 join invariant."
+    claim: >-
+      To avoid a join the producer must write an LF first, which turns the torn text into a permanent complete line
+      that is not JSON. FR-019 then holds only for appended lines, readers see garbage mid-file, and FR-012's 'highest
+      clock readable' must skip it. The spec does not say this.
+    remediation: "State that FR-019 admits flagged torn lines, and that clock recovery and dedupe skip them."
+  - id: SPEC-FRESH3-014
+    lens: wording
+    severity: 1
+    title: Small wording defects in FR-012, FR-025 and the size budget
+    evidence:
+      - "FR-012: 'a gap with or without a line' (a gap exists only when state advanced and no line was written)."
+      - "FR-025: the client 'clamps to' the seam bound but must be 'strictly below' it."
+      - "spec.md plus data-model.md measure 62997 bytes against the ~62 KB budget (over if read as 62000)."
+    claim: "None changes an implementation, but each invites a needless question."
+    remediation: "Reword the gap clause, say 'stays strictly below', and trim a few hundred bytes."
