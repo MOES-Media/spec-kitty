@@ -431,3 +431,256 @@ Original wording of trimmed non-gating prose; no requirement or acceptance state
 - dm2t (data-model.md): "RFC 3339 UTC, never synthesized; unparseable or absent is `rejected`."
 - dm6 (data-model.md): "## 6 Producer protocol entities (fields; wire format is a plan decision)"
 - s2b (spec.md): "Full table: `plan-carryover.md` section E (E1 to E15). Load-bearing:"
+
+
+## AB Wording moved from spec and data-model (spec phase, round 4)
+
+Round-4 rationale: error rows are set aside before dedupe so a malformed duplicate can never displace a valid row; every non-survivor counts as collapsed and a conflict is an extra report on the key, which makes ordered + errors + collapsed = rows read hold (example 9 of data-model section 4 is the worked case). Retention deletes whole files only so the single writers of the publish log and fault log stay single; the unit and the evaluator of "Mission open" are the blocking sub-questions OD-RETAIN and OD-RETAIN-FACTS. The lifecycle fire does not forward `repo_root` to handlers today (the status fire does), hence the FR-004 seam change.
+
+Moved or superseded wording (originals):
+
+- r4-s3-order (spec.md original):
+**The total order (formal in data-model section 4).** Key `(has_clock, lamportclock, time, id, source)` over normalized ids, on upcast-form rows after dedupe on `(source, normalized id)`; error rows surfaced by name, never dropped. Sink-agnostic (OD-SINK).
+
+
+- r4-s7-table (spec.md original):
+## 7 Dependencies and hand-offs
+
+| Item | This mission delivers | Leaves to | Owner issue |
+|---|---|---|---|
+| Envelope schema + validator, upcaster, legacy fixtures, STRICT-type registry, bindings, major-bump artifacts, events-charter amendment | the FR-014 list (#92 acknowledges each item) | all the rest; the reducer sort-key switch (Phase 2) | events#92 |
+| Event-log write side | first Java producer: ULID id, clock stamping, local publish log, retention, wheels | lock-interop spike, committed-log appends, commit step, temporary Python bridge | #6193 |
+| Command-side write core; lane cut-over; merge driver; reducer sort key | only the defined order and fixtures | Java lane state machine (#6194); CloudEvents into committed ledgers, retiring Python writers, CLI reducer switch, schema bump, CloudEvents-aware dedupe and fork detection in `status/event_log_merge.py` (#6195, #6196) | #6194, #6195, #6196 |
+| Removal of hosted/sync/drain, `zeitgeist_bridge.py` | the seam works either order | the removal | #6164 |
+| `domain-model` / `event-log` modules | liftable producer layout | extraction | #6192 |
+
+
+
+- r4-s11 (spec.md original):
+Elaboration: carryover K. Main risks: spawn cost (NFR-002); unsigned binaries (OD-SIGN); INTERIM choices turn breaking once emitted; seam coverage drift (AC-004); a missing platform leg is permanent once published (G-12).
+
+
+- r4-dm8 (original):
+## 8 Exemption ledger (entity `Exemption`)
+
+`clear` = the marker is gone and the persisted lines its writer wrote validate in the **legacy-row form**: generated from the single `data` schema plus the lifted-member list of section 3 (FR-014), never a second authored schema. `residual` = stays, with a reason and an issue reference to be filed. Reasons: carryover M.
+
+- **Clear:** markers 1 and 2 (`decisions/emit.py`), 5 and 6 (`status/lifecycle_events.py`), all #1198; 8 (`engine._append_event`, #1248, FR-035). Five fixtures for AC-019.
+- **Plan decides:** 3 (`events/decision_log.py`), 4 (`migration/mission_state.py`), 7 (`build_saas_lifecycle_queue_event`).
+- **Residual:** 9 to 16 (`glossary/events.py`, 8 markers, #1200; not widened).
+
+The producer lint gains a persisted-line mode; its baseline is not widened. 
+
+
+
+- r4-dm10 (original):
+## 10 PlatformWheel matrix entity
+
+Per wheel: `platform_tag`; `os_arch` (FR-041, OD-MATRIX); `binary_path` (one executable, one known path); `binary_checksum` (AC-032); `toolchain_pin`; `smoke_result` (G-3); `signed` (OD-SIGN). The pure wheel (OD-FALLBACK) and the sdist hold no binary. Invariants: one binary per platform wheel; `packs/internal/` in no wheel; the expected set is pinned (G-12).
+
+
+
+- r4-s3-d (original):
+| D-REDUCER | `status/reducer.py` untouched; the order ships as comparator spec plus fixtures; the sort-key change is handed off (section 7). | E9 | none |
+| D-6164 | The seam fires the producer irrespective of drain; either landing order works. | E2 | AC-003 |
+
+- fr17 (spec.md original): states per type the legacy source, writer, emission point, scope, `subject`, lifted members and status. In scope: lane transition, annotation, the `status/lifecycle_events.py` lifecycle rows, decision opened and resolved, the retrospective rows and the run-journal rows (named by #1248; OD-JOURNAL). Deferred: glossary rows (#1200) and the three registered decision kinds with no emitter (`DecisionPointWidened`, `DecisionPointDeferred`, `DecisionPointCanceled`; deferred and canceled outcomes travel as `DecisionPointResolved`).
+
+- fr4 (spec.md original): An unresolvable start is fault class `rejected` (`root-unresolvable`), never a silent return; with no root the warning is stderr only.
+
+- r4 (spec.md original): ; the client repeats that only to place the fault log (FR-026)
+
+- fr4b (spec.md original):  (the decision and run-journal calls keep their derived hosted envelope for the hosted handlers; the producer reads the row, never that envelope)
+
+- r4 (spec.md original):  The fault log sits beside the publish log under the local tier (FR-019); with no root the warning is stderr only.
+
+- r4 (spec.md original):  The client is the outermost catch; the seam's busy-skip and `TimeoutError` paths for the producer handler call the client's fault recorder.
+
+- r4 (spec.md original): The default is a plan decision under NFR-002.
+
+- acintro (spec.md original): Observable and falsifier; brackets name the requirements verified (every FR, NFR and C appears, bar C-001, C-006). Tests are committed RED first.
+
+- r4 (original): **In scope.**
+1. A Java producer, shipped as a native binary in platform-tagged wheels, that turns each persisted ledger row into one CloudEvents 1.0 structured-JSON row appended to a gitignored local publish log.
+2. A thin Python client on the post-persistence fan-out seam (`status/adapters.py`), firing irrespective of drain.
+3. One `spec-kitty-events` PR (separate repo, released first): the FR-014 list.
+4. The defined total order for logs mixing clocked and clockless rows (spec section 3; data-model section 4).
+5. Fault handling that never fails a lifecycle command and is never silent.
+6. Retention for the gitignored local logs; committed ledgers are never pruned.
+7. Clearing the #1198 and #1248 `canonical-producer-exempt` markers; lane-list deduplication; carrying `reason_source`.
+8. Platform wheels and the release gates they need.
+9. An ADR amendment recording the CloudEvents ruling, the added read path and the added local-tier files (section 9).
+
+
+
+- r4 (original): The seam hands the producer only in-scope rows. The census gate (AC-004) derives its universe from the persisted row kinds, so a kind in neither this table nor the deferred rows fails it; a registered kind with no emitter is listed as deferred and fails the census once an emitter appears. Each row's lifted-member list is part of its registry entry (FR-014).
+
+- r4 (original): A legacy UUID `0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b` sorts before ULID `01JAAAA0000000000000000ABC` by code point.
+
+- r4 (original): **Join invariant**: each publish-log line matches at most one ledger row by normalized `event_id`, and each in-scope ledger row has at most one line (faults produce none).
+
+- r4g (original): Kill injected at each point (before the state write, between state write and append, after the append), rerun: the next stamp is above every clock in the log and in the state, and equals none ever written to a line (a gap is permitted). A killed producer yields a `crash` fault (AC-005); only a killed whole CLI process can leave none.
+
+- r4g (original): Writers derive from data-model section 3 and the persisted row kinds: the ledger's non-lane set (`AUTHORITATIVE_NON_LANE_EVENT_TYPES`), retrospective, lane and annotation rows and the run-journal kinds of `runtime/next/_internal_runtime/events.py`; no hand list; a registered kind with no emitter in `src/` is a named census exemption that fails when an emitter appears;
+
+- r4g (original): Release steps, scripts and packaging fixtures iterate the expected wheel set (floor: the pinned list is non-empty); the dist set equals the pinned list (platform wheels, one sdist, the pure wheel iff OD-FALLBACK a); mutation: one wheel removed must fail.
+
+- r4g (original): The producer and client make no network call and need no credential.
+
+- r4g (original): Exactly-once is not claimed: the guarantee is at most one row per `(source, id)` and never silent when not produced.
+
+- r4g (original): Merge order with #6164:** whichever lands second rebases (shared file: `status/adapters.py`). Writers at cutover: C-004. Tooling constraints: carryover T.
+
+- r4h (original): 1. Taken at the maintainer's request. 2. Strangler: Java producer, thin Python client only (FR-001, FR-026, FR-027, FR-039). 3. CloudEvents 1.0 structured JSON now (q3a, option A); legacy rows stay readable, never rewritten (FR-006, FR-036, FR-037). 4. Ordering option C; ULID-only new ids; prefix `ai.spec-kitty` (FR-007 to FR-013). 5. Platform wheels bundling the binary (FR-041 to FR-044). 6. Degrade with a recorded warning, never silent (FR-022 to FR-025). 7. One schema set, one writer per type (FR-014, FR-015, FR-034, section 7). 8. Public hygiene (NFR-006).
+
+- r4h (original): **INTERIM** (ADR 0001 "further choices"; the events PR confirms each): snake_case `data` members; `actor` and `executionmode` attributes; `.vN` versioning; `(source, id)` dedupe key; type names; lifted-member set; relative `source` form; `dataschema` base URI.
+
+- r4h (original): (`binary-missing`, `crash`, `timeout`, `malformed-reply`, `clock-overflow`, `busy`; `rejected` for a 32-hex id, a hyphenated UUID id, a bad time, an unresolvable root, a schema-invalid row and, only under OD-MISSIONID (a), a Mission without `mission_id` (under (b): published, project source, no fault); `disabled` only under OD-OPTOUT b, else an enum-equality test)
+
+- r4h (original): Stamp and append are one exclusive operation, state written first, then the line; a kill leaves no advance and no line, or an advance and no line (a gap), never a reused value.
+
+- r4h (original): A degraded repeated state stays visible: 
+
+- r4h (original): Every in-scope persisted row (data-model section 3) reaches the seam exactly once. E4 gaps close: every persisted `InnerStateChanged` row, plain or resolved-binding, standalone or bundled by `emit_status_transition` or `emit_status_transition_batch`, gets its own NEW seam call (today none reaches a registered slot: `_resolved_binding_fan_out` serves binding rows only); persist-only lifecycle callers and the retrospective writers get one where their row is persisted or at their existing fan-out call.
+
+- r4h (original): **C-004** One writer per type and per file: Python writes the ledger row, the producer the publish-log row; at #6193/#6195 Java writes both and the publish log becomes the ledger or is retired (decided there).
+
+- r4i (original): ## 11 Requirement-to-entity trace
+
+FR-001 to FR-005, FR-026, FR-027: sections 6, 3. FR-006, FR-010: 1. FR-007 to FR-009, FR-016, FR-036 to FR-038: 2, 4. FR-011, FR-012: 7, 1. FR-013: 4. FR-014, FR-015, FR-017, FR-018, FR-034, FR-035: 3, 9. FR-019 to FR-021, FR-028 to FR-031: 7. FR-022 to FR-025: 6, 7. FR-032, FR-033: 8. FR-041 to FR-044: 10. FR-039, FR-040, FR-045, FR-046: spec sections 7, 9, 13.
+
+
+- r4i (original): ## 5 Example lines
+
+carryover X (real bytes come from the serializer).
+
+
+- r4i (original): At one instant, C `01jaaaa0000000000000000abc` and D `01JAAAA0000000000000000ABD` normalize to `…ABC` < `…ABD`: C before D.
+
+- r4i (original): Without `s` all six permutations differ.
+
+- r4i (original): ; outcomes of a kill, state loss and the bound are FR-012's.
+
+- r4i (original): Location: an already-gitignored path (candidate `.kittify/events/`) or the canonical ignore mechanism (AC-023).
+
+- r4i (original): Detail: carryover D.
+1. Charter "Python 3.11+" versus the Java producer: Python only for the shim.
+2. Charter forbids vendoring events source (OD-SCHEMA-DELIVERY).
+3. ADR 2026-10-13-2 is departed from at D-1, D-2 and D-3; the amendment is FR-045.
+4. to 7. Flagged, not amended (carryover D).
+
+- r4i (original): Table: carryover E. Load-bearing: **E2** the seam has three slots, all `fire_*` return unless the drain posture is enabled, handlers run bounded, a busy handler is skipped; `RuntimeMomentProducer._publish` has its own drain read.
+
+- r4i (original): | G-1 | Per platform wheel: one binary, executable, platform tag. |
+| G-2 | Exact installability from each built wheel. |
+
+
+- r4i (original): | G-6 | `uv lock --check`, the only dependency gate in CI today. |
+
+- r4i (original): | G-9 | Red-CI-no-release (Standing Order 9): `build-release` becomes a per-OS build stage feeding one assembling job; `publish-pypi` needs the set-checked artifact. |
+
+- r4j (original):  A `torn-line` notice is a second fault-log row kind, not a reason class: it writes one stderr line and one row, and is not a fault for the FR-024 count. One warning per event, not per retry.
+
+- r4j (original): Carriers: a stderr line in EVERY mode (no `--json` body changes) and an append-only gitignored fault log (retention applies); if the log cannot be written, stderr still carries the warning and the command succeeds.
+
+- r4j (original): separate clones of one user on one machine share a `nodeid` and stay an accepted residual (OD-CLOCK).
+
+- r4j (original): so no child outlives a process that the seam abandoned.
+
+- r4j (original): A gate asserts `git check-ignore` for the publish log and fault log; for the clock state, `git check-ignore` (a working-tree path) or, under the git common directory (OD-CLOCK a), that its resolved path lies under the output of `git rev-parse --git-common-dir`.
+
+- r4j (original): **Actor rule.** Persisted `actor` is a string (lifecycle rows), a structured `{role, profile, tool, model}` object (lane, annotation; `ActorField`) or a retrospective `{kind, id, display}` object.
+
+- r4j (original): Invariants (checked by a read-only script over all permutations of every fixture and all triples): total, transitive, input-order independent.
+
+- r4j (original): UTC unless shown. Ids `…A`, `…B`, `…C` are full ULIDs sharing the prefix `01JAAAA0000000000000000AB`.
+
+- r4j (original): Machinery and reasons: carryover G and Z.
+
+
+
+- r4j (original): Elaboration: carryover K (spawn cost NFR-002; OD-SIGN; INTERIM choices; seam coverage AC-004; a missing platform leg, G-12).
+
+- r4j (original): This mission's own events are written by the Python writers; it never depends on the producer for its own gates. Mid-flight Missions: FR-038, AC-017.
+
+- r4k (original): **Companion**: [`data-model.md`](data-model.md) (entities, type table, total-order key, trace). Requirements and acceptance only; HOW belongs to the plan, which reads [`plan-carryover.md`](plan-carryover.md).
+
+- r4k (original): A mission open at upgrade keeps working; its publish log starts at the first event after upgrade.
+
+- r4k (original): Per-command overhead (cold and warm spawn, per OS) summed over the largest in-scope multi-row command (`emit_status_transition_batch`) stays under a ceiling held in `tests/_perf_helpers.py`.
+
+- r4k (original): A stub outliving the bound is terminated by handle; the command returns within the fan-out bound; no child remains. A batch of N rows with a hanging stub spawns once, then records N faults. With the seam bound disabled, or lowered below the client default through its environment override, the client still ends the stub before the seam gives up.
+
+- r4k (original): Release verification enumerates the built wheels and fails unless the three minimum platform tags (and the pure wheel iff OD-FALLBACK a) are present; mutation: one required tag removed must fail. Per platform wheel: binary at the single known path, executable, correct tag, exactly one; a by-path clean-venv install passes the smoke test on its OS.
+
+- r4l (original): (i) the caller: existing Python lane-state code behind the `doctor` command computes the open Missions and unfinished runs and passes them as opaque data, Java applies eligibility without interpreting them (**amends** data-model section 6: the operation carries the facts); (ii) the producer reduces the committed ledgers itself (**amends** section 1 out-of-scope and D-REDUCER: it needs the Java read model, no unlanded #5529 code per FR-039).
+
+- r4l (original): Who derives "Mission open" and "unfinished step" (FR-029); lock files and file ages the producer sees itself.
+
+- r4l (original): (b) one per command batch (**amends** FR-003, FR-026, AC-004: the client buffers rows across seam calls and flushes once at exit; a lost flush records one fault per row).
+
+- r4l (original): For those types `data` is `payload` verbatim (so `actor` stays in `data`); `event_id` is `id`, `timestamp` is `time`, `event_type` picks the type, `aggregate_id` is `subject` for work package types, `project_uuid` forms the project `source`; the rest is dropped.
+
+- r4l (original): The pure wheel (OD-FALLBACK) and the sdist hold no binary. Invariants:
+
+- r4m (original): "Verbatim": row members moved unchanged; member lists in carryover Y.
+
+"NEW" marks a seam call FR-003 adds.
+
+
+- r4m (original): seam NEW (the runtime producer deliberately publishes neither)
+
+- r4m (original): A naive comparator (both clocked: `(clock, time, id)`, else `(time, id)`) is not transitive (example 4). Consequences: carryover W.
+
+- r4m (original): `s` is a final tie-break only, so the order is total across sources; `nodeid` is not in the key (#6193).
+
+- r4m (original): Both orders of #6164: (a) Zeitgeist handlers registered, drain off: a test adapter and the producer fire, no network call;
+
+- r4m (original): Default install, drain off, networking denied: a lane transition appends
+
+- r4m (original): Nothing the producer emits exceeds what the persisted row holds. It adds no member
+
+- r4m (original): Policy keys `ledger.retention.keep_runs` and `ledger.retention.max_age_days` in `.kittify/config.yaml` (proposed 20 and 30, OD-RETENTION). "Run" is defined for each local-tier file the plan places, so N-runs/X-days is well-defined for the publish log.
+
+- r4n (original): **FR-016** Re-firing the seam for a ledger row already published (same `(source, id)`) leaves one row in the publish log.
+
+- r4n (original): No Python code opens it for write (gate AC-030); no file shared with a Python writer is introduced.
+
+- r4n (original): Cleanup is an explicit, dry-run-first command in the `doctor` family; it never runs implicitly. Who runs the eligibility logic: OD-RETAIN. A dry run lists what a real run would delete and deletes nothing.
+
+- r4n (original): Cleanup never opens a git-tracked path for write, proven by a non-vacuous gate (AC-014). Committed ledgers are never pruned.
+
+- r4n (original): Names match `^[a-z0-9]{1,20}$`; CloudEvents attribute types only; absent means omitted, never `null`.
+
+- r4n (original): (identical payload), C `…ABD`: survivor B (`…ABC` sorts before `…abc` by code point), ordered `[B, C]`, collapsed count 1; with dedupe on raw ids both stay.
+
+- r4o (original): (1) a Java producer behind a thin Python client; (2) Python writers stay authoritative, the producer appends to a gitignored publish log (D-SINK); (3) either landing order with #6164 works (D-6164); (4) INTERIM marks an unconfirmed ADR 0001 choice.
+
+- r4o (original): The census gate (AC-004) fails when a persisted ledger row kind has no seam call.
+
+- r4o (original): Release builds produce platform-tagged wheels each bundling exactly one native producer binary,
+
+- r4o (original): the CLI installs and runs and the producer reports `binary-missing`; never an install failure (C-007).
+
+- r4o (original): **LamportState.** Local state owned by the producer, gitignored or (OD-CLOCK a) under the git common directory (FR-019): per-`nodeid` counter, integer 0..2^31-1, shared by every worktree of one repository (OD-CLOCK)
+
+- r4p (original): **Omitted:** signing and notarization (OD-SIGN); extra arches and libc variants (plan).
+
+- r4p (original): An option marked **amends** contradicts a named requirement and is legal only with that spec amendment, made before the plan relies on it; every unmarked option satisfies every requirement (carryover Q).
+
+- r4p (original): Entities and invariants for [`spec.md`](spec.md). Wire formats are a plan decision.
+
+- r4q (original):  "plan (blocking)": the plan cannot start its dependent part before the ruling.
+
+- r4q (original): Brackets name the requirements verified (each FR, NFR and C appears bar C-001, C-006). Tests are committed RED first.
+
+- r4q (original): Rationale per FR: carryover R.
+
+
+- r4q (original): ## 4 The total order (formal)
+
+- r4q (original): `status/reducer.py` untouched; the order ships as comparator spec plus fixtures (section 7).
+
+- r4q (original): Producer on the post-persistence seam; Python writers authoritative; gitignored publish log.
+
+Section map (original data-model section 11, requirement-to-entity trace): FR-001 to FR-005, FR-026, FR-027 are in sections 6, 3; FR-006, FR-010: 1; FR-007 to FR-009, FR-016, FR-036 to FR-038: 2, 4; FR-011, FR-012: 7, 1; FR-013: 4; FR-014, FR-015, FR-017, FR-018, FR-034, FR-035: 3, 9; FR-019 to FR-021, FR-028 to FR-031: 7; FR-022 to FR-025: 6, 7; FR-032, FR-033: 8; FR-041 to FR-044: 10.

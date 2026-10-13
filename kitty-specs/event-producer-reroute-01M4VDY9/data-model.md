@@ -1,10 +1,10 @@
 # Data Model: event-producer-reroute-01M4VDY9
 
-Entities and invariants for [`spec.md`](spec.md). Wire formats are a plan decision. **INTERIM** marks adopted ADR 0001 choices awaiting confirmation. Envelope schema, registry and upcaster belong to events#92; never a parallel set.
+Entities and invariants for [`spec.md`](spec.md). Wire formats: plan. **INTERIM** marks unconfirmed ADR 0001 choices. Envelope schema, registry and upcaster belong to events#92.
 
 ## 1 Envelope attributes (CloudEvents 1.0 structured JSON)
 
-Names match `^[a-z0-9]{1,20}$`; CloudEvents attribute types only; absent means omitted, never `null`.
+Names match `^[a-z0-9]{1,20}$`; CloudEvents attribute types only; absent is omitted, never `null`.
 
 | Attribute | Kind | Type | Req | Source on the producer |
 |---|---|---|---|---|
@@ -32,13 +32,11 @@ Names match `^[a-z0-9]{1,20}$`; CloudEvents attribute types only; absent means o
 - **`time`**: the row's own instant (`at` on lane, annotation, decision and retrospective rows; `timestamp` on lifecycle and run-journal rows), RFC 3339, never synthesized; unparseable or absent is `rejected`.
 - **`source`**: Mission-scoped rows `/spec-kitty/missions/<missionid>`; `ProjectInitialized` `/spec-kitty/projects/<project_uuid>` (INTERIM). `missionid` is a ULID; when neither the row nor `meta.json` yields one, OD-MISSIONID decides.
 - **Dedupe key** `(source, i)` with `i` the normalized id (INTERIM; section 4). A second append for an existing key is a no-op. A row with no `source` (upcast diary or `3.0.0` rows) has the empty string as `source`; not an error row.
-- **Join invariant**: each publish-log line matches at most one ledger row by normalized `event_id`, and each in-scope ledger row has at most one line (faults produce none).
+- **Join invariant**: each publish-log line matches at most one ledger row by normalized `event_id`, and each in-scope ledger row has at most one line.
 
 ## 3 Type table (all names INTERIM; registry authority is events#92)
 
-"Verbatim": row members moved unchanged; member lists in carryover Y.
-
-"NEW" marks a seam call FR-003 adds.
+"Verbatim": row members moved unchanged (lists: carryover Y). "NEW": a seam call FR-003 adds.
 
 | Legacy row | Type | Scope / `subject` | `data` members (row members moved verbatim unless noted) | Emission point (writer: Python) / seam | Status |
 |---|---|---|---|---|---|
@@ -55,18 +53,18 @@ Names match `^[a-z0-9]{1,20}$`; CloudEvents attribute types only; absent means o
 | `DecisionPointOpened` | `decision.opened.v1` | Mission / none | row members verbatim | `emit_decision_opened`; lifecycle slot | in |
 | `DecisionPointResolved` (outcome in `terminal_outcome`: resolved, deferred, canceled) | `decision.resolved.v1` | Mission / none | row members verbatim | `emit_decision_resolved`; as above | in |
 | Run journal: `MissionRunStarted`, `NextStepIssued`, `NextStepAutoCompleted`, `DecisionInputRequested`, `DecisionInputAnswered`, `MissionRunCompleted` | `run.started.v1`, `run.step.issued.v1`, `run.step.autocompleted.v1`, `run.decision.requested.v1`, `run.decision.answered.v1`, `run.completed.v1` | Mission (identity from journal context) / none | payload models of `runtime/next/_internal_runtime/events.py` | `engine._append_event`; lifecycle slot; FR-035 | in |
-| Run journal: `SignificanceEvaluated`, `DecisionAuthorityDenied` | `run.significance.evaluated.v1`, `run.decision.denied.v1` | as above | payload verbatim | seam NEW (the runtime producer deliberately publishes neither) | in |
+| Run journal: `SignificanceEvaluated`, `DecisionAuthorityDenied` | `run.significance.evaluated.v1`, `run.decision.denied.v1` | as above | payload verbatim | seam NEW | in |
 | Retrospective rows: `RetrospectiveCaptured`, `RetrospectiveCaptureFailed`, `RetrospectiveSkipped` | `retrospective.captured.v1`, `retrospective.capturefailed.v1`, `retrospective.skipped.v1` | Mission / none | row members verbatim except the lifted ones and `type`; the row's `lamport` stays in `data` (a legacy per-Mission counter, not `lamportclock`); `actorbinding` per the actor rule; lifted `event_id`, `at`, `actor`, `mission_id`, `mission_slug` (`execution_mode` stays in `data`) | `retrospective/lifecycle_events.py::emit_captured`, `emit_capture_failed`, `emit_skipped` (via `append_raw_rows_atomic`); seam NEW | in |
 | Glossary rows (`src/glossary/events.py`) | n/a | n/a | n/a | n/a | **deferred** (#1200 residual) |
 | `DecisionPointWidened`, `DecisionPointDeferred`, `DecisionPointCanceled` | n/a | n/a | n/a | registered kinds, no emitter in `src/` (outcomes travel as `DecisionPointResolved`) | **deferred** |
 
-**Actor rule.** Persisted `actor` is a string (lifecycle rows), a structured `{role, profile, tool, model}` object (lane, annotation; `ActorField`) or a retrospective `{kind, id, display}` object. Only the lane, annotation and retrospective types lift it. Attribute `actor`: a string verbatim; a structured object its `actor_identity_str` projection (`tool`, else `role`); a retrospective object its `id`; omitted when empty. `data.actorbinding` exists only for an object actor and equals the row's `actor` unchanged (the one rename). Other types keep their own actor members (`actor`; `actor_id`, `actor_type` on decision rows) in `data` verbatim and set no `actor` attribute.
+**Actor rule.** Persisted `actor` is a string (lifecycle rows), a structured `{role, profile, tool, model}` object (lane, annotation) or a retrospective `{kind, id, display}` object. Only the lane, annotation and retrospective types lift it. Attribute `actor`: a string verbatim; a structured object its `actor_identity_str` projection (`tool`, else `role`); a retrospective object its `id`; omitted when empty. `data.actorbinding` exists only for an object actor and equals the row's `actor` unchanged (the one rename). Other types keep their own actor members (`actor`; `actor_id`, `actor_type` on decision rows) in `data` verbatim and set no `actor` attribute.
 
-**Lifecycle rule.** The twelve `LIFECYCLE_EVENT_TYPES` rows are the envelope of `status/lifecycle_events.py::_build_envelope` (`event_id`, `event_type`, `aggregate_id`, `aggregate_type`, `schema_version`, `timestamp`, `payload`, `project_uuid`, `project_slug`). For those types `data` is `payload` verbatim (so `actor` stays in `data`); `event_id` is `id`, `timestamp` is `time`, `event_type` picks the type, `aggregate_id` is `subject` for work package types, `project_uuid` forms the project `source`; the rest is dropped. Decision rows persist `{event_id, at, event_type, payload}`: `id` is `event_id`, `time` is `at`, `data` is `payload`, `source` from `payload.mission_id`, no `subject`. Run-journal rows persist `{event_type, timestamp, payload, event_id (FR-035)}`: `id` is that ULID, never the uuid5 moment id of the hosted envelope; `time` is `timestamp`; mission identity from the journal context.
+**Lifecycle rule.** The twelve `LIFECYCLE_EVENT_TYPES` rows are the envelope of `status/lifecycle_events.py::_build_envelope` (`event_id`, `event_type`, `aggregate_id`, `aggregate_type`, `schema_version`, `timestamp`, `payload`, `project_uuid`, `project_slug`). For those types `data` is `payload` verbatim (`actor` stays in `data`); `event_id` is `id`, `timestamp` is `time`, `event_type` picks the type, `aggregate_id` is `subject` for work package types, `project_uuid` forms the project `source`; the rest is dropped. Decision rows persist `{event_id, at, event_type, payload}`: `id` is `event_id`, `time` is `at`, `data` is `payload`, `source` from `payload.mission_id`, no `subject`. Run-journal rows persist `{event_type, timestamp, payload, event_id (FR-035)}`: `id` is that ULID, never the uuid5 moment id of the hosted envelope; `time` is `timestamp`; mission identity from the journal context.
 
-The seam hands the producer only in-scope rows. The census gate (AC-004) derives its universe from the persisted row kinds, so a kind in neither this table nor the deferred rows fails it; a registered kind with no emitter is listed as deferred and fails the census once an emitter appears. Each row's lifted-member list is part of its registry entry (FR-014).
+The seam hands the producer only in-scope rows. The census gate (AC-004) derives its universe from the persisted row kinds: a kind in neither this table nor the deferred rows fails it. Each row's lifted-member list is part of its registry entry (FR-014).
 
-## 4 The total order (formal)
+## 4 The total order
 
 Let `clk(r)` be the integer `lamportclock` if present, `t(r)` the `time` as a UTC instant, `i(r)` the normalized `id` (`normalize_event_id` rules), `s(r)` the `source` (the empty string when the row has none, section 2).
 
@@ -75,58 +73,57 @@ key(r) = ( h(r), c(r), t(r), i(r), s(r) )
   h(r) = 1 if r has a clock else 0      c(r) = clk(r) if r has a clock else 0
 ```
 
-Ascending, lexicographic: `h` (all clockless rows before all clocked), `c`, `t` as an instant, `i` and `s` by ASCII code point (not UTF-16). `s` is a final tie-break only, so the order is total across sources; `nodeid` is not in the key (#6193).
+Ascending, lexicographic: `h` (all clockless rows before all clocked), `c`, `t` as an instant, `i` and `s` by ASCII code point (not UTF-16). `s` is a final tie-break, so the order is total across sources; `nodeid` is not in the key (#6193).
 
-**Domain.** The order applies to upcast-form rows (diary, `3.0.0`, CloudEvents) after dedupe; sources with no id (the legacy run journal) are outside it and read by their own reader. Dedupe runs first, on `(s(r), i(r))`, so two spellings of one id (case, hyphenation) in one source are one row. Of duplicates the survivor is the row whose serialization (members sorted, compact, UTF-8) has the smallest bytes, so it never depends on input position; a duplicate differing in any member other than `id` is reported as a conflict by its `(s, i)` key (named reason); the rest are only counted as collapsed. After dedupe `(s, i)` is unique, so no two rows have equal keys. **Error rows** (unparseable `time`, a clock outside 0..2^31-1, an id that does not normalize, a missing id) go to a separate list with named reason and the line position of the file as read: never dropped, never silently sorted. Permutation equality compares the ordered rows, the collapsed count, the conflict keys and the error rows as a set (position excluded). Count: ordered + errors + collapsed = rows read.
+**Domain.** The order applies to upcast-form rows (diary, `3.0.0`, CloudEvents); sources with no id (the legacy run journal) are outside it and read by their own reader. **Error rows** (unparseable `time`, a clock outside 0..2^31-1, an id that does not normalize, a missing id) are set aside first, with named reason and the line position of the file as read: never dropped, never silently sorted, never a survivor. Dedupe then runs on the valid rows only, on `(s(r), i(r))`, so two spellings of one id (case, hyphenation) in one source are one row. Of each group the survivor is the row whose serialization (members sorted, compact, UTF-8) has the smallest bytes, so it never depends on input position; every other row of the group counts as collapsed, and a group whose rows differ in any member other than `id` is also reported as a conflict by its `(s, i)` key (a report on the key, not another bucket). After dedupe `(s, i)` is unique, so no two rows have equal keys. Permutation equality compares the ordered rows, the collapsed count, the conflict keys and the error rows as a multiset (position excluded). Count: ordered + errors + collapsed = rows read.
 
-Invariants (checked by a read-only script over all permutations of every fixture and all triples): total, transitive, input-order independent. A naive comparator (both clocked: `(clock, time, id)`, else `(time, id)`) is not transitive (example 4). Consequences: carryover W.
+Invariants (checked by a read-only script over all permutations of every fixture): total, transitive, input-order independent. A naive comparator (both clocked: `(clock, time, id)`, else `(time, id)`) is not transitive (example 4). Carryover W.
 
-### Worked examples (the eight fixtures of AC-008 and AC-009; example 4 is the naive counter-example)
+### Worked examples (the nine fixtures of AC-008 and AC-009; example 4 is the naive counter-example)
 
-UTC unless shown. Ids `…A`, `…B`, `…C` are full ULIDs sharing the prefix `01JAAAA0000000000000000AB`.
+UTC unless shown. Ids `…A`, `…B`, `…C` are ULIDs with the prefix `01JAAAA0000000000000000AB`.
 
 1. **Two clockless.** A `10:00, id …B`; B `10:00, id …A`: `id` decides, B before A.
 2. **Two clocked.** A `clock 5, 09:00`; B `clock 4, 11:00`: B before A (clock beats time); equal clock and time: `id` decides.
 3. **Mixed.** A clockless `23:00`; B `clock 1, 08:00`: A before B (`h` 0 < 1).
 4. **Naive counter-example.** A `clock 5, 10:00`; B clockless `10:30`; C `clock 3, 11:00`. Naive: C<A (clock), A<B (time), B<C (time): a cycle. Total order: **B, C, A** for every permutation.
-5. **Offsets and ids.** Clockless A `2026-10-13T12:00:00+02:00` (= 10:00:00Z), B `2026-10-13T10:00:00.5Z`: A before B (text order says B). At one instant, C `01jaaaa0000000000000000abc` and D `01JAAAA0000000000000000ABD` normalize to `…ABC` < `…ABD`: C before D. A legacy UUID `0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b` sorts before ULID `01JAAAA0000000000000000ABC` by code point.
+5. **Offsets and ids.** Clockless A `2026-10-13T12:00:00+02:00` (= 10:00:00Z), B `2026-10-13T10:00:00.5Z`: A before B (text order says B). At one instant, C `01jaaaa…abc` and D `01JAAAA…ABD` normalize to `…ABC` < `…ABD`: C before D. A legacy UUID `0190a1b2-…` sorts before ULID `01JAAAA…ABC` by code point.
 6. **Error row and duplicate.** Clockless A `10:00`, B `time: "yesterday"`, C `11:00`, D byte-identical to C: ordered `[A, C]`, errors `{B: unparseable time}`, collapsed count 1; 4 read = 2 + 1 + 1.
-7. **Source tie-break.** Three rows `clock 7`, same time, same id, sources A `/spec-kitty/projects/P1`, B `/spec-kitty/missions/M1`, C none (empty): order **C, B, A** for every permutation (empty < `/spec-kitty/m…` < `/spec-kitty/p…`). Without `s` all six permutations differ.
-8. **Two spellings of one id.** Same source, clock 3, same time: A id `01jaaaa0000000000000000abc`, B id `01JAAAA0000000000000000ABC` (identical payload), C `…ABD`: survivor B (`…ABC` sorts before `…abc` by code point), ordered `[B, C]`, collapsed count 1; with dedupe on raw ids both stay.
+7. **Source tie-break.** Three rows `clock 7`, same time, same id, sources A `/spec-kitty/projects/P1`, B `/spec-kitty/missions/M1`, C none (empty): order **C, B, A** for every permutation (empty < `/spec-kitty/m…` < `/spec-kitty/p…`). Without `s` the permutations differ.
+8. **Two spellings of one id.** Same source, clock 3, same time: A id `01jaaaa0000000000000000abc`, B id `01JAAAA0000000000000000ABC` (identical payload), C `…ABD`: survivor B (`…ABC` sorts before `…abc`), ordered `[B, C]`, collapsed 1; dedupe on raw ids keeps both.
+9. **Conflict, survivor, every error class.** Clockless, same source. G and H share id `…ABA` and differ in a payload member (`x`, `y`); X has id `…ABA` and an empty `time`; K has no id; M id `…ABB` and clock 2^31; N id `nope`; Z `11:00`, id `…ABC`. Ordered `[G, Z]` (G is valid and its bytes sort first; X cannot displace it), errors `{X: unparseable time, K: missing id, M: clock out of range, N: non-normalizing id}`, collapsed 1, conflict `(empty source, …ABA)`; 7 read = 2 + 4 + 1.
 
 ## 5 Example lines
 
-carryover X (real bytes come from the serializer).
+Carryover X.
 
 ## 6 Producer protocol entities (fields only)
 
 **ProduceRequest** (client to producer; assembled by the seam, passed through uninterpreted): `row` (the persisted authoritative row, post-sanitization, FR-004; a list under OD-SPAWN (b)); `slot` (`status` or `lifecycle`; the resolved-binding slot is not registered, FR-003); `seam_args` (the existing keyword arguments, as given); `start_path` (the call site's path, E14; the producer resolves the canonical root from it, never from the process working directory); `deadline_ms` (the client's effective timeout, FR-025; the producer exits by it on its own).
 
-**ProduceReply** (producer to client; exactly one): `outcome` (`produced` \| `skipped_duplicate` \| `refused`); `event_id` (normalized, always present); `type` (when produced or skipped); `reason_class` (when refused: `rejected` \| `clock-overflow`); `notice` (optional: `torn-line` with the line position; recorded by the client as a notice row, not a fault); `detail` (one line, repo-relative paths only, NFR-006).
+**ProduceReply** (producer to client; exactly one): `outcome` (`produced` \| `skipped_duplicate` \| `refused`); `event_id` (normalized; present when the row carries a normalizable id, else omitted); `type` (when produced or skipped); `reason_class` (when refused: `rejected` \| `clock-overflow`); `notice` (optional: `torn-line` with the line position; recorded by the client as a notice row, not a fault); `detail` (one line, repo-relative paths only, NFR-006).
 
-**ProducerFault** (recorded, never raised into the command): `class` (`binary-missing` \| `crash` \| `timeout` \| `malformed-reply` \| `clock-overflow` \| `rejected` \| `busy`, plus `disabled` only under OD-OPTOUT b); `event_type`; `event_id` (if known); `message` (carries the FR-023 sentence); `at` (client clock, never in an envelope).
+**ProducerFault** (recorded, never raised into the command): `class` (`binary-missing` \| `crash` \| `timeout` \| `malformed-reply` \| `clock-overflow` \| `rejected` \| `busy`, plus `disabled` only under OD-OPTOUT b); `event_type` and `event_id`: the reply's values when one was read; for a fault the client raises alone (`binary-missing`, `crash`, `timeout`, `busy`, `malformed-reply`) the row's own `event_type` and `event_id` members, copied as the seam handed them (no interpretation, no normalization), each omitted when the row has none; `message` (carries the FR-023 sentence); `at` (client clock, never in an envelope).
 
 Mapping: an unreadable, truncated, non-JSON or schema-violating reply `malformed-reply`; non-zero exit, signal or empty reply `crash`; no executable `binary-missing`; the deadline `timeout`; a handler already in flight `busy`.
 
 ## 7 Local-tier entities
 
-**PublishLogFile.** Gitignored; a new local-tier file class (spec section 9). Unit (per-Mission or per-run file) is a plan decision; it carries an age (newest row `time` or file mtime) and a run or Mission association (FR-028). Complete lines ending LF; single writer: the producer. A final line without LF is preserved, flagged via `notice`, never joined. Location: an already-gitignored path (candidate `.kittify/events/`) or the canonical ignore mechanism (AC-023).
+**PublishLogFile.** Gitignored; a new local-tier file class (spec section 9). Unit (per-Mission or per-run file) is a plan decision; it carries an age (newest row `time` or file mtime) and a run or Mission association (FR-028). Complete lines ending LF; single writer: the producer. A final line without LF is preserved and flagged via `notice`; the next row starts on a new line (FR-021), so the fragment is the one non-JSON line, skipped by clock recovery and dedupe. Location: an already-gitignored path (candidate `.kittify/events/`) or the canonical ignore mechanism (AC-023).
 
-**LamportState.** Local state owned by the producer, gitignored or (OD-CLOCK a) under the git common directory (FR-019): per-`nodeid` counter, integer 0..2^31-1, shared by every worktree of one repository (OD-CLOCK); outcomes of a kill, state loss and the bound are FR-012's.
+**LamportState.** Producer-owned local state, gitignored or (OD-CLOCK a) under the git common directory (FR-019): per-`nodeid` counter, integer 0..2^31-1, shared by every worktree of one repository; kill, loss and bound: FR-012.
 
-**FaultLogRow.** Append-only, gitignored, retention applies, written only by the client (FR-023): two row kinds, a ProducerFault (its fields plus a relative root marker) or a `torn-line` notice (path, line position, `at`). `doctor` derives the fault count (fault rows in the retention window) and last class from the first kind, and counts notices apart.
+**FaultLogRow.** Append-only, gitignored, retention applies, written only by the client (FR-023): two row kinds, a ProducerFault (its fields plus a relative root marker) or a `torn-line` notice (path, line position, `at`). `doctor` derives the fault count (fault rows, not notice rows, in the files within the retention window) and last class from the first kind, and counts notices apart.
 
-**RetentionPolicy.** `.kittify/config.yaml` keys `ledger.retention.keep_runs` (positive integer, proposed 20) and `ledger.retention.max_age_days` (positive integer, proposed 30). Invalid values are a named command error (fail closed, AC-031). Eligible: FR-029. Local tier only (publish log, fault log, run journals, `.kittify/events/`); committed files are never candidates.
+**RetentionPolicy.** `.kittify/config.yaml` keys `ledger.retention.keep_runs` (positive integer, proposed 20) and `ledger.retention.max_age_days` (positive integer, proposed 30). Invalid values are a named command error (fail closed, AC-031). Eligible: FR-029. Local tier only (publish log, fault log, run journals, `.kittify/events/`); committed files are never candidates. The unit is a whole file (FR-028): retention never rewrites or trims a file with another writer.
 
 ## 8 Exemption ledger (entity `Exemption`)
 
-`clear` = the marker is gone and the persisted lines its writer wrote validate in the **legacy-row form**: generated from the single `data` schema plus the lifted-member list of section 3 (FR-014), never a second authored schema. `residual` = stays, with a reason and an issue reference to be filed. Reasons: carryover M.
+`clear` = the marker is gone and the persisted lines its writer wrote validate in the **legacy-row form**: the single `data` schema plus the lifted-member list of section 3 (FR-014), never a second authored schema. `residual` = stays, with a reason and an issue reference to be filed (reasons: carryover M).
 
-- **Clear:** markers 1 and 2 (`decisions/emit.py`), 5 and 6 (`status/lifecycle_events.py`), all #1198; 8 (`engine._append_event`, #1248, FR-035). Five fixtures for AC-019.
+- **Clear:** markers 1, 2 (`decisions/emit.py`), 5, 6 (`status/lifecycle_events.py`), all #1198; 8 (`engine._append_event`, #1248, FR-035). Five fixtures for AC-019.
 - **Plan decides:** 3 (`events/decision_log.py`), 4 (`migration/mission_state.py`), 7 (`build_saas_lifecycle_queue_event`).
-- **Residual:** 9 to 16 (`glossary/events.py`, 8 markers, #1200; not widened).
-
-The producer lint gains a persisted-line mode; its baseline is not widened. 
+- **Residual:** 9 to 16 (`glossary/events.py`, #1200). The producer lint gains a persisted-line mode; its baseline is not widened.
 
 ## 9 LaneVocabulary
 
@@ -136,8 +133,4 @@ The schema's persisted lane enumeration = genesis, planned, claimed, in_progress
 
 ## 10 PlatformWheel matrix entity
 
-Per wheel: `platform_tag`; `os_arch` (FR-041, OD-MATRIX); `binary_path` (one executable, one known path); `binary_checksum` (AC-032); `toolchain_pin`; `smoke_result` (G-3); `signed` (OD-SIGN). The pure wheel (OD-FALLBACK) and the sdist hold no binary. Invariants: one binary per platform wheel; `packs/internal/` in no wheel; the expected set is pinned (G-12).
-
-## 11 Requirement-to-entity trace
-
-FR-001 to FR-005, FR-026, FR-027: sections 6, 3. FR-006, FR-010: 1. FR-007 to FR-009, FR-016, FR-036 to FR-038: 2, 4. FR-011, FR-012: 7, 1. FR-013: 4. FR-014, FR-015, FR-017, FR-018, FR-034, FR-035: 3, 9. FR-019 to FR-021, FR-028 to FR-031: 7. FR-022 to FR-025: 6, 7. FR-032, FR-033: 8. FR-041 to FR-044: 10. FR-039, FR-040, FR-045, FR-046: spec sections 7, 9, 13.
+Per wheel: `platform_tag`; `os_arch` (FR-041, OD-MATRIX); `binary_path`; `binary_checksum` (AC-032); `toolchain_pin`; `smoke_result` (G-3); `signed` (OD-SIGN). The pure wheel (OD-FALLBACK) and sdist hold no binary. Invariants: one binary per platform wheel; `packs/internal/` in no wheel; the expected set is pinned (G-12).
