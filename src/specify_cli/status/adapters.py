@@ -130,6 +130,38 @@ def _run_fanout_handler_bounded(handler: Callable[..., None], kwargs: dict[str, 
         raise error[0]
 
 
+#: One log line of a dispatch outcome: a ``%``-format message and its arguments.
+_LogLine = tuple[str, tuple[Any, ...]]
+
+
+def _dispatch_handlers(
+    handlers: list[Callable[..., None]],
+    kwargs: dict[str, Any],
+    *,
+    label: str,
+    busy: _LogLine,
+    timed_out: _LogLine,
+    failed: _LogLine,
+    failed_level: int = logging.WARNING,
+) -> None:
+    """Run every handler of one slot, bounded, in registration order; never raise.
+
+    The one place the three ``fire_*`` functions share: a handler still in
+    flight is skipped (``busy``), one that outlives the bound is abandoned
+    (``timed_out``) and one that raises is logged (``failed``, with the
+    traceback). Each outcome carries the slot's own message and arguments.
+    """
+    for handler in handlers:
+        try:
+            _run_fanout_handler_bounded(handler, kwargs, label=label)
+        except _FanoutHandlerBusyError:
+            logger.warning(busy[0], *busy[1])
+        except TimeoutError:
+            logger.warning(timed_out[0], *timed_out[1])
+        except Exception:
+            logger.log(failed_level, failed[0], *failed[1], exc_info=True)
+
+
 # Callback signature: keyword-only, mirrors emit_wp_status_changed
 SaasFanOutHandler = Callable[..., None]
 
@@ -307,33 +339,25 @@ def fire_saas_fanout(*, repo_root: Path | None = None, **kwargs: Any) -> None:
         _fanout_force(kwargs),
         len(_saas_handlers),
     )
-    for handler in _saas_handlers:
-        try:
-            _run_fanout_handler_bounded(handler, kwargs, label="SaaS fan-out")
-        except _FanoutHandlerBusyError:
-            logger.warning(
-                "SaaS fan-out handler still in flight from a prior transition; skipped to avoid overlap (wp_id=%s from=%s to=%s)",
-                kwargs.get("wp_id"),
-                kwargs.get("from_lane"),
-                kwargs.get("to_lane"),
-            )
-        except TimeoutError:
-            logger.warning(
-                "SaaS fan-out handler timed out; canonical status log unaffected (wp_id=%s from=%s to=%s force=%s)",
-                kwargs.get("wp_id"),
-                kwargs.get("from_lane"),
-                kwargs.get("to_lane"),
-                _fanout_force(kwargs),
-            )
-        except Exception:
-            logger.warning(
-                "SaaS fan-out handler failed; canonical status log unaffected (wp_id=%s from=%s to=%s force=%s)",
-                kwargs.get("wp_id"),
-                kwargs.get("from_lane"),
-                kwargs.get("to_lane"),
-                _fanout_force(kwargs),
-                exc_info=True,
-            )
+    wp_args = (kwargs.get("wp_id"), kwargs.get("from_lane"), kwargs.get("to_lane"))
+    forced_args = (*wp_args, _fanout_force(kwargs))
+    _dispatch_handlers(
+        _saas_handlers,
+        kwargs,
+        label="SaaS fan-out",
+        busy=(
+            "SaaS fan-out handler still in flight from a prior transition; skipped to avoid overlap (wp_id=%s from=%s to=%s)",
+            wp_args,
+        ),
+        timed_out=(
+            "SaaS fan-out handler timed out; canonical status log unaffected (wp_id=%s from=%s to=%s force=%s)",
+            forced_args,
+        ),
+        failed=(
+            "SaaS fan-out handler failed; canonical status log unaffected (wp_id=%s from=%s to=%s force=%s)",
+            forced_args,
+        ),
+    )
 
 
 def fire_resolved_binding_fanout(*, repo_root: Path | None = None, **kwargs: Any) -> None:
@@ -358,25 +382,15 @@ def fire_resolved_binding_fanout(*, repo_root: Path | None = None, **kwargs: Any
         kwargs.get("mission_slug"),
         len(_resolved_binding_handlers),
     )
-    for handler in _resolved_binding_handlers:
-        try:
-            _run_fanout_handler_bounded(handler, kwargs, label="Resolved-binding fan-out")
-        except _FanoutHandlerBusyError:
-            logger.warning(
-                "Resolved-binding fan-out handler still in flight from a prior emit; skipped to avoid overlap (wp_id=%s)",
-                kwargs.get("wp_id"),
-            )
-        except TimeoutError:
-            logger.warning(
-                "Resolved-binding fan-out handler timed out; canonical status log unaffected (wp_id=%s)",
-                kwargs.get("wp_id"),
-            )
-        except Exception:
-            logger.warning(
-                "Resolved-binding fan-out handler failed; canonical status log unaffected (wp_id=%s)",
-                kwargs.get("wp_id"),
-                exc_info=True,
-            )
+    wp_arg = (kwargs.get("wp_id"),)
+    _dispatch_handlers(
+        _resolved_binding_handlers,
+        kwargs,
+        label="Resolved-binding fan-out",
+        busy=("Resolved-binding fan-out handler still in flight from a prior emit; skipped to avoid overlap (wp_id=%s)", wp_arg),
+        timed_out=("Resolved-binding fan-out handler timed out; canonical status log unaffected (wp_id=%s)", wp_arg),
+        failed=("Resolved-binding fan-out handler failed; canonical status log unaffected (wp_id=%s)", wp_arg),
+    )
 
 
 def fire_lifecycle_saas_fanout(*, repo_root: Path | None = None, **kwargs: Any) -> None:
@@ -392,22 +406,15 @@ def fire_lifecycle_saas_fanout(*, repo_root: Path | None = None, **kwargs: Any) 
     # replace, the import-time moment_handlers_disabled_reason() gate below.
     if not hosted_posture.drain_posture(project_root=repo_root).enabled:
         return
-    for handler in _lifecycle_saas_handlers:
-        try:
-            _run_fanout_handler_bounded(handler, kwargs, label="Lifecycle SaaS fan-out")
-        except _FanoutHandlerBusyError:
-            logger.warning(
-                "Lifecycle SaaS fan-out handler still in flight from a prior transition; skipped to avoid overlap",
-            )
-        except TimeoutError:
-            logger.warning(
-                "Lifecycle SaaS fan-out handler timed out; canonical lifecycle log unaffected",
-            )
-        except Exception:
-            logger.debug(
-                "Lifecycle SaaS fan-out handler failed; canonical lifecycle log unaffected",
-                exc_info=True,
-            )
+    _dispatch_handlers(
+        _lifecycle_saas_handlers,
+        kwargs,
+        label="Lifecycle SaaS fan-out",
+        busy=("Lifecycle SaaS fan-out handler still in flight from a prior transition; skipped to avoid overlap", ()),
+        timed_out=("Lifecycle SaaS fan-out handler timed out; canonical lifecycle log unaffected", ()),
+        failed=("Lifecycle SaaS fan-out handler failed; canonical lifecycle log unaffected", ()),
+        failed_level=logging.DEBUG,
+    )
 
 
 # Default wiring: every process that imports this seam carries the Zeitgeist
