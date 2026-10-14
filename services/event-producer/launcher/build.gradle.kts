@@ -53,6 +53,13 @@ extensions.configure<GraalVMExtension> {
             sharedLibrary = false
             verbose = true
             buildArgs.addAll("--no-fallback", "-O2", "--enable-native-access=ALL-UNNAMED")
+            // macOS: the wheel tag floor is macOS 11 (scripts/release/dist-set.json). The JDK's static libraries are built for minos 11.0, but
+            // the final link takes its minos from the linker's deployment target, which defaults to the build host's OS (14.0 on macos-14);
+            // the run of 2026-10-14 measured 14.0 although MACOSX_DEPLOYMENT_TARGET was set. Pass the target on the linker and the C
+            // compiler command lines. Both are native-image options (-H:NativeLinkerOption, -H:CCompilerOption), macOS only.
+            if (System.getProperty("os.name").startsWith("Mac")) {
+                buildArgs.addAll("-H:NativeLinkerOption=-mmacosx-version-min=11.0", "-H:CCompilerOption=-mmacosx-version-min=11.0")
+            }
         }
     }
 }

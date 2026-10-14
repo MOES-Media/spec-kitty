@@ -416,3 +416,11 @@ def test_the_container_build_checks_java_home_on_host_and_inside(event_producer:
 def test_expect_failure_runs_the_java_home_controls() -> None:
     text = (TOOLS / "expect-failure.sh").read_text(encoding="utf-8")
     assert "javahome) javahome ;;" in text and "all) floor; tamper; module; sbom; javahome ;;" in text
+
+
+def test_the_macos_link_targets_the_pinned_floor_on_the_command_line() -> None:
+    gradle = (ROOT / "services" / "event-producer" / "launcher" / "build.gradle.kts").read_text(encoding="utf-8")
+    assert "-H:NativeLinkerOption=-mmacosx-version-min=11.0" in gradle
+    assert "-H:CCompilerOption=-mmacosx-version-min=11.0" in gradle
+    macos = next(w for w in json.loads(DIST_SET.read_text(encoding="utf-8"))["platform_wheels"] if w["leg"] == "macos-arm64")
+    assert "macosx_11_0" in macos["tag"], "the flag above and the wheel tag name the same floor"

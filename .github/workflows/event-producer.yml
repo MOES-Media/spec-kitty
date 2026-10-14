@@ -202,7 +202,8 @@ jobs:
             -e JAVA_HOME=/graalvm -e GRADLE_USER_HOME=/work/.gradle-home -e HOME=/work/.home \
             -w /work "$image" bash -c 'bash tools/check-java-home.sh /graalvm && ./gradlew --no-daemon :launcher:nativeCompile cyclonedxBom'
 
-      # macOS: deployment target 11.0 (the minos floor of the macosx_11_0_arm64 tag). The binary is never stripped (ad-hoc signature).
+      # macOS: deployment target 11.0 (the minos floor of the macosx_11_0_arm64 tag): the env var here, and -mmacosx-version-min=11.0 on the
+      # linker and compiler through launcher/build.gradle.kts (the env alone measured minos 14.0 on macos-14). Never stripped (ad-hoc signature).
       - name: Build the native image (macOS)
         if: matrix.leg == 'macos-arm64'
         env:
