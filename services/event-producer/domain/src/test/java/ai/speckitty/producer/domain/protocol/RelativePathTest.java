@@ -20,7 +20,7 @@ class RelativePathTest {
     @Test
     void absoluteAndEscapingPathsAreRefused() {
         for (String path : new String[] {
-            null, "", "/", "/a", "/home/someone/x", "C:/x", "c:\\x", "C:x", "\\a", "a\\b", "../a", "a/../b", "a/..", "./a", "a/./b", "a//b", "a/", "a/b/",
+            null, "", "/", "/a", "/work/dir/x", "C:/x", "c:\\x", "C:x", "\\a", "a\\b", "../a", "a/../b", "a/..", "./a", "a/./b", "a//b", "a/", "a/b/",
             "a\nb", "a\rb", "a" + (char) 0 + "b", "~/a", "file:///a"
         }) {
             assertThat(RelativePath.isValid(path)).as("%s", path).isFalse();
