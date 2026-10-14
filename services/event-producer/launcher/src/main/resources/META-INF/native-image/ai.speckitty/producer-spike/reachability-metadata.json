@@ -1,9 +1,0 @@
-{
-  "foreign": {
-    "downcalls": [
-      { "returnType": "jint", "parameterTypes": ["void*", "jlong"] },
-      { "returnType": "jint", "parameterTypes": ["void*", "jint"] },
-      { "returnType": "jint", "parameterTypes": ["jshort", "void*"] }
-    ]
-  }
-}

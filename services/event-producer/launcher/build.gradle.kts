@@ -8,7 +8,7 @@ plugins {
 
 // The ONE place the entry class is named: the native image and the JVM application both read it. WP01 points it at the spike;
 // WP04 changes this single line to ai.speckitty.producer.launcher.Main in the commit that deletes the spike.
-val producerMainClass = "ai.speckitty.producer.launcher.spike.SpikeMain"
+val producerMainClass = "ai.speckitty.producer.launcher.Main"
 
 dependencies {
     implementation(project(":domain"))
