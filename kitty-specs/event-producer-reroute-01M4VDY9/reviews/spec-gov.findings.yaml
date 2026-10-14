@@ -1,0 +1,142 @@
+schema: review-findings/v1
+complete: true
+phase: spec
+lens_group: gov
+mission: event-producer-reroute-01M4VDY9
+findings:
+  - id: SPEC-GOV-001
+    lens: Governance-drift honesty
+    severity: 3
+    title: Section 9 flags only ADR D-1 as superseded; the publish log also departs from D-2 and D-3 of the same ADR
+    evidence:
+      - artifact: "spec.md § 9 item 3; § 3 D-SINK; § 10 OD-SINK; data-model.md § 7 PublishLogFile"
+      - code: "docs/adr/4.x/2026-10-13-2-the-event-ledger-is-the-publication-seam-default-on-with-local-retention.md::D-2, D-3"
+    claim: >
+      ADR D-2 says a subscriber learns of events "by reading the ledger, never by being called by the CLI" and names
+      the supported read paths (events tail, the Read API); D-3 enumerates the closed list of local-tier files under
+      retention. The spec adds a second persisted artifact (a publish log duplicating ledger content) as an
+      integration read surface and a new local-tier file class, which the ADR does not list. Section 9 records only
+      the D-1 flat-rows supersession (FR-045); the D-2 read-path statement and the D-3 file list are changed in
+      effect but not flagged, and OD-SINK frames the choice as a sink question only. The ADR does allow local
+      adapters on the seam, so this is a flag-and-amend gap, not a violation.
+    remediation: >
+      Add a section 9 item: the publish log, fault log and clock state extend D-2's read-path set and D-3's local-tier
+      list; extend FR-045 so the ADR amendment covers D-2 (new supported read path) and D-3 (new local-tier files),
+      not only D-1.
+  - id: SPEC-GOV-002
+    lens: Scope
+    severity: 3
+    title: FR-014 says the events PR "adds nothing else" yet FR-013, FR-034/data-model section 9 and FR-035 add more to it
+    evidence:
+      - artifact: "spec.md § 4 FR-013, FR-014, FR-034, FR-035; § 1 in-scope item 3; data-model.md § 9 (spec_kitty_events.Lane aligned in the events PR)"
+    claim: >
+      FR-014 closes the events PR to schemas, registry entries, dataschema URIs and producer fixtures and says the
+      envelope schema, validator and upcaster are events#92's. FR-013 adds a reference comparator specification and
+      total-order fixtures to the same PR, data-model section 9 adds a change to the events package's Lane
+      enumeration, and FR-035 conditionally adds a minimal envelope subset. The allocation against events#92 (whose
+      body lists envelope, registry, schemas, upcaster, compatibility entries, and no ordering comparator or Lane
+      change) is therefore internally inconsistent, which invites parallel-set drift the operator forbade.
+    remediation: >
+      Restate FR-014 as the closed list of what the events PR carries (data schemas, registry entries, dataschema
+      URIs, producer fixtures, total-order comparator spec and fixtures, Lane alignment, conditional envelope subset)
+      and add the comparator and Lane change to the section 7 hand-off row for events#92 so #92 can acknowledge them.
+  - id: SPEC-GOV-003
+    lens: Scope
+    severity: 3
+    title: Spec does not record where it supersedes the text of #6185, #6193 and events#92
+    evidence:
+      - artifact: "spec.md § 1, § 7"
+      - code: "issue spec-kitty#6185 scope items 1 and 3; #6193 'Take over the local producer' bullet; events#92 'If #6185 lands first, this mission wraps its schemas'"
+    claim: >
+      #6185 item 1 asks to extract the Event-building into a kept core module and item 3 to write from the package
+      model; the spec delivers a Java producer instead (operator decision 2) without saying item 1 is superseded.
+      #6193 describes #6185 as "a local publish seam in the Python CLI" whose Python producer path #6193 retires;
+      events#92 says its schemas "wrap" #6185's. Under this spec the Python side is only a shim, so those texts are
+      stale and a later reader will resolve the conflict silently. The section 7 table gives hand-offs but not the
+      text corrections.
+    remediation: >
+      Add to section 7 a short "Issue-text reconciliation" list: #6185 item 1 superseded by decision 2; #6193's
+      take-over bullet now takes over a Java producer, not Python; events#92 wraps these schemas. Name the owner of
+      each tracker comment (issue-matrix row).
+  - id: SPEC-GOV-004
+    lens: Scope
+    severity: 3
+    title: '"One writer per event type" (C-004, decision 7) is asserted while D-SINK makes two writers per type'
+    evidence:
+      - artifact: "spec.md § 3 D-SINK; § 5 C-004; § 7 rows #6193/#6195/#6196; § 10 OD-SINK"
+      - code: "issue spec-kitty#6193 ('one writer per event type'); #6195/#6196 ('Python writers deleted in the same release')"
+    claim: >
+      Under D-SINK the Python ledger writers and the Java producer both write each in-scope type, to different files.
+      C-004 and decision 7 are encoded as a constraint but never defined per sink, so the constraint is untestable
+      and arguably contradicted. The epic's migration rule (no event ever has two writers) is satisfied only if
+      "writer" means "writer of a given file", and the cutover story (who stops writing the publish log duplicate
+      when #6195/#6196 move the authoritative write to Java) is left implicit.
+    remediation: >
+      Define C-004 per artifact: one writer of the authoritative ledger row and one writer of the publish-log row per
+      type, and state in section 7 that at cutover the Java core writes both and the publish log either becomes the
+      ledger or is retired (decision left to #6193/#6195), so no type has two writers of the same file.
+  - id: SPEC-GOV-005
+    lens: Directive
+    severity: 3
+    title: How the Java producer obtains the events-repo data schemas is not decided, and sits across the no-vendoring rule
+    evidence:
+      - artifact: "spec.md § 4 FR-015, FR-039, FR-040; § 9 item 2; § 10 (no matching OD)"
+      - code: ".kittify/charter/charter.md::Architecture: Shared Package Boundaries / External Contract Packages ('Do not vendor their source')"
+    claim: >
+      FR-015 makes the Java producer validate every row against the events-repo data schemas, and FR-040 forbids
+      path/git overrides. Section 9 item 2 notes binding generation crosses the no-vendoring line but no open
+      decision names the delivery mechanism (build-time fetch of the released artifact, copy, or generated binding),
+      although the choice is plan-blocking for the Gradle build and is gated in events#92 on a charter amendment not
+      owned here. A plan could pick vendoring unnoticed.
+    remediation: >
+      Add OD-SCHEMA-DELIVERY to section 10 (options: consume the released events artifact at build time; wait for
+      #92's Java binding; copy), recommend the first, mark it plan-blocking, and require in FR-039 that no schema
+      source is committed to this repository.
+  - id: SPEC-GOV-006
+    lens: Directive
+    severity: 2
+    title: Spec is silent on the charter's opening campsite clean and tracer files
+    evidence:
+      - artifact: "spec.md § 5, § 12 (neither mentions them); kitty-specs/event-producer-reroute-01M4VDY9/tasks/README.md only"
+      - code: ".kittify/charter/charter.md::Quality & Tech-Debt Standing Orders 2 and 3"
+    claim: >
+      Standing Order 2 requires campsite-cleaning the surfaces a mission will touch before the functional change, and
+      Order 3 requires seeding the tooling-friction, approach and design-decisions tracer files at planning. This
+      mission touches status/adapters.py, status/emit.py, status/lifecycle_events.py and decisions/emit.py; the spec
+      carries no constraint reserving a campsite step, and the mission directory has no tracer files yet. Red-first
+      (section 6 preamble), no-version-numbers (C-006) and the change-the-owning-repo-first rule (FR-040) are encoded.
+    remediation: >
+      Add one constraint (C-007): the first work package is a behaviour-preserving campsite pass on the touched
+      seam and writer modules, and the planning step seeds the three tracer files. No FR needed.
+  - id: SPEC-GOV-007
+    lens: Terminology
+    severity: 2
+    title: Section 13 says none of the new terms exist in docs/context, but neighbours and near-collisions do
+    evidence:
+      - artifact: "spec.md § 13; § 3 (lamportclock); data-model.md § 1"
+      - code: "docs/context/system-events.md::Lamport Clock (canonical, applicable to 1.x/2.x, field lamport_clock), Event Envelope; docs/context/product-lines.md::Definition (producer line); docs/context/team-kitty.md::Drain row (forbids 'fan-out enabled'); docs/context/orchestration.md::Routing (retired 'sync fan-out routing' sense)"
+    claim: >
+      Lamport Clock and Event Envelope are canonical terms the spec reuses without citing, and the spec's
+      attribute lamportclock differs in spelling and applicability metadata from the glossary's lamport_clock (1.x/2.x
+      only). "Producer" is already used as an adjective for the open-core line, and "fan-out" appears in a
+      forbidden-synonym cell and a retired sense. Adding "Producer" and "Fan-out" as new terms without relating
+      them risks a glossary clash or Contextive conflict at the CI-enforced regeneration step.
+    remediation: >
+      Amend section 13: extend Lamport Clock (applicability and the lamportclock attribute) and relate the new terms
+      to Event Envelope, Lamport Clock, Drain and the retired fan-out sense; give "Producer" a qualifier (for
+      example "event producer") distinct from the product-line usage.
+  - id: SPEC-GOV-008
+    lens: Scope
+    severity: 2
+    title: Fault log and degraded-state handling do not relate to the existing machinery-fault ruling
+    evidence:
+      - artifact: "spec.md § 4 FR-022 to FR-024; § 3 decision 6; plan-carryover.md (cites #2535 only)"
+      - code: "docs/adr/3.x/2026-08-13-6-gate-outcomes-carry-severity-operator-strategy-decides-effect.md::machinery faults are fail-open only as a recorded degraded outcome"
+    claim: >
+      Decision 6 aligns with the machinery-fault ruling, and the repo already has an accepted ADR for recorded
+      degraded outcomes with a severity vocabulary. The spec introduces its own seven-class fault enum, fault log and
+      doctor surface without saying whether they reuse or deliberately differ from that pattern, so a reviewer cannot
+      tell whether a new pattern is justified.
+    remediation: >
+      Add one sentence in section 3 stating how the fault classes relate to the ADR's degraded-outcome model (mapped
+      to RECOVERABLE, or intentionally separate because this is not a gate) and cite the ADR beside #2535.

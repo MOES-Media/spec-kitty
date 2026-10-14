@@ -1,0 +1,107 @@
+schema: review-findings/v1
+complete: true
+phase: plan
+lens_group: fresh
+mission: event-producer-reroute-01M4VDY9
+findings:
+  - id: PLAN-FRESH3-001
+    lens: wp-ownership-ordering
+    severity: 3
+    title: WP01 needs dist-set.json for wheel tags, but only WP08 creates it
+    evidence:
+      - artifact: "plan.md § 2 (tag table pinned in dist-set.json; Tag authority), § 3.1 (caller reads the tag from dist-set.json), § 3.2 (WP08 owns check_dist_set.py and dist-set.json), § 11 WP01 and WP08 rows"
+      - artifact: "research.md § 3 (dist-set.json (new)), § 15 (WP08 owns it)"
+      - code: "scripts/release/ (checkout has only check_exact_install.py, check_shared_package_drift.py, extract_changelog.py, validate_release.py; no dist-set.json)"
+    claim: >
+      WP01 must build a stub wheel with its own hook, which requires SPEC_KITTY_PRODUCER_PLATFORM_TAG, and its
+      producer-native.yml/event-producer.yml legs assert the measured glibc and macOS floors against the
+      "pinned floor of dist-set.json". The file does not exist in the checkout and the WP table gives its creation
+      to WP08, which depends on WP01. An implementer of WP01 will either hardcode the tags in the workflow and hook
+      call (a second tag authority that WP08 then has to migrate, contradicting "single authority") or create
+      dist-set.json and collide with WP08's ownership. WP01 cannot be green alone as written.
+    remediation: >
+      Move the creation of dist-set.json (tags only, the three platform entries) into WP01's scope and ownership
+      list; WP08 then extends it with the sdist and py3-none-any entries and adds check_dist_set.py. Update
+      section 3.2, the WP01 and WP08 rows, and research section 15.
+  - id: PLAN-FRESH3-002
+    lens: seam-contract
+    severity: 3
+    title: Mission identity for run-journal rows has no stated source now that Java never reads the envelope
+    evidence:
+      - artifact: "plan.md § 4.2 Journal route (client gets the raw persisted journal line as row, never an envelope; Java never reads seam_args envelope per research § 24)"
+      - artifact: "data-model.md § 3 (run-journal rows: Mission (identity from journal context)) and the missionid rule (row, else meta.json, else rejected)"
+      - code: "src/specify_cli/events/runtime_moments.py::RuntimeMomentProducer._with_mission_identity (stamps mission_slug and mission_id into the ENVELOPE payload only 'where the engine left them empty')"
+      - code: "src/specify_cli/events/runtime_moments.py::_publish_journalled (log_path is .kittify/runtime/runs/<run_id>/run.events.jsonl, not under a mission directory)"
+    claim: >
+      The only place the producer knows the mission of a journal row that the engine left unstamped is the envelope
+      payload, which the plan forbids Java to read. The run journal path carries no mission directory, so
+      meta.json cannot be located from log_path or start_path. Unless every journal payload already persists a
+      mission_id, those rows are all refused as rejected (OD-MISSIONID) and the six run-journal types plus the two
+      significance/denial types never produce. Nothing in plan section 4.2/5 or R-24 says which of seam_args or
+      start_path carries the feature directory for these rows, so an implementer will guess, and AC-004/AC-017 would
+      not reveal it if they use fixtures with the identity already in the row.
+    remediation: >
+      State in section 4.2 (and R-24) how a journal row reaches a mission: either WP06 passes the producer's
+      feature_dir as start_path for journal rows (and Java resolves meta.json from it), or the journal route
+      requires the persisted payload to carry mission_id and says so. Add one WP06 test: a journal row whose
+      payload has empty mission_id, produced through the real route, yields a publish-log row with the correct
+      missionid.
+  - id: PLAN-FRESH3-003
+    lens: internal-consistency
+    severity: 2
+    title: Home of ensure_producer_client is ambiguous between section 4.1 and 4.2, and gate (a) pins an exact symbol set
+    evidence:
+      - artifact: "plan.md § 4.1 row 'register on the seam' (file: 'same + status/adapters.py'; symbols ensure_producer_client, produce_status_handler, produce_lifecycle_handler)"
+      - artifact: "plan.md § 4.2 status/adapters.py row (new ensure_producer_client) and research.md § 16 table (new names of adapters.py: _dispatch_handlers, ensure_producer_client)"
+      - artifact: "plan.md § 4.2 Gate (a): exact top-level symbol set of the three new modules equals the table"
+    claim: >
+      Sections 4.2 and R-16 place ensure_producer_client in adapters.py, while 4.1 can be read as listing it in
+      producer_client.py. The thinness gate compares exact symbol sets, so a wrong placement is either a red gate
+      or a symbol silently allowed in the wrong file.
+    remediation: >
+      In 4.1 split the row: producer_client.py owns produce_status_handler and produce_lifecycle_handler;
+      adapters.py owns ensure_producer_client.
+  - id: PLAN-FRESH3-004
+    lens: layer-and-gate-soundness
+    severity: 2
+    title: Gate (e) does not bind engine.py to ULID-only stamping; uuid4 and hashlib are already imported there
+    evidence:
+      - artifact: "plan.md § 4.2 Gate (e) ('engine.py may add ulid and nothing else') and (b) (key set only); research.md § 16 mutation 'engine.py with an import absent from its row'"
+      - code: "src/runtime/next/_internal_runtime/engine.py lines 10 and 18: import hashlib; from uuid import uuid4"
+      - code: "src/runtime/next/_internal_runtime/engine.py::_append_event (the stamping site)"
+    claim: >
+      The import-set rule only forbids NEW imports. A stamping implementation that writes str(uuid4()) (or a
+      hashlib digest) as event_id inside the changed _append_event adds no symbol and no import, keeps the five keys
+      and passes gates (a) to (e). That would violate the ULID-only ruling. Plan text says tests (1) to (3) of
+      R-24 guard the meaning, but those test the runtime_moments route with a hand-stamped journal line, not
+      the writer's output. The mutation case in R-16 must also use an import engine.py does not already have, or it
+      is vacuous.
+    remediation: >
+      Add to WP07 (and AC-022's test) an assertion on the real _append_event output: event_id parses as a ULID
+      (26-char Crockford) and the function body contains no uuid4 or hashlib reference (AST check inside gate (b)).
+      State that the engine.py mutation uses an absent import such as secrets or random.
+  - id: PLAN-FRESH3-005
+    lens: wp-ownership-ordering
+    severity: 2
+    title: WP02 bundles release-gated items with ungated ones, so the approval rule blocks the whole WP and its dependents
+    evidence:
+      - artifact: "plan.md § 6 While unreleased (no WP that reads the schemas is approved before the pin names the released wheel; 'work that does not read schemas proceeds')"
+      - artifact: "plan.md § 11 WP02 row (domain work now; pin task, AC-029 test and comparator fixtures wait for the release), WP03 and WP05 depend on WP02"
+    claim: >
+      WP02 reads the schemas (AC-029, comparator fixtures), so by the rule it cannot be approved before the events
+      release, and WP03, WP05 (and so WP06) inherit the block although none of them reads schemas. The stated
+      intent that unrelated work proceeds does not hold, and an implementer cannot tell whether WP02's :domain
+      part may be approved alone.
+    remediation: >
+      Move the pin task, events-pin.properties, AC-029 test and comparator fixtures into a separate WP (or into
+      WP04, which already waits for the release), leaving WP02 as :domain code with ungated tests.
+  - id: PLAN-FRESH3-006
+    lens: process
+    severity: 1
+    title: plan.md is 45,608 bytes, above the stated ~45 KB ceiling
+    evidence:
+      - artifact: "plan.md (wc -c: 45608)"
+    claim: Marginally over the budget; no content impact.
+    remediation: >
+      Trim a sentence or two from section 4.2 prose that research.md section 16 already repeats (the unioning
+      sentence and the Gate (e) rationale).

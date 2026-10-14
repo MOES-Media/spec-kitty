@@ -1,0 +1,115 @@
+schema: review-verify/v1
+complete: true
+phase: spec
+results:
+- id: SPEC-GOV-001
+  status: resolved
+  reason: Section 9 item 3 and FR-045 now name D-1, D-2 and D-3 and AC-033 asserts the amendment names all three.
+- id: SPEC-GOV-002
+  status: resolved
+  reason: FR-014 is now a closed list including comparator, fixtures and Lane alignment, and the section 7 events#92 row lists each item for acknowledgement.
+- id: SPEC-GOV-004
+  status: resolved
+  reason: C-004 is defined per artifact and section 7 states the cutover (Java writes both, publish log becomes the ledger or is retired), so no file has two writers.
+- id: SPEC-GOV-005
+  status: resolved
+  reason: OD-SCHEMA-DELIVERY added as plan-blocking with a no-vendoring recommendation, and FR-039 plus AC-027 forbid committed schema source (option (c) is declared as needing a charter amendment).
+- id: SPEC-ARCH-001
+  status: resolved
+  reason: FR-004 and ProduceRequest.start_path make the producer resolve the canonical root, an unresolvable start is rejected (root-unresolvable), and AC-001/AC-005 cover worktree, subdirectory and unresolved
+    cases.
+- id: SPEC-ARCH-003
+  status: resolved
+  reason: FR-002 now covers the runtime producer drain read, the registration kill-switch branch, the pin test and reset helpers, and AC-003 (c) to (e) test each with a falsifier.
+- id: SPEC-ARCH-004
+  status: resolved
+  reason: FR-023/FR-025 make the client the outermost catch with a timeout strictly below the seam bound, busy and TimeoutError call the fault recorder, a per-process breaker is defined, and AC-005/AC-006
+    add busy and batch cases.
+- id: SPEC-ARCH-005
+  status: resolved
+  reason: FR-003 registers on status and lifecycle only, resolved_binding is dropped from the ProduceRequest.slot enum, and AC-004 asserts one annotation row gives one client invocation.
+- id: SPEC-ARCH-006
+  status: resolved
+  reason: Data-model section 8 defines the legacy-row form as generated from the single data schema plus lifted list, and AC-019 (ii) validates one real-writer row per cleared marker with a schema-invalid
+    falsifier.
+- id: SPEC-ARCH-011
+  status: resolved
+  reason: FR-011 and data-model section 1 cite identity/project.py::generate_node_id as canonical, require same inputs and hash, and AC-039 adds a per-OS golden test with injected hostname:username strings.
+- id: SPEC-ARCH-013
+  status: resolved
+  reason: The three retrospective rows are in the type table as in scope with seam NEW, and the AC-004 census derives its universe from the ledger's non-lane row set so an unlisted kind fails.
+- id: SPEC-COMPLETE-001
+  status: resolved
+  reason: FR-012 and LamportState scope the counter to every worktree of one repository (OD-CLOCK) and AC-010 uses a primary checkout plus two worktrees with a repeated-pair falsifier.
+- id: SPEC-COMPLETE-002
+  status: resolved
+  reason: AC-004 now derives writers from the type table and ledger row set, sets a floor of the in-scope writers, and the floor rule requires a self-mutation case (injected writer with no seam call).
+- id: SPEC-COMPLETE-003
+  status: resolved
+  reason: AC-005 makes the disabled row conditional on OD-OPTOUT b with an enum-equality test otherwise, and FR-022/FR-023/ProducerFault carry disabled only under b.
+- id: SPEC-COMPLETE-004
+  status: resolved
+  reason: AC-013 is reworded to at-least-keep_runs and any-item-within-max_age_days, AC-031 covers invalid retention config, and FR-029 defines an open Mission.
+- id: SPEC-COMPLETE-005
+  status: resolved
+  reason: FR-007 and data-model section 2 now state the producer accepts only a 26-char ULID, refuses any UUID form as rejected, and leaves UUID normalization to readers.
+- id: SPEC-COMPLETE-007
+  status: resolved
+  reason: FR-023 puts the warning on stderr in every mode with no --json body change, states stderr and success when the fault log is unwritable, and AC-005 tests that case.
+- id: SPEC-COMPLETE-008
+  status: resolved
+  reason: FR-012 states the permitted kill outcomes, FR-023 words crash/timeout as 'may not have been produced', and AC-010 adds the kill-between-stamp-and-append rerun case.
+- id: SPEC-COMPLETE-009
+  status: resolved
+  reason: AC-029 (data key subset, injected-member falsifier) covers FR-005 and AC-030 (single-writer gate with floor and self-mutation) covers FR-020.
+- id: SPEC-COMPLETE-010
+  status: resolved
+  reason: AC-032 to AC-036 now cover FR-042, FR-044 to FR-046, NFR-003, NFR-004, NFR-006 and FR-019 with falsifiers, and G-8 is renamed to provenance and pinned toolchain.
+- id: SPEC-COMPLETE-011
+  status: resolved
+  reason: AC-024 enumerates built wheels and fails unless the three minimum platform tags are present, with a removed-matrix-entry falsifier under the floor rule.
+- id: SPEC-COMPLETE-012
+  status: resolved
+  reason: AC-019 now requires at least one validated line per in-scope type and AC-020 requires finding the data-model section 9 census lists before judging, both under the floor rule.
+- id: SPEC-COMPLETE-016
+  status: resolved
+  reason: FR-024 defines the fault count (rows in retention window, not reset by success) and FR-029 defines open Mission and unfinished step via lane state, journal completion and lock files.
+- id: SPEC-RELEASE-001
+  status: resolved
+  reason: Section 8 per-wheel rule names the glob/assert sites and the known-prefix binary path, and AC-037 fails fixtures that pick fewer wheels than the expected set.
+- id: SPEC-RELEASE-002
+  status: resolved
+  reason: G-12 and AC-037 require the dist set to equal the pinned list with a removed-wheel falsifier, and G-9 makes publish need the assembled set-checked artifact so a failed leg blocks it.
+- id: SPEC-RELEASE-003
+  status: resolved
+  reason: G-3 now runs the by-path clean-venv install and smoke in the nightly, on producer-touching PRs via a named router group, and in release.yml, as new jobs rather than ci-windows.yml.
+- id: SPEC-RELEASE-004
+  status: resolved
+  reason: G-7 is restated to the FR-043 outcome, C-007 and AC-038 forbid requiring the binary for sdist or editable builds, and OD-FALLBACK is a recommended-yes plan-blocking decision under which FR-043
+    and the ACs hold either way.
+- id: SPEC-RELEASE-008
+  status: resolved
+  reason: AC-036 adds a per-command overhead ceiling via tests/_perf_helpers.py with a planted slow stub, and OD-SPAWN (b) batching is flagged now with FR-001 and ProduceRequest allowing it.
+- id: SPEC-RELEASE-009
+  status: resolved
+  reason: FR-042 and AC-032 re-verify the recorded checksum against the member inside each published wheel with a swap falsifier, and G-8 drops the reproducibility claim (explicit non-claim).
+- id: SPEC-RELEASE-010
+  status: resolved
+  reason: G-6 names only uv lock --check, G-13 adds Java dependency checksum verification, G-5 requires the SBOM to list Java dependencies and embedded toolchain, and AC-040 tests both.
+- id: SPEC-ORDER-003
+  status: resolved
+  reason: FR-012 requires the first stamp after state loss to exceed the highest clock in the publish log and state never pruned while its log exists, AC-010 tests both loss directions, and the neither-present
+    residual is stated in section 11.
+- id: SPEC-ORDER-006
+  status: resolved
+  reason: Worked example 5 now uses valid 26-char ULIDs and a UUID, section 4 states normalize_event_id rules, code-point comparison and error rows, and FR-007/section 2 make UUID normalization reader-only.
+- id: SPEC-ORDER-008
+  status: resolved
+  reason: Section 4 limits the order to upcast-form rows, excludes the id-less run journal, restates the count with collapsed, and AC-009 and example 6 include a duplicate row.
+- id: SPEC-ORDER-009
+  status: resolved
+  reason: Section 4 applies dedupe first, keeps the smallest key of duplicate (source, id) rows, reports differing payloads as a named conflict, and adds source as the final key component.
+- id: SPEC-ORDER-011
+  status: resolved
+  reason: FR-009 now states the missing-mission_id outcome (command succeeds, never silently lost, warning once per Mission) with OD-MISSIONID defining options (a) refuse plus doctor repair and (b) ADR
+    fallback, and AC-005 includes the case.

@@ -1,0 +1,174 @@
+schema: review-findings/v1
+complete: true
+phase: plan
+lens_group: seq
+mission: event-producer-reroute-01M4VDY9
+findings:
+  - id: PLAN-SEQ-001
+    lens: Phasing - each WP leaves main green
+    severity: 4
+    title: WP01 adds a pull_request workflow but its fleet-verdict registration is owned by WP09, so WP01 is red on its own
+    evidence:
+      - artifact: "plan.md § 11 (WP01 creates event-producer.yml skeleton; WP09 owns fleet verdict registration) and § 9 CI home"
+      - code: "scripts/ci/fleet_verdict.py::PR_WORKFLOWS (closed set) and applicable_workflows raising 'PR workflow inventory changed'"
+      - code: "tests/ci/test_fleet_verdict.py::test_all_existing_pr_workflows_are_registered (asserts applicable_workflows(ROOT, ...) == PR_WORKFLOWS against the real tree)"
+      - artifact: "tracer-tooling-friction.md ('Easy to miss')"
+    claim: >
+      WP01 creates .github/workflows/event-producer.yml with a pull_request trigger. The closed inventory test and the
+      fleet verdict script fail on any PR-triggered workflow not in PR_WORKFLOWS, and the registration (fleet_verdict.py,
+      ci-fleet-verdict.yml, test_fleet_verdict.py) is assigned to WP09 (eight WPs later). WP01 therefore cannot be green or approved
+      on its own gates, contradicting the section 11 claim that every WP leaves its lane green. An implementer following the table
+      either ships a red WP01 or edits WP09's chokepoint files. The same ownership split applies to
+      tests/architectural/test_no_duplicate_suite_execution.py for the new workflow_call workflow producer-native.yml.
+    remediation: >
+      Move the fleet-verdict registration (fleet_verdict.py, ci-fleet-verdict.yml, test_fleet_verdict.py) and any
+      duplicate-suite ledger row for event-producer.yml and producer-native.yml into WP01, the WP that creates the workflows;
+      keep WP09 only for release.yml and the nightly call. Update the chokepoint sentence in section 11 accordingly.
+  - id: PLAN-SEQ-002
+    lens: Write-scope chokepoints
+    severity: 3
+    title: WP01 needs the hatch hook and a stub wheel but pyproject.toml and the hook are WP08's sole-owner scope, and WP08 depends on WP01
+    evidence:
+      - artifact: "plan.md § 11 WP01 ('stub wheel with hook'), WP08 ('sole owner of pyproject.toml'; depends on WP01), final sentence of § 11"
+      - artifact: "plan.md § 3.1 (hook path scripts/release/hatch_build_producer.py, pyproject [tool.hatch.build.targets.wheel.hooks.custom])"
+    claim: >
+      The WP01 exit criterion is that a stub wheel built WITH THE HOOK installs and runs on each OS, and section 11 says WP08's
+      stub-binary wheel build "is exercised in WP01 already". But the hook file and the pyproject.toml table are owned by WP08,
+      which runs after WP01. Either WP01 writes the hook and edits pyproject.toml (violating the sole-owner rule and creating a
+      WP01/WP08 merge conflict on pyproject.toml and scripts/release/) or WP01 exercises a throwaway hook that does not prove WP08's.
+    remediation: >
+      Assign the hook, its pyproject.toml table and the minimal stub-wheel packaging test to WP01 (the risky-first WP), and make WP08
+      the owner of the remainder (check_dist_set, dist-set.json, check_exact_install, shared_build_artifacts, docs); or state that WP01
+      uses an out-of-tree throwaway hook and that WP08 must re-prove all three OS legs with the real one.
+  - id: PLAN-SEQ-003
+    lens: Interaction with #6164
+    severity: 3
+    title: The four-commit A-D order for status/adapters.py omits the drain-gate move into the Zeitgeist handlers, so commit A re-opens hosted fan-out with drain off
+    evidence:
+      - artifact: "plan.md § 12 (commits A, B, C, D; 'drain gate moves into the three Zeitgeist handlers') and § 4.2 row status/zeitgeist_bridge.py"
+      - artifact: "research.md R-11 hunk list (A to D contains no zeitgeist_bridge.py hunk)"
+      - code: "src/specify_cli/status/adapters.py::fire_saas_fanout, fire_lifecycle_saas_fanout, fire_resolved_binding_fanout (drain_posture checks near lines 295, 353, 393)"
+    claim: >
+      The only thing preventing the registered Zeitgeist handlers from sending when hosted.drain is off is the fire_* drain check.
+      Plan commit A deletes it first; the compensating check in status/zeitgeist_bridge.py appears in none of A-D. Between A and
+      the bridge edit, the history contains commits where hosted fan-out runs with drain off (C-003 breach, test_hosted_drain_gate red),
+      so A is not an independently green, bisectable commit, and an implementer following A-D literally can forget the bridge hunk entirely.
+      The plan also does not say that if #6164 lands first the bridge-handler edit becomes a modify/delete conflict (resolve by accepting deletion).
+    remediation: >
+      Reorder: commit 1 adds the drain check to the three Zeitgeist handlers (additive, still green); commit 2 (A) removes the fire_* gates;
+      then B, C, D. Add to the #6164-first paragraph that the zeitgeist_bridge.py hunk and its re-pointed pin test are dropped as deleted-by-them.
+  - id: PLAN-SEQ-004
+    lens: Phasing - dependency order / events-repo release gating
+    severity: 3
+    title: WP04 mixes schema-independent protocol work with release-gated schema validation, so the whole Python critical path (WP06, WP07, WP10) waits on an external release
+    evidence:
+      - artifact: "plan.md § 11 (WP04 'needs the events release for the contract tests'; WP06 depends on WP04; WP07 on WP06) and § 6 'While unreleased'"
+      - artifact: "plan.md § 11 last paragraph ('the only legitimate split ... not planned') and WP02 'order and fixtures' versus § 6 (comparator spec and the nine fixtures are carried by the events PR)"
+    claim: >
+      Section 6 lists work that can proceed while the events wheel is unreleased and names the protocol, but WP04 bundles Produce,
+      the launcher protocol and schema validation in one unit gated on the release. WP06 depends on WP04 only for the protocol, yet inherits the
+      gate, so WP06/WP07 (largest Python scope) cannot be approved until an event the mission does not control happens. The plan gives no
+      owner, no tracking point and no fallback timing for the events release. Separately, WP02 claims "order and fixtures" while the
+      authoritative nine fixtures live in the events PR: an implementer either blocks WP02 on the release or authors a second fixture set
+      (the parallel set the operator ruled out, decision 7).
+    remediation: >
+      Split WP04 into WP04a (launcher, protocol value types, Produce against a RowSchemaValidator port with a test double, fault vocabulary;
+      no release needed) and WP04b (real schema validation and contract tests; release-gated). Make WP06 depend on WP04a. State in WP02 that
+      comparator tests use the nine data-model section 4 cases as local test data, replaced by the released fixtures in WP04b via the same
+      assertions (no copy committed as a schema artefact). Add an explicit events-release milestone to the WP table with an owner (orchestrator) and the review point at which it is checked.
+  - id: PLAN-SEQ-005
+    lens: Write-scope chokepoints
+    severity: 3
+    title: The spec-kitty-events floor bump is bundled in WP08 (pyproject.toml owner) so the release-machinery WP chain WP08, WP09 is gated on the unreleased events wheel
+    evidence:
+      - artifact: "plan.md § 3.2 ('at the floor bump also the events range and uv.lock'), § 6 (pyproject floor raised to V_E), § 11 WP08 ('also the events floor bump'; WP09 depends on WP08)"
+      - artifact: "research.md § 8 table row check-spec-kitty-events-alignment.yml (triggers at the floor bump)"
+    claim: >
+      WP08 is both the packaging hook WP, which should be early and independent, and the only WP allowed to edit pyproject.toml, so
+      the events floor bump (impossible before the release, and which trips check-spec-kitty-events-alignment.yml, uv.lock and the
+      tests/contract/spec_kitty_events_consumer pin) lands there. Either WP08 and WP09 stall on the events release, or another WP edits pyproject.toml.
+    remediation: >
+      Carve the floor bump, uv.lock refresh and consumer-contract pin into its own late WP (or the first task of WP04b / WP10) with its own
+      ownership of pyproject.toml's dependency lines, handed off from WP08 after the hook table lands. State that the two edits are disjoint hunks.
+  - id: PLAN-SEQ-006
+    lens: Phasing - risky work front-loaded / PR shape
+    severity: 3
+    title: The release.yml wiring (needs edges, publish-pypi gating, dist-set check, build-release wheel loop) is only exercised on a real tag, and sits late in WP09
+    evidence:
+      - artifact: "plan.md § 3.3 (all changes inside release.yml; smoke-wheels is a release.yml job), § 9 CI home, § 11 (WP09 after WP08, one PR)"
+      - code: ".github/workflows/release.yml (on: push tags 'v*.*.*' and workflow_dispatch of an existing tag; publish-pypi job publishes to PyPI)"
+      - code: "tests/release/test_release_ci_ownership.py (static text pins only)"
+    claim: >
+      release.yml triggers only on a tag or dispatch of an existing tag, and the same run publishes. Pull-request CI exercises native-smoke
+      (event-producer.yml), but not the new job graph, the assemble-all-wheels steps, check_dist_set against the real artifacts, or the
+      publish-pypi needs/if condition with two predecessors. Those edits are guarded only by static text tests, and their first real execution is a
+      release attempt, i.e. the highest-risk change is validated last and live. In a single PR with no slices nothing else catches it.
+    remediation: >
+      Put the wheel-assembly steps (download, recompute sha256, build per-leg wheel, check_dist_set, check_exact_install per tag) in one script or
+      composite action called by BOTH release.yml and event-producer.yml, so PR CI runs the same assembly on the real three-leg artifacts. Add to
+      WP09/WP10 a rehearsal on a pre-release tag or dispatch path that stops before publish-pypi, with the evidence recorded, and a workflow-level
+      mutation test that publish-pypi lacks the new needs edge when removed.
+  - id: PLAN-SEQ-007
+    lens: Campsite-clean first commit
+    severity: 3
+    title: The campsite commit is a docs paragraph fix, not the Standing Order 2 campsite of the surfaces the mission will change, and it has no owning WP
+    evidence:
+      - artifact: "plan.md § 11 'Campsite-clean (Standing Order 2)'"
+      - code: ".kittify/charter/charter.md Standing Order 2 ('campsite-cleaning the surfaces it will touch first ... extract/decompose over-long functions ... dispatch a campsite scout on god-surfaces')"
+      - code: "src/specify_cli/status/adapters.py::fire_saas_fanout, fire_lifecycle_saas_fanout, fire_resolved_binding_fanout (three near-identical gate and breadcrumb bodies the mission edits)"
+      - code: "AGENTS.md section 'PyPI Release' (verified: still states release.yml is absent)"
+    claim: >
+      The first commit is distinct and behaviour-preserving, which is right, but its content is an AGENTS.md/README staleness fix
+      unrelated to the code surfaces the mission touches (status/adapters.py, status/emit.py, runtime engine.py, release.yml). The plan
+      states no Sonar was measured and does not justify the absence of the tidy-first step on the god surfaces, nor dispatch a scout. The
+      commit is also in no WP's scope, so no implementer owns it, and its edit of AGENTS.md (the shared agent contract file) is unassigned.
+    remediation: >
+      Assign the campsite commit to WP01 (docs) and add a per-WP rule: WP06 and WP07 each open with a distinct, behaviour-preserving
+      tidy commit on the surfaces in their section 4.2 rows (for example folding the duplicated fire_* bodies behind one helper before the gate edits) or record
+      a one-line justification per surface that the planned edits are deletions and wiring only; record Sonar as unmeasured, not as clean.
+  - id: PLAN-SEQ-008
+    lens: Mid-flight Mission reflexivity
+    severity: 3
+    title: Registering the client on the seam makes every dev and test environment degrade with binary-missing, but only tests/status/conftest.py is planned to cope
+    evidence:
+      - artifact: "plan.md § 4.2 (tests/status/conftest.py 'fixture also restores the client'), § 13.8, research.md § 'Behaviour of the other build paths' (uv sync leaves _native absent; client reports binary-missing)"
+      - artifact: "spec.md FR-023 (stderr warning in EVERY mode, fault-log row per fault)"
+      - code: "tests/conftest.py (root autouse fixtures isolate home and drain; none stubs the producer client)"
+    claim: >
+      Once WP06 lands, every status transition, lifecycle or decision emission in any test and in any lane workspace running the lane's code
+      emits a binary-missing stderr line and writes a fault-log file, because the editable install has no binary. The plan fixes only tests/status
+      and says only that gates do not depend on the producer. CLI tests asserting clean output, tests counting files in tmp repos and the
+      WP07-WP10 lanes all see the new noise, and the cost shows up as unplanned rework outside WP06's listed test surface.
+    remediation: >
+      Add to WP06 a root-level default (autouse fixture in tests/conftest.py, or the seam's registration helper) that points locate_binary at a
+      no-op/absent-safe test double outside tests that opt in with a marker, listed in the 4.2 table and in the thinness gate census. In
+      section 13.8 state what mission-in-flight tooling (installed spec-kitty versus lane code) will see, and that WP07-WP10 gate runs happen with the double.
+  - id: PLAN-SEQ-009
+    lens: Baseline method captured before the first change
+    severity: 2
+    title: The baseline says #3283/#3284 are not in the repository, but both are, and the known-red set they describe is not used
+    evidence:
+      - artifact: "plan.md § 10 and § 17; research.md § 9 item 3 and the closing note ('neither id appears in this repository')"
+      - code: ".github/actions/warmup/action.yml (cites #3283 venv-lock bootstrap cascade)"
+      - code: "docs/reports/test-sanitation/assertive-test-suite-sanitation-01KZME3P/issue-matrix.md (#3283, #3284 rows; #3284 base 27 failures + 3 teardown errors)"
+    claim: >
+      The claim is wrong, so the lock-timeout rule ('rerun once alone') is an invented definition and #3284's known-red set is not a stated
+      baseline input. Because the method captures red empirically it is still workable, but the empirical capture alone cannot tell a
+      #3284 failure from an environment flake, and the charter rule needs an issue opened for pre-existing failures before continuing, which the
+      plan converts into 'report to the operator'.
+    remediation: >
+      Replace the 'not in repository' statements with these citations; define the lock-timeout rule from the warmup action contract; seed
+      baseline-red.txt with the #3284 node ids as 'known red, tracked' and say who opens the charter-required issue (operator, before WP01 proceeds past it).
+  - id: PLAN-SEQ-010
+    lens: Write-scope chokepoints
+    severity: 2
+    title: Shared Gradle files are not named as chokepoints although WP03, WP04 and WP05 edit them in parallel
+    evidence:
+      - artifact: "plan.md § 1 Build (gradle/verification-metadata.xml, pins.json, events-pin.properties), § 11 chokepoint sentence and WP04/WP05 both depending on WP03"
+    claim: >
+      The chokepoint list names only Python and CI files. verification-metadata.xml (Gradle-generated, covers every dependency), settings.gradle.kts,
+      pins.json and the subproject build.gradle.kts files are touched by every Java WP as dependencies appear (schema validator in WP04, ledger parsing in WP05),
+      and WP04 and WP05 run in parallel, so each regenerates the same generated file and the merge conflicts.
+    remediation: >
+      Name WP01 as owner of the Gradle root files and have it declare all runtime and test dependencies up front (verification metadata generated once);
+      later WPs request additions through the owner, or state that the generated file is regenerated, never hand-merged, on each rebase.

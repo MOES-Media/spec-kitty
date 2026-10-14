@@ -204,6 +204,12 @@ artifacts = [
 # tests/cross_cutting/packaging/test_packaging_safety.py.
 force-include = { "packs/built-in" = "packs/built-in" }
 
+# The native event producer ships in platform wheels built by release.yml (mission event-producer-reroute). The hook is OFF unless
+# HATCH_BUILD_HOOK_ENABLE_CUSTOM=true, so every other build (uv sync, editable, sdist, the shared test build) is unchanged.
+[tool.hatch.build.targets.wheel.hooks.custom]
+path = "scripts/release/hatch_build_producer.py"
+enable-by-default = false
+
 [tool.hatch.build.targets.sdist]
 include = [
     "src/**/*",

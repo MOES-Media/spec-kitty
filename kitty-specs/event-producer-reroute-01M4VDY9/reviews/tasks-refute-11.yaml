@@ -1,0 +1,14 @@
+schema: review-refute/v1
+complete: true
+phase: tasks
+batch: 11
+verdicts:
+  - id: TASKS-RELEASE-011
+    verdict: confirmed
+    reason: T059 and plan 3.4 give no command, source tree or output directory for the platform wheels, while release.yml:178 builds the wheel from the sdist and the plan keeps the sdist include list unwidened, so the checkout-versus-sdist choice is genuinely unstated (severity 2 is fair).
+  - id: TASKS-RELEASE-012
+    verdict: confirmed
+    reason: T062 and plan 9 only say ci-nightly.yml calls the same smoke path; release.yml nightly-gate is fail-closed and nightly-summary has an explicit needs list, so whether the smoke job gates is not stated.
+  - id: TASKS-RELEASE-013
+    verdict: confirmed
+    reason: Plan 9 lists src/specify_cli/_native/** as a path filter while plan 3.1 and WP01 T006 gitignore that directory, so the glob can never match tracked changes; a harmless nit (severity 1) but accurate.

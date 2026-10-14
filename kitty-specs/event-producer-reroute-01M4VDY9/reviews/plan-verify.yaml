@@ -1,0 +1,27 @@
+schema: review-verify/v1
+complete: true
+phase: plan
+reviewer_profile: reviewer-renata
+directives_applied: "Verified each fix against the checkout rather than the commit message; a fix that restates the finding without changing substance was to be marked unresolved (none found); graph checked independently."
+results:
+  - id: PLAN-FRESH3-001
+    status: resolved
+    reason: WP01 now owns dist-set.json (three platform tags) plus its test, WP08 only extends it additively and adds check_dist_set.py; plan sections 2, 3.2, the WP01 and WP08 rows and research section 15 all agree.
+  - id: PLAN-FRESH3-002
+    status: resolved
+    reason: Plan 4.2 states one rule (client start_path is the mission directory that _publish passes as repo_root, which I confirmed is _feature_dir; Java order payload mission_id, then meta.json in start_path, else rejected) with a WP06 real-route test, a WP04 Java test and a WP10 end-to-end check, repeated in research section 24.
+  - id: PLAN-FRESH3-003
+    status: resolved
+    reason: Section 4.1 now lists ensure_producer_client only under status/adapters.py, matching section 4.2 and research section 16.
+  - id: PLAN-FRESH3-004
+    status: resolved
+    reason: Gate (b) now AST-bans uuid4, hashlib, secrets and random in the _append_event body and asserts a real 26-character Crockford ULID output (engine.py does import uuid4 and hashlib); the self-mutation uses an absent secrets import plus a str(uuid4()) copy that must fail (b).
+  - id: PLAN-FRESH3-005
+    status: resolved
+    reason: The pin task, events-pin.properties, AC-029 test and comparator fixtures moved to a new gated WP11, leaving WP02 ungated; the approval rule now names only WP07, WP09, WP10 and WP11 as blocked, while WP01 to WP06 and WP08 proceed.
+  - id: PLAN-FRESH3-006
+    status: resolved
+    reason: plan.md is 44,992 bytes, under the 45,000 limit.
+  - id: PLAN-FINAL-GRAPH
+    status: resolved
+    reason: Edges WP02<-01, 03<-02, 04 and 05<-03, 06<-04 and 05, 08<-01, 11<-04 (plus the release), 07<-06 and 11, 09<-08 and 11, 10<-all are acyclic; each WP is green alone (WP01 owns dist-set.json and the first pyproject edit, WP08 and WP11 do not clash on pyproject, WP11 is last editor), and plan section 6, the WP table and research sections 15 and 24 agree on the floor bump living in WP11 and WP07 depending on WP11.

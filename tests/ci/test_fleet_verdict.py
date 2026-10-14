@@ -30,6 +30,7 @@ pytestmark = pytest.mark.fast
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS_DIR = ".github/workflows"
 CONTRACTS = "contracts.yml"
+EVENT_PRODUCER = "event-producer.yml"
 REPO = "spec-kitty/spec-kitty"
 HEAD = "a" * 40
 IDS = {name: i for i, name in enumerate(sorted(PR_WORKFLOWS | {AGGREGATE}), start=1)}
@@ -103,15 +104,21 @@ class API:
 def test_all_existing_pr_workflows_are_registered() -> None:
     # pyproject.toml is a Contracts trigger path too (the contract tools run under its pins).
     assert applicable_workflows(ROOT, pull(), ["pyproject.toml"]) == PR_WORKFLOWS
-    expected = PR_WORKFLOWS - {CONTRACTS}
+    expected = PR_WORKFLOWS - {CONTRACTS, EVENT_PRODUCER}
     docs_only = expected - {"release-readiness.yml", "check-spec-kitty-events-alignment.yml"}
     assert applicable_workflows(ROOT, pull(), ["docs/example.md"]) == docs_only
     # The contracts workflow is path-gated: only a change under contracts/ (or its own files) selects it.
     assert applicable_workflows(ROOT, pull(), ["contracts/README.md"]) == docs_only | {CONTRACTS}
     assert CONTRACTS in PR_WORKFLOWS
+    # The event producer workflow is path-gated too: only a change under its trigger paths selects it, and a change to the producer build
+    # does not select anything else that was path-gated.
+    assert applicable_workflows(ROOT, pull(), ["services/event-producer/build.gradle.kts"]) == docs_only | {EVENT_PRODUCER}
+    assert EVENT_PRODUCER in applicable_workflows(ROOT, pull(), ["scripts/release/dist-set.json"])
+    assert applicable_workflows(ROOT, pull(), [".github/actions/producer-smoke/action.yml"]) == docs_only | {EVENT_PRODUCER}
+    assert EVENT_PRODUCER in PR_WORKFLOWS
     release = pull()
     release["base"]["ref"] = "release/3.2.6.x"
-    assert applicable_workflows(ROOT, release, ["pyproject.toml"]) == {"ci-router.yml", "ci-modules.yml", "ci-quality.yml", "packs.yml", CONTRACTS}
+    assert applicable_workflows(ROOT, release, ["pyproject.toml"]) == {"ci-router.yml", "ci-modules.yml", "ci-quality.yml", "packs.yml", CONTRACTS, EVENT_PRODUCER}
 
 
 @pytest.mark.parametrize("extension", ["yml", "yaml"])

@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+# Install the pinned GraalVM Community JDK for one pins.json entry into a directory, verifying the sha256 BEFORE anything is unpacked,
+# and export JAVA_HOME (and PATH) to later workflow steps. Single definition used by every job of event-producer.yml that needs the toolchain.
+#
+#   install-graalvm.sh <pins-tool-name> <destination-dir> [pins.json]
+#
+# <pins-tool-name> is a jdk-archive entry of pins.json (graalvm-jdk-linux-x64, graalvm-jdk-macos-aarch64, graalvm-jdk-windows-x64).
+# Exits non-zero on a checksum mismatch, an unknown entry, a missing tool or a native-image whose version differs from the pin.
+set -Eeuo pipefail
+# A failing command must always say which one, with its exit code: a bare exit 127 with no output cost a CI round on the Windows runner.
+trap 'rc=$?; echo "install-graalvm: FAILED rc=$rc at line $LINENO: $BASH_COMMAND" >&2' ERR
+
+name="${1:?pins tool name}"
+dest="${2:?destination directory}"
+pins="${3:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/pins.json}"
+
+# Every external command is checked by name before use: a missing one must never surface as a bare exit 127 (the Windows runner did).
+need() { command -v "$1" >/dev/null 2>&1 || { echo "install-graalvm: MISSING_TOOL $1" >&2; exit 2; }; }
+for t in jq curl cut head dirname mkdir rm find awk; do need "$t"; done
+entry=$(jq -c --arg n "$name" '[.tools[] | select(.name == $n and .kind == "jdk-archive")][0] // empty' "$pins")
+[ -n "$entry" ] || { echo "install-graalvm: no jdk-archive entry named '$name' in $pins" >&2; exit 2; }
+url=$(jq -r .url <<<"$entry")
+want=$(jq -r .sha256 <<<"$entry")
+version=$(jq -r .version <<<"$entry")
+case "$url" in https://*) ;; *) echo "install-graalvm: refusing a non-https url: $url" >&2; exit 2 ;; esac
+if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1; then echo "install-graalvm: MISSING_TOOL sha256sum" >&2; exit 2; fi
+
+# Resolve the extractor BEFORE downloading. 7-Zip is installed on the Windows runner but is not always on the Git Bash PATH, so its
+# documented install directory is tried by explicit path; the Windows system tar (bsdtar) also reads zip. Git Bash's own tar does not.
+extract=()
+case "$url" in
+  *.zip)
+    if command -v 7z >/dev/null 2>&1; then extract=(7z x -y)
+    elif command -v 7za >/dev/null 2>&1; then extract=(7za x -y)
+    else
+      for cand in "${ProgramW6432:-}/7-Zip/7z.exe" "${PROGRAMFILES:-}/7-Zip/7z.exe" "/c/Program Files/7-Zip/7z.exe"; do
+        if [ -f "$cand" ]; then extract=("$cand" x -y); break; fi
+      done
+      if [ "${#extract[@]}" -eq 0 ] && command -v unzip >/dev/null 2>&1; then extract=(unzip -q -o); fi
+    fi
+    [ "${#extract[@]}" -gt 0 ] || { echo "install-graalvm: MISSING_TOOL 7z (a zip extractor: 7z, 7za, 7-Zip under Program Files, or unzip)" >&2; exit 2; }
+    ;;
+  *.tar.gz) need tar ;;
+  *) echo "install-graalvm: unsupported archive format: $url" >&2; exit 2 ;;
+esac
+
+mkdir -p "$dest"
+archive="$dest/graalvm-archive"
+curl --fail --silent --show-error --location --retry 3 --output "$archive" "$url"
+
+# Run a command with all of its output captured in a log that is printed (to stderr) when it fails; nothing is discarded.
+run_logged() {
+  local log="$dest/step.log" rc=0
+  "$@" >"$log" 2>&1 || rc=$?
+  if [ "$rc" -ne 0 ]; then echo "install-graalvm: command exited $rc: $*" >&2; cat "$log" >&2; fi
+  rm -f "$log"
+  return "$rc"
+}
+
+# Hash from stdin: sha256sum given a PATH that holds a backslash (a Windows RUNNER_TEMP) prefixes the digest with a backslash.
+if command -v sha256sum >/dev/null 2>&1; then
+  got=$(sha256sum <"$archive" | cut -d' ' -f1)
+else
+  got=$(shasum -a 256 <"$archive" | cut -d' ' -f1)
+fi
+if [ "$got" != "$want" ]; then
+  echo "install-graalvm: CHECKSUM_MISMATCH for $name: pinned $want but downloaded $got" >&2
+  exit 1
+fi
+
+case "$url" in
+  *.zip)
+    case "${extract[0]}" in
+      unzip) run_logged "${extract[@]}" "$archive" -d "$dest/unpacked" ;;
+      *) run_logged "${extract[@]}" "-o$dest/unpacked" "$archive" ;;
+    esac ;;
+  *) mkdir -p "$dest/unpacked" && run_logged tar -xzf "$archive" -C "$dest/unpacked" ;;
+esac
+rm -f "$archive"
+
+# The archive holds one top directory; macOS nests the JDK under Contents/Home. The JDK root is the directory holding bin/java AND
+# bin/native-image: lib/svm/bin/native-image also exists but is not a JDK root. check-java-home.sh fails closed.
+tools="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+java_home=$("$tools/check-java-home.sh" --find "$dest/unpacked")
+"$tools/check-java-home.sh" "$java_home"
+
+if command -v cygpath >/dev/null 2>&1; then java_home=$(cygpath -m "$java_home"); fi
+# Pin check: the toolchain must be the pinned release.
+# Windows ships bin/native-image.cmd, not the bare name (WP01 CI finding: rc=127 here); the shared helper picks the launcher that exists.
+native_image=$("$tools/check-java-home.sh" --launcher "$java_home" native-image)
+reported=$("$native_image" --version 2>&1 | head -n 3)
+pinned_number="${version#jdk-}"
+case "$reported" in
+  *"$pinned_number"*) ;;
+  *) echo "install-graalvm: native-image --version does not report the pinned $pinned_number: $reported" >&2; exit 1 ;;
+esac
+
+echo "install-graalvm: $name $version sha256=$want JAVA_HOME=$java_home"
+if [ -n "${GITHUB_ENV:-}" ]; then
+  echo "JAVA_HOME=$java_home" >> "$GITHUB_ENV"
+  echo "GRAALVM_TOOLCHAIN_SHA256=$want" >> "$GITHUB_ENV"
+fi
+if [ -n "${GITHUB_PATH:-}" ]; then echo "$java_home/bin" >> "$GITHUB_PATH"; fi

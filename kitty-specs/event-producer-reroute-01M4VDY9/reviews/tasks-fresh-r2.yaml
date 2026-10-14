@@ -1,0 +1,102 @@
+schema: review-findings/v1
+complete: true
+phase: tasks
+lens_group: fresh
+mission: event-producer-reroute-01M4VDY9
+findings:
+  - id: TASKS-FRESH2-001
+    lens: ci-wiring
+    severity: 4
+    title: "WP10 real-binary tests fail closed under CI inside nightly lanes that collect tests/integration and tests/perf by directory"
+    evidence:
+      - artifact: "tasks/WP10-integration-and-final-gate.md § Where the real-binary tests run (REQUIRE_NATIVE_PRODUCER=1 'set by that job, and by CI'; files in tests/integration and tests/perf, marker integration)"
+      - artifact: ".github/ci-module-registry.yml (tests/integration and tests/perf are out_of_matrix dirs; the nightly integration-next job runs 'pytest tests/integration tests/next' by directory and is in nightly-summary.needs)"
+      - artifact: "scripts/ci/integration_slice.py SLICE_MARKER_EXPR (nightly integration-slice selects 'integration and not fast and not unit ...' over tests/integration)"
+    claim: "WP10 places test_event_producer_e2e.py, test_event_producer_degraded.py and the perf test in tests/integration and tests/perf with the integration marker, and makes a missing binary a failure whenever CI is set. Those directories are not run per PR; they are run in full by the nightly integration-next lane (a gating member of nightly-summary.needs, which the release nightly-gate reads) and by the integration-slice lane. Neither builds the GraalVM binary, so under CI=true both go red every night, and red CI means no release (Standing Order 9). The 'no skip-on-missing' design is right for the native-e2e job but wrong as a CI-wide default."
+    remediation: "Make the fail-on-missing switch depend only on REQUIRE_NATIVE_PRODUCER=1, which only the native-e2e job sets (drop 'and by CI'). Outside that job a missing binary skips with a message. Give the real-binary files a dedicated marker (for example native_producer) and add it to the nightly deselections (SLICE_MARKER_EXPR and the integration-next lane), with a test pinning that no other lane selects it. Add the new marker to WP10 owned scope or record the edit."
+  - id: TASKS-FRESH2-002
+    lens: ownership-contradiction
+    severity: 3
+    title: "WP11 T084 replaces the fail-closed default that WP04's own tests pin, with no recorded edit of those tests"
+    evidence:
+      - artifact: "tasks/WP04-java-produce-and-protocol.md § T023 (test: with the default binding a well-formed row replies rejected / validator-unavailable; mutation: accept-all default must fail)"
+      - artifact: "tasks/WP11-events-release-consumer.md § T084 ('the previous default (WP04's fail-closed validator) is replaced')"
+      - artifact: "tasks/WP11-events-release-consumer.md § Recorded out-of-map edits (lists Wiring.java and protocol/smoke-request.json only)"
+    claim: "WP04 owns and ships a launcher test asserting the default Wiring binding rejects a well-formed row. WP11 then replaces that default with the schema-backed validator, so the WP04 test goes red on the WP11 lane (and on the merged tree) unless WP11 edits it. That test is WP04-owned (launcher e2e or protocol tests) and the edit is not in WP11's recorded edits or the overview allowlist. Either the WP11 gate cannot pass, or an unrecorded second-editor edit is implied."
+    remediation: "State the intended end state. Preferred: Wiring keeps the fail-closed validator as its explicit fallback when no registry is embedded (WP11 builds always embed it), and WP04's test constructs that fallback through a test-only factory rather than through the default binding. Then record in WP11 and in the overview allowlist the edit of WP04's default-binding test (the file path named), or move that assertion into a test WP11 can own."
+  - id: TASKS-FRESH2-003
+    lens: build-wiring
+    severity: 3
+    title: "Round-2 move of the released tests to :adapter strands the WP02 mutant table that T075 says it reuses"
+    evidence:
+      - artifact: "tasks/WP02-java-domain-core.md § T013 (mutants live in domain/src/test/.../order/**; 'The same mutant table is reused by WP11 T075 for the released run')"
+      - artifact: "tasks/WP11-events-release-consumer.md § T075 (ReleasedComparatorFixturesTest now in :adapter test package schema.released; 'the mutant table of WP02 T013 ... is reused here')"
+      - artifact: "tasks-overview.md § R9 (build files settled once in WP01; no later WP edits a WP01 build file)"
+    claim: "Before round 2 both test sets were in :domain, so reuse was trivial. Now WP11's test runs from :adapter, but the mutant comparators, the nine test-local fixtures and the permutation reference are :domain test sources, which another subproject cannot see without java-test-fixtures (or a test-jar configuration) in domain/build.gradle.kts. That file is WP01-owned and R9 forbids later edits, and WP02 is told to add nothing to the build. As written T075 cannot reuse the table; the likely outcome is a silent fork (a copy in WP11) that drifts from WP02's, or an unrecorded WP01 build edit."
+    remediation: "Pick one and write it down. Either WP01 T003 pre-wires java-test-fixtures on :domain and WP02 places the mutant comparators and fixture loader under src/testFixtures (owned by WP02, added to its owned_files), consumed by :adapter test via testFixtures(project(':domain')); or WP11 T075 states it carries its own copy of the five mutants under adapter/src/test/.../schema/released/** and a WP02 test pins the two lists equal by name. Also state in T074 and T075 that :adapter's build file exposes :domain on the test classpath (plan section 1 lists :adapter as depending only on :application)."
+  - id: TASKS-FRESH2-004
+    lens: gate-satisfiability
+    severity: 3
+    title: "WP01 floor-breach test targets :domain, which has no code or tests in WP01, so JaCoCo verification is skipped and the expected red never occurs"
+    evidence:
+      - artifact: "tasks/WP01-feasibility-gate-and-build-skeleton.md § T003 step 4 (tools/expect-failure.sh runs ':domain:check -PjacocoLineFloor=1.01' and passes only if the build is red; wired into verify-pins)"
+      - artifact: "wps.yaml WP02 owned_files (all :domain sources and tests belong to WP02; WP01 owns only the spike in :launcher, which JaCoCo excludes)"
+    claim: "On WP01's tip :domain has no classes and no test execution data. Gradle's jacocoTestCoverageVerification is skipped when there is no execution data, so ':domain:check' with an impossible floor stays green and expect-failure.sh fails. The verify-pins job, and so the terminal event-producer-gate, would be red on the scratch pull request for a reason that is not a feasibility finding. The same hole means the 'floor-breach test' proves nothing until WP02 lands."
+    remediation: "Have T003 give the floor-breach test something to measure: a one-class, one-test placeholder in a WP01-owned location that is covered by the verification (for example a build-owned probe source set under tools/ or a trivial class in :domain that WP02 deletes in its first commit, recorded as an out-of-map deletion), or point expect-failure.sh at a subproject WP01 fills. Alternatively state that the step is added to verify-pins only from WP02 and assert it in test_event_producer_workflow.py at that point."
+  - id: TASKS-FRESH2-005
+    lens: ownership-gap
+    severity: 3
+    title: "Handover of the launcher entry point from WP01's spike to WP04's real launcher edits a WP01-owned build file with no recorded edit"
+    evidence:
+      - artifact: "tasks/WP04-java-produce-and-protocol.md § T023 (deletes launcher/.../spike/**; real entry and Wiring in launcher/*.java)"
+      - artifact: "tasks/WP01-feasibility-gate-and-build-skeleton.md § T003, T004 (launcher/build.gradle.kts is WP01-owned; spike package is the only launcher code)"
+      - artifact: "tasks-overview.md § R9 and section 4 (no later WP edits a WP01 build file; a grep of tasks, plan and overview for mainClass or entry class finds nothing)"
+    claim: "The native-image build needs a main class, normally named in launcher/build.gradle.kts or the native-image arguments. WP01's spike lives in package launcher.spike; WP04 owns launcher/*.java and deletes the spike. Nothing says which class the build names, who changes it, or how the producer-native.yml build keeps working across the deletion. Either WP01 names a class it does not own and cannot compile (breaking WP01 to WP03 builds), or WP04 must edit the WP01 build file, which R9 and the recorded-edit tables rule out."
+    remediation: "Fix the entry class name now: WP01 reads it from one property (for example producerMainClass in the WP01-owned gradle.properties-equivalent inside build.gradle.kts) set to the spike class, and WP04 records a one-line second-editor edit of that property in its out-of-map table and in the overview allowlist. Or name the stable class ai.speckitty.producer.launcher.Main in WP01 and have the spike's entry be that class in a file WP01 owns, which WP04 then replaces by a recorded edit."
+  - id: TASKS-FRESH2-006
+    lens: stale-reference
+    severity: 2
+    title: "Overview section 4 allowlist omits recorded edits that WP11 and WP04 bodies declare"
+    evidence:
+      - artifact: "tasks-overview.md § 4 'Recorded out-of-map edits' (WP11 row covers Wiring.java and pyproject.toml only)"
+      - artifact: "tasks/WP11-events-release-consumer.md § Recorded out-of-map edits (also protocol/smoke-request.json replacement and fix-only edits of producer-adapter-fs and producer-launcher metadata)"
+      - artifact: "tasks/WP04-java-produce-and-protocol.md § Recorded out-of-map edits (fix-only edit of producer-adapter-fs)"
+    claim: "The overview calls its table 'the reviewer's allowlist; also in each WP body', but the round-2 smoke-request design added WP11's replacement of the WP04-owned protocol/smoke-request.json and both fix-only metadata edits, and none of them appear there. A reviewer using the overview as the allowlist would flag legitimate edits or miss the smoke-request replacement."
+    remediation: "Add three rows to the section 4 table: WP11 replaces launcher/src/test/resources/protocol/smoke-request.json (WP04); WP04 fix-only edit of adapter producer-adapter-fs metadata (WP03); WP11 fix-only edits of producer-adapter-fs and producer-launcher metadata. Keep them in sync with the WP bodies."
+  - id: TASKS-FRESH2-007
+    lens: coverage
+    severity: 2
+    title: "No work package owns a CHANGELOG.md entry although research expects one and two WPs edit __init__.py"
+    evidence:
+      - artifact: "research.md § gate table (docs lint: 'ADR, glossary, CHANGELOG entry')"
+      - artifact: "wps.yaml (no CHANGELOG.md in any owned_files); AGENTS.md Code Style (a change to __init__.py needs a CHANGELOG.md entry); WP06 edits status/__init__.py, WP07 edits acceptance/__init__.py"
+      - artifact: "CHANGELOG.md has an [Unreleased] section for the current candidate cycle"
+    claim: "The mission changes user-visible behaviour (default-on local publish, platform wheels, a new doctor command, the run-journal stamp) and edits two __init__.py files, but the entry is in nobody's scope, so it is either skipped or added as an unrecorded edit at PR time. The version-bump half of the AGENTS.md rule also conflicts with C-006 (no version numbers assigned), and the tasks do not say how that is resolved."
+    remediation: "Add CHANGELOG.md to WP07 owned_files (last Python WP before the gated tail) with a task line under T050, one [Unreleased] entry covering the whole mission, and a sentence recording that the __init__.py edits add no version bump because C-006 forbids assigning one."
+  - id: TASKS-FRESH2-008
+    lens: ci-wiring
+    severity: 2
+    title: "Path filters of event-producer.yml leave the only real-binary job unreached by seam, client-call-site and e2e-test changes"
+    evidence:
+      - artifact: "tasks/WP01-feasibility-gate-and-build-skeleton.md § T007 (path filters: services/event-producer/**, scripts/release/**, pyproject.toml, producer-smoke action, itself, producer-native.yml)"
+      - artifact: "tasks/WP06-python-client-and-seam.md § Commit order step 2 (adds only src/specify_cli/status/producer_*.py)"
+      - artifact: "tasks/WP10-integration-and-final-gate.md § T083 (native-e2e is a job of event-producer.yml)"
+    claim: "A later pull request that edits status/adapters.py, status/emit.py, the engine, the doctor, tests/integration/test_event_producer_*.py or tests/perf/test_event_producer_overhead.py does not match any filter, so native-e2e (the one place the real binary meets the real client) does not run for it. The mission pull request matches, but the guard is gone after merge."
+    remediation: "In WP10 T083 add the globs tests/integration/test_event_producer_*.py, tests/integration/_native_binary.py, tests/perf/test_event_producer_overhead.py and the seam files of plan 4.2 to the workflow path filters (recorded edit already covers the file), and have test_event_producer_workflow.py assert them."
+  - id: TASKS-FRESH2-009
+    lens: stale-reference
+    severity: 1
+    title: "Plan section 11 WP11 row still says AC-029 is a :domain test file, and the overview's superseded-rows list omits R3"
+    evidence:
+      - artifact: "plan.md section 11 WP11 row ('AC-029 test (a :domain test file)', ':domain test file' in write-scope notes)"
+      - artifact: "tasks-overview.md § 10 ('Plan rows superseded by the tasks' names only R6 and R4; 'Plan refinements R4 to R14')"
+    claim: "Round 2 moved RegistryDataSubsetTest and ReleasedComparatorFixturesTest to :adapter (R3), but the overview's list of superseded plan rows does not include the WP11 row, and 'R4 to R14' skips R3."
+    remediation: "Add the WP11 row and R3 to the section 10 residuals so the tasks are visibly authoritative over plan section 11."
+  - id: TASKS-FRESH2-010
+    lens: ownership-hygiene
+    severity: 1
+    title: "WP11 owned_files lists the two released test files twice (glob and explicit path)"
+    evidence:
+      - artifact: "wps.yaml WP11 owned_files (adapter/src/test/java/.../adapter/schema/** and the two explicit .../schema/released/*.java entries; same in lanes.json lane-k write_scope)"
+    claim: "Leftover from the round-2 package move: the explicit entries are subsumed by the glob and add nothing, which invites a later edit to drop one and desync the manifest from the WP frontmatter."
+    remediation: "Delete the two explicit entries from wps.yaml, the WP11 frontmatter and (via finalize-tasks) lanes.json and tasks.md."

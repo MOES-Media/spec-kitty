@@ -1,0 +1,309 @@
+schema: review-findings/v1
+complete: true
+phase: spec
+lens_group: arch
+mission: event-producer-reroute-01M4VDY9
+findings:
+  - id: SPEC-ARCH-001
+    lens: Layering (seam as it really behaves)
+    severity: 4
+    title: "ProduceRequest.repo_root is not what the seam carries; the kwarg is a canonicalisation starting point, and an unresolvable one fails closed silently"
+    evidence:
+      - artifact: "data-model.md § 6 ProduceRequest (repo_root: 'the emitting checkout as the seam carries it'); spec.md § FR-004 ('together with the mission directory or repo root the call already carries')"
+      - code: "src/specify_cli/status/lifecycle_events.py::fanout_lifecycle_event_hosted (repo_root = log_path.parent)"
+      - code: "src/specify_cli/events/runtime_moments.py::RuntimeMomentProducer._repo_root (returns self._feature_dir, passed as repo_root)"
+      - code: "src/specify_cli/core/hosted_posture.py::_resolve_repo_root (documents the value as a starting point, walks up via resolve_canonical_root, returns None on failure)"
+    claim: >-
+      The three fire_* functions take a repo_root keyword, but its value is not a repository root on the lifecycle
+      and run-moment paths. fanout_lifecycle_event_hosted passes the directory that holds the log (a Mission
+      directory, or the project state directory for the project-scoped log), and RuntimeMomentProducer passes the
+      feature directory. hosted_posture._resolve_repo_root exists precisely because callers hand it a subdirectory,
+      and it returns None (treated as "drain off") when it cannot resolve. A producer that takes data-model section 6
+      at face value would place the publish log, the clock state and the fault log relative to a Mission directory,
+      or under a lane worktree, and an unresolvable start would degrade into the old silent return rather than a
+      recorded fault. Nothing in the spec says which component resolves the canonical root, and AC-004 checks only
+      that a call is made.
+    remediation: >-
+      Reword ProduceRequest.repo_root and FR-004: the seam supplies a starting path (log path, Mission directory or
+      repo root, as each call site gives it) and the PRODUCER resolves the canonical repository root from it (the
+      same canonical-root resolution the lock and posture code use, so a lane worktree, a coordination worktree and
+      the primary checkout all reach one publish log). An unresolvable start is fault class rejected (or a new named
+      class), never a silent return. Add to AC-001/AC-004 one case per slot fired from a lane worktree and from a
+      Mission subdirectory, asserting the same single publish log.
+
+  - id: SPEC-ARCH-002
+    lens: Layering (thin client versus what the seam hands over)
+    severity: 4
+    title: "The seam does not carry the persisted row at the lifecycle and run-moment sites; envelopes are synthesized, which collides with FR-005 and FR-007"
+    evidence:
+      - artifact: "spec.md § FR-004, FR-005, FR-007; data-model.md § 3 rows 'Run journal' ('payload verbatim') and § 2 id rule"
+      - code: "src/specify_cli/events/runtime_moments.py::moment_event_id (uuid5 over run_id:line:event_type) and ::_with_mission_identity (stamps mission_slug and mission_id into the payload)"
+      - code: "src/specify_cli/decisions/emit.py (fan-out envelope renames at to timestamp and drops members of event_dict)"
+      - code: "src/specify_cli/status/emit.py::_saas_fan_out (carries wp_id, lanes, actor, metadata; no event_id, no persisted dict)"
+      - code: "src/specify_cli/status/store.py::serialize_event_line (the one authority for the on-disk row shape, applies sanitize_event_for_log)"
+    claim: >-
+      For run-journal rows the lifecycle slot receives an envelope the moment producer built: its event_id is a
+      deterministic uuid5 (never a ULID, so FR-007 would refuse every run moment as rejected), and its payload carries
+      mission identity the journal row does not hold (so forwarding it breaks FR-005 "adds no member the authoritative
+      row lacks"). For decision rows the envelope is a reshaped copy. For lane rows the kwargs hold no row at all. The
+      only faithful source is the dict the writer serialized, and "after sanitization" (FR-004) means the call site
+      must run serialize_event_line or hand over the dict it just wrote. The spec does not say that each call site
+      (about six) builds and passes that mapping, nor that the client must not derive it, so the thin-client boundary
+      is ambiguous exactly where logic would creep in (sanitizing and reshaping in the client would violate FR-026).
+    remediation: >-
+      Add to FR-004: the mapping handed over is the exact dict the authoritative writer serialized (built by the call
+      site through the writer's own serializer, never reconstructed by the client from the seam kwargs, and never the
+      hosted envelope). State that the runtime moment path passes the journal record itself, with the event_id FR-035
+      writes, and that the moment_event_id derivation and mission-identity stamping are hosted-projection concerns that
+      do not reach the producer. Make AC-004's "carrying the persisted row" a byte comparison with the line the writer
+      appended.
+
+  - id: SPEC-ARCH-003
+    lens: Layering (registration, drain gating, ADR D-2 encoding)
+    severity: 4
+    title: "FR-002 omits two of the places that silence the seam: RuntimeMomentProducer's own drain check and the moment-handler registration kill switch"
+    evidence:
+      - artifact: "spec.md § FR-001, FR-002, AC-003, OD-OPTOUT; § 2 E2"
+      - code: "src/specify_cli/events/runtime_moments.py::RuntimeMomentProducer._publish (reads hosted_posture.drain_posture before any fan-out)"
+      - code: "src/specify_cli/status/adapters.py import tail: 'if moment_handlers_disabled_reason() is None: ensure_zeitgeist_moment_handlers()'"
+      - code: "src/specify_cli/core/env.py::moment_handlers_disabled_reason (SPEC_KITTY_NO_MOMENT_HANDLERS, SPEC_KITTY_SYNC_DISABLE, deprecated alias)"
+      - code: "src/specify_cli/status/adapters.py::reset_handlers and ensure_zeitgeist_moment_handlers (test restore path only re-registers the Zeitgeist handlers)"
+      - artifact: "docs/adr/4.x/2026-10-13-2-... D-2 (the runtime moment producer drops its own drain check; the registration gate keeps binding only the hosted handlers) and Confirmation (a pin that every ensure_zeitgeist_moment_handlers handler checks drain first)"
+    claim: >-
+      FR-002 speaks only of the three fire_* functions. Run-journal rows reach the seam through
+      RuntimeMomentProducer._publish, which has a fourth, separate drain read; left alone, no run-journal row is ever
+      produced on a default install and FR-001 fails for that kind, while AC-003 (which tests the fire_* functions)
+      stays green. Separately, if the client registers in the same import-tail branch as the Zeitgeist handlers, then
+      setting a hosted kill switch silently removes the local producer, which is a not-produced event with no
+      warning (FR-022/FR-023) and the very coupling the ADR removes. The ADR also names a confirmation test the spec
+      does not carry, and the status test fixtures restore only the Zeitgeist wiring, so seam tests would run
+      without the producer unless the restore path is extended.
+    remediation: >-
+      Extend FR-002 and AC-003: (a) RuntimeMomentProducer._publish drops its drain read and always calls the seam; (b)
+      the client registers outside the moment_handlers_disabled_reason branch and is independent of those variables
+      (state the `disabled` class is then reachable only by an explicit producer setting, or remove it, tying OD-OPTOUT
+      to this); (c) the pin test that every Zeitgeist handler checks drain first moves with the gate; (d) the test
+      reset/restore helpers re-register the client. Add a run-journal case and a kill-switch-set case to AC-003.
+
+  - id: SPEC-ARCH-004
+    lens: Layering (handler bounds, "never silent")
+    severity: 3
+    title: "Seam-level drops (busy skip, handler TimeoutError, inline mode, per-event multiplication) bypass the fault record the spec promises"
+    evidence:
+      - artifact: "spec.md § FR-022, FR-023, FR-025, AC-005, AC-006"
+      - code: "src/specify_cli/status/adapters.py::_run_fanout_handler_bounded (raises _FanoutHandlerBusyError when the handler key is still in flight; TimeoutError after the bound; timeout <= 0 runs inline with no bound)"
+      - code: "src/specify_cli/status/adapters.py::fire_saas_fanout and fire_lifecycle_saas_fanout (these outcomes are only logger.warning / logger.debug lines)"
+      - code: "src/specify_cli/status/emit.py::emit_status_transition_batch (one _saas_fan_out per event in the batch)"
+    claim: >-
+      The bound lives in the seam, per handler call, not in the client. Three seam outcomes produce no row and no
+      FR-023 warning: a skipped call because a prior invocation of the same handler is still running, a seam-side
+      TimeoutError (the client records `timeout` only if it fires first), and an exception raised before the client's
+      own try. The fault enum has no class for the busy skip. SPEC_KITTY_SAAS_FANOUT_TIMEOUT <= 0 removes the bound
+      entirely, so FR-025's "never holds the command beyond the fan-out bound" has no meaning in that mode. A batch of
+      N events pays up to N times the client timeout, which AC-006 (one stub) does not bound.
+    remediation: >-
+      State in FR-023/FR-025 that the client is the outermost catch (a handler that never raises), that its timeout is
+      strictly below the seam bound, and that a busy-skip is recorded as a not-produced fault (add a class, or map it
+      explicitly). Say what FR-025 means when the seam bound is disabled (the client timeout still applies) and add a
+      per-command budget (for example one breaker per process: after the first timeout the rest of the batch records
+      one fault each without spawning). Add a busy-skip and a batch case to AC-005/AC-006.
+
+  - id: SPEC-ARCH-005
+    lens: Layering (slots and coverage)
+    severity: 3
+    title: "The resolved-binding slot is not a row source; ProduceRequest.slot and FR-003 invite a second call for the same annotation row"
+    evidence:
+      - artifact: "data-model.md § 6 ProduceRequest.slot (status | lifecycle | resolved_binding); § 3 row 'Inner-state annotation'; spec.md § FR-003, FR-016"
+      - code: "src/specify_cli/status/emit.py::_resolved_binding_fan_out (fires only for an annotation whose delta binds role/profile/model/provider; passes causation_id, not a row)"
+      - code: "src/specify_cli/status/emit.py::emit_status_transition (annotation fan-out follows the lane fan-out for the same prepared transition)"
+    claim: >-
+      A WPResolvedBindingChanged call is a hosted projection of an InnerStateChanged annotation that is itself a
+      persisted row (and of data already inside the lane row's actor binding). If the client is registered on all three
+      slots, the same annotation reaches it twice, once with the annotation row and once as a kwargs-only call with no
+      row; FR-003 "exactly once per persisted row" and FR-016 dedupe hide the problem instead of specifying it.
+      Meanwhile the type table has no type for the slot, so the enum value is dead or ambiguous.
+    remediation: >-
+      State which slots the client registers on (status and lifecycle only, with the annotation getting its own
+      seam call per FR-003) and drop `resolved_binding` from the ProduceRequest.slot enum, or define what a
+      resolved-binding call produces. Add an AC-004 assertion that one annotation row yields one client invocation.
+
+  - id: SPEC-ARCH-006
+    lens: Contracts (one schema set, FR-032 clearance of markers)
+    severity: 4
+    title: "Marker clearance rests on an undefined 'legacy-row form' schema and AC-019 never validates the legacy writers' persisted lines"
+    evidence:
+      - artifact: "spec.md § FR-032, AC-019, AC-002; data-model.md § 8 ('clear' = writer's persisted line validated by the published per-kind schema (legacy-row form)) and § 3 (event_id, at, actor, wp_id lifted out of data)"
+      - artifact: "docs/adr/4.x/2026-10-13-2-... Confirmation (every persisted line validates against its row schema in a producer gate); operator decision 7 (one schema set)"
+      - code: "src/specify_cli/status/lifecycle_events.py::_build_envelope and src/runtime/next/_internal_runtime/engine.py::_append_event (the writers whose markers are to be cleared; their persisted shape is the flat row)"
+    claim: >-
+      The `data` schema excludes the members the type table lifts to attributes, but the legacy persisted rows (the
+      committed ledgers the Python writers keep writing) hold those members inline. Validating such a row needs a second
+      shape, called "legacy-row form", which is neither defined in data-model nor assigned to the events PR (FR-014
+      adds "nothing else"). If it is a second schema per type, it is the parallel set decisions 7 and C-004 forbid; if
+      it is derived from the `data` schema plus the lifted-attribute set, that derivation must be stated. Independently,
+      FR-032's gate and AC-019 validate PUBLISH-LOG lines, which are the producer's output, not the Python writers'
+      persisted lines, so markers 1, 2, 5, 6 and 8 can be cleared with a green gate that never looked at the lines the
+      markers exempt. That makes the clearance vacuous.
+    remediation: >-
+      In data-model section 8 define the legacy-row form as generated from the single `data` schema plus the lifted
+      attribute list (one source, in the events PR, FR-014), or drop the clause and clear markers only on the
+      producer-side evidence the producer can give. Rewrite AC-019 so the gate also validates the lines each cleared
+      marker's writer persists (a fixture row per cleared marker, written by the real writer) and fails when one of them
+      is made schema-invalid.
+
+  - id: SPEC-ARCH-007
+    lens: Sink decision soundness (OD-SINK versus ADR D-2)
+    severity: 3
+    title: "A gitignored per-clone publish log makes the ADR's 'ledger is the publication' claim misleading and leaves holes invisible to subscribers"
+    evidence:
+      - artifact: "spec.md § 3 D-SINK, § 10 OD-SINK, NFR-007, FR-024, FR-045; data-model.md § 2 join invariant, § 7 PublishLogFile"
+      - artifact: "docs/adr/4.x/2026-10-13-2-... D-2 ('a subscriber learns about events by reading the ledger ... events tail, the Read API') and Technical Story (integrations read the committed ledger)"
+      - code: "src/specify_cli/status/lifecycle_events.py::_repo_root_for_lifecycle_log (canonical root resolution exists; the spec does not require the sink to use it)"
+    claim: >-
+      With the sink decided as OD-SINK(a), the ADR's published read paths (events tail, the Read API) still read the
+      committed ledger and the new log has no read path, no cursor and no completeness signal. A row produced on another
+      clone never appears in this clone's publish log (git carries the ledger, not the log); a row persisted while the
+      binary was missing is never backfilled (non-goal); the only evidence of either is a local fault log. A consumer
+      therefore cannot tell "no event" from "event not produced". The spec says this in NFR-007 but states no consumer
+      contract and no way to reconcile, and the Mission/worktree scope of the log is left to the plan (see also
+      SPEC-ARCH-001). FR-045 as worded would record "new rows are CloudEvents" without narrowing the ADR's claim that
+      the ledger itself is the publication seam.
+    remediation: >-
+      Add to FR-045 (and a short consumer-contract sentence in section 1) that the publish log is a best-effort,
+      at-most-once, per-repository-per-clone projection of the committed ledger, that completeness is obtained by
+      reading the ledger, and that the join invariant is the reconciliation key. Require one publish log per canonical
+      repository root regardless of emitting worktree. Extend FR-024 so doctor can also report ledger event ids absent
+      from the publish log (count only), so an incomplete log is detectable without the fault log.
+
+  - id: SPEC-ARCH-008
+    lens: Sink decision soundness (one writer per type, hand-over to the write-side mission)
+    severity: 3
+    title: "'One writer per type' is satisfied per file, not per type, and no rule retires the publish-log emission when a type's writer is cut over"
+    evidence:
+      - artifact: "spec.md § C-004, FR-020, § 7 rows 'Event-log write side' and 'Lane cut-over'; operator decision 7"
+      - artifact: "issue #6193 scope (the Java append becomes the producer for the rows it writes and 'the Python producer path for those rows is retired in the same release')"
+    claim: >-
+      Until the cut-over missions land, the Python writer authors the legacy row in the committed ledger and the Java
+      producer authors the CloudEvent for the same event in the publish log: two shapes, two writers, one event type.
+      That is defensible only as a projection, but the spec never says so, and it states no end-of-life rule. When the
+      write-side mission has Java append CloudEvents into the committed ledger, the publish-log emission for that
+      type would either double-publish or leave two authors of one type, which is the thing decision 7 forbids. The
+      hand-off table lists what is left to #6193 and #6195/#6196 but not this switch.
+    remediation: >-
+      Add one requirement or hand-off row: the publish log is a projection of the committed ledger while the Python
+      writers are authoritative; a type whose committed-ledger writer becomes the Java core stops being published by
+      this producer path in the same release (the committed row is then the published row), and the type table's
+      Status column gets a 'writer after cut-over' entry. Define C-004 as per type and per sink.
+
+  - id: SPEC-ARCH-009
+    lens: Contracts (spec-kitty-events ADR 0001 phases, release classification)
+    severity: 3
+    title: "The producer emits CloudEvents before the events ADR's cutover phase and relies on an envelope validator the ADR calls non-normative; no hand-off amends that"
+    evidence:
+      - artifact: "spec.md § FR-015, FR-014, FR-035, FR-040, § 7 first two rows, OD-EVENTS"
+      - artifact: "spec-kitty-events ADR 0001 and design § 13-14 (Phases 1-3 non-normative: 'no consumer or producer is to gate on them'; producers keep emitting 3.0.0 until the 4b cutover release; writers only after 4b plus the merge-driver precondition)"
+      - artifact: "issue events#92 (envelope, registry, upcaster; blocked by ADR acceptance and the charter amendment)"
+    claim: >-
+      Operator decision 3 settles CloudEvents now, but the events-side ADR still says the opposite for producers, and
+      FR-015 makes the producer gate on envelope attribute rules that live in the Phase-3 validator which #92 has not
+      shipped. The only mitigation is a fallback sentence buried in FR-035 (a "minimal envelope subset") whose
+      timing and release classification are not stated: the CLI floor is `>=10.4.4,<11`, so the events PR must be an
+      additive minor, yet FR-040 does not say so, and a subset envelope schema is a normative surface the ADR said
+      does not exist yet. The hand-off table has no row asking events#92 to amend ADR 0001 (Phase 5 precondition,
+      'producers keep emitting 3.0.0') to match.
+    remediation: >-
+      Move the fallback out of FR-035 into FR-014/FR-015 as its own sentence; state that the events PR is an additive
+      minor within the `<11` range and that rows written ahead of the cutover release are explicitly outside the
+      ADR's 3.0.0 wire rule because they never leave the machine; add a section 7 row: events#92 amends ADR 0001
+      Phase 0/5 wording to record local CloudEvents producers ahead of 4b, with the merge-driver precondition scoped to
+      COMMITTED logs only.
+
+  - id: SPEC-ARCH-010
+    lens: Contracts (JSON surfaces preserved)
+    severity: 3
+    title: "FR-023 limits the stderr warning to human mode; AC-005 demands it for every run including --json"
+    evidence:
+      - artifact: "spec.md § FR-022, FR-023 ('a stderr line in human mode'), AC-005 ('one stderr warning'), AC-018 (no --json body changes), C-002"
+      - code: "src/specify_cli/orchestrator_api/envelope.py::CONTRACT_VERSION (1.15.0; machine consumers of orchestrator-api and --json commands)"
+    claim: >-
+      The two statements disagree on the --json case, and the choice matters: emitting a line on stderr when a machine
+      caller asked for JSON can break callers that merge streams, and omitting it makes the fault visible only through
+      the fault log, which the invoking tool never reads. An implementer cannot pass both FR-023 and AC-005.
+    remediation: >-
+      Decide once: in --json and orchestrator-api modes the stderr line is still written (stdout bytes unchanged, as
+      AC-018 asserts) or the fault is surfaced in a named non-body channel; align FR-023 and AC-005 and add the
+      orchestrator-api command to the fault matrix.
+
+  - id: SPEC-ARCH-011
+    lens: Canonical source
+    severity: 3
+    title: "Node identity cites a non-canonical duplicate, and the cross-language owner of the value is undefined"
+    evidence:
+      - artifact: "data-model.md § 1 nodeid row ('_generate_node_id form'); spec.md § FR-011, E10"
+      - code: "src/specify_cli/identity/project.py::generate_node_id (canonical: sha256(hostname:username)[:12] via socket.gethostname and getpass.getuser)"
+      - code: "src/specify_cli/status/migrate_lifecycle_envelope.py::_generate_node_id (local copy kept for CORE import rules)"
+    claim: >-
+      The data model points at the private copy in the migration module instead of the canonical function. More
+      importantly the Java producer cannot call either: FR-026 forbids the client from computing or supplying the
+      value, so Java must re-derive hostname and username on three operating systems and match what Python derives
+      (Java and Python disagree on hostname resolution on macOS and Windows in practice). A mismatched nodeid fragments
+      one machine's clock domain across Python-produced and Java-produced rows.
+    remediation: >-
+      Cite identity/project.py::generate_node_id as the canonical definition, and add to FR-011 that the node id is
+      derived by the producer from the same inputs and the same hash with a golden test per OS against fixtures produced
+      by the Python function; or have the request carry the value (and relax FR-026 for that one pass-through field,
+      stated explicitly).
+
+  - id: SPEC-ARCH-012
+    lens: Migrations and reflexivity
+    severity: 2
+    title: "The ignore mechanism and upgrade path for the new local-tier files are not named"
+    evidence:
+      - artifact: "spec.md § FR-019, AC-023, E13; data-model.md § 7 ('added through the canonical ignore mechanism')"
+      - code: "src/specify_cli/state/contract.py (STATE_SURFACES, get_runtime_gitignore_entries)"
+      - code: "src/specify_cli/upgrade/migrations/m_3_2_6rc3_worktrees_gitignore_backfill.py (precedent for backfilling ignore entries into existing projects)"
+      - code: "tests/specify_cli/test_state_contract.py and tests/architectural/test_lifted_root_gitignore_contract.py"
+    claim: >-
+      E13 cites ignore entries visible in this repository's own .gitignore, which is not what a consumer project gets.
+      A consumer's ignore entries come from the state-surface registry, guarded by state-contract tests, and an
+      existing project only receives a new entry through an upgrade migration. AC-023 requires "after upgrade" but no
+      requirement names the registry entry, the migration or the guarding tests, so a mid-flight project could keep
+      writing an unignored publish log into a tracked tree.
+    remediation: >-
+      Add to FR-019: the publish log, fault log and clock state are registered as IGNORED surfaces in the state contract,
+      and an upgrade migration backfills the entry for existing projects (migration to be idempotent and
+      config-aware); name test_state_contract as the gate that must stay green.
+
+  - id: SPEC-ARCH-013
+    lens: Contracts (type table coverage)
+    severity: 3
+    title: "Retrospective lifecycle rows are persisted into the ledger but appear nowhere in the type table, the deferral list or the census"
+    evidence:
+      - artifact: "spec.md § FR-003, FR-017 ('rows of types not in this table are never published and never an error'); data-model.md § 3"
+      - code: "src/specify_cli/retrospective/lifecycle_events.py (RetrospectiveCaptured, RetrospectiveCaptureFailed, RetrospectiveSkipped appended to status.events.jsonl through append_raw_rows_atomic; a separate drain-gated live-work publish)"
+      - code: "src/specify_cli/status/lifecycle_events.py::AUTHORITATIVE_NON_LANE_EVENT_TYPES (defines the ledger's non-lane row set)"
+    claim: >-
+      The census gate (FR-003) is defined over "in-scope writers", and in-scope is whatever the table lists, so a ledger
+      row kind that is authoritative and non-lane can be missing without any gate noticing. FR-017's catch-all makes
+      the omission silent by design. Retrospective rows are exactly such a kind, written by a fourth writer outside
+      status/lifecycle_events.py, and they are neither in scope nor on the deferred list.
+    remediation: >-
+      Add the three retrospective rows to the type table as in scope (seam NEW) or deferred with a named residual, and
+      make the census gate derive its universe from the ledger's non-lane row set (AUTHORITATIVE_NON_LANE_EVENT_TYPES plus
+      the retrospective and lane kinds) so an unlisted persisted kind fails the gate instead of being ignored.
+
+  - id: SPEC-ARCH-014
+    lens: Contracts (ADR amendment content)
+    severity: 2
+    title: "FR-045 does not carry the narrowings the mission makes to the accepted ADR"
+    evidence:
+      - artifact: "spec.md § FR-033, FR-045, § 9 item 3"
+      - artifact: "docs/adr/4.x/2026-10-13-2-... D-1 (glossary row in the schema list; 'the canonical 3.0.0 Event envelope stays the wire contract for anything that leaves the machine'), Confirmation (all markers including #1200 gone)"
+    claim: >-
+      The mission leaves the eight glossary markers in place, defers glossary rows, supersedes "flat rows" for new
+      publish-log rows, and keeps the 3.0.0 statement true only for off-machine transport. Only the CloudEvents change
+      is named in FR-045, so the amended ADR would still promise the glossary schema and a marker-free tree.
+    remediation: >-
+      List in FR-045 the four ADR statements the amendment edits: the glossary row and the #1200 confirmation (deferred),
+      the flat-row choice for publish-log rows, the 3.0.0 wire sentence (scope it to transport), and the sink note from
+      SPEC-ARCH-007.

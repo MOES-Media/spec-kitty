@@ -1,0 +1,29 @@
+schema: review-refute/v1
+complete: true
+phase: spec
+batch: 7
+verdicts:
+  - id: SPEC-RELEASE-012
+    verdict: refuted
+    reason: Section 9 items 1 and 5 already flag the uncovered Java gates and the finding itself asks for no spec change, only plan routing.
+  - id: SPEC-ORDER-001
+    verdict: refuted
+    reason: The mission does not ship the reducer switch (D-REDUCER, section 7 hand-off), data-model example 5 already states instant order differs from text order, and gating the switch on the archive-freeze check is the receiving issues' concern.
+  - id: SPEC-ORDER-002
+    verdict: refuted
+    reason: The mission changes none of the listed sort sites and delivers only the order plus fixtures, so enumerating every existing comparator is hand-off HOW detail for the issues that own the switch, not a gap in a requirement of this spec.
+  - id: SPEC-ORDER-003
+    verdict: confirmed
+    reason: FR-012 requires a strictly increasing per-node counter yet LamportState is silent on state loss while the publish log remains (stamping restarts low and sorts before older clocked rows), and AC-010 tests only concurrency and overflow.
+  - id: SPEC-ORDER-005
+    verdict: refuted
+    reason: Data-model section 4 and LamportState explicitly keep nodeid out of the key and leave cross-node merging to the downstream issue, and the local publish log is single-node, so the cross-node semantics are an acknowledged deferral on operator-ruled option C.
+  - id: SPEC-ORDER-006
+    verdict: confirmed
+    reason: Worked example 5 (an AC-008 fixture) uses 5-character ids 01abc and 01ABD that FR-007 and normalize_event_id reject (verified, ValueError for 5 chars), so the fixture contradicts the id rules.
+  - id: SPEC-ORDER-007
+    verdict: refuted
+    reason: The clock is declared an Integer in range 0..2^31-1 with out-of-range rows becoming named error rows, and the legacy over-range and String-type cases are speculative edge handling or events#92 type decisions that FR-012 explicitly defers.
+  - id: SPEC-ORDER-008
+    verdict: confirmed
+    reason: AC-009 asserts ordered + errors = rows read while data-model section 4 collapses and lists duplicates, so the identity is false whenever a duplicate exists, and the comparator input domain for id-less legacy journal rows is unstated.

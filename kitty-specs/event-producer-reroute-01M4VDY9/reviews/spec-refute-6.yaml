@@ -1,0 +1,29 @@
+schema: review-refute/v1
+complete: true
+phase: spec
+batch: 6
+verdicts:
+  - id: SPEC-RELEASE-004
+    verdict: confirmed
+    reason: G-7 ("sdist builds without the binary or fails loudly") does contradict FR-043/AC-025 (install must succeed), and no spec text decides whether a pure fallback wheel ships.
+  - id: SPEC-RELEASE-005
+    verdict: refuted
+    reason: Exact tag pattern and libc/macOS floors are explicitly plan decisions (OD-MATRIX, section 8 omissions) and AC-024/G-1 already gate platform tag presence; the finding asks for plan-level HOW.
+  - id: SPEC-RELEASE-006
+    verdict: refuted
+    reason: FR-026 plus FR-043/AC-025 already define the observable behaviour (binary found or binary-missing); where and how the client looks is plan-level HOW, not needed to make a requirement testable.
+  - id: SPEC-RELEASE-007
+    verdict: refuted
+    reason: One warning per event is the spec's own FR-023 under settled operator decision 6 (never silent) and OD-OPTOUT is a recorded open decision; rate-limiting and test seams are plan-level design.
+  - id: SPEC-RELEASE-008
+    verdict: confirmed
+    reason: NFR-002 has no acceptance criterion (no AC mentions latency or spawn cost) and its only falsifier is deferred to a plan measurement, leaving the charter 2 s requirement untestable.
+  - id: SPEC-RELEASE-009
+    verdict: confirmed
+    reason: No AC covers FR-042 (checksum, pinned toolchain, provenance) and G-8 is titled reproducibility while FR-042 states no reproducibility property.
+  - id: SPEC-RELEASE-010
+    verdict: confirmed
+    reason: A search of .github, Makefile and scripts finds no pip-audit or bandit invocation, so G-6 cites a non-existent gate, and release.yml uses cyclonedx-py environment which only snapshots the Python environment.
+  - id: SPEC-RELEASE-011
+    verdict: refuted
+    reason: Which pin mechanism the Gradle and native toolchain reuse and what the sdist excludes are plan HOW; FR-042 already requires a pinned toolchain and G-10 plus the packaging gates cover shipped contents.

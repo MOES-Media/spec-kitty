@@ -1,0 +1,273 @@
+schema: review-findings/v1
+complete: true
+phase: plan
+lens_group: verify
+mission: event-producer-reroute-01M4VDY9
+findings:
+  - id: PLAN-VERIFY-001
+    lens: Gate-implication audit / revert discipline (vacuity by empty set)
+    severity: 4
+    title: "src/specify_cli/_native/ is not gitignored; the plan relies on it and AC-038 is vacuous in CI"
+    evidence:
+      - artifact: "research.md section 3 ('the directory is gitignored') and section 10 ('developers copy a built binary into the gitignored _native/'); plan.md section 3.2 (file list has no .gitignore) and section 3.1 (C-007, AC-038)"
+      - code: ".gitignore (no _native entry; 'git check-ignore -v src/specify_cli/_native/spec-kitty-event-producer' prints nothing)"
+      - code: "pyproject.toml [tool.hatch.build.targets.wheel].packages includes src/specify_cli; [tool.hatch.build.targets.sdist].include has 'src/**/*'"
+    claim: >
+      The plan states the _native/ directory is gitignored. It is not, and .gitignore is not in the changed-file list. Hatch honours
+      .gitignore for both the wheel (packages) and the sdist (src/**/*), so a locally copied binary is not excluded: a hook-off
+      'uv build' or 'python -m build' on a developer machine ships the binary in the pure wheel and the sdist, and 'git status' offers it
+      for commit. AC-038 and the new test_packaging_safety assertions ('sdist and hook-off wheel contain no binary') are also vacuous
+      in CI, because a CI checkout never has a binary in _native/; they pass whether or not the exclusion works.
+    remediation: >
+      Add .gitignore entries for src/specify_cli/_native/ (a directory pattern) to the WP08 file list. Make the packaging test plant a
+      stub file in src/specify_cli/_native/ (untracked) and assert it is absent from the hook-off wheel and the sdist, and present only
+      when the hook is on (force_include). Correct research.md section 3 and 10 accordingly.
+
+  - id: PLAN-VERIFY-002
+    lens: Silent-success
+    severity: 3
+    title: "build-release keeps an if: that does not look at build-producer, so a failed or partial native build is not stopped at the job level"
+    evidence:
+      - artifact: "plan.md section 3.3 items 1-2 ('adds needs: [nightly-gate, build-producer]'; 'download the three producer artifacts'; 'recompute sha256')"
+      - code: ".github/workflows/release.yml build-release if: '!cancelled() && (nightly-gate success || waived)' (lines 83-97) reads only needs.nightly-gate.result"
+    claim: >
+      With '!cancelled()' in the job condition the implicit success() check is replaced, so adding build-producer to needs does not stop
+      build-release when a leg of build-producer failed (fail-fast is false, so the other legs still upload). Whether the job then fails
+      depends on how the download step is written: a pattern download (producer-*) with merge-multiple silently yields two of three
+      artifacts, and the sha256 recompute and wheel-build loops iterate whatever arrived. Only check_dist_set.py later catches it, and
+      the plan lists that check after the build loop, not as a guard on the download.
+    remediation: >
+      State that build-release's if: gains 'needs.build-producer.result == success'. Download each leg by explicit name taken from
+      dist-set.json (three named download steps or a loop over the pinned legs, failing on a missing one), and have the recompute step
+      assert exactly three manifests before building any wheel.
+
+  - id: PLAN-VERIFY-003
+    lens: Revert discipline / mutation checks for the dist-set gate
+    severity: 3
+    title: "dist-set gate has one named mutation and no floor on the binary re-hash"
+    evidence:
+      - artifact: "plan.md section 3.4 ('AC-037/AC-024 ... with the one-removed-wheel mutation test'), section 2 ('check_dist_set.py --verify-binaries re-hashes the member of every published wheel')"
+      - artifact: "research.md section 3 (check_dist_set.py 'optionally verifies binary checksums')"
+    claim: >
+      The dist-set gate is the sole defence against a wrong or missing wheel (G-12) and has a single mutation case. Cases that fail
+      differently are untested: an extra wheel or second sdist; a wheel with the right name and wrong tag; a platform wheel built with the
+      hook off (a pure wheel carrying a platform name, or three pure wheels overwriting each other under one filename); a platform wheel
+      holding no binary or two; a member hash different from the manifest. --verify-binaries is described as optional and "of every
+      published wheel", with no count: if the loop discovers zero platform wheels (or a manifest directory that is empty or mis-pathed)
+      it passes vacuously.
+    remediation: >
+      List the mutation matrix in plan section 9 (missing, extra, wrong tag, wheel without binary, hash mismatch, hook-off overwrite) as
+      parametrised tests of check_dist_set.py. Make --verify-binaries mandatory in release.yml and publish-pypi, and have it fail unless
+      the number of verified binaries equals the number of platform entries in dist-set.json (floor three, with a self-mutation case that
+      empties the manifest directory).
+
+  - id: PLAN-VERIFY-004
+    lens: Silent-success / OS-specific tests
+    severity: 3
+    title: "Artifact round-trip drops the executable bit; the wheel then carries a non-executable binary on Linux and macOS"
+    evidence:
+      - artifact: "plan.md section 3.3 item 2 (producer artifacts uploaded by producer-native.yml, downloaded in build-release, wheels built there); research.md section 3 test row ('executable bit preserved')"
+      - code: ".github/workflows/release.yml (actions/upload-artifact / download-artifact are used for release-distributions)"
+    claim: >
+      actions/upload-artifact does not keep file permission bits, so the binary downloaded in build-release is mode 0644 and hatch's
+      force_include records that mode in the wheel; pip installs a non-executable file. The planned packaging test uses a stub built in
+      the same job (mode preserved), so it cannot see this. The smoke-wheels job would go red but with a misleading 'crash' or
+      'binary-missing' cause, and the macOS and Linux wheels are only proven on their own OS legs.
+    remediation: >
+      Have the hook set mode 0755 explicitly on non-Windows platform tags (or tar the binary in the artifact), and have check_dist_set.py
+      --verify-binaries assert the member's mode bits in the zip external attributes for the Linux and macOS wheels (mutation: a 0644
+      member fails).
+
+  - id: PLAN-VERIFY-005
+    lens: Silent-success / file locking
+    severity: 3
+    title: "Retain deletes whole publish-log files without taking the clock lock; a concurrent produce can report produced and lose the row"
+    evidence:
+      - artifact: "plan.md section 8 ('calls delete on whole files'; 'opens no file for write in retain') and section 7 (one clock.lock held across stamp and append)"
+      - artifact: "research.md section 5 ('retention never lists clock.json or clock.lock'); spec.md FR-029 ('holds no lock')"
+    claim: >
+      The only serialisation point is clock.lock, held by produce across stamp, dedupe and append. Retain does not take it. On Linux and
+      macOS a delete between produce's open and append unlinks the inode and the appended row is lost while the reply says produced; on
+      Windows the delete fails with a sharing violation that the plan does not map to kept-with-reason. A Mission can be closed, old and
+      outside keep_runs yet still receive a late retrospective or lifecycle row, so the window is real. The "lock facts" input of
+      FR-029 is also ambiguous because clock.lock always exists.
+    remediation: >
+      Specify that Retain takes clock.lock (bounded by deadline_ms) around each candidate delete and re-checks eligibility and file
+      length under the lock; map a delete failure to kept-with-reason. Define "lock facts" as lock files of other writers, never
+      clock.lock. Add a two-process test (produce racing retain --apply on an eligible file).
+
+  - id: PLAN-VERIFY-006
+    lens: Gates (pin verification) / canonical authority
+    severity: 3
+    title: "verify-pins builds a second pin-vs-build checker as a Gradle task instead of extending gradle_pin_check.py; implicated pin tests missed"
+    evidence:
+      - artifact: "plan.md section 9 CI home ('verify-pins (installer checksum, pin file vs build declarations as a Gradle task)') and section 1 (reuse of install_tools.py)"
+      - code: "contracts/tools/gradle_pin_check.py (one authority parameterised by Subproject for contracts/ and acceptance-jvm/; module docstring)"
+      - code: "contracts/tools/verify_pins.py (action-pin rule scoped to contracts*.yml; DEFAULT_PINS is contracts/tools/pins.json)"
+      - code: "tests/contract/test_gradle_pin_check.py, tests/contract/test_verify_pins.py (not in R-7)"
+    claim: >
+      The repository already has one authority for 'the build uses the version pins.json pins', with a precedent of adding a Subproject
+      per Gradle build (acceptance-jvm). The plan writes a third mechanism in Gradle, contradicting charter Standing Order 6
+      (unification, one authority) and leaving the existing check blind to the new build. The test files that pin the existing checker
+      are absent from R-7, and verify_pins.py does not police the new workflow's uses: lines (scope is contracts*.yml), which the
+      plan's 'SHA-pinned action versions (WP09)' leaves unenforced.
+    remediation: >
+      Add services/event-producer as a third Subproject in gradle_pin_check.py (extend tests/contract/test_gradle_pin_check.py with
+      planted mismatches and a floor on compared values) and run verify_pins.py with --pins services/event-producer/tools/pins.json
+      --workflow for the new workflows (or state that action pinning is intentionally unenforced). Add both test files to R-7.
+
+  - id: PLAN-VERIFY-007
+    lens: Gates (supply chain)
+    severity: 3
+    title: "No step provisions and checksums the GraalVM archive; 'native-image --version differs' is not an integrity check"
+    evidence:
+      - artifact: "plan.md section 2 ('archive URL and sha256 in tools/pins.json; the build fails when native-image --version differs') and section 1 (install_tools.py --only gradle)"
+      - code: "contracts/tools/install_tools.py (_unpack handles zip; _unpack_tarball needs a named binary; callers select tools with --only)"
+    claim: >
+      Only Gradle is installed through the sha256-checking installer. Nothing says what downloads the GraalVM JDK on each OS (zip on
+      Windows, tar.gz on Linux and macOS) or that its sha256 is verified before use. An implementer would reach for a setup action or
+      an inline curl; the version check then passes on any archive that reports the pinned string, leaving the native binary's
+      toolchain unverified while the plan claims a pinned, checksummed toolchain (FR-042, G-5, G-8).
+    remediation: >
+      Specify the provisioning mechanism per leg (installer extension for jdk archives, or a pinned action plus an explicit sha256sum
+      step against pins.json), make it a verify-pins subject, and add a tamper case (planted wrong sha256 fails before native-image runs).
+
+  - id: PLAN-VERIFY-008
+    lens: Revert discipline / gate-implication audit
+    severity: 3
+    title: "Lane-list consolidation treats four differently-shaped lists as duplicates of Lane; deriving them changes behaviour"
+    evidence:
+      - artifact: "plan.md section 4.2 ('literal lane tuples replaced by values derived from Lane/CANONICAL_LANES ... constants only') and section 4.4"
+      - code: "src/specify_cli/migration/rebuild_state.py::_LANE_ORDER (five-step history path), ::_VALID_LANES (eight lanes, no in_review)"
+      - code: "src/specify_cli/acceptance/__init__.py::_LEGACY_NOT_DONE_LANES (contains 'doing', not a Lane member)"
+      - code: "src/specify_cli/consolidation/done_bookkeeping.py::_PRE_APPROVED_LANE_VALUES (four-member subset)"
+      - code: "tests/specify_cli/migration/test_rebuild_state.py, tests/specify_cli/status/test_lane_uninitialized.py (docstring still says _VALID_LANES derives from Lane)"
+    claim: >
+      These are not copies of the full vocabulary: one is an ordered migration path, one is a deliberately legacy set, one contains an
+      alias, one is a subset. 'Derive from Lane/CANONICAL_LANES' implemented literally (for example frozenset(CANONICAL_LANES) for
+      _VALID_LANES, or CANONICAL_LANES order for _LANE_ORDER) changes rebuild_state's synthesized event chain and the acceptance
+      not-done set. The plan labels the change 'constants only', so no behavioural test is required, and a revert would not fail any
+      test.
+    remediation: >
+      Say per list how it is derived (subset selected by name from Lane, alias kept explicit) or that it stays and is registered as a
+      reviewed exception in the census gate with a reason. Add a characterisation test per changed list (value equality with the
+      pre-change literal) committed red-first, and name test_rebuild_state.py and the acceptance tests in the WP07 blast radius.
+
+  - id: PLAN-VERIFY-009
+    lens: Revert discipline (vacuity by empty set)
+    severity: 3
+    title: "Java contract tests iterate wheel-extracted schemas, registry and fixtures with no floor on the discovered count"
+    evidence:
+      - artifact: "plan.md section 9 Gradle gates ('contract tests against the pinned released events wheel (schema validity of every in-scope type, comparator results equal, AC-002/008/027)') and section 6 (extraction into build/)"
+    claim: >
+      Floors and self-mutation are stated for ArchUnit and the Python census gates, not for these tests. If the extraction path, the
+      registry file name (listed as unverified in section 17) or a glob is wrong, the registry or fixture directory is empty and
+      'every in-scope type is valid' and 'comparator results equal' pass for zero cases. This is the contract tests' only link to the
+      released events artifact.
+    remediation: >
+      Add to section 9: the registry entry count must equal the data-model section 3 type count, the comparator fixtures must number
+      nine, and each type must have at least one valid and one invalid fixture; the tests fail on any zero or short count, with a
+      self-mutation case that points the extraction at an empty directory.
+
+  - id: PLAN-VERIFY-010
+    lens: Silent-success / gate-implication audit
+    severity: 3
+    title: "Nightly producer smoke is not tied into nightly-summary.needs; nightly tests that pin the job set are not named"
+    evidence:
+      - artifact: "plan.md section 9 CI home ('Nightly: ci-nightly.yml calls the same smoke path (AC-036 numbers recorded there)')"
+      - code: ".github/workflows/ci-nightly.yml nightly-summary.needs (acceptance-bdd, the other Gradle job, is not in it); tests/ci/test_nightly_escalation.py, tests/ci/test_mission_state_audit_routing.py (asserts its job is in nightly-summary.needs), tests/architectural/test_dual_mode_contract.py"
+    claim: >
+      The plan does not say whether the new nightly job joins nightly-summary.needs. The only Gradle precedent (acceptance-bdd) does not,
+      so an implementer following it gets a job whose red never reaches the aggregator, the escalation or the release nightly-gate
+      verdict, and whose AC-036 numbers have no reader. If it does join, the nightly tests above are implicated and are not in R-7.
+    remediation: >
+      Decide and state it: add the job to nightly-summary.needs (and the echo list) so a red nightly smoke blocks the release gate, or
+      document it as informational with the AC-036 numbers uploaded as an artifact. Add the nightly test files to R-7 for WP09.
+
+  - id: PLAN-VERIFY-011
+    lens: Gate-implication audit
+    severity: 2
+    title: "State-contract step defers a decision the code already makes, and misses two implicated tests"
+    evidence:
+      - artifact: "research.md section 7 ('a root outside the work tree needs a new StateRoot member or a GIT_COMMON_DIR note; decided in WP07')"
+      - code: "src/specify_cli/state/contract.py::StateRoot.GIT_INTERNAL ('.git/spec-kitty/') and the existing GitClass.GIT_INTERNAL surface"
+      - code: "tests/specify_cli/test_gitignore_contract.py (exempts GIT_INTERNAL from the gitignore requirement), tests/specify_cli/test_state_doctor.py"
+    claim: >
+      StateRoot.GIT_INTERNAL already exists, so the clock state needs no new root; the open question is only how the common-dir path
+      (linked worktrees) maps onto it. test_gitignore_contract.py and test_state_doctor.py cover the registered surfaces and are not in
+      R-7.
+    remediation: >
+      Record that the clock surface uses StateRoot.GIT_INTERNAL and AuthorityClass.GIT_INTERNAL, and add the two tests to the WP07 list.
+
+  - id: PLAN-VERIFY-012
+    lens: Gate-implication audit
+    severity: 2
+    title: "test_identity_contract_matrix is listed for run.events.jsonl only; surface 5 patches the facade fan-out the plan rewires"
+    evidence:
+      - artifact: "research.md section 7 row for engine.py::_append_event; plan.md section 4.2 (RuntimeMomentProducer._publish drain read dropped, row passed through)"
+      - code: "tests/contract/test_identity_contract_matrix.py::_build_runtime_moment_envelope (patches specify_cli.status.fire_lifecycle_saas_fanout and reads published[0]['envelope'])"
+    claim: >
+      The matrix builds a real RuntimeMomentProducer with the facade function patched and indexes the first captured call. Changing
+      _publish (drain read removed, row= added, seam call added) can leave published empty or add a keyword the lambda ignores, and any
+      client invocation outside the patched name would spawn the real client against a temp directory. The audit row names only the
+      journal-shape expectation.
+    remediation: >
+      Add this surface to the R-7 row for runtime_moments.py and state that the matrix must keep patching the same name; assert the
+      patched call still receives envelope= and row=.
+
+  - id: PLAN-VERIFY-013
+    lens: Gates / silent-success
+    severity: 2
+    title: "'Baseline not widened' for the canonical-producer lint has no enforcer"
+    evidence:
+      - artifact: "plan.md section 4.2 (scripts/lint_canonical_producers.py: 'persisted-line mode; baseline not widened'); research.md section 7 (exempt markers)"
+      - code: "scripts/canonical_producer_lint_baseline.txt (42 lines); tests/architectural/test_lifted_lint.py (round-trip only); no workflow, Makefile target or test runs the lint over the tree against the baseline"
+    claim: >
+      The lint is not wired into CI. Clearing markers (FR-032) and adding a mode can leave violations or grow the baseline with every
+      gate green; test_exemption_ledger is the only new check and the plan does not say it runs the lint with the baseline.
+    remediation: >
+      Make test_exemption_ledger (or a WP07 test) run the lint over the cleared files with the baseline and assert the baseline file
+      is unchanged (line count and a pinned digest), with a self-mutation case that re-adds a marker-less violation.
+
+  - id: PLAN-VERIFY-014
+    lens: Gates (omitted-gate reasons)
+    severity: 2
+    title: "Omitted-gate reasoning misses TID251 on tests and the in-CI security rules of ruff"
+    evidence:
+      - artifact: "plan.md section 9 ('Bandit and pip-audit (invoked nowhere in CI ...)'; 'TID251 ... the client uses none')"
+      - code: "pyproject.toml [tool.ruff.lint] select includes 'S' (Bandit-equivalent rules); banned-api 'hashlib.sha256' applies to src/ and tests/ and is exempt only for scripts/**"
+    claim: >
+      Bandit the tool is indeed not invoked, but the S rules run inside the enforced ruff check, so the plan's reason is incomplete.
+      More concretely, the AC-032 and wheel-content tests that re-hash a binary or PRODUCER.sha256 in tests/ are subject to TID251 and
+      need a justified noqa; the plan implies TID251 is irrelevant because the client uses no hashing.
+    remediation: >
+      Reword the reason (ruff S rules cover the Python changes; Bandit and pip-audit are not run) and note that tests hashing binaries
+      carry an inline '# noqa: TID251 - file-integrity checksum' as in contracts/tools/install_tools.py.
+
+  - id: PLAN-VERIFY-015
+    lens: Gates (Java build)
+    severity: 2
+    title: "Kotlin DSL on Gradle 8.14.5 running under JDK 25 is unproven; both precedent builds are Groovy"
+    evidence:
+      - artifact: "plan.md section 1 Build ('Kotlin DSL ... Gradle 8.14.5 ... Java 25') and section 2 WP01 exit criteria"
+      - code: "acceptance-jvm/build.gradle and contracts/build.gradle (Groovy); tests/ci/test_acceptance_bdd_job.py setup uses java-version 25"
+    claim: >
+      Not verifiable in this checkout (no JDK or Gradle installed). Gradle versions before 9.1 are reported to fail evaluating Kotlin
+      DSL scripts when Gradle itself runs on JDK 25, a failure the Groovy precedents cannot show. The WP01 feasibility gate lists the
+      native-image build but not this, so the failure would surface late if at all.
+    remediation: >
+      Add 'settings.gradle.kts and build.gradle.kts evaluate on Gradle 8.14.5 with JDK 25 as the running JVM' to the WP01 exit
+      criteria, with the Groovy DSL (same layout) named as the recorded fallback, or run Gradle on a JDK 21 and keep the 25 toolchain.
+
+  - id: PLAN-VERIFY-016
+    lens: Determinism / silent-success
+    severity: 2
+    title: "State loss after retention can reuse Lamport values; 'never a reused value' is stated only for kill points"
+    evidence:
+      - artifact: "plan.md section 7 ('State loss: next stamp = max(state, highest lamportclock readable across publish-log files) + 1'; 'never a reused value (AC-010)') and section 8 (whole-file deletion of publish logs)"
+    claim: >
+      Recovery depends on the publish log, which retention deletes. If clock.json is lost after the files holding the highest values
+      were deleted, the next stamp is lower than values already emitted, so order ties or inversions appear with no fault recorded.
+    remediation: >
+      Either have Retain refuse to delete the file holding the current maximum clock while the state file is absent, or persist a
+      high-water mark that retention never touches; add a test (delete state and the newest-eligible log, produce, assert monotonic).

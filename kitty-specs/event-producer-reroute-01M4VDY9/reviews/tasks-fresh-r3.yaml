@@ -1,0 +1,45 @@
+schema: review-findings/v1
+complete: true
+phase: tasks
+lens_group: fresh
+mission: event-producer-reroute-01M4VDY9
+findings:
+  - id: TASKS-FRESH3-001
+    lens: ci-gate-integration
+    severity: 4
+    title: "Change-triggered pytest steps in event-producer.yml (verify-pins, native-e2e) trip test_no_duplicate_suite_execution.py; no WP adds the authorised-ledger row"
+    evidence:
+      - artifact: "tests/architectural/test_no_duplicate_suite_execution.py (module docstring; AUTHORIZED_PER_CHANGE_SUITE_JOBS; unauthorized_suite_jobs; stale-row check near line 904): any change-triggered job that reaches pytest and is not a ledger row is a duplicate suite execution"
+      - artifact: "tasks/WP10-integration-and-final-gate.md § T083: job native-e2e runs pytest on named files in event-producer.yml (a pull_request workflow)"
+      - artifact: "tasks/WP01-feasibility-gate-and-build-skeleton.md § T007: verify-pins runs gradle_pin_check.py 'and its pytest'; only a NON_CHANGE_TRIGGERED row for producer-native.yml is added to the gate file"
+      - artifact: "tasks-overview.md section 4 recorded-edits table and wps.yaml WP10 owned_files: no WP10 edit of tests/architectural/test_no_duplicate_suite_execution.py is recorded (WP01 owns it)"
+    claim: "The gate treats every change-triggered job that reaches pytest as a duplicate execution unless it is a row of AUTHORIZED_PER_CHANGE_SUITE_JOBS (a closed ledger, contracts.yml states 'No pytest runs here' for the same reason). event-producer.yml triggers on pull_request. WP10's native-e2e job (pytest per OS leg) and, if 'its pytest' in WP01 T007 is a pytest invocation, the verify-pins job, are therefore unauthorised and turn test_no_duplicate_suite_execution.py red in the architectural lane. The ledger also asserts no stale rows (a row must name a live suite job), so WP01 cannot pre-register native-e2e; the row must land in the same commit that adds the job, which is WP10, and WP10 neither owns the file nor records the edit. This is an unowned edit that produces a red CI."
+    remediation: "(1) In WP01 T007 make verify-pins call gradle_pin_check.py directly and drop the pytest of the pin tests from that job (tests/contract/test_gradle_pin_check.py already runs in the router's contract-tools lane). (2) In WP10 T083 add a ledger row (event-producer.yml, native-e2e) with its reason (the only job that has the real binary; every other lane skips these files) to AUTHORIZED_PER_CHANGE_SUITE_JOBS in the same commit as the job, and record it as an out-of-map edit of a WP01 file in WP10's table and tasks-overview section 4. Keep one pytest invocation per leg. Add the gate file to the gates WP10 runs."
+  - id: TASKS-FRESH3-002
+    lens: ownership
+    severity: 3
+    title: "WP01 Java tests (spike launcher test, no-:domain-leak build test) have no owned location"
+    evidence:
+      - artifact: "tasks/WP01-feasibility-gate-and-build-skeleton.md § T003 step 9 and step 10: 'an ArchUnit/build test pins that no :domain main dependency leaks'; 'A launcher test (launcher/src/test/.../spike, WP01; replaced by WP04's protocol test)'"
+      - artifact: "wps.yaml / lanes.json lane-a: WP01 owns no services/event-producer/*/src/test/** path (only launcher src/main spike and tools/**); WP04 owns launcher/src/test/.../protocol/** and e2e/** only"
+    claim: "Round 3 added two WP01 Java tests whose directories no WP owns. The spike test would sit in launcher/src/test/java/.../launcher/spike/**, which is outside every owned_files list and outside lane-a's write scope; WP04's replacement and deletion of it is also not a recorded edit. The leak pin has no named home at all, and an ArchUnit test needs a src/test tree that WP01 does not own in :adapter or :application (WP03 and WP04 own parts of those). The write-scope check or the reviewer allowlist will flag them."
+    remediation: "Add services/event-producer/launcher/src/test/java/ai/speckitty/producer/launcher/spike/** to WP01 owned_files (and regenerate lanes.json), add it to the WP04 spike-deletion row in WP04 and tasks-overview section 4. Place the leak pin where WP01 owns the path: a Gradle check/verification step under tools/** (or a case in tests/contract/test_gradle_pin_check.py), not an ArchUnit test in a subproject owned by a later WP."
+  - id: TASKS-FRESH3-003
+    lens: feasibility
+    severity: 3
+    title: "WP10 Definition of Done needs CI runs (per-OS numbers, planted-mutation job red) but defines no push path"
+    evidence:
+      - artifact: "tasks/WP10-integration-and-final-gate.md § T068: limits 'set from CI numbers', 'the numbers that set the limits are reproduced by a CI job'; Definition of Done: 'AC-036 limits set from CI numbers and green; the planted-missing-binary mutation turns the job red'"
+      - artifact: "tasks/WP01-feasibility-gate-and-build-skeleton.md § Evidence path: the scratch pull request is 'the only push planned before the end of the mission'"
+      - artifact: "tasks-overview.md section 10: per-OS legs run only in CI"
+    claim: "WP01 has an explicit evidence path (orchestrator pushes a scratch draft pull request, run ids recorded). WP10 has none, although its DoD and T068/T083 can only be met by real macOS and Windows runs of native-e2e (the relative limits are set from per-OS CI numbers, and 'the mutation turns the job red' is a job result). With the stated rule that WP01's push is the only one planned, the WP10 agent cannot satisfy its DoD inside its lane, and the reviewer has no run ids to check."
+    remediation: "Add an 'Evidence path' section to WP10 mirroring WP01: the agent reports the lane ready, the orchestrator pushes the lane (scratch or the draft mission pull request, operator-authorised), the agent records run ids and per-leg conclusions in research/wp10-measurements.md, sets the limits from those numbers, and a second push confirms green; the planted-mutation red is shown by a recorded scratch run. Amend the WP01 wording 'only push planned' accordingly, and make the DoD cite run ids."
+  - id: TASKS-FRESH3-004
+    lens: consistency
+    severity: 1
+    title: "WP10 says the real-binary exposure is 'the three named files' but native-e2e names four, and the helper test calls require_native_binary()"
+    evidence:
+      - artifact: "tasks/WP10-integration-and-final-gate.md § 'Where the real-binary tests run' guard test (1) versus § T083 pytest file list (e2e, degraded, overhead, test_native_binary_helper)"
+      - artifact: "tasks-overview.md R12(b) 'by named file'"
+    claim: "Guard (1) forbids any file other than the three real-binary files from calling require_native_binary(), but test_native_binary_helper.py (the fourth named file) exercises that function, so the guard as worded is red on its own file or must exempt it silently."
+    remediation: "State that the guard's allowlist is the three real-binary test files plus the helper test file, and that the helper test only exercises the function under monkeypatched environment."

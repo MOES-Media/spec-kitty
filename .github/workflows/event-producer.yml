@@ -1,0 +1,329 @@
+# Event Producer: gates the native event producer (services/event-producer, Java 25) and the platform-wheel build glue.
+# Jobs: verify-pins (pins, dependency verification, negative controls), gradle-test (the full Gradle check on all three OS),
+# native (the three native-image legs: GraalVM Community JDK 25, Linux in the pinned manylinux_2_28 container) and native-smoke
+# (the bundled binary run by path from a stub platform wheel on each OS), closed by event-producer-gate, which fails unless every
+# job and every matrix leg succeeded.
+# Triggers: pull_request and push to main (path-filtered), workflow_dispatch (by hand, on a fork too) and workflow_call (release.yml
+# calls it with mode `release` and the release ref, to build the release binaries). Input `mode`: `pr` (the default) holds the
+# warm start-time gate (median at most 100 ms, the WP01 feasibility gate); `release` builds without it. Input `ref` is the git ref
+# (tag, branch or SHA) to build; empty means the commit that triggered the run.
+# Each native leg uploads `producer-<leg>`: the binary, producer-manifest.json (binary sha256, toolchain sha256, source commit,
+# measured floor), producer-measure.json (warm start time) and producer-sbom.json. The Linux leg also uploads `producer-sbom`.
+# Tool versions and checksums come from services/event-producer/tools/pins.json; the wheel tags (and with them the glibc and macOS
+# floors the legs are held to) from scripts/release/dist-set.json.
+# No pytest runs here. The pin and glue tests (tests/contract/test_gradle_pin_check.py, test_verify_pins.py,
+# tests/architectural/test_build_glue_thin.py, tests/release/test_dist_set_platform_tags.py and the stub-wheel packaging test) run in
+# the router lanes that own them; a pytest call in this workflow would be a duplicate per-change suite execution.
+name: Event Producer
+
+on:
+  pull_request:
+    paths:
+      - 'services/event-producer/**'
+      - 'scripts/release/**'
+      - 'pyproject.toml'
+      - '.github/actions/producer-smoke/**'
+      - '.github/workflows/event-producer.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/event-producer/**'
+      - 'scripts/release/**'
+      - 'pyproject.toml'
+      - '.github/actions/producer-smoke/**'
+      - '.github/workflows/event-producer.yml'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '`pr` holds the warm start-time gate; `release` builds the release binaries without it.'
+        required: false
+        default: pr
+        type: choice
+        options: [pr, release]
+      ref:
+        description: 'Git ref (tag, branch or SHA) to build; empty builds the selected ref.'
+        required: false
+        default: ''
+        type: string
+  workflow_call:
+    inputs:
+      mode:
+        description: '`pr` holds the warm start-time gate; `release` builds the release binaries without it.'
+        required: false
+        default: pr
+        type: string
+      ref:
+        description: 'Git ref (tag, branch or SHA) to build; empty builds the calling commit.'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+# Per-SHA concurrency on push to main (the contracts.yml pattern); PRs coalesce per ref.
+concurrency:
+  group: event-producer-${{ github.event_name == 'push' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
+
+jobs:
+  verify-pins:
+    # A root job: it carries the canonical fork guard as the first conjunct.
+    if: (github.repository == 'spec-kitty/spec-kitty' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: '3.12'
+      - name: Install the locked Python environment
+        run: uv sync --frozen --no-install-project
+      # The manifest, every uses: pin and the install form of the producer workflow. The pinned archives are checksum-verified at use
+      # (install-graalvm.sh before unpacking; the Gradle wrapper's distributionSha256Sum), so no multi-hundred-megabyte download is repeated here.
+      - name: Verify the pins of the producer workflow
+        run: >-
+          uv run --frozen --no-sync python contracts/tools/verify_pins.py
+          --pins services/event-producer/tools/pins.json
+          --workflow .github/workflows/event-producer.yml
+          --pins-only
+      # The Gradle version the wrapper declares must equal the pin that installs and names it; a mismatch is GRADLE_PIN_MISMATCH.
+      - name: Verify the build's versions equal the pinned versions
+        run: uv run --frozen --no-sync python contracts/tools/gradle_pin_check.py
+      - name: Install the pinned GraalVM (checksum verified before it is unpacked)
+        run: bash services/event-producer/tools/install-graalvm.sh graalvm-jdk-linux-x64 "$RUNNER_TEMP/graalvm"
+      # Negative controls: each plants a defect and passes only when the build goes red for the right reason.
+      - name: Coverage floor breach must be red, with a positive control (planted)
+        run: bash services/event-producer/tools/expect-failure.sh floor
+      - name: Tampered dependency verification metadata must be refused (planted)
+        run: bash services/event-producer/tools/expect-failure.sh tamper
+      - name: An adapter main dependency on the domain must be refused (planted)
+        run: bash services/event-producer/tools/expect-failure.sh module
+      - name: A planted SBOM without a pinned dependency, and a manifest without the toolchain, must be refused (planted)
+        run: bash services/event-producer/tools/expect-failure.sh sbom
+
+  gradle-test:
+    name: gradle-test (${{ matrix.os }})
+    if: (github.repository == 'spec-kitty/spec-kitty' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            graalvm: graalvm-jdk-linux-x64
+          - os: macos-14
+            graalvm: graalvm-jdk-macos-aarch64
+          - os: windows-2022
+            graalvm: graalvm-jdk-windows-x64
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: '3.12'
+      - name: Install the locked Python environment
+        run: uv sync --frozen --no-install-project
+      - name: Install the pinned GraalVM (checksum verified before it is unpacked)
+        run: bash services/event-producer/tools/install-graalvm.sh "${{ matrix.graalvm }}" "$RUNNER_TEMP/graalvm"
+      # The live Python node id of this machine, for the Java golden/live comparison (AC-039). REQUIRE_LIVE_NODE_ID turns a missing
+      # value into a failure; this job is the only place that sets it.
+      - name: Export the live Python node id
+        run: |
+          node_id=$(uv run --frozen python -c "from specify_cli.identity.project import generate_node_id; print(generate_node_id())")
+          echo "PRODUCER_LIVE_PY_NODE_ID=$node_id" >> "$GITHUB_ENV"
+          echo "REQUIRE_LIVE_NODE_ID=1" >> "$GITHUB_ENV"
+      # The whole Gradle check on every OS (:domain :application :adapter :launcher): lock, torn-line, golden-byte, node-id and the
+      # launcher's retention race tests run where lock, deletion and byte semantics differ. Dependency verification is strict.
+      - name: Gradle check (all four subprojects)
+        run: cd services/event-producer && ./gradlew --no-daemon check
+
+  native:
+    name: native (${{ matrix.leg }})
+    # A root job: it carries the canonical fork guard as the first conjunct.
+    if: (github.repository == 'spec-kitty/spec-kitty' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
+    runs-on: ${{ matrix.runs-on }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - leg: linux-x86_64
+            runs-on: ubuntu-24.04
+            graalvm: graalvm-jdk-linux-x64
+          - leg: macos-arm64
+            runs-on: macos-14
+            graalvm: graalvm-jdk-macos-aarch64
+          - leg: windows-x86_64
+            runs-on: windows-2022
+            graalvm: graalvm-jdk-windows-x64
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      # The pinned GraalVM Community JDK: downloaded from pins.json, sha256 checked BEFORE it is unpacked, and native-image --version must
+      # report the pinned release. Exports JAVA_HOME and GRAALVM_TOOLCHAIN_SHA256 to the later steps.
+      - name: Install the pinned GraalVM (checksum verified before it is unpacked)
+        run: bash services/event-producer/tools/install-graalvm.sh "${{ matrix.graalvm }}" "$RUNNER_TEMP/graalvm"
+
+      # Windows: native-image needs the MSVC environment (vcvars64). The action is pinned by SHA (v1.13.0).
+      - name: Set up the MSVC environment (Windows)
+        if: matrix.leg == 'windows-x86_64'
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        with:
+          arch: x64
+
+      # Linux: linked against glibc 2.28 inside the pinned manylinux_2_28 image, so the binary runs wherever a manylinux_2_28 wheel does.
+      # The GraalVM installed above is mounted read-only; the build runs as the runner's user. checkout, upload and the measurements stay
+      # on the host.
+      - name: Build the native image (Linux, manylinux_2_28 container)
+        if: matrix.leg == 'linux-x86_64'
+        run: |
+          image=$(jq -r '[.tools[] | select(.kind == "container-image")][0].image' services/event-producer/tools/pins.json)
+          echo "building in $image"
+          # Fail closed on the host (JAVA_HOME must hold bin/java) and again inside the container, where /graalvm is the mount of it.
+          bash services/event-producer/tools/check-java-home.sh "$JAVA_HOME"
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "$PWD/services/event-producer:/work" -v "$JAVA_HOME:/graalvm:ro" \
+            -e JAVA_HOME=/graalvm -e GRADLE_USER_HOME=/work/.gradle-home -e HOME=/work/.home \
+            -w /work "$image" bash -c 'bash tools/check-java-home.sh /graalvm && ./gradlew --no-daemon :launcher:nativeCompile cyclonedxBom'
+
+      # macOS: deployment target 11.0 (the minos floor of the macosx_11_0_arm64 tag): the env var here, and -mmacosx-version-min=11.0 on the
+      # linker and compiler through launcher/build.gradle.kts (the env alone measured minos 14.0 on macos-14). Never stripped (ad-hoc signature).
+      - name: Build the native image (macOS)
+        if: matrix.leg == 'macos-arm64'
+        env:
+          MACOSX_DEPLOYMENT_TARGET: '11.0'
+        run: cd services/event-producer && ./gradlew --no-daemon :launcher:nativeCompile cyclonedxBom
+
+      - name: Build the native image (Windows)
+        if: matrix.leg == 'windows-x86_64'
+        run: cd services/event-producer && ./gradlew --no-daemon :launcher:nativeCompile cyclonedxBom
+
+      # Measures the floor against the leg's wheel tag (fails when it exceeds it), checks the signature (macOS), writes the manifest,
+      # runs the SBOM content check (AC-040) and records the warm start time.
+      - name: Package the leg (floor, manifest, SBOM check, start time)
+        env:
+          ENFORCE: ${{ inputs.mode != 'release' && '--enforce-start-gate' || '' }}
+        run: bash services/event-producer/tools/package-leg.sh "${{ matrix.leg }}" "$RUNNER_TEMP/producer-out" $ENFORCE
+
+      # Planted: the same packaging with a tighter floor than the binary must be refused.
+      - name: A binary above the pinned floor must be refused (planted)
+        env:
+          LEG: ${{ matrix.leg }}
+        run: bash services/event-producer/tools/expect-failure.sh floorgate
+
+      - name: Job summary
+        run: |
+          {
+            echo "### Producer ${{ matrix.leg }}"
+            echo '```json'
+            cat "$RUNNER_TEMP/producer-out/producer-manifest.json"
+            cat "$RUNNER_TEMP/producer-out/producer-measure.json"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: producer-${{ matrix.leg }}
+          path: ${{ runner.temp }}/producer-out
+          if-no-files-found: error
+          overwrite: true
+
+      # One SBOM name for the release (WP09 consumes `producer-sbom`); the Java dependency set is the same on every leg.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: matrix.leg == 'linux-x86_64'
+        with:
+          name: producer-sbom
+          path: ${{ runner.temp }}/producer-out/producer-sbom.json
+          if-no-files-found: error
+          overwrite: true
+
+  native-smoke:
+    name: native-smoke (${{ matrix.leg }})
+    needs: native
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - leg: linux-x86_64
+            os: ubuntu-24.04
+          - leg: macos-arm64
+            os: macos-14
+          - leg: windows-x86_64
+            os: windows-2022
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: '3.12'
+      - name: Install the locked Python environment
+        run: uv sync --frozen --no-install-project
+      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: producer-${{ matrix.leg }}
+          path: ${{ runner.temp }}/producer-in
+      # The stub platform wheel: the repository's own build with the hook switched on, tagged from dist-set.json. The hook, not this step,
+      # restores the exec bit that artifact transfer dropped.
+      - name: Build the stub platform wheel with the build hook
+        env:
+          HATCH_BUILD_HOOK_ENABLE_CUSTOM: 'true'
+          LEG: ${{ matrix.leg }}
+        run: |
+          set -euo pipefail
+          tag=$(jq -r --arg leg "$LEG" '[.platform_wheels[] | select(.leg == $leg)][0].tag' scripts/release/dist-set.json)
+          binary=$(find "$RUNNER_TEMP/producer-in" -maxdepth 1 -type f \( -name 'spec-kitty-event-producer' -o -name 'spec-kitty-event-producer.exe' \) | head -n 1)
+          [ -n "$binary" ] || { echo "::error::no producer binary in the downloaded artifact"; exit 1; }
+          export SPEC_KITTY_PRODUCER_BINARY="$binary" SPEC_KITTY_PRODUCER_PLATFORM_TAG="$tag"
+          uv build --wheel --out-dir "$RUNNER_TEMP/stub-wheel"
+          ls -l "$RUNNER_TEMP/stub-wheel"
+          echo "STUB_WHEEL=$(ls "$RUNNER_TEMP"/stub-wheel/*.whl)" >> "$GITHUB_ENV"
+      - name: Run the bundled binary by path from the installed wheel
+        uses: ./.github/actions/producer-smoke
+        with:
+          wheel: ${{ env.STUB_WHEEL }}
+          mode: binary
+          expect: produced
+
+  # The terminal gate: it lists every job (and so every matrix leg of each) and fails unless all of them succeeded. A missing or
+  # skipped leg is a failure, never a pass.
+  event-producer-gate:
+    needs: [verify-pins, gradle-test, native, native-smoke]
+    # always() makes the job self-starting, so the canonical fork guard is required here too.
+    if: (github.repository == 'spec-kitty/spec-kitty' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Fail unless every needed job succeeded
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "needed job results: $RESULTS"
+          for result in $RESULTS; do
+            if [ "$result" != "success" ]; then
+              echo "::error::a needed job did not succeed: $RESULTS"
+              exit 1
+            fi
+          done

@@ -1,0 +1,29 @@
+schema: review-refute/v1
+complete: true
+phase: tasks
+batch: 2
+verdicts:
+  - id: TASKS-DECOMP-009
+    verdict: refuted
+    reason: T065 does not prescribe skipping, WP10 is explicitly a CI-run final gate ("Per-OS legs run only in CI"), and the finding's silent-skip outcome is speculation about an implementer rather than a defect in the artifact.
+  - id: TASKS-DECOMP-010
+    verdict: refuted
+    reason: WP01 T007 smoke runs the stub wheel in native-smoke while WP09 T060 is the release smoke over real wheels, and the claim that both are the same script rests on an unnamed WP01 path, so duplication is not evidenced.
+  - id: TASKS-DECOMP-011
+    verdict: refuted
+    reason: tasks-overview section 1 already states review by contiguous WP ranges and excludes generated files, and history compaction and the PR body belong to the later wrap-up procedure, not to WP task prompts.
+  - id: TASKS-DECOMP-012
+    verdict: refuted
+    reason: Both edits are explicitly marked (WP04 T023 states the spike deletion, WP09 T061 says additive and serial after WP01/WP11, and the overview chokepoint row says WP09 adds only plugin/config lines), so there is no unmarked second-order edit.
+  - id: TASKS-SEQ-001
+    verdict: confirmed
+    reason: plan section 1 puts ports in :application with :adapter depending on it, wps.yaml gives application/port/** to WP04 while WP03 (depends on WP02 only) builds the adapters, and WP03 prompt names no port interfaces, so the inversion is real (severity 4 is arguably 3).
+  - id: TASKS-SEQ-002
+    verdict: confirmed
+    reason: META-INF/native-image/** and spike/** are owned only by WP01 in wps.yaml, WP04 T023 deletes spike files it does not own, and no later WP (WP03, WP04, WP11) owns reachability or resource metadata that native-smoke would need.
+  - id: TASKS-SEQ-003
+    verdict: confirmed
+    reason: WP08 T052 extends dist-set.json which is absent from WP08 owned_files (WP01 owns it), and the Gradle and pyproject edits by WP02, WP03, WP09 and WP11 are outside their owned_files while overview R2 declares only marker and ledger edits as out-of-map; the README-stale sub-claim is minor and unneeded.
+  - id: TASKS-SEQ-004
+    verdict: confirmed
+    reason: WP05 T033 registers at an unspecified WP04 registration point while WP05 owns only launcher/retain/**, so the mechanism and ownership disagree and R1's "concurrent writes" reasoning does not match the real compile-time dependency.

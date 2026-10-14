@@ -1,0 +1,29 @@
+schema: review-refute/v1
+complete: true
+phase: tasks
+batch: 10
+verdicts:
+  - id: TASKS-RELEASE-003
+    verdict: confirmed
+    reason: "verify_pins.py --workflow flags UNPINNED_USES for the actions/checkout@v6 lines and UNPINNED_INSTALL for the non-prelude uv sync and pip install in release.yml, so the T063 gate is red on base and no task scopes it."
+  - id: TASKS-RELEASE-004
+    verdict: refuted
+    reason: "tasks-overview section 4 already declares the Gradle build files and verification-metadata.xml as a serial chokepoint where WP09 adds plugin/config lines, the same recorded out-of-map pattern used for pyproject.toml, so this is handled and severity 4 is overstated."
+  - id: TASKS-RELEASE-005
+    verdict: refuted
+    reason: "dist-set.json and scripts/release/README.md are declared chokepoints with ordered editors in tasks-overview, and the cited nightly tests are generic (job-needs coverage check) rather than pinning a literal job set, so a nightly job added with its needs entry does not turn them red."
+  - id: TASKS-RELEASE-006
+    verdict: confirmed
+    reason: "PASS item 2 says 'warm' with no protocol (runs, statistic, payload) and T005 names no MSVC environment step, though a minos miss does route to HALT and an operator decision, so severity 3 is overstated (2)."
+  - id: TASKS-RELEASE-007
+    verdict: refuted
+    reason: "A HALT stops the WP before it reaches done and nothing merges, WP01's Definition of Done requires the PASS verdict, and the claimed premature WP08 dispatch is speculation with no concrete defect in the artifacts."
+  - id: TASKS-RELEASE-008
+    verdict: refuted
+    reason: "research.md section on provenance (referenced by WP09 via R-3 and R-12) already specifies actions/attest-build-provenance SHA-pinned at WP09 with attestations: write and id-token: write, so the attestation flavour and permissions are decided; only minor detail such as the producer SBOM name is open."
+  - id: TASKS-RELEASE-009
+    verdict: confirmed
+    reason: "WP09 creates the new Python file scripts/release/producer_smoke.py, which is not among the F1-allowed files (hook, check_dist_set.py, check_exact_install.py edit, gradle_pin_check entry) in operator decision 10 or plan 13 item 2, and WP01 native-smoke defines a separate inline smoke."
+  - id: TASKS-RELEASE-010
+    verdict: refuted
+    reason: "Both triggers set RELEASE_REF to the same tag name, and the design already fails closed (build-release fails unless every manifest source commit equals its own git rev-parse HEAD), and plan 17 already flags the env-in-with risk, so no concrete defect is shown."

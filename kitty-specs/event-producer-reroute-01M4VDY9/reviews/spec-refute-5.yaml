@@ -1,0 +1,29 @@
+schema: review-refute/v1
+complete: true
+phase: spec
+batch: 5
+verdicts:
+  - id: SPEC-COMPLETE-012
+    verdict: confirmed
+    reason: AC-019 and AC-020 carry no floor (unlike AC-012, AC-014), so an empty persisted log or a scan matching none of the data-model section 9 lists passes vacuously.
+  - id: SPEC-COMPLETE-013
+    verdict: refuted
+    reason: FR-044 is covered by the PlatformWheel invariants line (packs/internal never in any wheel) and the FR-036 to FR-038 mapping to Rules (2) and clockless-row order is defensible, leaving only a cosmetic trace nit.
+  - id: SPEC-COMPLETE-014
+    verdict: refuted
+    reason: The charter Pre-existing Failure Reporting Rule and the CLAUDE.md baseline-red gotcha already govern attribution of pre-existing reds, and pyproject sets mypy strict with mypy_path, so no spec-level gap.
+  - id: SPEC-COMPLETE-015
+    verdict: refuted
+    reason: Spec section 7 explicitly points to plan-carryover section T, which states the per-checkout publish log fact and is declared plan input, and FR-012 already makes stamp-and-append exclusive across processes, so nothing binding is lost.
+  - id: SPEC-COMPLETE-016
+    verdict: confirmed
+    reason: count_since_clean, open Mission and unfinished step are undefined anywhere in spec, data-model or carryover, so AC-007 and AC-013 cannot name their fixtures.
+  - id: SPEC-RELEASE-001
+    verdict: confirmed
+    reason: check_exact_install.locate_wheel exits on more than one wheel, release.yml uses WHEEL_FILE=$(ls dist/*.whl), and the shared fixture takes wheels[-1], so G-1 and G-2 as an extension of these go red or test one arbitrary wheel.
+  - id: SPEC-RELEASE-002
+    verdict: confirmed
+    reason: None of G-1 to G-11 asserts the published wheel set equals the FR-041 matrix, release.yml has no per-OS matrix today, and FR-043 turns a missing platform into a silent binary-missing degrade.
+  - id: SPEC-RELEASE-003
+    verdict: confirmed
+    reason: G-3 names ci-windows.yml, which is path-filtered, Windows-only and pipx-based, and no linux or macOS lane exists, so the native build first runs at tag time after the nightly gate has already passed.

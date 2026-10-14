@@ -1,0 +1,29 @@
+schema: review-refute/v1
+complete: true
+phase: tasks
+batch: 1
+verdicts:
+  - id: TASKS-DECOMP-001
+    verdict: refuted
+    reason: The WP06 size is real (31 owned files) but the artifact already names the cut and tasks-overview section 1 explicitly reserves the stacked-slice and split decision to the operator, so it is a deliberate deferral not an unhandled defect, and severity 4 is overstated.
+  - id: TASKS-DECOMP-002
+    verdict: confirmed
+    reason: wps.yaml gives WP07 dependencies WP06 and WP11 and T044 blocks the whole WP, though only T047 needs the released events wheel; lane consolidation, journal stamping and glossary/ADR work are gated needlessly (severity more like 2 to 3).
+  - id: TASKS-DECOMP-003
+    verdict: refuted
+    reason: WP01 exit criterion 3 requires a stub wheel built with WP01's own hatch hook and the pin and skeleton are needed by the spike, so the proposed move of T006 out of WP01 contradicts the feasibility gate and the rest is a preference.
+  - id: TASKS-DECOMP-004
+    verdict: confirmed
+    reason: WP04 owns the launcher entry using a fake RowSchemaValidator and WP11 owns only adapter/schema and gradle files, and no plan or WP text names who binds the real validator in the launcher or what the pre-WP11 default is (grep for wiring, composition or fail-closed found nothing).
+  - id: TASKS-DECOMP-005
+    verdict: confirmed
+    reason: T038 says fakes in tests/runtime/test_bridge_engine.py gain the method but that file is absent from WP06 owned_files in wps.yaml; the other cited fakes already lack emit_significance_evaluated so they are not shown to break, which lowers severity to 2.
+  - id: TASKS-DECOMP-006
+    verdict: confirmed
+    reason: WP07 T048 says gate/test with no file or assertion and itself defers the real byte-identity check to WP10, so FR-036 and FR-037 have no WP07 artifact; severity 2 is more apt.
+  - id: TASKS-DECOMP-007
+    verdict: confirmed
+    reason: WP07 T044 is 'No code.', WP09 T058, WP10 T064 and WP11 T071 are check-only subtasks, and T064 has a heading with no steps at all (verified in WP10), though this is a nit given the Precondition gate sections.
+  - id: TASKS-DECOMP-008
+    verdict: refuted
+    reason: T008 names the native-smoke job and T009 names research/wp01-feasibility.md, and the T047 marker-to-file mapping is derivable from data-model section 8 and the T047 text itself, so the claim of ambiguity is not concretely supported.

@@ -4,7 +4,7 @@
 build. This check closes that gap: a JVM toolchain is installed from ``pins.json``, but the build file declares
 its own plugin version, and the two can drift apart without any other check noticing.
 
-One canonical authority, two subprojects. The same scan runs, parameterised by a :class:`Subproject`, over:
+One canonical authority, three subprojects. The same scan runs, parameterised by a :class:`Subproject`, over:
 
 * ``contracts/`` — pins ``gradle`` and the ``openapi-generator-gradle-plugin``. It compares the
   ``id 'org.openapi.generator' version '...'`` line of ``contracts/build.gradle``; every
@@ -20,7 +20,13 @@ One canonical authority, two subprojects. The same scan runs, parameterised by a
   none today; it installs Gradle from ``pins.json``). No plugin-side check runs for this subproject. An absent
   wrapper or ``acceptance-bdd`` job is tolerated exactly like the absent wrapper file in ``contracts/``.
 
-For both subprojects the manifest's own ``url`` must carry the entry's ``version`` (a bumped ``version`` with an
+* ``services/event-producer/`` — pins ``gradle`` (and lists the GraalVM archives, which this check does not read). Its
+  build declares no Gradle version, so the live comparisons are the manifest ``url`` against that entry's ``version``
+  and the version in ``distributionUrl`` of the committed ``services/event-producer/gradle/wrapper/gradle-wrapper.properties``
+  (compared only if the file exists, as for the other subprojects). Scanned by the whole-repository mode only when its
+  ``pins.json`` exists.
+
+For every subproject the manifest's own ``url`` must carry the entry's ``version`` (a bumped ``version`` with an
 old ``url`` would install the old tool while every comparison above passed).
 
 Failure, one stable code: ``GRADLE_PIN_MISMATCH`` (a value the build uses is not the pinned version).
@@ -67,6 +73,11 @@ ACCEPTANCE_PINS = ACCEPTANCE_ROOT / "tools" / "pins.json"
 ACCEPTANCE_BUILD = ACCEPTANCE_ROOT / "build.gradle"
 ACCEPTANCE_METADATA = ACCEPTANCE_ROOT / "gradle" / "verification-metadata.xml"
 ACCEPTANCE_WRAPPER = ACCEPTANCE_ROOT / "gradle" / "wrapper" / "gradle-wrapper.properties"
+EVENT_PRODUCER_ROOT = Path("services") / "event-producer"
+EVENT_PRODUCER_PINS = EVENT_PRODUCER_ROOT / "tools" / "pins.json"
+EVENT_PRODUCER_BUILD = EVENT_PRODUCER_ROOT / "build.gradle.kts"
+EVENT_PRODUCER_METADATA = EVENT_PRODUCER_ROOT / "gradle" / "verification-metadata.xml"
+EVENT_PRODUCER_WRAPPER = EVENT_PRODUCER_ROOT / "gradle" / "wrapper" / "gradle-wrapper.properties"
 NIGHTLY_WORKFLOW = Path("ci-nightly.yml")
 ACCEPTANCE_JOB = "acceptance-bdd"
 PLUGIN_ID_LINE = re.compile(r"""\bid\s*\(?\s*['"]org\.openapi\.generator['"]\s*\)?\s*version\s*\(?\s*['"]([^'"]+)['"]""")
@@ -306,6 +317,21 @@ def _acceptance_jvm_subproject(
     )
 
 
+def _event_producer_subproject(root: Path) -> Subproject:
+    return Subproject(
+        pins=root / EVENT_PRODUCER_PINS,
+        build=root / EVENT_PRODUCER_BUILD,
+        metadata=root / EVENT_PRODUCER_METADATA,
+        wrapper=root / EVENT_PRODUCER_WRAPPER,
+        candidates=(GRADLE_TOOL,),
+        required=(GRADLE_TOOL,),
+        plugin_tool=None,
+        job=None,
+        workflows=(),
+        workflow_glob=None,
+    )
+
+
 def check(
     root: str | Path,
     pins: str | Path | None = None,
@@ -345,6 +371,8 @@ def check_all(root: str | Path) -> Report:
     _scan(report, root, _contracts_subproject(root, None, None, None, None, None))
     if (root / ACCEPTANCE_PINS).exists():
         _scan(report, root, _acceptance_jvm_subproject(root))
+    if (root / EVENT_PRODUCER_PINS).exists():
+        _scan(report, root, _event_producer_subproject(root))
     _finalize(report, root)
     return report
 

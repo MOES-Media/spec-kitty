@@ -1,0 +1,20 @@
+schema: review-refute/v1
+complete: true
+phase: spec
+batch: 8
+verdicts:
+  - id: SPEC-ORDER-009
+    verdict: confirmed
+    reason: data-model section 4 says equal keys are the same event under the (source, id) dedupe key although the key omits source, and the survivor of a differing duplicate is unstated.
+  - id: SPEC-ORDER-010
+    verdict: refuted
+    reason: Section 4 already treats an unparseable time as an error row and NFR-003 pins serializer bytes via golden tests, so naive-time handling and the written form are plan-level detail.
+  - id: SPEC-ORDER-011
+    verdict: confirmed
+    reason: FR-009 refuses any event with no resolvable mission id while FR-038 says an open Mission keeps working, and the spec states no rule for Missions lacking mission_id in meta.json.
+  - id: SPEC-ORDER-012
+    verdict: refuted
+    reason: FR-007 and AC-005 deliberately cover the non-ULID fallback with the rejected class, and removing the writer fallback is a scope and plan choice rather than a spec ambiguity.
+  - id: SPEC-ORDER-013
+    verdict: refuted
+    reason: The event_lamport field is an unchanged return value outside the stamped lamportclock under FR-011, and the glossary wording is a documentation nicety that leaves no requirement ambiguous.

@@ -378,7 +378,7 @@ Treat these as code-shaping constraints, not post-hoc cleanup:
 
 ## PyPI Release
 
-Follow [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md) for PyPI and GitHub releases. Publication is owner+controller-executed only after the required checks pass. Contributors do not push release tags as part of an ordinary change; that restriction applies until the [#830 release phase](https://github.com/spec-kitty/EXPERIMENTAL-spec-kitty/issues/830). `release.yml` is not present in this EXPERIMENTAL checkout.
+Follow [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md) for PyPI and GitHub releases. Publication is owner+controller-executed only after the required checks pass. Contributors do not push release tags as part of an ordinary change; that restriction applies until the [#830 release phase](https://github.com/spec-kitty/EXPERIMENTAL-spec-kitty/issues/830). The release workflow is `.github/workflows/release.yml` ("Publish Release"); it runs on a `v*.*.*` tag push or a maintainer `workflow_dispatch`, and its jobs are `nightly-gate`, `build-release`, `publish-pypi` and `verify-pypi-installability`.
 
 ---
 

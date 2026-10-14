@@ -1,0 +1,29 @@
+schema: review-refute/v1
+complete: true
+phase: plan
+batch: 5
+verdicts:
+  - id: PLAN-VERIFY-013
+    verdict: refuted
+    reason: The unenforced baseline is true of the existing script, but marker clearing is gated by test_exemption_ledger and the seam census, and the baseline only grows through a deliberate --update-baseline run, so the plan as written does not build anything wrong.
+  - id: PLAN-VERIFY-014
+    verdict: refuted
+    reason: Ruff (including its TID251 rule) is an included gate, and a test that re-hashes a binary would fail it loudly and be fixed with an inline noqa, so the plan cannot silently produce a wrong outcome; the plan's TID251 remark is about the client, not tests.
+  - id: PLAN-VERIFY-015
+    verdict: refuted
+    reason: The finding itself says it is unverifiable, and WP01's exit criteria build a trivial producer on all three runners with the chosen Gradle and JDK 25 first, which surfaces any Kotlin DSL evaluation failure before later work.
+  - id: PLAN-VERIFY-016
+    verdict: refuted
+    reason: Reuse needs a double fault (clock.json lost and the newest-clock file already eligible for deletion), retention never touches the state file, and the recovery path (AC-010) is specified; a rare edge without a concrete wrong-build in the plan.
+  - id: PLAN-RELEASE-001
+    verdict: confirmed
+    reason: Plan 2/3.3 calls the reusable workflow with no ref input, release.yml's RELEASE_REF is a workflow-level env not visible to a called workflow, and the manifest's source commit is only recorded, so a workflow_dispatch republish could build the binary from the dispatching ref (severity 3, dispatch path only).
+  - id: PLAN-RELEASE-003
+    verdict: confirmed
+    reason: Plan 2 says the wheel tag is measured from the binary while dist-set.json pins it (research 38 and 54 repeat the split), and neither document says which governs, so a measured 2.17 against a pinned manylinux_2_28 would fail check_dist_set on the first release (severity 2, loud failure not silent).
+  - id: PLAN-RELEASE-005
+    verdict: refuted
+    reason: Plan 1 reuses install_tools.py unchanged only with --only gradle, not for GraalVM, so the finding misquotes the plan, and the GraalVM install route is a WP01 feasibility output rather than a claimed reuse.
+  - id: PLAN-RELEASE-006
+    verdict: refuted
+    reason: Windows hostname agreement is already listed as unverified (plan 16, research 207) and WP01 requires the gethostname downcall to run on all three runners plus the live AC-039 golden test, so a WSANOTINITIALISED failure is caught by a stated gate, not shipped.

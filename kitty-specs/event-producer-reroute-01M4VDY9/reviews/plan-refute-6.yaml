@@ -1,0 +1,29 @@
+schema: review-refute/v1
+complete: true
+phase: plan
+batch: 6
+verdicts:
+  - id: PLAN-RELEASE-007
+    verdict: refuted
+    reason: Platform wheels come from the same clean CI checkout that already produced the sdist, the plan adds hook-on content tests and a wheel-contents loop, and the stray-file divergence is hypothetical with no concrete wrong-build path.
+  - id: PLAN-RELEASE-008
+    verdict: refuted
+    reason: F1 already covers the hook, check_dist_set.py (including --verify-binaries) and edits to existing scripts/release/*.py; the manifest is produced in workflow YAML, so the finding mostly asks for a longer enumeration without a wrong-build outcome.
+  - id: PLAN-RELEASE-009
+    verdict: refuted
+    reason: WP01 is an explicit feasibility gate that builds on all three runners with stated fallbacks, so container prerequisites are discovered and resolved there by design; the finding only asks for more detail.
+  - id: PLAN-SHIM-001
+    verdict: confirmed
+    reason: Section 4.2 says the gate fails on any new module or function in the emission area, but rules (a) to (d) pin symbols only for the three new modules and census modules, so a helper added in emit.py, lifecycle_events.py or engine.py passes (severity 3 is more apt than 4).
+  - id: PLAN-SHIM-002
+    verdict: confirmed
+    reason: fault_summary in producer_faults.py must decode the fault-log JSONL and apply a file-age window, yet gate rule (a) bans json.loads outside the reply reader and the symbol set lists no fault-log reader, so the plan is self-contradictory (severity 2 to 3).
+  - id: PLAN-SHIM-003
+    verdict: confirmed
+    reason: The busy and TimeoutError branches in adapters.py sit inside the loop shared by all handlers and the plan says they call record_fault without restricting it to the client's handler, so a slow Zeitgeist handler would log a bogus producer fault (severity 2).
+  - id: PLAN-SHIM-004
+    verdict: confirmed
+    reason: Section 5 caps the timeout at bound - 1.0 s, which is zero or negative for bounds of 1.0 or less that _saas_fanout_timeout_s accepts, and the plan defines no floor or behaviour (severity 2; the circular-import aspect is secondary).
+  - id: PLAN-SHIM-005
+    verdict: refuted
+    reason: seam_args serialisation is the specified pass-through, the producer reads only the row, and an unresolvable start_path is already defined by FR-004 as rejected root-unresolvable, so no wrong-build scenario is shown.

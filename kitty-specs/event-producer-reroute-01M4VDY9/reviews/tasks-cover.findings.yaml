@@ -1,0 +1,278 @@
+schema: review-findings/v1
+complete: true
+phase: tasks
+lens_group: cover
+mission: event-producer-reroute-01M4VDY9
+findings:
+  - id: TASKS-COVER-001
+    lens: AC traceability (AC-019 observable)
+    severity: 4
+    title: T047 narrows AC-019 (ii) to run-journal kinds, so cleared markers 1, 2, 5, 6 are never validated
+    evidence:
+      - artifact: "spec.md § AC-019 (ii): one row per cleared marker written by the real writer, in legacy-row form"
+      - artifact: "data-model.md § 8: clear markers 1, 2 (decisions/emit.py), 5, 6 (status/lifecycle_events.py), 8; five fixtures for AC-019"
+      - artifact: "tasks/WP07 T047: '(ii) one row per run-journal kind in legacy-row form'"
+      - artifact: "plan.md § 4.4: a marker is cleared only when the persisted line validates"
+    claim: >
+      FR-032 allows a marker to be cleared only when a producer gate validates the persisted lines that writer wrote.
+      T047 replaces 'one row per cleared marker' with 'one row per run-journal kind'. That covers marker 8 (engine._append_event)
+      only. Markers 1, 2, 5, 6 (decision emit, lifecycle events) and any of 3, 4, 7 that get cleared would be cleared with no
+      validating test. An implementer following T047 literally passes the gate while violating FR-032.
+    remediation: >
+      Reword T047 (ii) to the spec text: one persisted row per cleared marker, produced by the real writer
+      (decisions/emit.py x2, lifecycle_events.py x2, engine._append_event, plus each of markers 3, 4, 7 that is cleared),
+      validated in legacy-row form. State the floor (cleared-marker count and schema count above zero) and the mutation
+      (a schema-invalid persisted line must fail). Keep the run-journal kinds as an additional case, not a replacement.
+  - id: TASKS-COVER-002
+    lens: AC traceability (AC-004 floor rule)
+    severity: 3
+    title: T040 (census gate) drops the floor, the self-mutation cases and the named census exemption of AC-004
+    evidence:
+      - artifact: "spec.md § 6 Floor rule: AC-004 is a census gate that needs a floor and a self-mutation case"
+      - artifact: "spec.md § AC-004: registered kind with no emitter is a named exemption that fails when an emitter appears; floor includes annotation standalone and bundled by each of the two transition writers; one annotation row yields one client invocation"
+      - artifact: "tasks/WP06 T040: only 'one forced row per writer yields exactly one seam call'"
+    claim: >
+      T040 names none of: the three falsifiers (injected writer with no seam call, persisted kind in no list, truncated set),
+      the floor, the named census exemption for the three registered decision kinds with no emitter, the
+      'no hand list' derivation rule beyond a single phrase, or the 'one annotation row yields one client invocation' check
+      (a client-level, not seam-level, assertion). A gate that scans nothing would pass.
+    remediation: >
+      Extend T040 with: floor = the in-scope writers of data-model section 3 plus the annotation written standalone and
+      bundled by emit_status_transition and emit_status_transition_batch; three self-mutation cases (injected writer,
+      kind in no list, truncated set); the exemption entry that fails when an emitter appears; and a second assertion
+      that an annotation row reaches the registered client exactly once.
+  - id: TASKS-COVER-003
+    lens: AC traceability (AC-003 sub-observables)
+    severity: 3
+    title: AC-003 parts (b), (c), (d), (e) have no named task or test
+    evidence:
+      - artifact: "spec.md § AC-003 (a) to (f); plan.md § 12: 'AC-003 skips (a) when zeitgeist_bridge.py is gone and runs (b) always'"
+      - artifact: "tasks/WP06 T036 covers only drain_fanout re-point and the pin test (a, f); T038 covers the journal-identity request, not a publish-log line"
+      - code: "src/specify_cli/status/adapters.py:237-248 (reset_handlers), :413-423 (import-tail gate by moment_handlers_disabled_reason)"
+    claim: >
+      Nothing in the WP text asserts: (b) the producer fires with zeitgeist_bridge/hosted_posture absent (import-free test),
+      (c) a run-journal row via RuntimeMomentProducer yields a line, (d) each hosted kill switch set still fires the producer
+      (SPEC_KITTY_NO_MOMENT_HANDLERS, SPEC_KITTY_SYNC_DISABLE, the deprecated alias), (e) reset helpers re-register the client
+      (the plan routes this through tests/status/conftest.py, but no test asserts it). The AC also requires (c) to (e) to fail
+      when their FR-002 part is reverted, a revert-check not stated anywhere.
+    remediation: >
+      Add to T036 (or a new T036b) one test per sub-observable (a) to (f), with the revert-check for (c) to (e) named, the
+      kill-switch list for (d) enumerated from adapters.py, and the (a)-skips-when-bridge-gone rule from plan 12.
+  - id: TASKS-COVER-004
+    lens: FR traceability (FR-004 repo_root forwarding)
+    severity: 3
+    title: The lifecycle (and resolved-binding) fire consumes repo_root instead of forwarding it; no task or hunk fixes it
+    evidence:
+      - code: "src/specify_cli/status/adapters.py:382-410 fire_lifecycle_saas_fanout takes repo_root as a keyword and never re-joins it into kwargs"
+      - code: "src/specify_cli/status/adapters.py:339-360 fire_resolved_binding_fanout, same shape"
+      - code: "src/specify_cli/status/adapters.py:293 fire_saas_fanout does kwargs['repo_root'] = repo_root"
+      - artifact: "spec.md § FR-004 and AC-001 falsifier 'a lifecycle fire that drops the start path'"
+      - artifact: "plan.md § 4.2 adapters row hunks (A) to (D); tasks/WP06 T036, T037"
+    claim: >
+      FR-004 requires the lifecycle fire to forward repo_root to handlers 'as the status fire does'. The code confirms it does not.
+      The plan's hunk list (A drain gate, B row and fault recorder, C registration, D docstring) and T036/T037 contain no
+      forwarding change; T037 only lists call-site files. Without it the client's start_path is None for every lifecycle row and
+      AC-001's lifecycle-slot case fails. The resolved-binding fire has the same gap and carries InnerStateChanged rows that FR-003 puts in scope.
+    remediation: >
+      Add an explicit hunk (B2) and a red-first test to T036/T037: fire_lifecycle_saas_fanout and fire_resolved_binding_fanout
+      set kwargs['repo_root'] before dispatch; the AC-001 lifecycle case asserts the stub receives the start path. State which
+      slot the plain/resolved-binding InnerStateChanged seam call uses.
+  - id: TASKS-COVER-005
+    lens: FR/AC traceability (FR-004 root resolution, AC-005 rejected class)
+    severity: 3
+    title: Java-side canonical root resolution and the root-unresolvable refusal have no task
+    evidence:
+      - artifact: "spec.md § FR-004: the PRODUCER resolves the canonical repository root; unresolvable start is 'rejected' (root-unresolvable)"
+      - artifact: "spec.md § AC-005 lists 'an unresolvable root' under rejected; AC-001 requires a lane worktree and a Mission subdirectory to reach one log"
+      - artifact: "tasks/WP03 T018 (common dir only), WP04 T025 (rejected: UUID id, bad time, validation failure, row without id), WP10 T065 ('lane worktree and a Mission checkout')"
+    claim: >
+      WP03 resolves the git common dir for the clock, but no task states how the publish-log location (.kittify/events/ under the
+      canonical root, parity with core.paths.resolve_canonical_root) is derived from a worktree, coordination worktree or
+      Mission subdirectory start path. T025 omits the root-unresolvable refusal and the no-fault-log-row consequence
+      AC-005 asks for. T065 tests a 'Mission checkout', not the 'Mission subdirectory' and coordination worktree of the AC.
+    remediation: >
+      Add to T018 a canonical-root derivation test (primary, linked worktree, coordination worktree, subdirectory start all
+      give one publish-log path, parity fixtures from resolve_canonical_root). Add 'root-unresolvable' to T025 and a WP06/WP10
+      assertion of stderr warning with no fault-log row. Reword T065 to 'Mission subdirectory'.
+  - id: TASKS-COVER-006
+    lens: Mid-flight / OD-MISSIONID (b) fallback (AC-005)
+    severity: 3
+    title: Missing-mission_id fallback tests omit the no-warning, no-fault-count and wrong-member mutations
+    evidence:
+      - artifact: "spec.md § AC-005 last sentence: no stderr warning, no fault-log row, fault count unchanged, exit code and body unchanged; mutations refusing it, faulting it, or emitting an empty or slug missionid must fail"
+      - artifact: "research.md § 24: WP04 also tests 'a slug-only payload still gets the project-scoped source, never a slug as missionid'"
+      - artifact: "tasks/WP04 T026 (two cases only), WP10 T066 ('publishes project-scoped with no fault')"
+    claim: >
+      T026 tests two cases and no mutation. The slug-only-payload case that research R-24 assigns to WP04 is not in the task.
+      No task asserts the client-side half (no stderr line, no fault-log row, doctor count unchanged, exit code and --json body
+      identical). A producer that returns refused/missionid:"" or a slug would pass the tasks as written.
+    remediation: >
+      Extend T026 with the slug-only and empty-missionid cases and mutations (refuse, fault, emit empty or slug missionid
+      each fail). Extend T066/T065 to assert stderr empty, fault-log unchanged, fault_summary unchanged and byte-identical
+      exit code and body for the no-mission_id Mission.
+  - id: TASKS-COVER-007
+    lens: AC traceability (AC-008 / AC-009 mutations)
+    severity: 3
+    title: T013 names none of the four AC-008 mutants or the AC-009 drop-an-error-row mutant
+    evidence:
+      - artifact: "spec.md § AC-008: mutations naive comparator (ex. 4), no-source (ex. 7), raw-id dedupe (ex. 8), invalid duplicate survivor or no conflict (ex. 9) must fail; AC-009: a comparator that drops an error row must fail"
+      - artifact: "tasks/WP02 T013: 'Permutation test (AC-008 against a test-local reference)'"
+    claim: >
+      The AC is only non-vacuous if the permutation test is shown to fail against the five mutants. T013 mentions the
+      fixtures and the permutation test but no mutant, so a test that passes everything (e.g. one that only compares a
+      comparator with itself) satisfies the task text. WP11's released run (T075) also states no mutants.
+    remediation: >
+      Add to T013 a mutant table (naive, without-source, raw-id dedupe, invalid-survivor, drops-error-row) each asserted red,
+      the 'all nine' floor, and the multiset comparison of error rows. Reference it from T075 for the released run.
+  - id: TASKS-COVER-008
+    lens: Spec touch-up 4 (clockless definition) ownership
+    severity: 3
+    title: Non-integer lamportclock (null, string, boolean) as an error row has no owning test
+    evidence:
+      - artifact: "spec touch-up 4 (research.md § 18); data-model.md § 4: a present non-integer lamportclock is an error row, not clockless"
+      - artifact: "tasks/WP02 T012 (value 0..2^31-1, overflow) and T013 ('clock out of range')"
+    claim: >
+      Fixture 9 covers only the out-of-range value 2^31. The null/string/boolean cases (the part touch-up 4 added) are not named
+      in T012 or T013. A Jackson-based reader that coerces "5" or true to an integer, or treats null as absent, would pass.
+    remediation: >
+      Add to T013 explicit error-row cases for lamportclock = null, "5", true, 1.5 and -1 (each an error row with the named
+      reason, never clockless) and a case with the member absent (clockless).
+  - id: TASKS-COVER-009
+    lens: Spec touch-up 11 / FR-024 fault-count window
+    severity: 3
+    title: Fault-count window rule (touch-up 11) is not stated or tested in T035 or T041
+    evidence:
+      - artifact: "spec.md § FR-026: window = fault-log day files whose name date lies within the raw max_age_days of today; absent or non-numeric means every file present"
+      - artifact: "tasks/WP06 T035 'in the retention window'; AC-007 'fault-log rows in the window'"
+    claim: >
+      T035 does not define the window, so the boundary day, the absent value and the non-numeric value (the last is where
+      client and Java would disagree) are untested. Also unstated: that 'notice rows are counted apart' and 'success does not
+      reset' are separate assertions in AC-007.
+    remediation: >
+      Add to T035 tests for: a file dated exactly max_age_days ago, one day older, max_age_days absent, "abc", and day files
+      from a non-fault notice; with an injected _now_utc. Assert notice rows are excluded from the count.
+  - id: TASKS-COVER-010
+    lens: AC traceability (AC-020 observable)
+    severity: 3
+    title: AC-020 'doing appears as in_progress' and 'uninitialized rejected' have no task that asserts them
+    evidence:
+      - artifact: "spec.md § AC-020 and FR-018: 'doing' is resolved to in_progress; persisted vocabulary excludes uninitialized; data-model.md § 9 (alias via LANE_ALIASES)"
+      - artifact: "tasks/WP07 T045 ('uninitialized excluded'); overview AC-020 -> WP07 only"
+    claim: >
+      T045 covers the census list and lane-list derivation. The producer-side observables (a legacy 'doing' row becomes
+      in_progress in the published data; a row with to_lane 'uninitialized' is refused) belong to the Java mapping and the
+      lane.transitioned schema (WP04 T024 / WP11 T073) and WP07 reads released schemas. No task owns the
+      'doing' mapping or says whether Python or Java performs it, which also touches FR-005 (no member beyond the row).
+    remediation: >
+      Add a case to WP04 T024 (and to the WP11 contract test) for 'doing' to in_progress and 'uninitialized' rejected, and
+      say in T045 that the AC-020 clause is verified there; or reassign the observable in the overview with the owning test.
+  - id: TASKS-COVER-011
+    lens: AC traceability (AC-026 end-to-end)
+    severity: 3
+    title: AC-026's client half (torn-line notice row and one stderr line) is only assigned to the Java WP
+    evidence:
+      - artifact: "spec.md § AC-026 and FR-021/FR-023: fault log holds a torn-line notice naming repo-relative path and line position, and one stderr line is written"
+      - artifact: "overview AC-026 -> WP03 only; tasks/WP03 T020 (adapter level); WP06 T035 lists record_notice without an AC-026 test"
+    claim: >
+      WP03 can prove the torn line is preserved and flagged in the reply. The notice row, the stderr line and the
+      'not a fault for FR-024' rule can only be tested in WP06 or WP10, and neither task names AC-026.
+    remediation: >
+      Add to T035 a test: a reply carrying notice torn-line gives one stderr line and one notice row with a repo-relative path and
+      position, fault_summary unchanged; and add AC-026 to WP10 T065 as an end-to-end truncate-then-append case.
+  - id: TASKS-COVER-012
+    lens: FR-027 allowed surface vs task text
+    severity: 3
+    title: T042 'path literals in one constants module' introduces an unlisted module the thinness gate would reject
+    evidence:
+      - artifact: "tasks/WP06 T042; plan.md § 4.2 (complete list of Python changes; gate (c) pins the emission-area module census; gate (a) pins exact top-level symbols of the three modules)"
+      - artifact: "spec.md § FR-027: the gate fails on any other new module or function in the status and emission area"
+    claim: >
+      T042 asks for a constants module that is in no row of plan 4.2, in no owned_files list and in no gate (c) pinned list.
+      Either the gate fails the WP, or the implementer widens the list silently. The same ambiguity applies to the
+      'decide StateRoot/GIT_COMMON_DIR handling' text: state/contract.py already has StateRoot.GIT_INTERNAL anchored at .git/spec-kitty/
+      (src/specify_cli/state/contract.py:36), which is not the git common directory for a linked worktree.
+    remediation: >
+      Rewrite T042 so the path constants live in producer_faults.py (or producer_client.py) within the table's symbol set, and
+      state the decision for the clock-state surface (existing GIT_INTERNAL root with a documented common-dir note, or a new
+      enum member, which would itself need a plan 4.2 row).
+  - id: TASKS-COVER-013
+    lens: Dependency tracking (FR-014 / FR-040)
+    severity: 2
+    title: The external events PR that blocks WP07, WP09, WP10, WP11 approval has no task, owner or tracker reference in wps.yaml
+    evidence:
+      - artifact: "plan.md § 6 (orchestrator opens it); tasks-overview.md § 2 (external, not a WP)"
+      - artifact: "tasks/WP11 T071 only checks for a released wheel; wps.yaml has no tracker_refs for it"
+    claim: >
+      FR-014's content list (schemas, registry file, comparator specification, nine fixtures, Lane alignment, conditional
+      envelope subset) is entirely outside this mission's tasks. Nothing records who delivers it or what happens if the events
+      maintainers reshape it; WP11 T075 produces only the 'confirmation list'. Four of eleven WPs depend on it.
+    remediation: >
+      Add a tracker reference (issue or Op id) to WP11 and the overview, and a checklist in T071 of the FR-014 items the
+      released wheel must contain (including the registry file name WP11 will read, plan 17 'unverified').
+  - id: TASKS-COVER-014
+    lens: AC traceability (AC-012 mutation list)
+    severity: 2
+    title: T039 lists fewer client mutations than AC-012 requires and omits the positive capability checks
+    evidence:
+      - artifact: "spec.md § AC-012: mutated client adds an id mint, timestamp, schema import, log read or the bridge envelope code; the other FR-026 capabilities must pass"
+      - artifact: "tasks/WP06 T039 self-mutations: id mint, clock outside _now_utc, import uuid in emit.py, secrets in engine.py/rebuild_state.py"
+    claim: >
+      No mutation for a schema import, a publish-log read or the bridge's envelope code in the client; no positive fixture showing
+      stderr line, bound resolution, child termination, breaker, fault-log append/read, opaque identifier copy, root resolution and
+      retention pass-through are allowed.
+    remediation: >
+      Extend T039 with those three mutants on a copy of the client and a positive 'allowed capabilities' fixture.
+  - id: TASKS-COVER-015
+    lens: Spec touch-up 7 (retain failures are not event faults)
+    severity: 2
+    title: No test asserts that retain failures stay out of the fault log and fault count
+    evidence:
+      - artifact: "spec.md § FR-023 last sentence; research.md § 18 item 7"
+      - artifact: "tasks/WP06 T041 (renders the reply)"
+    claim: >
+      T041 renders policy_error and kept-with-reason but nothing checks that a retain crash/timeout or policy_error writes no fault-log
+      row and does not move the doctor fault count.
+    remediation: >
+      Add to T041 a test: retain with policy_error, and with a stubbed crash, produces a rendered error, zero fault-log rows,
+      unchanged fault_summary.
+  - id: TASKS-COVER-016
+    lens: File references real (ownership and create_intent)
+    severity: 2
+    title: Owned-file and create_intent markings disagree with what the tasks edit
+    evidence:
+      - artifact: "tasks/WP02, WP03, WP05 frontmatter: create_intent: [] while every owned path is absent on this checkout (e.g. services/event-producer/domain/src/main/**)"
+      - artifact: "tasks/WP07 T046 edits src/runtime/next/_internal_runtime/engine.py (stamping) but WP07 owned_files omit it; overview R2 excuses only 'marker comment removal'"
+      - artifact: "tasks/WP06 T038 edits tests/runtime/test_bridge_engine.py, not in WP06 owned_files; tasks/WP01 T002 edits scripts/release/README.md, owned by WP08"
+      - artifact: "tasks/WP07 T047/T046 edit tests/architectural/test_producer_client_thinness.py, not in WP07 owned_files"
+    claim: >
+      The core FR-035 deliverable (the only flagged Python modification) edits a file WP07 does not own, and three more
+      edits sit outside the owning WP's list. Greenfield Java trees are not marked as created. Reviewers and the ownership
+      validator then see out-of-map edits that the overview does not enumerate.
+    remediation: >
+      List engine.py, test_bridge_engine.py, the thinness gate file and scripts/release/README.md as recorded out-of-map edits in
+      overview R2 (each with the dependency-order justification), or add them to owned_files after resolving the lane merge;
+      add the new Java source globs to create_intent of WP02, WP03, WP04, WP05, WP11.
+  - id: TASKS-COVER-017
+    lens: Red-first / revert-check statements
+    severity: 2
+    title: WP08 and WP10 do not state the revert-check; the -PeventsWheel refusal under CI has no test
+    evidence:
+      - artifact: "plan.md § 9 Method: every behaviour is revert-checked; WP09 and WP11 Gates restate it"
+      - artifact: "tasks/WP08 Gates ('Red-first with mutation cases'), WP10 Gates ('All of the above'); plan.md § 6 '-PeventsWheel is refused when CI is set'; tasks/WP11 T072 mentions it without a test"
+    claim: >
+      Only the overview carries the generic rule for these two WPs, and the one guard that keeps a local wheel out of CI
+      (refusal when CI is set) is a security-relevant behaviour with no stated test.
+    remediation: >
+      Add the revert-check sentence to WP08 and WP10 Gates and a red-first test to T072 (Gradle run with CI=true and -PeventsWheel fails).
+  - id: TASKS-COVER-018
+    lens: AC traceability (AC-005 fault carriers)
+    severity: 2
+    title: "Fault log unwritable (stderr still appears) and human/--json mode are not named in T035"
+    evidence:
+      - artifact: "spec.md § FR-023, AC-005"
+      - artifact: "tasks/WP06 T035; WP10 T065 (degraded run only says 'leaves every --json body unchanged')"
+    claim: >
+      The fallback path (unwritable fault log, no resolvable root giving stderr only) and the per-class matrix in both output modes
+      are in the AC but not in any task step.
+    remediation: >
+      Add both to T035 as explicit tests (read-only log directory, no root) and make T065 parametrize classes by output mode.

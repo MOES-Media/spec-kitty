@@ -1,0 +1,50 @@
+{
+  "tools": [
+    {
+      "name": "gradle",
+      "kind": "archive",
+      "version": "9.8.1",
+      "url": "https://services.gradle.org/distributions/gradle-9.8.1-bin.zip",
+      "sha256": "dce76f55f8e251a3a1f130eb120f30b3d271de2b76c9b0729d316b5a1b6dc01f",
+      "published": "2026-10-07",
+      "advisory_feed_checked": "GitHub security advisories of gradle/gradle: GHSA-j5m7-59rp-24f5, GHSA-xwqc-3h47-hg64 and GHSA-mvvg-497x-hmj8 (published 2026-10-07) are patched in 8.14.6 and 9.8.1; GHSA-mqwm-5m85-gmcv and GHSA-w78c-w6vf-rw82 are patched in 9.3.0 and later; checked 2026-10-14. 9.8.1 is the first 9.x release carrying all fixes."
+    },
+    {
+      "name": "graalvm-jdk-linux-x64",
+      "kind": "jdk-archive",
+      "version": "jdk-25.0.2",
+      "url": "https://github.com/graalvm/graalvm-ce-builds/releases/download/jdk-25.0.2/graalvm-community-jdk-25.0.2_linux-x64_bin.tar.gz",
+      "sha256": "e0be791c8fda4d03b6b0a0cb824fef3149736170057b3a515252b44419606af0",
+      "published": "2026-01-20",
+      "advisory_feed_checked": "GitHub security advisories of graalvm/graalvm-ce-builds and oracle/graal (none published), checked 2026-10-14; the sha256 equals the vendor's .sha256 file for this archive"
+    },
+    {
+      "name": "graalvm-jdk-macos-aarch64",
+      "kind": "jdk-archive",
+      "version": "jdk-25.0.2",
+      "url": "https://github.com/graalvm/graalvm-ce-builds/releases/download/jdk-25.0.2/graalvm-community-jdk-25.0.2_macos-aarch64_bin.tar.gz",
+      "sha256": "50201fb8e8e653e7a253d955877a6b6ad634b42e60c84f45df7e1bb51361635f",
+      "published": "2026-01-20",
+      "advisory_feed_checked": "GitHub security advisories of graalvm/graalvm-ce-builds and oracle/graal (none published), checked 2026-10-14; the sha256 equals the vendor's .sha256 file for this archive"
+    },
+    {
+      "name": "graalvm-jdk-windows-x64",
+      "kind": "jdk-archive",
+      "version": "jdk-25.0.2",
+      "url": "https://github.com/graalvm/graalvm-ce-builds/releases/download/jdk-25.0.2/graalvm-community-jdk-25.0.2_windows-x64_bin.zip",
+      "sha256": "72edc27ce2dd3c156332144a339c97995745cae291205ed2f9b5cc26aa9cb422",
+      "published": "2026-01-20",
+      "advisory_feed_checked": "GitHub security advisories of graalvm/graalvm-ce-builds and oracle/graal (none published), checked 2026-10-14; the sha256 equals the vendor's .sha256 file for this archive"
+    },
+    {
+      "name": "manylinux-2-28-x86-64",
+      "kind": "container-image",
+      "version": "manylinux_2_28",
+      "url": "https://quay.io/v2/pypa/manylinux_2_28_x86_64/manifests/sha256:4131ddd7acb9c6c966af02fe7e71edc51e078c2d41f475966697676430bfa2ae",
+      "image": "quay.io/pypa/manylinux_2_28_x86_64@sha256:4131ddd7acb9c6c966af02fe7e71edc51e078c2d41f475966697676430bfa2ae",
+      "sha256": "4131ddd7acb9c6c966af02fe7e71edc51e078c2d41f475966697676430bfa2ae",
+      "published": "2026-10-09",
+      "advisory_feed_checked": "No advisory feed exists for the pypa manylinux images; the image is pinned by manifest digest, is used only to link the Linux native binary against glibc 2.28, and ships nothing into the wheel except that binary. Checked 2026-10-14."
+    }
+  ]
+}

@@ -1,0 +1,139 @@
+schema: review-findings/v1
+complete: true
+phase: plan
+lens_group: fresh
+mission: event-producer-reroute-01M4VDY9
+findings:
+  - id: PLAN-FRESH-001
+    lens: debugging-recurrence (gate vs. mandated edit)
+    severity: 4
+    title: Gate 4.2(e) forbids the new imports and names that FR-035 and FR-034 edits require
+    evidence:
+      - artifact: "plan.md § 4.2 gate (e) and the 'engine.py' row; research.md § 16 (e)"
+      - artifact: "plan.md § 4.4 (lane-list consolidation); research.md § 14"
+      - code: "src/runtime/next/_internal_runtime/engine.py::_append_event (imports only uuid4 and hashlib; no ULID helper)"
+      - code: "src/specify_cli/migration/rebuild_state.py (no Lane or CANONICAL_LANES import)"
+      - code: "src/specify_cli/acceptance/__init__.py (no Lane import; _LEGACY_NOT_DONE_LANES is a string literal tuple)"
+    claim: >
+      Gate (e) requires every existing table file to have a top-level symbol set and import set equal to the base commit's
+      plus "the table's new names". The table lists no new import or helper for engine.py, rebuild_state.py or
+      acceptance/__init__.py. Yet FR-035 needs a ULID minted inside _append_event (engine.py has no ULID source; a helper
+      or a `ulid` import is the only way, and a helper such as `_mint_id` is the plan's own named failure example), and
+      section 4.4 derives _VALID_LANES, _LANE_ORDER and _LEGACY_NOT_DONE_LANES from Lane or CANONICAL_LANES, which
+      none of the three files imports today. Built as written, the gate is red on the mandated edits. The implementer
+      has to weaken the gate (an ad hoc exemption, which the self-mutation case will not catch) or leave FR-035 and
+      FR-034 undone.
+    remediation: >
+      Give the table an explicit "permitted new imports / names" column and make gate (e) compare against base plus that
+      column only: engine.py gets the single ULID source (name the module or existing helper, for example the `ulid`
+      module that decisions/emit.py already uses) and nothing else; the three lane-list files get the named Lane or
+      CANONICAL_LANES import. Add a self-mutation case that an import not in the column still fails.
+  - id: PLAN-FRESH-002
+    lens: debugging-recurrence (layer contract)
+    severity: 4
+    title: Run-journal seam route for SignificanceEvaluated is contradictory and DecisionAuthorityDenied has none
+    evidence:
+      - artifact: "plan.md § 4.2 rows 'events/runtime_moments.py' (emitter method for SignificanceEvaluated) and 'engine.py' (_record_significance: seam call)"
+      - artifact: "data-model.md § 3 row 'Run journal: SignificanceEvaluated, DecisionAuthorityDenied' (seam NEW, in)"
+      - code: "src/runtime/next/_internal_runtime/engine.py::_record_significance (appends then calls emitter.emit_significance_evaluated; _audit_decision_authority appends DecisionAuthorityDenied with no emitter call)"
+      - code: "src/specify_cli/events/runtime_moments.py::RuntimeMomentProducer.emit_significance_evaluated (existing no-op: 'Not a runtime moment')"
+      - code: "tests/architectural/test_layer_rules.py (runtime -> specify_cli is a ledgered, size-capped outbound edge; engine.py imports no specify_cli today)"
+    claim: >
+      The table asks for two routes for one row: a seam call in engine._record_significance and an emitter method in
+      RuntimeMomentProducer. Calling the seam (specify_cli.status) from engine.py adds a runtime -> specify_cli import,
+      which the layer rules ledger and cap (growth fails the _baselines.yaml cap, and the plan says no baseline growth);
+      the emitter route already exists as a no-op method, so also wiring the engine would double-fire once the method
+      is filled. DecisionAuthorityDenied is in the data-model type table as an in-scope persisted kind (FR-003, AC-004)
+      but appears nowhere in section 4.2: the RuntimeEventEmitter Protocol has no method for it and engine.py cannot
+      reach the seam. An implementer will either import specify_cli into engine.py (layer red) or leave this kind
+      without a seam call (AC-004 census red, or an exemption that hides the gap).
+    remediation: >
+      State one route for both journal kinds. Either extend the RuntimeEventEmitter Protocol (events.py, the Null and
+      producer implementations, and name test_runtime_emitter_seam.py as implicated) with a denial method and fill the
+      existing significance method in RuntimeMomentProducer, dropping the engine seam call from the table; or declare
+      an explicit injected callback. Add the Protocol file to the allowed-surface table and say which of
+      _record_significance / _audit_decision_authority gains an emitter call.
+  - id: PLAN-FRESH-003
+    lens: sequencing / ownership
+    severity: 3
+    title: WP06 gates and census assert state that WP07 produces; seam-wiring ownership of emit.py and siblings is contradictory
+    evidence:
+      - artifact: "plan.md § 11 WP table (WP06 scope: 'seam wiring, census, thinness gate'; WP07 scope: 'Journal stamping, lane consolidation, marker clearing')"
+      - artifact: "plan.md § 11 campsite (3): 'WP07's edits to status/emit.py, lifecycle_events.py and engine.py are call sites and keyword additions'"
+      - artifact: "plan.md § 4.2 gate (b) and § 9 test_seam_census.py (AC-004)"
+    claim: >
+      Section 4.2 attributes seam wiring in emit.py, lifecycle_events.py, decisions/emit.py, retrospective and
+      runtime_moments.py to FR-002 to FR-004, and the WP table puts "seam wiring, census" in WP06, but campsite (3)
+      says WP07 edits emit.py, lifecycle_events.py and engine.py as call sites. WP07 is the only WP that touches
+      engine._append_event, so gate (b) (key set equals the five keys), which WP06 creates, is red on WP06's tip, and
+      AC-004's census (one seam call per writer) cannot be green in WP06 if any writer's wiring is WP07's. This breaks
+      the plan's own rule that every WP leaves its lane green and one owner per file.
+    remediation: >
+      Assign each file of the section 4.2 table to exactly one WP (suggested: all seam call sites and the census in
+      WP06; engine stamping, marker comment removal and lane constants in WP07) and either move gate (b) to WP07 or
+      make WP06 ship it as an expected-failing placeholder it can state. Fix campsite (3) to match.
+  - id: PLAN-FRESH-004
+    lens: sequencing / dependency
+    severity: 3
+    title: WP02 and WP08 read or bump events-release artifacts but list no events-release dependency
+    evidence:
+      - artifact: "plan.md § 11 rows WP02 (depends WP01; 'order and fixtures', AC-029 test), WP04 (depends 'WP03, events release'), WP08 (depends WP01; 'events floor bump')"
+      - artifact: "plan.md § 6 'While unreleased' (no WP that reads the schemas is approved before the pin names the released wheel)"
+      - artifact: "plan.md § 9 AC-029 ('driven by the registry')"
+    claim: >
+      The AC-029 test is driven by the events registry and the nine comparator fixtures come from the events PR; the
+      floor bump needs the released version V_E. Only WP04 declares the events release as a dependency. A WP02
+      implementer with no released wheel has nothing to drive the registry test with, and will hand-write a local
+      registry or fixture copy, which the no-committed-events-schema gate (AC-027) exists to forbid; a WP08 implementer
+      cannot choose V_E.
+    remediation: >
+      Add "events release" to the Depends column of WP02 (for the registry-driven test and comparator fixtures; the
+      rest of WP02 may start) and WP08 (floor bump), or state in WP02 that those two items are deferred to a later
+      commit after the pin lands.
+  - id: PLAN-FRESH-005
+    lens: scope
+    severity: 2
+    title: Marker clearing for markers 3 and 4 touches files outside the 'complete' allowed-surface list
+    evidence:
+      - artifact: "plan.md § 4.2 intro ('the complete list of Python changes this mission may make') and the marker row (lifecycle_events.py, decisions/emit.py, engine.py only)"
+      - artifact: "plan.md § 4.4 and data-model.md § 8 (markers 3 and 4 decided in the WP)"
+      - code: "src/specify_cli/events/decision_log.py (marker 3), src/specify_cli/migration/mission_state.py (marker 4)"
+    claim: >
+      If the WP decides to clear marker 3 or 4, it edits decision_log.py or mission_state.py, neither of which is in
+      the table the gate takes as data. Comment removal passes the symbol gate, but the plan states the list is complete
+      and gate (c) and the 4.2 list are the stated review aid, so the edit is formally out of surface.
+    remediation: >
+      Add both files to the marker row (comment removal only), or state that a marker outside the listed three files
+      is residual by default.
+  - id: PLAN-FRESH-006
+    lens: cross-reference
+    severity: 2
+    title: research.md section 7 still assigns the state/contract.py StateRoot decision to WP07
+    evidence:
+      - artifact: "research.md § 7 row 'state/contract.py (three new surfaces)': 'decided in WP07'"
+      - artifact: "plan.md § 4.2 row state/contract.py (WP06) and research.md § 15 ('was WP07')"
+    claim: >
+      The revision moved the state/contract.py entries to WP06, but section 7 of research.md keeps the open question
+      (new StateRoot member or GIT_COMMON_DIR note) with WP07. The clock state sits under the git common dir, outside
+      the work tree, so the decision is real, and WP06 would add the entries before WP07 decides it.
+    remediation: Change "decided in WP07" to "decided in WP06".
+  - id: PLAN-FRESH-007
+    lens: cross-reference
+    severity: 1
+    title: WP06 dependency column says '#6164 per section 12' but section 12 says either landing order works
+    evidence:
+      - artifact: "plan.md § 11 WP06 row; plan.md § 12 first sentence"
+    claim: >
+      "Depends on ... #6164 per section 12" reads as a blocking dependency, while section 12 states the seam fires
+      irrespective of drain and either order works. Only the hunk-conflict handling differs.
+    remediation: Reword to "none blocking; conflict handling per section 12".
+  - id: PLAN-FRESH-008
+    lens: hygiene / size
+    severity: 1
+    title: plan.md is 45,690 bytes, at the ~45 KB budget
+    evidence:
+      - artifact: "plan.md (wc -c: 45690)"
+    claim: >
+      The revision grew plan.md past 45,000 bytes (44.6 KiB). It is still readable, but the next edit crosses any
+      reasonable cap; section 15 (11 spec touch-ups) and section 3.2 are candidates to move to research.md.
+    remediation: Move section 15 detail to research.md and leave a one-line pointer.

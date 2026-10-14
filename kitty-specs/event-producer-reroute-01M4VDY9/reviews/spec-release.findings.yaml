@@ -1,0 +1,226 @@
+schema: review-findings/v1
+complete: true
+phase: spec
+lens_group: release
+mission: event-producer-reroute-01M4VDY9
+findings:
+  - id: SPEC-RELEASE-001
+    lens: "release/packaging feasibility (single-wheel assumptions)"
+    severity: 4
+    title: "Spec names gates as \"extending\" release.yml but never states that the existing machinery asserts exactly one pure wheel and goes red with several"
+    evidence:
+      - artifact: "spec.md § 8 (G-1, G-2, G-4), FR-041, E11"
+      - code: "scripts/release/check_exact_install.py::locate_wheel (SystemExit 'Expected exactly one wheel')"
+      - code: ".github/workflows/release.yml build-release step 'Verify wheel contents' (WHEEL_FILE=$(ls dist/*.whl))"
+      - code: "tests/_support/shared_build_artifacts.py::published_build_artifacts (wheels[-1] of spec_kitty_cli-*.whl)"
+      - code: "tests/cross_cutting/packaging/test_packaging_safety.py::test_wheel_contains_only_known_packages (closed prefix tuple)"
+      - code: "tests/release/test_check_exact_install.py (fixtures build py3-none-any wheels)"
+    claim: >
+      E11 says "one pure wheel today" but FR-041 and section 8 only say the gates extend the existing steps. The existing steps and tests hard-code
+      the single-wheel shape: the exact-install script refuses more than one wheel, the content step runs `ls dist/*.whl` into one variable, the shared
+      test fixture silently picks the lexically last wheel (an arbitrary platform), and the known-prefix test rejects any wheel member outside a closed
+      prefix list, so a binary placed anywhere new fails it. Implemented as written, G-1/G-2 either go red on the first multi-wheel build or, worse, the
+      fixture quietly tests one arbitrary platform wheel and the rest are never opened. The spec also does not say where in the wheel the binary lives,
+      which AC-024 ("binary present") and G-1 both depend on.
+    remediation: >
+      Add to section 8 a one-line requirement: every release step, script and test that globs or asserts one wheel is made per-wheel (iterates the
+      expected set), and the wheel layout names a single known in-package location for the binary under an existing known prefix (or the prefix list is
+      amended deliberately). Add an AC that fails the packaging fixtures if they pick fewer wheels than the expected platform set.
+  - id: SPEC-RELEASE-002
+    lens: "release/packaging feasibility (wheel set completeness / publish atomicity)"
+    severity: 4
+    title: "No gate asserts the published wheel SET equals the FR-041 matrix, so a missing platform silently degrades to the sdist"
+    evidence:
+      - artifact: "spec.md § 8 G-1, G-9; FR-041; FR-043; AC-024"
+      - code: ".github/workflows/release.yml build-release 'if: !cancelled() && ...' and publish-pypi (downloads one 'release-distributions' artifact)"
+    claim: >
+      G-1 checks each wheel that exists. Nothing checks that a wheel exists for every platform in FR-041. A skipped, cancelled or failed matrix leg, or a
+      partial upload, yields a release with fewer wheels; PyPI files are immutable, so a user on the missing platform gets the sdist and, by FR-043 design,
+      a working CLI that warns binary-missing on every event. FR-043's graceful fallback therefore converts a release defect into a silent, permanent one.
+      G-9 says the matrix is "inside the aggregate gate" but release.yml has no matrix today (one ubuntu job both builds and tests) and the aggregate gate
+      in ci-aggregate.yml is the PR gate, not the tag-time build; the spec does not say what structural change makes a failed leg block publish-pypi.
+    remediation: >
+      Add a gate: before publish, the dist set must equal exactly the planned platform-tag set plus one sdist (expected list pinned in the repo,
+      self-mutation: remove one wheel and the gate must fail). State that build-release becomes a per-OS build stage feeding one assembling job, and that
+      publish-pypi needs the assembled, set-checked artifact so a failed or cancelled leg blocks it (red-CI-no-release).
+  - id: SPEC-RELEASE-003
+    lens: "release/packaging feasibility (gate reality, red-CI-no-release, nightly gate)"
+    severity: 4
+    title: "The native build and its smoke test first run at tag time; the green-nightly release precondition does not cover them"
+    evidence:
+      - artifact: "spec.md § 8 G-3, G-8, G-9; § 11 risk 'native build weight'"
+      - code: ".github/workflows/release.yml job nightly-gate -> build-release; scripts/ci/release_nightly_gate.py"
+      - code: ".github/workflows/ci-windows.yml (path-filtered 'skips when unaffected'; pipx install --editable)"
+      - code: ".github/workflows/ci-router.yml (acceptance_jvm group gates no job by design; unmatched loop covers src/** only)"
+    claim: >
+      Release proof today is "a green nightly for the exact SHA" plus tag-time build checks. If the Java/native-image build and the per-OS wheel smoke
+      exist only in release.yml, the first time a native-image build is attempted for a SHA is the tag run, after the nightly gate has already passed on
+      a nightly that never built it: a broken toolchain pin, a reflection-config gap or a Windows-only failure is discovered after tagging. G-3 names
+      ci-windows.yml as the extension point, but that workflow is Windows-only, path-filtered, and installs the project editable via pipx, i.e. it
+      cannot prove a built wheel works; the "linux and macOS lanes" it also names do not exist. A new top-level Java directory is also unrouted by the
+      path router (src-only unmatched loop), so a PR that breaks the producer build could run no native job.
+    remediation: >
+      Require the per-OS native build plus clean-venv wheel-install smoke to run in the nightly (so the nightly-gate covers the SHA) and on PRs that
+      touch the producer's Java tree, packaging config or the client (a named router group and gate_selection entry), and again in release.yml as the
+      authoritative pre-publish check. State G-3 as "install the built wheel by path into a fresh venv on each OS and run the smoke", not as an
+      extension of ci-windows.yml.
+  - id: SPEC-RELEASE-004
+    lens: "release/packaging feasibility (fallback, sdist, hatch build hook)"
+    severity: 3
+    title: "G-7 permits \"sdist builds without the binary OR fails loudly\", contradicting FR-043 (install must succeed); the pure-wheel fallback is left undecided"
+    evidence:
+      - artifact: "spec.md § 8 G-7 vs FR-043, AC-025, data-model § 10 (sdist row)"
+      - code: "pyproject.toml [tool.hatch.build.targets.wheel] / [tool.hatch.build.targets.sdist] / [build-system] requires hatchling==1.31.0"
+      - code: "tests/cross_cutting/packaging/test_package_bundling.py (sdist and wheel built from the working tree)"
+    claim: >
+      FR-043 says an sdist install must succeed and report binary-missing; G-7 accepts "fails loudly" as an alternative, so the gate can pass an
+      implementation FR-043 forbids. Separately the spec never says whether a pure py3-none-any wheel is still published beside the platform wheels.
+      Without it, every platform outside the matrix (linux aarch64, musl, macOS x86_64 per OD-MATRIX) is forced through an sdist build on the user's
+      machine; with it, pip and uv fall back to the pure wheel with no build step, and tests/scripts that assume a pure wheel stay valid. Making the wheel
+      platform-specific also needs a hatchling build hook or build_data override that must not run unconditionally: an unconditional one would break
+      `uv sync`/editable installs (they build a wheel through the same backend) and the sdist-to-wheel step on machines with no binary.
+    remediation: >
+      Reword G-7 to the FR-043 outcome only (install succeeds, binary-missing reported; a test builds the wheel from the extracted sdist with no binary).
+      Decide in the spec (not the plan) whether a pure fallback wheel ships; recommend yes. Add a constraint that building from the sdist or an editable
+      checkout never requires the binary.
+  - id: SPEC-RELEASE-005
+    lens: "release/packaging feasibility (wheel tags)"
+    severity: 3
+    title: "The wheel tag in FR-041/AC-024 is undefined, so the wheel-tag gate can be satisfied vacuously or by a wrong tag"
+    evidence:
+      - artifact: "spec.md FR-041, AC-024, § 8 G-1; data-model § 10 (platform_tag)"
+      - code: "pyproject.toml classifiers: 'Operating System :: OS Independent' (line ~36)"
+    claim: >
+      The bundled executable is not a Python extension, so the correct tags are py3-none-<platform> (not cpXY-cpXY, which a default hatchling
+      platform build would infer, multiplying wheels per interpreter). The native-image binary also fixes a glibc floor and a macOS deployment target
+      that the tag must truthfully declare; "linux x86_64" alone does not say which manylinux tag, and a too-new tag installs fine on old systems and
+      then crashes at spawn (a crash fault, not binary-missing). AC-024 only requires "correct tag" without saying what that is. The classifier
+      "Operating System :: OS Independent" becomes false for platform wheels and nothing flags it.
+    remediation: >
+      State in FR-041 the tag pattern (py3-none-{platform}), that exactly one wheel per platform is published for all supported interpreters, and that
+      the declared libc/macOS floor is verified against the binary (e.g. by inspecting its required symbols/min-OS) in G-1. Replace the OS-independent
+      classifier with the real set or list the classifier change in section 8.
+  - id: SPEC-RELEASE-006
+    lens: "release/packaging feasibility (binary discovery)"
+    severity: 4
+    title: "The thin client's binary-discovery contract is unspecified and untested for editable installs, uv tool, pipx and relocated venvs"
+    evidence:
+      - artifact: "spec.md FR-026 ('locate the platform binary'), AC-024, AC-025; § 7 tooling defects SK-350/SK-311"
+      - code: "src/kernel/sibling_paths.py::resolve_installed_sibling (existing editable-versus-installed resolution pattern)"
+      - code: ".github/workflows/ci-windows.yml ('pipx install --editable .')"
+    claim: >
+      FR-026 lets the client "locate the platform binary" and nothing more, but no requirement or AC fixes where it looks or proves it survives the
+      install topologies users and CI really use. An editable or git checkout has no built binary at all, so every developer and every existing CI
+      lane (the Windows lane is a pipx editable install; the main matrix runs from a synced dev venv) would take the binary-missing path. A lookup based
+      on sys.prefix/bin or a console-script data directory breaks when a venv is relocated or recreated by `uv tool upgrade`; one anchored on the
+      installed module path does not. The repo already has an editable-versus-installed resolver, but the spec does not require reuse of it, and
+      AC-024/AC-025 run only a fresh `pip` venv.
+    remediation: >
+      Add a requirement that the binary is located relative to the installed package (single authority, no PATH search, no environment-derived absolute
+      path stored at build time), plus ACs: found after the venv is moved/copied, under `uv tool install` and `pipx install` (Windows included), and
+      reported binary-missing (not crash) for editable installs. Say how a developer or CI lane gets a working binary or an explicit stand-in.
+  - id: SPEC-RELEASE-007
+    lens: "release/packaging feasibility (test and CI posture without a binary)"
+    severity: 4
+    title: "Per-event stderr warning plus no opt-out means the whole existing suite and every degraded user see warnings on every lifecycle command"
+    evidence:
+      - artifact: "spec.md FR-023, FR-043, OD-OPTOUT, AC-005, AC-018"
+      - code: ".github/workflows/ci-windows.yml (editable install, no wheel)"
+      - code: "tests/cross_cutting/packaging/test_package_bundling.py (builds artifacts from the working tree, no native step)"
+    claim: >
+      FR-023 requires one stderr warning per unproduced event and OD-OPTOUT recommends no kill switch. In every environment without the binary (editable
+      installs, all unit/integration shards that do not build Java, users on unmatched platforms or sdist installs) each lifecycle command that persists
+      N rows prints N warnings and writes N fault rows forever. That breaks any existing test asserting empty stderr or parsing combined output, and it
+      makes "binary-missing is the supported degraded state" a permanent nuisance with no remedy. AC-018 ("no --json body changes") is only meaningful
+      if the suite's runners separate streams, which the spec does not require. FR-025/AC-006 also assume "a stub" producer, so a locator override must
+      exist, but none is specified.
+    remediation: >
+      Keep never-silent but rate-limit the human warning for binary-missing (once per process or per day) while still writing every fault-log row and
+      the doctor count; state that stub/test injection of the producer is a documented test-only seam (or resolve OD-OPTOUT toward an explicit disable
+      that is itself reported by doctor). Add an AC that the pre-existing command-output assertions are unaffected in a binary-less run.
+  - id: SPEC-RELEASE-008
+    lens: "release/packaging feasibility (2 s budget measurability)"
+    severity: 4
+    title: "NFR-002 has no acceptance criterion and fixes \"once per row\" spawning, so the 2 s budget is neither measured nor reachable by design"
+    evidence:
+      - artifact: "spec.md NFR-002, FR-001, FR-003, FR-025; § 11 risk; AC list (none for NFR-002)"
+      - code: "tests/performance/test_cli_startup_budget_4409.py (ratio-to-fixed-workload, no absolute seconds)"
+      - code: "tests/architectural/test_perf_limit_authority.py (single authority for limits in tests/_perf_helpers.py)"
+    claim: >
+      NFR-002 says the plan measures spawn cost "and sets the budget from it", which is not a requirement and has no falsifier. The design forces one
+      process spawn per persisted row (FR-001/FR-003), inside the command; a command that persists several rows pays several spawns, and on Windows
+      with unsigned binaries (OD-SIGN) the first-run antivirus scan can dominate. The repo's established method (relative ratio, limits only in the
+      single authority, nightly performance lane) is not referenced, and an absolute 2 s assertion would be rejected by the existing authority gate.
+    remediation: >
+      Add an AC: a per-command overhead ceiling expressed through tests/_perf_helpers.py (cold and warm spawn, per OS, with a planted slow stub proving
+      the assertion can fail), summed over the largest in-scope multi-row command. If measurement shows per-row spawn cannot meet it, FR-001 must allow
+      batching rows per command invocation; flag that choice now rather than at implementation.
+  - id: SPEC-RELEASE-009
+    lens: "release/packaging feasibility (provenance, checksum, reproducibility)"
+    severity: 4
+    title: "FR-042 / G-8 have no acceptance criterion; \"recorded checksum\" proves nothing and \"reproducibility\" is overclaimed"
+    evidence:
+      - artifact: "spec.md FR-042, § 8 G-8, data-model § 10 (binary_checksum), AC list (none for FR-042)"
+      - code: ".github/workflows/release.yml 'Record artifact checksums' (sha256sum dist/* of the final dist only)"
+    claim: >
+      FR-042 requires a pinned toolchain, a recorded checksum and attached provenance, but no AC tests any of them. A checksum computed from the same
+      build that produced the wheel cannot detect a binary swapped between the per-OS build job and the job that assembles the wheel; it only proves
+      self-consistency. G-8 is titled "reproducibility" while the requirement states no reproducibility property (native-image output is not
+      bit-reproducible by default). The existing release only checksums the final dist/, so the binary-to-wheel handoff is unverified.
+    remediation: >
+      Add an AC: the checksum recorded at binary build is re-computed from the member inside each published wheel and must match; self-mutation swaps the
+      binary after build and the gate fails. Either rename G-8 "provenance and pinned toolchain" or state the reproducibility claim being made (for
+      example two builds of one SHA yield the same checksum, or an explicit non-claim).
+  - id: SPEC-RELEASE-010
+    lens: "release/packaging feasibility (SBOM, license, dependency audit gates)"
+    severity: 4
+    title: "G-6 names pip-audit as an existing gate that does not run in CI, and G-5's SBOM extension point cannot see the native toolchain"
+    evidence:
+      - artifact: "spec.md § 8 G-5, G-6; § 9 item 1; plan-carryover G-6 row"
+      - code: ".github/workflows/release.yml step 'Generate CycloneDX SBOM' (cyclonedx-py environment, Python environment snapshot)"
+      - code: ".github/workflows/ci-router.yml job 'uv lock --check' (real); pyproject.toml [dependency-groups].lint lists pip-audit and bandit"
+    claim: >
+      A search of workflows, scripts and the Makefile finds no pip-audit or bandit invocation; they are only declared in the lint group. G-6 therefore
+      claims "existing dependency gates" that are not gates (only `uv lock --check` is real), and "Unchanged for Python" would pass vacuously while
+      adding a Java dependency surface with no audit at all. G-5 extends the CycloneDX step, but `cyclonedx-py environment` enumerates the installed
+      Python environment; it cannot see Gradle dependencies, the native-image runtime or statically linked libraries, so the SBOM would be silently
+      unchanged by the new binary.
+    remediation: >
+      Reword G-6 to name only gates that run (`uv lock --check`) and add an explicit new gate for Java dependency verification reusing the existing
+      Gradle checksum-verification pattern in the contracts build. Reword G-5 as a requirement that the release SBOM lists the Java dependencies and the
+      toolchain/runtime embedded in each binary (a CycloneDX Gradle output merged or attached per platform), with a test that it names a known
+      dependency.
+  - id: SPEC-RELEASE-011
+    lens: "release/packaging feasibility (toolchain coherence with existing Gradle builds)"
+    severity: 3
+    title: "A third JDK/toolchain and a per-OS binary pin are introduced without saying how they join the existing pin authority"
+    evidence:
+      - artifact: "spec.md FR-039, FR-042, OD-JAVA; data-model § 10 (toolchain_pin)"
+      - code: "contracts/tools/pins.json, contracts/tools/install_tools.py, contracts/tools/gradle_pin_check.py"
+      - code: ".github/workflows/contracts.yml and contracts-release.yml (Java 21); .github/workflows/ci-nightly.yml acceptance-bdd (Java 25, 3-OS)"
+    claim: >
+      The repository already pins Gradle and tools by sha256 in pins.json, verified by one installer and one GRADLE_PIN_MISMATCH check, with Java 21 in
+      contracts/ and Java 25 in acceptance-jvm/ chosen deliberately. FR-039 and FR-042 add a Gradle build and a "pinned toolchain" (a native-image
+      distribution, not a stock JDK) without saying whether it reuses that authority. The existing pins carry linux-only URLs for some tools, so a
+      three-OS native toolchain pin has no precedent. A fourth ad-hoc pinning mechanism would drift from the gate that guards the other two. The new
+      build is also excluded from nothing: the sdist include list is `src/**/*`, so a Java tree under src/ would ship, whereas acceptance-jvm/** is
+      explicitly excluded.
+    remediation: >
+      Require the producer build to take its Gradle and native toolchain pins from the same pins.json mechanism and gradle_pin_check (extended per OS),
+      state the Java version choice and why, and add a gate that no Java source, Gradle output or build cache is in the wheel or sdist (alongside the
+      packs/internal check, G-10).
+  - id: SPEC-RELEASE-012
+    lens: "release/packaging feasibility (governance drift, flagged not resolved)"
+    severity: 2
+    title: "Java-side gates the charter does not cover (ArchUnit, coverage floors) are required by the spec but have no charter row"
+    evidence:
+      - artifact: "spec.md § 9 items 1, 5, 7; NFR-005; AC-028"
+      - code: ".kittify/charter/charter.md Deployment and Constraints (PyPI distribution, Python 3.11+, 90% coverage)"
+    claim: >
+      AC-028 makes ArchUnit and Java unit tests release-relevant and NFR-005 defers coverage floors to the plan, while the charter's quality gates
+      (ruff, mypy, 90% diff-cover, Sonar) are Python-only. Section 9 flags this correctly; it is recorded here only so the plan does not invent
+      thresholds the charter never approved, and so AC-028's Java checks are not mistaken for CI-enforced gates: no workflow today runs Java tests for
+      this build, and the router has no group for it (see SPEC-RELEASE-003).
+    remediation: >
+      No spec change beyond section 9. Ensure the plan routes the governance question to the operator and wires AC-028's Java checks into a named CI
+      job before they are cited as gates.

@@ -1,0 +1,29 @@
+schema: review-refute/v1
+complete: true
+phase: spec
+batch: 3
+verdicts:
+  - id: SPEC-ARCH-009
+    verdict: refuted
+    reason: The events-side ADR wording cannot be checked from this checkout, section 7 already hands the envelope, validator and charter amendment to events#92, and additive-minor classification and fallback timing are release-plan detail (OD-EVENTS) rather than an ambiguity in a requirement.
+  - id: SPEC-ARCH-011
+    verdict: confirmed
+    reason: data-model section 1 cites the private migration copy while the canonical function is identity/project.py::generate_node_id, and FR-026 forbids the client from supplying the value so the Java producer's derivation (hostname and username per OS) has no stated owner or test.
+  - id: SPEC-ARCH-012
+    verdict: refuted
+    reason: m_2_0_9_state_gitignore already backfills .kittify/events/ for existing projects, FR-019 plus AC-023 already require git check-ignore on fresh init and after upgrade, so naming the registry entry or migration is plan-level HOW.
+  - id: SPEC-ARCH-013
+    verdict: confirmed
+    reason: retrospective/lifecycle_events.py appends RetrospectiveCaptured, CaptureFailed and Skipped to status.events.jsonl and fans them out, yet the words retrospective appear nowhere in spec.md, data-model.md or the deferral list, and FR-017 silently drops unlisted types.
+  - id: SPEC-ARCH-014
+    verdict: refuted
+    reason: FR-033 and section 9 item 3 already state the glossary deferral and the supersession of flat rows, and enumerating the exact ADR sentences an amendment edits is amendment-authoring detail, not a requirement ambiguity.
+  - id: SPEC-COMPLETE-001
+    verdict: confirmed
+    reason: nodeid derives from hostname and username (one per machine and user) while the clock state file and publish log are per checkout, so FR-012's no-duplicate-pair guarantee is undefined across a primary checkout plus lane worktrees and AC-010 only tests one scratch repo.
+  - id: SPEC-COMPLETE-002
+    verdict: confirmed
+    reason: AC-004 says only per in-scope writer one forced row yields one seam call, with no discovery rule, floor or self-mutation case, unlike AC-012 and AC-014 which carry them.
+  - id: SPEC-COMPLETE-003
+    verdict: confirmed
+    reason: AC-005 requires a test per class including disabled while OD-OPTOUT recommends (a) under which the class never occurs, so the required test is unwritable or vacuous.

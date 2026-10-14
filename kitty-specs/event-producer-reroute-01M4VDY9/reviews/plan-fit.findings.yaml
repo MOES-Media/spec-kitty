@@ -1,0 +1,162 @@
+schema: review-findings/v1
+complete: true
+phase: plan
+lens_group: fit
+mission: event-producer-reroute-01M4VDY9
+findings:
+  - id: PLAN-FIT-001
+    lens: Architecture (blast radius, contracts preserved)
+    severity: 4
+    title: Retention treats "a lock file present" as a held lock, but the repo's lock primitive leaves its sidecar behind after release
+    evidence:
+      - artifact: "plan.md § 8 (Mission open, 'Lock facts: a lock file present'); spec.md FR-029"
+      - code: "src/kernel/locks.py::_LockCore.release (truncates, never unlinks; guarantee G3) and ::_os_lock (fcntl.flock / msvcrt.locking)"
+      - code: "docs/adr/4.x/2026-10-08-1-serialise-run-dir-advance.md (per-run lock sidecar <run_dir>/state.json.lock through kernel.locks.machine_file_lock)"
+    claim: >
+      Every run directory that ever took the run-cursor lock keeps an empty state.json.lock for good, so "file present" is true for essentially every run
+      that has advanced once. Implemented as written, Retain either never finds an eligible run journal (retention silently does nothing in a real repo
+      while the AC-013 fixtures, which plant a lock file, pass), or a Java reader that tries FileChannel.tryLock to test "held" does not interlock with
+      Python's flock on Linux/macOS (different advisory-lock families) and would report a live Python holder as free and delete under it. The plan
+      names no held-lock test that both runtimes agree on.
+    remediation: >
+      Define the lock fact in plan section 8 as the lock sidecar's content, not its presence: the sidecar holds a non-empty parsable LockRecord (the format of
+      kernel.locks.LockRecord / read_lock_record) whose age is below the stale threshold; an empty or truncated sidecar is not a lock. Add two AC-013
+      fixtures: a sidecar released by the real Python primitive (empty, run eligible) and one with a live record (run kept). State that Java never takes
+      or tests an OS lock on Python-owned sidecars.
+  - id: PLAN-FIT-002
+    lens: Architecture (contracts preserved, blast radius)
+    severity: 4
+    title: Java retention deletes run-journal files with no handling of the run index, so `spec-kitty next` fails with RUN_STATE_MISSING
+    evidence:
+      - artifact: "plan.md § 8 ('Whole-file deletion only', 'Run journals: existing per-run file; run = one run')"
+      - code: "docs/adr/4.x/2026-10-13-2-the-event-ledger-is-the-publication-seam-default-on-with-local-retention.md D-3 ('Deleting a run directory also removes its entry from .kittify/runtime/feature-runs.json, under that index's own lock')"
+      - code: "src/runtime/next/run_index.py::index_lock (flock-based machine_file_lock); src/runtime/next/runtime_bridge_io.py RunStateMissing / the resolve step that raises it when <run_dir>/state.json is absent"
+    claim: >
+      The run journal (.kittify/runtime/runs/<run>/run.events.jsonl) sits beside state.json and is registered in feature-runs.json. The plan's candidate
+      is "the existing per-run file" and its delete is whole-file only. Either (a) only the journal is deleted and a run with state.json but no journal
+      remains, or (b) the run directory goes and the index keeps an entry whose state.json is missing, which makes the next `next` call raise
+      RunStateMissing (error_code RUN_STATE_MISSING, "will not be silently restarted") for that Mission. The ADR the plan amends requires the index entry to
+      be removed under the index lock; the Java side cannot take that Python flock lock and the thin-client rule forbids Python deciding which entry to
+      drop. FR-028's "whole files only" does not settle this; the plan must.
+    remediation: >
+      Add an explicit decision to plan section 8 and a spec touch-up in section 15, one of: (1) run journals are not Retain candidates in this mission and
+      the exemption is recorded against #6193 (the ADR D-3 run-directory clause stays unimplemented, stated in the ADR amendment); or (2) the Retain reply
+      lists eligible run ids and the doctor pass-through prunes feature-runs.json through run_index.index_lock / save_index after Java deleted the
+      directory, listed in the section 4.2 allowed surface as the one retention-side Python write. Whichever is chosen needs an AC-013 case that runs
+      `next` for the Mission after a real retention pass. Surface it in section 16 as a fork because it changes FR-028/FR-029 scope.
+  - id: PLAN-FIT-003
+    lens: Architecture (single canonical authority; seam placement)
+    severity: 3
+    title: Canonical-root resolution is re-implemented in Java with no stated algorithm and no parity test against resolve_canonical_root
+    evidence:
+      - artifact: "plan.md § 1 (:adapter 'git common-dir resolution by reading .git/commondir'), § 7, § 8 (publish log under .kittify/events/publish/); spec.md FR-004"
+      - code: "src/specify_cli/core/paths.py::resolve_canonical_root (four rules: .git dir; worktree gitdir pointer via get_main_repo_root; non-worktree pointer stops at a .kittify marker; GIT_CEILING_DIRECTORIES) and ::get_main_repo_root"
+    claim: >
+      FR-004 makes the producer resolve the canonical repository root "through core.paths.resolve_canonical_root" so that a lane worktree, a coordination
+      worktree and the primary checkout reach one publish log. The plan only describes locating the git common dir (for the clock). It never says how Java
+      derives the canonical root for the .kittify/events/... placement, nor how it handles the submodule/.kittify-marker and GIT_CEILING_DIRECTORIES rules.
+      Two implementations of one authority with no conformance test is the drift pattern the charter's single-authority principle rules out; the
+      concrete failure is a publish log split across two trees, or one created under a submodule's parent.
+    remediation: >
+      State in plan section 1 that `RepoLocator` ports the four rules of resolve_canonical_root, and add a cross-language parity gate in
+      `event-producer.yml` in the style of AC-039: a fixture set (primary, linked worktree, coordination worktree, submodule with .kittify, ceiling variable,
+      non-repo) where the Python side prints resolve_canonical_root and Java resolves the same start path; equal results, with a floor of all six layouts.
+  - id: PLAN-FIT-004
+    lens: Architecture (single canonical authority; blast radius for downstream workspaces)
+    severity: 3
+    title: A fourth pin of spec-kitty-events (events-pin.properties) is added with no consistency gate, and the release-authority manifest is missing from the file lists
+    evidence:
+      - artifact: "plan.md § 3.2 (files that change), § 6 (events-pin.properties; pyproject floor bump), § 11 WP08 (sole owner of pyproject.toml)"
+      - code: ".kittify/release/shared-package-compatibility.json (spec-kitty-events cli_range and locked_version 10.4.4)"
+      - code: "scripts/release/check_shared_package_drift.py::collect_manifest_alignment_issues; .github/workflows/check-spec-kitty-events-alignment.yml (triggers on pyproject.toml, uv.lock, the manifest, scripts/release/**)"
+    claim: >
+      The released events version will be recorded in pyproject.toml, uv.lock, the release-authority manifest and now services/event-producer/gradle/events-pin.properties.
+      The drift checker covers only the first three. Nothing ties the Java pin to the Python lock, so the CLI can validate against one events release while the native
+      producer validates and embeds the schemas of another (the failure the 'same release feeds both consumers' sentence is meant to prevent). Separately, the plan's
+      file lists for the floor bump name pyproject.toml and uv.lock but not the manifest (named only in research.md R-8), so a WP08 that follows plan.md alone
+      turns the Shared Package Drift workflow red, and no WP owns the manifest.
+    remediation: >
+      Add `.kittify/release/shared-package-compatibility.json` (and the pinning inventory the research notes) to § 3.2 and to WP08's write scope. Extend `verify-pins`
+      (or check_shared_package_drift.py) with one assertion: the version in events-pin.properties equals the uv.lock locked version and the manifest's locked_version,
+      with a floor (pin file found) and a mutation case (a mismatched pin fails).
+  - id: PLAN-FIT-005
+    lens: Spec fidelity (traceability)
+    severity: 3
+    title: AC-029 (FR-005 falsifier) appears nowhere in the plan and FR-005 is mapped only to AC-001 to AC-004
+    evidence:
+      - artifact: "plan.md § 14 row 'FR-001 to FR-005 ... ACs 001 to 004', § 9 (Gradle gates list)"
+      - artifact: "spec.md § 6 AC-029 [FR-005]: data key set is a subset of the persisted row's keys plus lifted-member rules, floor over every section 3 type, mutation injects a member"
+    claim: >
+      Every other AC and G id is reachable in the plan (directly or through a range); AC-029 is not, and the traceability row sends FR-005 to the wrong ACs. FR-005
+      ('the producer emits nothing beyond the persisted row') is the guard against the producer injecting meta.json or environment data into published events;
+      with no planned test, the Java mapping code is built with no gate that fails when it adds a member.
+    remediation: >
+      Add AC-029 to the Gradle gate list in § 9 (domain-level test over every type of data-model section 3, driven by the registry, with the floor and the injected-member
+      mutation) and correct the § 14 row to 'FR-005: 1 (envelope), 9; AC-029'.
+  - id: PLAN-FIT-006
+    lens: "Architecture (contracts - events package and schemas)"
+    severity: 3
+    title: The run-journal version member is named `row_version` by the plan alone and pinned by a gate, while the existing row convention is `schema_version`
+    evidence:
+      - artifact: "plan.md § 4.2 (engine.py row: keys exactly event_id,row_version,event_type,timestamp,payload) and the thinness gate clause (b); § 6 confirmation list"
+      - code: "src/specify_cli/status/models.py (schema_version, serialized as 'schema_version'); data-model.md § 3 lifecycle rule (envelope carries schema_ve...)"
+      - artifact: "spec.md FR-035 says only 'a row version'; data-model.md names no member"
+    claim: >
+      The member name becomes part of the persisted run-journal contract (the events PR's run.* data schemas and the legacy-row form of FR-032 must agree with it) yet it is
+      invented in the plan, absent from spec and data-model, and not on the list of items the events PR is asked to confirm. A rename after the events release is a
+      schema change; the gate in § 4.2(b) would then pin the wrong key.
+    remediation: >
+      Either reuse the repo's `schema_version` or declare `row_version` an INTERIM name in § 4.2, add it to the § 6 confirmation list, and have the thinness gate read the
+      member name from one constant that the events PR fixture also uses.
+  - id: PLAN-FIT-007
+    lens: Architecture (generated artifacts; reuse of existing tooling)
+    severity: 3
+    title: The GraalVM toolchain pin cannot be installed by the shared installer the plan says it reuses
+    evidence:
+      - artifact: "plan.md § 1 (install_tools.py reused unchanged for gradle), § 2 (GraalVM archive 'pinned in tools/pins.json'), § 9 verify-pins"
+      - code: "contracts/tools/install_tools.py::_load_tools (kind 'archive'), ::_unpack_tarball (requires `binary` at the archive root, else BINARY_MISSING), ::_format_of (zip or tar.gz only); one url per tool, no per-platform selection"
+    claim: >
+      The plan needs three GraalVM archives (linux/macOS tar.gz with a nested JDK directory, Windows zip) selected per runner, each sha256-checked. The installer takes one
+      url per tool, expects the binary at the tarball root, and installs by `--only NAME`; the plan names no step that installs GraalVM. The WP01 implementer will either
+      fork or modify a script that contracts.yml also runs, or add an unchecked download step in the workflow, which undoes the 'sha256 verified before unpack' claim for
+      the very toolchain FR-042 says is pinned.
+    remediation: >
+      Add one sentence and a file row: either extend the installer additively (per-platform entries, nested JDK root, tests in tests/contract/) under WP01 ownership, or
+      use a SHA-pinned setup action for GraalVM plus a recorded archive checksum compared in `verify-pins`. State which, and that contracts.yml behaviour is unchanged.
+  - id: PLAN-FIT-008
+    lens: Architecture (single canonical authority)
+    severity: 2
+    title: Source of the ULID minted in engine._append_event is unspecified; the repo already has five private copies
+    evidence:
+      - artifact: "plan.md § 4.2 engine.py row; § 4.2 thinness gate import allowlist (ulid forbidden in the three new modules only)"
+      - code: "src/specify_cli/decisions/emit.py::_generate_ulid, src/specify_cli/coordination/atomic_write.py::_generate_ulid, src/charter/activation/_io.py::_generate_ulid, src/specify_cli/invocation/executor.py::_new_ulid; src/runtime/next/_internal_runtime/engine.py has no ULID import; pyproject declares python-ulid"
+    claim: >
+      engine.py lives in the `runtime` layer (it may not import specify_cli). An implementer adds a sixth private helper or reaches for a layer-violating import. FR-035
+      says 'no new logic'.
+    remediation: >
+      Name the call in § 4.2 (a direct `ulid.ULID()` use inside _append_event, as the decisions writer does) and confirm in § 9 that test_layer_rules.py needs no ledger entry.
+  - id: PLAN-FIT-009
+    lens: Architecture (generated artifacts regenerated by a documented command)
+    severity: 2
+    title: Generated files are listed as 'regenerated' without the commands, and the ADR index/inventory update reads as a hand edit
+    evidence:
+      - artifact: "plan.md § 4.2 last row (_completion_manifest.json, docs/api/cli-commands.md 'regenerated'); § 13.3 ('docs/adr/4.x/index.md updated')"
+      - code: "tests/architectural/test_completion_manifest_freshness.py (regenerate with `python -m specify_cli.completion --regenerate`); scripts/docs/build_cli_reference.py; docs/adr/4.x/index.md ('python -m scripts.docs.freshen_adr_inventory docs/adr/4.x/<your-adr>.md')"
+    claim: >
+      WP07 owns these files; nothing in the plan says how they are produced, and the ADR index row plus page-inventory lockfile are written by a script. A hand patch passes
+      locally and fails the freshness gates in CI.
+    remediation: >
+      Name the three commands (completion --regenerate, build_cli_reference.py, freshen_adr_inventory.py for the new ADR and the amended one) in § 4.2/§ 13.3 and forbid
+      hand edits of those outputs.
+  - id: PLAN-FIT-010
+    lens: Governance drift (ADR amendment choice)
+    severity: 2
+    title: The ADR route is decided inside the section titled 'Flagged, not resolved' and is absent from the operator forks
+    evidence:
+      - artifact: "plan.md § 13 item 3 ('Choice: amend that ADR in place ... and add one new ADR'); § 16 (only F1)"
+      - code: "docs/adr/4.x/index.md ('ADRs are immutable' as the reason earlier ADRs were not moved); docs/adr/4.x/2026-10-13-2-... D-1 (row schemas, 3.0.0 Event stays the wire contract), D-2 ('A subscriber learns about events by reading the ledger, never by being called by the CLI')"
+    claim: >
+      Amending an Accepted ADR in place has precedent (2026-10-06-1, 2026-10-01-2), and FR-045 allows either route, so the pick is defensible. But the amendment changes
+      D-1's envelope statement and D-2's subscriber model, which is an owner-level change, and the plan files it as a decision rather than a fork.
+    remediation: >
+      Keep the recommendation but move it to § 16 as F2 ('amend in place vs supersede with a new ADR'), so the operator confirms it before WP07.

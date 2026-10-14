@@ -1,0 +1,29 @@
+schema: review-refute/v1
+complete: true
+phase: plan
+batch: 2
+verdicts:
+  - id: PLAN-FIT-009
+    verdict: refuted
+    reason: research.md R-7 already names the completion regenerate command, the plan marks both rows "generated", and a hand patch fails the named freshness gates locally, so the finding asks for detail without a wrong-build scenario.
+  - id: PLAN-FIT-010
+    verdict: refuted
+    reason: FR-045 explicitly allows amend or new ADR, plan section 13 states the choice and its reason, and filing it as a flagged decision rather than a section 16 fork produces no wrong build.
+  - id: PLAN-SEQ-001
+    verdict: confirmed
+    reason: plan section 9 gives event-producer.yml a pull_request trigger and WP01 creates it, while fleet_verdict.py applicable_workflows raises on an unregistered PR workflow and test_all_existing_pr_workflows_are_registered asserts equality on the real tree, yet registration is assigned to WP09 (the research.md duplicate-suite ledger row for producer-native.yml has the same split); severity 3 is adequate.
+  - id: PLAN-SEQ-002
+    verdict: confirmed
+    reason: WP01 exit criteria require a stub wheel built with the hook while section 3.1/3.2 and the WP table give the hook file and the pyproject.toml table solely to WP08, which depends on WP01; severity 2 to 3 since a throwaway spike hook is a cheap resolution.
+  - id: PLAN-SEQ-003
+    verdict: refuted
+    reason: Section 12 already states the drain gate moves into the three Zeitgeist handlers, A to D only enumerates adapters.py hunks, and the send path keeps its own require_drain("relay") gate inside offer(), so no hosted send occurs and the final tree is correct; only commit-level ordering is at stake.
+  - id: PLAN-SEQ-004
+    verdict: refuted
+    reason: Section 6 already says the events PR goes first and is released and that protocol work not reading schemas proceeds, so the wait is an explicit scheduling gate and not a wrong-build outcome, and the parallel-fixture-set scenario for WP02 is speculative.
+  - id: PLAN-SEQ-005
+    verdict: refuted
+    reason: Section 6 already gates approval of schema-reading work and the mission PR on the released pin and sequences the events release first, so WP08 carrying the floor bump is a stated dependency and not a wrong build.
+  - id: PLAN-SEQ-006
+    verdict: refuted
+    reason: Section 3.4 and 9 give the release.yml edits static ownership tests with mutation checks, native-smoke exercises the platform wheel build on PR CI, and the absence of a pre-release rehearsal is a process preference with no concrete wrong-outcome scenario.

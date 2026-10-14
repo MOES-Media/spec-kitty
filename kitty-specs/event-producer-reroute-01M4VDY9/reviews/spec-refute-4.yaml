@@ -1,0 +1,29 @@
+schema: review-refute/v1
+complete: true
+phase: spec
+batch: 4
+verdicts:
+  - id: SPEC-COMPLETE-004
+    verdict: confirmed
+    reason: AC-013 requires "exactly keep_runs newest are kept" while also keeping items younger than max_age_days and requiring both limits exceeded (FR-029), which contradict on a fixture, and no AC covers invalid retention values.
+  - id: SPEC-COMPLETE-005
+    verdict: confirmed
+    reason: FR-007 and data-model section 2 both normalize a UUID id (lower-case hyphenated) and refuse any non-ULID ledger id, leaving the producer's treatment of a hyphenated UUID id ambiguous.
+  - id: SPEC-COMPLETE-006
+    verdict: refuted
+    reason: Lifecycle writers already refuse unknown types at the source (persist_lifecycle_event_local checks LIFECYCLE_EVENT_TYPES) and data-model section 3 states the seam hands over only in-scope rows, so the claimed unmapped-type path is speculative.
+  - id: SPEC-COMPLETE-007
+    verdict: confirmed
+    reason: FR-023 limits the stderr line to human mode while AC-005 demands one stderr warning with byte-identical --json bodies, and no requirement covers the fault log itself being unwritable.
+  - id: SPEC-COMPLETE-008
+    verdict: confirmed
+    reason: FR-012 makes stamp-and-append one exclusive operation but never states the permitted outcome of a kill between the two, and the unconditional "NOT produced" sentence on timeout/crash can be false after a completed append, with no AC for either.
+  - id: SPEC-COMPLETE-009
+    verdict: confirmed
+    reason: No AC cites FR-005 or FR-020 and the G-11 gate list (client-no-logic, persisted-line schema, lane list, retention, seam census) contains no single-writer gate, so a Python writer elsewhere would pass.
+  - id: SPEC-COMPLETE-010
+    verdict: confirmed
+    reason: NFR-004 and NFR-006 have no AC or gate at all, and FR-045 and FR-046 are not tied to any observable criterion; FR-042 and FR-044 map only to G-8 and G-10 without an AC falsifier.
+  - id: SPEC-COMPLETE-011
+    verdict: confirmed
+    reason: AC-024 is worded "per platform wheel" with no floor tying it to the FR-041 minimum platform set, so an empty or one-entry matrix passes vacuously.

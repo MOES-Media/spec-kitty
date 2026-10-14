@@ -1,0 +1,29 @@
+schema: review-refute/v1
+complete: true
+phase: tasks
+batch: 3
+verdicts:
+  - id: TASKS-SEQ-005
+    verdict: confirmed
+    reason: WP11 T071 says the gate blocks approval not authoring while WP07 T044 and WP09 T058 say STOP and not started, and "complete" is undefined; the inconsistency is real though severity 3 is overstated (the dependency edges are a deliberate design).
+  - id: TASKS-SEQ-006
+    verdict: confirmed
+    reason: WP01 lists T006 hook and T007 fleet-verdict registration before T008-T010 measurements, and the HALT text only says stop and report without stating what is left in the tree.
+  - id: TASKS-SEQ-007
+    verdict: confirmed
+    reason: Plan 11 says campsite is WP01's first commit but T001 (baseline file committed via safe-commit) precedes T002 campsite; a nit.
+  - id: TASKS-SEQ-008
+    verdict: confirmed
+    reason: Live gh pr list shows open PR 6205 on pyproject.toml, uv.lock and the compatibility json, 6148 on ci-fleet-verdict.yml, 5540 on cli-commands.md, while tasks-overview still says about 19 open PRs.
+  - id: TASKS-SEQ-009
+    verdict: refuted
+    reason: The finding itself concedes write scopes are disjoint and the lane graph consistent, and wps.yaml gives WP01 ownership of the build files with WP11 additive serial edits already stated; the WP05 build-file conflict is speculative ("may need").
+  - id: TASKS-SEQ-010
+    verdict: confirmed
+    reason: wps.yaml WP05 lists WP03 and WP04 though WP04 depends on WP03, and WP10 lists all WPs; harmless redundancy, a nit.
+  - id: TASKS-COVER-001
+    verdict: confirmed
+    reason: WP07 T047 (ii) says one row per run-journal kind while spec AC-019 (ii) requires one row per cleared marker written by the real writer, and T047 clears markers 1, 2, 5, 6 with no stated validation of those writers.
+  - id: TASKS-COVER-002
+    verdict: confirmed
+    reason: WP06 T040 states no floor, no self-mutation cases, no named exemption for kinds with no emitter and no one-annotation-row-one-client-invocation check, all required by spec AC-004 and the floor rule; no other WP06 text supplies them.

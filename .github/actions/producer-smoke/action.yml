@@ -1,0 +1,105 @@
+name: Producer smoke
+description: >-
+  The single definition of the producer smoke, used by event-producer.yml (native-smoke) and by release.yml (smoke-wheels).
+  `binary` mode installs a wheel by path into a fresh virtual environment, runs the bundled native producer by path inside a scratch
+  git repository and asserts exit 0, one JSON object on stdout and (non-Windows) the exec bit. `cli` mode installs the same way and
+  runs a CLI command in the scratch repository, then finds the publish log with a fixed lookup. Shell only; no Python file.
+
+inputs:
+  wheel:
+    description: Path of the wheel to install.
+    required: true
+  mode:
+    description: '`binary` or `cli`.'
+    required: true
+  expect:
+    description: '`produced` or `binary-missing`.'
+    required: false
+    default: produced
+  command:
+    description: The CLI command to run in the scratch repository (cli mode only).
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Install the wheel into a fresh virtual environment
+      shell: bash
+      env:
+        WHEEL: ${{ inputs.wheel }}
+        MODE: ${{ inputs.mode }}
+      run: |
+        set -euo pipefail
+        smoke_dir="${RUNNER_TEMP}/producer-smoke"
+        rm -rf "$smoke_dir"
+        mkdir -p "$smoke_dir"
+        python3 -m venv "$smoke_dir/venv" || python -m venv "$smoke_dir/venv"
+        if [ -x "$smoke_dir/venv/bin/python" ]; then py="$smoke_dir/venv/bin/python"; else py="$smoke_dir/venv/Scripts/python.exe"; fi
+        if [ "$MODE" = "cli" ]; then
+          # A CLI command imports the package, so the wheel needs its real dependencies.
+          "$py" -m pip install --quiet "$WHEEL"
+        else
+          # Binary mode: the files are what is under test (location, exec bit, checksum); dependencies are not.
+          "$py" -m pip install --no-deps --quiet "$WHEEL"
+        fi
+        echo "SMOKE_PY=$py" >> "$GITHUB_ENV"
+        echo "SMOKE_DIR=$smoke_dir" >> "$GITHUB_ENV"
+
+    - name: Binary mode (run the bundled binary by path)
+      if: inputs.mode == 'binary'
+      shell: bash
+      run: |
+        set -euo pipefail
+        # find_spec locates the package without executing its __init__, which imports the CLI's dependencies (not installed here).
+        native=$("$SMOKE_PY" -c "import importlib.util, pathlib; print((pathlib.Path(next(iter(importlib.util.find_spec('specify_cli').submodule_search_locations))) / '_native').as_posix())")
+        binary=$(find "$native" -maxdepth 1 -type f \( -name 'spec-kitty-event-producer' -o -name 'spec-kitty-event-producer.exe' \) | head -n 1)
+        [ -n "$binary" ] || { echo "::error::no bundled producer binary under $native"; exit 1; }
+        [ -s "$native/PRODUCER.sha256" ] || { echo "::error::PRODUCER.sha256 is missing under $native"; exit 1; }
+        want=$(cut -d' ' -f1 "$native/PRODUCER.sha256")
+        if command -v sha256sum >/dev/null 2>&1; then got=$(sha256sum "$binary" | cut -d' ' -f1); else got=$(shasum -a 256 "$binary" | cut -d' ' -f1); fi
+        [ "$got" = "$want" ] || { echo "::error::bundled binary sha256 $got differs from PRODUCER.sha256 $want"; exit 1; }
+        case "$binary" in *.exe) ;; *) [ -x "$binary" ] || { echo "::error::the bundled binary is not executable"; exit 1; } ;; esac
+
+        scratch="$SMOKE_DIR/scratch-repo"
+        git init --quiet "$scratch"
+        cd "$scratch"
+
+        # Every smoke request of the checkout, each run in turn; the inline default (accepted by the WP01 spike) when none exists yet.
+        requests=$(find "$GITHUB_WORKSPACE/services/event-producer/launcher/src/test/resources" -type f -name 'smoke-request*.json' 2>/dev/null | sort || true)
+        if [ -z "$requests" ]; then
+          printf '%s\n' '{"v":1,"op":"produce","start_path":"."}' > "$SMOKE_DIR/inline-request.json"
+          requests="$SMOKE_DIR/inline-request.json"
+        fi
+        for request in $requests; do
+          echo "smoke request: $request"
+          reply=$("$binary" < "$request")
+          echo "$reply"
+          [ "$(printf '%s\n' "$reply" | wc -l | tr -d ' ')" = "1" ] || { echo "::error::expected exactly one reply line"; exit 1; }
+          printf '%s' "$reply" | jq -e 'type == "object"' >/dev/null || { echo "::error::the reply is not one JSON object"; exit 1; }
+        done
+
+    - name: CLI mode (run a CLI command in a scratch repository)
+      if: inputs.mode == 'cli'
+      shell: bash
+      env:
+        COMMAND: ${{ inputs.command }}
+        EXPECT: ${{ inputs.expect }}
+      run: |
+        set -euo pipefail
+        [ -n "$COMMAND" ] || { echo "::error::cli mode needs a command"; exit 1; }
+        scratch="$SMOKE_DIR/scratch-repo"
+        git init --quiet "$scratch"
+        cd "$scratch"
+        stderr="$SMOKE_DIR/cli-stderr.txt"
+        eval "$COMMAND" 2> "$stderr"
+        # The publish log is found by a fixed lookup, not by asking the CLI (no command reports a log path).
+        logs=$(find .kittify/events/publish -type f -name '*.jsonl' 2>/dev/null || true)
+        if [ "$EXPECT" = "produced" ]; then
+          if grep -q 'binary-missing' "$stderr"; then echo "::error::stderr reports binary-missing but a produced event was expected"; exit 1; fi
+          [ "$(printf '%s\n' "$logs" | grep -c .)" = "1" ] || { echo "::error::expected exactly one publish log, found: $logs"; exit 1; }
+          [ -s "$logs" ] || { echo "::error::the publish log is empty"; exit 1; }
+          [ "$(wc -l < "$logs" | tr -d ' ')" = "1" ] || { echo "::error::the publish log must hold exactly one line"; exit 1; }
+        else
+          grep -q 'binary-missing' "$stderr" || { echo "::error::stderr does not report binary-missing"; exit 1; }
+        fi

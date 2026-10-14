@@ -1,0 +1,29 @@
+schema: review-refute/v1
+complete: true
+phase: plan
+batch: 3
+verdicts:
+  - id: PLAN-SEQ-007
+    verdict: confirmed
+    reason: Charter Standing Order 2 requires tidy-first on touched surfaces and a scout on god-surfaces; plan section 11 limits the campsite to an AGENTS.md docs fix while status/emit.py (1570 lines) and the three fire_* bodies in status/adapters.py are edited with no tidy step or per-surface justification (severity corrected to 2, process compliance rather than a wrong build).
+  - id: PLAN-SEQ-008
+    verdict: refuted
+    reason: Plan section 4.2 and line 90 already say tests patch locate_binary and WP06 must leave its lane green on its own gates, so stray binary-missing noise would surface and be fixed inside WP06; the finding asks for added detail, not a wrong-build scenario.
+  - id: PLAN-SEQ-009
+    verdict: confirmed
+    reason: research.md lines 180 and 206 and plan section 17 say #3283/#3284 are absent from the repository, but .github/actions/warmup/action.yml cites #3283 and the test-sanitation issue-matrix has a #3284 row, so the statement is false and the lock-timeout rule is undefined by source (severity 2 is right).
+  - id: PLAN-SEQ-010
+    verdict: refuted
+    reason: WP01 already owns the services/event-producer skeleton, pins and verification metadata, and a conflict on a Gradle-regenerated file between WP04 and WP05 is rebase rework, not a wrong outcome.
+  - id: PLAN-VERIFY-001
+    verdict: confirmed
+    reason: .gitignore has no _native entry (git check-ignore prints nothing), research.md sections 3 and 10 wrongly claim it is gitignored, so a locally copied binary would be picked up by hatch and offered to git, and CI-side AC-038 assertions with no planted file are vacuous (severity 3 is arguable, 4 is high but the packaging gap is real).
+  - id: PLAN-VERIFY-002
+    verdict: refuted
+    reason: The plan runs check_dist_set.py (set equals the pinned list) in build-release after the wheel build and publish-pypi needs build-release, so a missing leg fails the job before publish; nothing wrong ships.
+  - id: PLAN-VERIFY-003
+    verdict: refuted
+    reason: check_dist_set.py already fails on any missing or extra file against the pinned list (so zero platform wheels cannot pass vacuously) and plan line 42 and AC-032 put the binary re-hash on every published wheel; the finding asks for a larger mutation matrix, not a wrong-build scenario.
+  - id: PLAN-VERIFY-004
+    verdict: confirmed
+    reason: Plan section 3.3 builds wheels in build-release from artifacts downloaded via download-artifact, which does not preserve mode bits, and hatch force_include takes the wheel mode from the file stat while the planned packaging test (research.md row for test_packaging_safety) uses a same-job stub, so a 0644 binary in the Linux/macOS wheels is neither prevented nor caught by the check_dist_set gate (severity 3 stands).

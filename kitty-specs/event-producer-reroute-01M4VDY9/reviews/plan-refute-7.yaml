@@ -1,0 +1,8 @@
+schema: review-refute/v1
+complete: true
+phase: plan
+batch: 7
+verdicts:
+  - id: PLAN-SHIM-006
+    verdict: confirmed
+    reason: FR-026 and AC-012 forbid client timestamps and clocks outright while plan 4.2 exempts datetime in producer_faults.py (fault rows and day file names need a clock) and section 15 has no matching FR-026 touch-up, so a literal AC-012 gate and the plan's gate disagree; severity overstated, corrected to 1 (text inconsistency, fix is a one-line touch-up).

@@ -1,0 +1,102 @@
+schema: review-findings/v1
+complete: true
+phase: plan
+lens_group: fresh
+mission: event-producer-reroute-01M4VDY9
+findings:
+  - id: PLAN-FRESH2-001
+    lens: debugger-debbie (structural root cause; contradiction with existing code)
+    severity: 4
+    title: "_publish_journalled (row=record) cannot work: JournalRecord holds no row, and the moment event_id is a Python-minted UUID5"
+    evidence:
+      - artifact: "plan.md § 4.2 row events/runtime_moments.py ('_publish_journalled (row=record)'); § 4.2 Journal route; research.md R-16 per-file base (runtime_moments: only emit_decision_authority_denied new, no new imports)"
+      - code: "src/specify_cli/events/runtime_moments.py::JournalRecord (fields line, timestamp only)"
+      - code: "src/specify_cli/events/runtime_moments.py::latest_matching_record (parses the full journal dict, returns only line+timestamp)"
+      - code: "src/specify_cli/events/runtime_moments.py::moment_event_id (uuid.uuid5 over run_id:line:event_type; _EVENT_ID_NAMESPACE)"
+      - code: "src/specify_cli/events/runtime_moments.py::_publish_journalled (builds an envelope dict with aggregate_id, a UUID5 event_id and _with_mission_identity payload, in Python)"
+    claim: >
+      The plan says the journal kinds reach the seam with row=record, where record is the journal row that
+      WP07 stamps with a ULID event_id. In the checkout the object called record is a JournalRecord dataclass
+      carrying only a line number and a timestamp; the raw row is parsed and thrown away inside
+      latest_matching_record. The existing code also mints the event_id itself (moment_event_id, a
+      uuid5 UUID, which the producer is specified to refuse) and assembles a bridge-style envelope in Python.
+      Neither JournalRecord, latest_matching_record, moment_event_id nor _EVENT_ID_NAMESPACE nor the uuid
+      import appears in the 4.2 row or in R-16 (which says runtime_moments gains one method and no imports),
+      and gate (e) fails any change outside the row. Wrong-build scenario: an implementer who keeps the
+      envelope code passes a Python-built dict with a UUID event_id (the producer refuses every moment as a
+      malformed id, silently as a fault row), or one who changes JournalRecord to carry the row trips gate
+      (e)/(c) and has to widen the table ad hoc. The WP06 census (stubbed client, asserts calls) would not
+      notice either failure.
+    remediation: >
+      Add to the 4.2 row and R-16 the real edits: JournalRecord gains the raw parsed row (or
+      latest_matching_record returns it), _publish_journalled passes that persisted row (with its ULID
+      event_id) and builds no envelope, and moment_event_id, _EVENT_ID_NAMESPACE, the uuid import and
+      _with_mission_identity are deleted (or named residuals with a reason). Name the unit test file
+      tests/specify_cli/events/test_runtime_moments_unit.py (the only test of moment_event_id and
+      latest_matching_record) as WP06 blast radius. State that WP06 rows still lack event_id until WP07, so
+      _publish_journalled must tolerate a row without event_id (clockless/legacy path) in the WP06 lane.
+  - id: PLAN-FRESH2-002
+    lens: debugger-debbie (ordering; green-alone)
+    severity: 3
+    title: "WP07 validates persisted lines against the released events schemas from Python, but the Python floor bump is WP08, which WP07 does not depend on"
+    evidence:
+      - artifact: "plan.md § 11 WP table rows WP07 ('AC-019 validates persisted lines against the released schemas'; Depends on WP06) and WP08 (events floor bump; Depends on WP01 + events release)"
+      - artifact: "plan.md § 6 (Python dependency floor raised by WP08; no schema may be committed, test_no_committed_events_schema.py) ; research.md R-15 row 'events-pin fetch task' (WP07 reads schemas 'via WP04')"
+      - artifact: "spec.md AC-019 (persisted-line validation, floor: schemas resolved)"
+    claim: >
+      The only schema delivery path named is the Java build's wheel fetch (WP02/WP04) and the Python
+      spec-kitty-events floor bump (WP08). The Python-side AC-019 gate and the marker-clearing check (clear
+      only if the persisted line validates, § 4.4) need those schemas in the Python test environment, but
+      WP07 depends on WP06 only; its lane has the old events floor in pyproject.toml/uv.lock, and committing
+      copies is forbidden. "Events release reached through WP04" covers the Java tree, not the Python venv.
+      WP07 is therefore not green alone, or the implementer invents a fetch path. Because the decision rule
+      for markers 3, 4, 7 depends on this validation, the choice also changes which markers are cleared.
+    remediation: >
+      Either make WP07 depend on WP08 (WP08 only needs WP01 + the release, so the order is feasible) or
+      state exactly how the WP07 test reaches the released schemas (for example the same pinned wheel from
+      events-pin.properties, unzipped by a test fixture, with the Python test refusing to run without it).
+      Update the WP table, R-15 and the ownership note on pyproject.toml accordingly.
+  - id: PLAN-FRESH2-003
+    lens: debugger-debbie (cross-section consistency)
+    severity: 2
+    title: "acceptance/__init__.py new-import row differs between plan 4.2 and R-16, and 4.2 is declared the gate's data"
+    evidence:
+      - artifact: "plan.md § 4.2 row acceptance/__init__.py ('Lane added to its existing specify_cli.status import')"
+      - artifact: "research.md R-16 per-file base: acceptance/__init__.py imports Lane and CANONICAL_LANES (existing status_lanes import)"
+      - code: "src/specify_cli/acceptance/__init__.py::_LEGACY_NOT_DONE_LANES (line 151; selected by name from Lane per plan 4.4, which needs no CANONICAL_LANES)"
+    claim: >
+      Plan 4.2 says FR-027's gate takes its table as data, yet the two documents disagree on the permitted
+      new imports for this file. R-16 additionally permits CANONICAL_LANES, which plan 4.4 never uses
+      ("selected by name from Lane"), so rule (e) would be looser than the plan for one file, and a test
+      author reading one document builds a different allowlist than one reading the other.
+    remediation: >
+      Make both lists identical. Prefer Lane only (matching 4.4); drop CANONICAL_LANES from R-16, or add it
+      to 4.2 with the reason.
+  - id: PLAN-FRESH2-004
+    lens: debugger-debbie (gate data ambiguity)
+    severity: 2
+    title: "Four files appear in two 4.2 rows, so 'that file's row' in gate (e) is not a single row"
+    evidence:
+      - artifact: "plan.md § 4.2 rows status/lifecycle_events.py (wiring) and the marker row listing status/lifecycle_events.py, decisions/emit.py, events/decision_log.py, migration/mission_state.py; engine.py also carries marker 8 in its own row"
+      - artifact: "research.md R-16 per-file base (lists decisions/emit.py and lifecycle_events.py once, as 'none')"
+    claim: >
+      Gate (e) lies within "base plus that file's row". With duplicate rows, a gate author must union them;
+      the plan does not say so. Comment removal adds no names, so the outcome is the same, but the
+      "table equals gate data" claim is only true after a merge rule is stated; otherwise the first
+      implementation of the table loader either fails on the duplicate key or silently keeps only the
+      last row (dropping the wiring symbols of decisions/emit.py and lifecycle_events.py).
+    remediation: >
+      Say in 4.2 that rows for the same file are unioned, or move the marker comment removals into the
+      file's primary row (a "Nature" of wiring, markers).
+  - id: PLAN-FRESH2-005
+    lens: debugger-debbie (hygiene/size)
+    severity: 1
+    title: "plan.md is 45,313 bytes, at the ~45 KB ceiling; the revision grew it"
+    evidence:
+      - artifact: "plan.md (wc -c = 45313)"
+    claim: >
+      Any further fold-in to plan.md pushes it past the limit. Sections 13, 14, 15 and 17 repeat material
+      that research.md R-17 to R-19 already carries verbatim (traceability, spec touch-ups, ADR plan).
+    remediation: >
+      When folding in the fixes above, move detail to research.md rather than plan.md; shorten section 15
+      to a pointer to R-18.

@@ -1,0 +1,19 @@
+schema: review-verify/v1
+complete: true
+phase: plan
+results:
+  - id: PLAN-FRESH2-001
+    status: resolved
+    reason: Plan 4.2 row and R-16 now name JournalRecord.row (compare=False), latest_matching_record filling it, row=record.row from _publish_journalled, the dataclasses.field import, residual envelope names kept for the Zeitgeist handler (verified it reads kwargs["envelope"]), blast-radius test files, red-first assertions, and tolerance of rows without event_id in WP06; this matches the checkout code.
+  - id: PLAN-FRESH2-002
+    status: resolved
+    reason: WP07 now depends on WP08 in the WP table, 4.x text, R-15 and R-24, and reads schemas from the installed spec_kitty_events package with a fail-not-skip floor, so no committed copy or ad hoc fetch path is needed.
+  - id: PLAN-FRESH2-003
+    status: resolved
+    reason: R-16 acceptance/__init__.py now lists Lane only and says CANONICAL_LANES is not needed, identical to the 4.2 row and 4.4.
+  - id: PLAN-FRESH2-004
+    status: resolved
+    reason: Plan 4.2 and R-16 now state that rows for the same file are unioned, a duplicate key is not an error, and a multi-file row applies to each file.
+  - id: PLAN-FRESH2-005
+    status: resolved
+    reason: Sections 13/15 were shortened and detail moved to research.md R-24; plan.md is 45,608 bytes (about 44.5 KiB), at the ~45 KB ceiling though 295 bytes larger than before, which is a nit with no implementation effect.
