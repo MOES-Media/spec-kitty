@@ -1,0 +1,344 @@
+{
+  "version": 1,
+  "mission_slug": "event-producer-reroute-01M4VDY9",
+  "mission_id": "01M4VDY92YSGZAQVKS3E879VPH",
+  "mission_branch": "kitty/mission-event-producer-reroute-01M4VDY9",
+  "target_branch": "feat/event-producer-reroute-6185",
+  "lanes": [
+    {
+      "lane_id": "lane-a",
+      "wp_ids": [
+        "WP01"
+      ],
+      "write_scope": [
+        ".github/workflows/ci-fleet-verdict.yml",
+        ".github/workflows/event-producer.yml",
+        ".github/workflows/producer-native.yml",
+        ".gitignore",
+        "AGENTS.md",
+        "contracts/tools/gradle_pin_check.py",
+        "pyproject.toml",
+        "scripts/ci/fleet_verdict.py",
+        "scripts/release/dist-set.json",
+        "scripts/release/hatch_build_producer.py",
+        "services/event-producer/README.md",
+        "services/event-producer/adapter/build.gradle.kts",
+        "services/event-producer/application/build.gradle.kts",
+        "services/event-producer/build.gradle.kts",
+        "services/event-producer/domain/build.gradle.kts",
+        "services/event-producer/gradle/verification-metadata.xml",
+        "services/event-producer/gradle/wrapper/**",
+        "services/event-producer/launcher/build.gradle.kts",
+        "services/event-producer/launcher/src/main/java/ai/speckitty/producer/launcher/spike/**",
+        "services/event-producer/launcher/src/main/resources/META-INF/native-image/**",
+        "services/event-producer/settings.gradle.kts",
+        "services/event-producer/tools/**",
+        "tests/architectural/test_no_duplicate_suite_execution.py",
+        "tests/ci/test_fleet_verdict.py",
+        "tests/contract/test_gradle_pin_check.py",
+        "tests/cross_cutting/packaging/test_producer_stub_wheel.py",
+        "tests/release/test_dist_set_platform_tags.py"
+      ],
+      "predicted_surfaces": [
+        "api",
+        "legacy-cleanup",
+        "tracker-integration"
+      ],
+      "depends_on_lanes": [],
+      "parallel_group": 0
+    },
+    {
+      "lane_id": "lane-b",
+      "wp_ids": [
+        "WP02"
+      ],
+      "write_scope": [
+        "services/event-producer/domain/src/main/**",
+        "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/arch/**",
+        "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/clock/**",
+        "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/envelope/**",
+        "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/fault/**",
+        "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/ids/**",
+        "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/order/**",
+        "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/protocol/**",
+        "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/retention/**"
+      ],
+      "predicted_surfaces": [
+        "api"
+      ],
+      "depends_on_lanes": [
+        "lane-a"
+      ],
+      "parallel_group": 1
+    },
+    {
+      "lane_id": "lane-h",
+      "wp_ids": [
+        "WP08"
+      ],
+      "write_scope": [
+        "scripts/release/README.md",
+        "scripts/release/check_dist_set.py",
+        "scripts/release/check_exact_install.py",
+        "tests/_support/shared_build_artifacts.py",
+        "tests/cross_cutting/packaging/test_package_bundling.py",
+        "tests/cross_cutting/packaging/test_packaging_safety.py",
+        "tests/cross_cutting/packaging/test_producer_wheel_contents.py",
+        "tests/release/test_check_dist_set.py",
+        "tests/release/test_check_exact_install.py"
+      ],
+      "predicted_surfaces": [
+        "api",
+        "artifact-rendering",
+        "legacy-cleanup"
+      ],
+      "depends_on_lanes": [
+        "lane-a"
+      ],
+      "parallel_group": 1
+    },
+    {
+      "lane_id": "lane-c",
+      "wp_ids": [
+        "WP03"
+      ],
+      "write_scope": [
+        "services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/clock/**",
+        "services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/fs/**",
+        "services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/identity/**",
+        "services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/json/**",
+        "services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/publishlog/**",
+        "services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/repo/**",
+        "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/clock/**",
+        "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/fs/**",
+        "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/identity/**",
+        "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/json/**",
+        "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/publishlog/**",
+        "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/repo/**"
+      ],
+      "predicted_surfaces": [
+        "api",
+        "tracker-integration"
+      ],
+      "depends_on_lanes": [
+        "lane-b"
+      ],
+      "parallel_group": 2
+    },
+    {
+      "lane_id": "lane-d",
+      "wp_ids": [
+        "WP04"
+      ],
+      "write_scope": [
+        "services/event-producer/application/src/main/java/ai/speckitty/producer/application/port/**",
+        "services/event-producer/application/src/main/java/ai/speckitty/producer/application/produce/**",
+        "services/event-producer/application/src/test/java/ai/speckitty/producer/application/ArchitectureTest.java",
+        "services/event-producer/application/src/test/java/ai/speckitty/producer/application/produce/**",
+        "services/event-producer/launcher/src/main/java/ai/speckitty/producer/launcher/*.java",
+        "services/event-producer/launcher/src/test/**"
+      ],
+      "predicted_surfaces": [
+        "api",
+        "legacy-cleanup"
+      ],
+      "depends_on_lanes": [
+        "lane-c"
+      ],
+      "parallel_group": 3
+    },
+    {
+      "lane_id": "lane-e",
+      "wp_ids": [
+        "WP05"
+      ],
+      "write_scope": [
+        "services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/ledger/**",
+        "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/ledger/**",
+        "services/event-producer/application/src/main/java/ai/speckitty/producer/application/retain/**",
+        "services/event-producer/application/src/test/java/ai/speckitty/producer/application/retain/**",
+        "services/event-producer/launcher/src/main/java/ai/speckitty/producer/launcher/retain/**"
+      ],
+      "predicted_surfaces": [
+        "api"
+      ],
+      "depends_on_lanes": [
+        "lane-c",
+        "lane-d"
+      ],
+      "parallel_group": 4
+    },
+    {
+      "lane_id": "lane-k",
+      "wp_ids": [
+        "WP11"
+      ],
+      "write_scope": [
+        ".github/workflows/check-spec-kitty-events-alignment.yml",
+        ".kittify/release/shared-package-compatibility.json",
+        "services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/schema/**",
+        "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/schema/**",
+        "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/released/RegistryDataSubsetTest.java",
+        "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/released/ReleasedComparatorFixturesTest.java",
+        "services/event-producer/gradle/events-pin.properties",
+        "tests/architectural/pinning_rule_inventory.json",
+        "tests/architectural/test_no_committed_events_schema.py",
+        "tests/contract/spec_kitty_events_consumer/**",
+        "uv.lock"
+      ],
+      "predicted_surfaces": [
+        "api",
+        "app-shell",
+        "artifact-rendering",
+        "legacy-cleanup"
+      ],
+      "depends_on_lanes": [
+        "lane-d"
+      ],
+      "parallel_group": 4
+    },
+    {
+      "lane_id": "lane-f",
+      "wp_ids": [
+        "WP06"
+      ],
+      "write_scope": [
+        "docs/api/cli-commands.md",
+        "src/runtime/next/_internal_runtime/engine.py",
+        "src/runtime/next/_internal_runtime/events.py",
+        "src/runtime/next/runtime_bridge_retrospective.py",
+        "src/specify_cli/_completion_manifest.json",
+        "src/specify_cli/cli/commands/_event_producer_doctor.py",
+        "src/specify_cli/coordination/outbound.py",
+        "src/specify_cli/coordination/status_transition.py",
+        "src/specify_cli/decisions/emit.py",
+        "src/specify_cli/events/decision_log.py",
+        "src/specify_cli/events/runtime_moments.py",
+        "src/specify_cli/retrospective/lifecycle_events.py",
+        "src/specify_cli/state/contract.py",
+        "src/specify_cli/status/__init__.py",
+        "src/specify_cli/status/adapters.py",
+        "src/specify_cli/status/emit.py",
+        "src/specify_cli/status/lifecycle_events.py",
+        "src/specify_cli/status/producer_client.py",
+        "src/specify_cli/status/producer_faults.py",
+        "src/specify_cli/status/zeitgeist_bridge.py",
+        "tests/architectural/test_producer_client_thinness.py",
+        "tests/architectural/test_producer_fault_enum.py",
+        "tests/architectural/test_publish_log_single_writer.py",
+        "tests/architectural/test_seam_census.py",
+        "tests/specify_cli/status/test_event_producer_doctor.py",
+        "tests/status/conftest.py",
+        "tests/status/test_drain_fanout.py",
+        "tests/status/test_producer_client.py",
+        "tests/status/test_producer_faults.py",
+        "tests/status/test_producer_seam_wiring.py",
+        "tests/status/test_saas_fanout_timeout.py"
+      ],
+      "predicted_surfaces": [
+        "api",
+        "artifact-rendering",
+        "legacy-cleanup",
+        "tracker-integration"
+      ],
+      "depends_on_lanes": [
+        "lane-d",
+        "lane-e"
+      ],
+      "parallel_group": 5
+    },
+    {
+      "lane_id": "lane-i",
+      "wp_ids": [
+        "WP09"
+      ],
+      "write_scope": [
+        ".github/workflows/ci-nightly.yml",
+        ".github/workflows/release.yml",
+        "CONTRIBUTING.md",
+        "RELEASE_CHECKLIST.md",
+        "scripts/release/producer_smoke.py",
+        "tests/release/test_release_ci_ownership.py",
+        "tests/release/test_release_producer_stages.py"
+      ],
+      "predicted_surfaces": [
+        "api"
+      ],
+      "depends_on_lanes": [
+        "lane-h",
+        "lane-k"
+      ],
+      "parallel_group": 5
+    },
+    {
+      "lane_id": "lane-g",
+      "wp_ids": [
+        "WP07"
+      ],
+      "write_scope": [
+        ".kittify/traceability/contextive-map.yaml",
+        "docs/adr/4.x/2026-10-13-2-*.md",
+        "docs/adr/4.x/2026-10-14-1-event-producer-java-native-binary-behind-thin-python-client.md",
+        "docs/adr/4.x/index.md",
+        "docs/context/system-events.md",
+        "scripts/canonical_producer_lint_baseline.txt",
+        "scripts/lint_canonical_producers.py",
+        "src/specify_cli/.contextive/**",
+        "src/specify_cli/acceptance/__init__.py",
+        "src/specify_cli/consolidation/done_bookkeeping.py",
+        "src/specify_cli/migration/mission_state.py",
+        "src/specify_cli/migration/rebuild_state.py",
+        "tests/architectural/_baselines.yaml",
+        "tests/architectural/dead_symbol_allowlist.yaml",
+        "tests/architectural/test_exemption_ledger.py",
+        "tests/architectural/test_single_lane_list.py",
+        "tests/contract/test_identity_contract_matrix.py",
+        "tests/cross_cutting/encoding/test_contextive_event_producer_terms.py",
+        "tests/runtime/test_journal_event_stamping.py",
+        "tests/specify_cli/migration/test_rebuild_state.py"
+      ],
+      "predicted_surfaces": [
+        "api",
+        "legacy-cleanup",
+        "tracker-integration"
+      ],
+      "depends_on_lanes": [
+        "lane-f",
+        "lane-k"
+      ],
+      "parallel_group": 6
+    },
+    {
+      "lane_id": "lane-j",
+      "wp_ids": [
+        "WP10"
+      ],
+      "write_scope": [
+        "tests/_perf_helpers.py",
+        "tests/integration/test_event_producer_degraded.py",
+        "tests/integration/test_event_producer_e2e.py",
+        "tests/perf/test_event_producer_overhead.py"
+      ],
+      "predicted_surfaces": [
+        "api"
+      ],
+      "depends_on_lanes": [
+        "lane-a",
+        "lane-b",
+        "lane-c",
+        "lane-d",
+        "lane-e",
+        "lane-f",
+        "lane-g",
+        "lane-h",
+        "lane-i",
+        "lane-k"
+      ],
+      "parallel_group": 7
+    }
+  ],
+  "computed_at": "2026-10-14T07:27:42.843472+00:00",
+  "computed_from": "dependency_graph+ownership",
+  "planning_artifact_wps": [],
+  "planning_commit_sha": "19d48b4622c961d5d2d2677a27f27827690a8da6"
+}

@@ -1,0 +1,229 @@
+work_packages:
+  - id: WP01
+    title: "Feasibility gate: native image on three OS, build skeleton, CI registration, hatch hook"
+    dependencies: []
+    owned_files:
+      - "services/event-producer/settings.gradle.kts"
+      - "services/event-producer/build.gradle.kts"
+      - "services/event-producer/domain/build.gradle.kts"
+      - "services/event-producer/application/build.gradle.kts"
+      - "services/event-producer/adapter/build.gradle.kts"
+      - "services/event-producer/launcher/build.gradle.kts"
+      - "services/event-producer/launcher/src/main/java/ai/speckitty/producer/launcher/spike/**"
+      - "services/event-producer/launcher/src/main/resources/META-INF/native-image/**"
+      - "services/event-producer/gradle/verification-metadata.xml"
+      - "services/event-producer/gradle/wrapper/**"
+      - "services/event-producer/tools/**"
+      - "services/event-producer/README.md"
+      - ".github/workflows/producer-native.yml"
+      - ".github/workflows/event-producer.yml"
+      - ".github/workflows/ci-fleet-verdict.yml"
+      - "scripts/ci/fleet_verdict.py"
+      - "tests/ci/test_fleet_verdict.py"
+      - "tests/architectural/test_no_duplicate_suite_execution.py"
+      - "contracts/tools/gradle_pin_check.py"
+      - "tests/contract/test_gradle_pin_check.py"
+      - "scripts/release/hatch_build_producer.py"
+      - "scripts/release/dist-set.json"
+      - "tests/cross_cutting/packaging/test_producer_stub_wheel.py"
+      - "tests/release/test_dist_set_platform_tags.py"
+      - "pyproject.toml"
+      - ".gitignore"
+      - "AGENTS.md"
+    requirement_refs: [FR-039, FR-041, FR-042, NFR-002, NFR-004, C-001]
+    subtasks: [T001, T002, T003, T004, T005, T006, T007, T008, T009, T010]
+    prompt_file: "tasks/WP01-feasibility-gate-and-build-skeleton.md"
+
+  - id: WP02
+    title: "Java :domain core: ids, clock value, total order, envelope model, retention eligibility, ArchUnit"
+    dependencies: [WP01]
+    owned_files:
+      - "services/event-producer/domain/src/main/**"
+      - "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/ids/**"
+      - "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/clock/**"
+      - "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/order/**"
+      - "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/envelope/**"
+      - "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/retention/**"
+      - "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/fault/**"
+      - "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/protocol/**"
+      - "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/arch/**"
+    requirement_refs: [FR-007, FR-008, FR-009, FR-010, FR-012, FR-013, FR-016, FR-029, NFR-003, NFR-005]
+    subtasks: [T011, T012, T013, T014, T015, T016]
+    prompt_file: "tasks/WP02-java-domain-core.md"
+
+  - id: WP03
+    title: "Java :adapter file-system side: lock, clock store, publish log, repo locator, node identity"
+    dependencies: [WP02]
+    owned_files:
+      - "services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/json/**"
+      - "services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/fs/**"
+      - "services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/repo/**"
+      - "services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/identity/**"
+      - "services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/clock/**"
+      - "services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/publishlog/**"
+      - "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/json/**"
+      - "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/fs/**"
+      - "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/repo/**"
+      - "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/identity/**"
+      - "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/clock/**"
+      - "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/publishlog/**"
+    requirement_refs: [FR-011, FR-012, FR-019, FR-020, FR-021, NFR-003, NFR-004]
+    subtasks: [T017, T018, T019, T020, T021, T022]
+    prompt_file: "tasks/WP03-java-adapter-filesystem.md"
+
+  - id: WP04
+    title: "Java :application Produce, ports, launcher protocol, fault vocabulary, journal-row mission identity"
+    dependencies: [WP03]
+    owned_files:
+      - "services/event-producer/application/src/main/java/ai/speckitty/producer/application/produce/**"
+      - "services/event-producer/application/src/main/java/ai/speckitty/producer/application/port/**"
+      - "services/event-producer/application/src/test/java/ai/speckitty/producer/application/produce/**"
+      - "services/event-producer/application/src/test/java/ai/speckitty/producer/application/ArchitectureTest.java"
+      - "services/event-producer/launcher/src/main/java/ai/speckitty/producer/launcher/*.java"
+      - "services/event-producer/launcher/src/test/**"
+    requirement_refs: [FR-001, FR-005, FR-006, FR-007, FR-009, FR-015, FR-016, FR-017, FR-018, FR-022, FR-025, FR-038, NFR-001, NFR-006, NFR-007]
+    subtasks: [T023, T024, T025, T026, T027, T028]
+    prompt_file: "tasks/WP04-java-produce-and-protocol.md"
+
+  - id: WP05
+    title: "Java retention: Retain use case, committed-ledger and lock-record readers, launcher retain operation"
+    dependencies: [WP03, WP04]
+    owned_files:
+      - "services/event-producer/application/src/main/java/ai/speckitty/producer/application/retain/**"
+      - "services/event-producer/application/src/test/java/ai/speckitty/producer/application/retain/**"
+      - "services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/ledger/**"
+      - "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/ledger/**"
+      - "services/event-producer/launcher/src/main/java/ai/speckitty/producer/launcher/retain/**"
+    requirement_refs: [FR-028, FR-029, FR-030, FR-031, NFR-006]
+    subtasks: [T029, T030, T031, T032, T033]
+    prompt_file: "tasks/WP05-java-retention.md"
+
+  - id: WP06
+    title: "Thin Python client, seam wiring, census, thinness gate, fault log, doctor pass-through"
+    dependencies: [WP04, WP05]
+    owned_files:
+      - "src/specify_cli/status/producer_client.py"
+      - "src/specify_cli/status/producer_faults.py"
+      - "src/specify_cli/status/adapters.py"
+      - "src/specify_cli/status/zeitgeist_bridge.py"
+      - "src/specify_cli/status/emit.py"
+      - "src/specify_cli/status/lifecycle_events.py"
+      - "src/specify_cli/status/__init__.py"
+      - "src/specify_cli/coordination/outbound.py"
+      - "src/specify_cli/coordination/status_transition.py"
+      - "src/specify_cli/decisions/emit.py"
+      - "src/specify_cli/retrospective/lifecycle_events.py"
+      - "src/specify_cli/events/runtime_moments.py"
+      - "src/specify_cli/events/decision_log.py"
+      - "src/runtime/next/_internal_runtime/events.py"
+      - "src/runtime/next/runtime_bridge_retrospective.py"
+      - "src/runtime/next/_internal_runtime/engine.py"
+      - "src/specify_cli/cli/commands/_event_producer_doctor.py"
+      - "src/specify_cli/state/contract.py"
+      - "src/specify_cli/_completion_manifest.json"
+      - "docs/api/cli-commands.md"
+      - "tests/status/conftest.py"
+      - "tests/status/test_producer_client.py"
+      - "tests/status/test_producer_faults.py"
+      - "tests/status/test_producer_seam_wiring.py"
+      - "tests/status/test_drain_fanout.py"
+      - "tests/status/test_saas_fanout_timeout.py"
+      - "tests/specify_cli/status/test_event_producer_doctor.py"
+      - "tests/architectural/test_producer_client_thinness.py"
+      - "tests/architectural/test_seam_census.py"
+      - "tests/architectural/test_producer_fault_enum.py"
+      - "tests/architectural/test_publish_log_single_writer.py"
+    requirement_refs: [FR-001, FR-002, FR-003, FR-004, FR-020, FR-022, FR-023, FR-024, FR-025, FR-026, FR-027, FR-030, C-001]
+    subtasks: [T034, T035, T036, T037, T038, T039, T040, T041, T042, T043]
+    prompt_file: "tasks/WP06-python-client-and-seam.md"
+
+  - id: WP07
+    title: "Run-journal stamping, lane-list consolidation, marker clearing, glossary and ADRs (events-release gated)"
+    dependencies: [WP06, WP11]
+    owned_files:
+      - "scripts/lint_canonical_producers.py"
+      - "scripts/canonical_producer_lint_baseline.txt"
+      - "tests/architectural/_baselines.yaml"
+      - "tests/architectural/dead_symbol_allowlist.yaml"
+      - "tests/architectural/test_single_lane_list.py"
+      - "tests/architectural/test_exemption_ledger.py"
+      - "tests/runtime/test_journal_event_stamping.py"
+      - "tests/specify_cli/migration/test_rebuild_state.py"
+      - "tests/contract/test_identity_contract_matrix.py"
+      - "src/specify_cli/migration/rebuild_state.py"
+      - "src/specify_cli/migration/mission_state.py"
+      - "src/specify_cli/acceptance/__init__.py"
+      - "src/specify_cli/consolidation/done_bookkeeping.py"
+      - "docs/context/system-events.md"
+      - "src/specify_cli/.contextive/**"
+      - ".kittify/traceability/contextive-map.yaml"
+      - "tests/cross_cutting/encoding/test_contextive_event_producer_terms.py"
+      - "docs/adr/4.x/2026-10-14-1-event-producer-java-native-binary-behind-thin-python-client.md"
+      - "docs/adr/4.x/index.md"
+      - "docs/adr/4.x/2026-10-13-2-*.md"
+    requirement_refs: [FR-032, FR-033, FR-034, FR-035, FR-036, FR-037, FR-045, FR-046]
+    subtasks: [T044, T045, T046, T047, T048, T049, T050, T051]
+    prompt_file: "tasks/WP07-journal-stamping-lanes-markers-docs.md"
+
+  - id: WP08
+    title: "Packaging remainder: dist-set check, exact-install check, fixtures and packaging tests"
+    dependencies: [WP01]
+    owned_files:
+      - "scripts/release/check_dist_set.py"
+      - "scripts/release/check_exact_install.py"
+      - "scripts/release/README.md"
+      - "tests/_support/shared_build_artifacts.py"
+      - "tests/release/test_check_dist_set.py"
+      - "tests/release/test_check_exact_install.py"
+      - "tests/cross_cutting/packaging/test_producer_wheel_contents.py"
+      - "tests/cross_cutting/packaging/test_packaging_safety.py"
+      - "tests/cross_cutting/packaging/test_package_bundling.py"
+    requirement_refs: [FR-041, FR-043, FR-044]
+    subtasks: [T052, T053, T054, T055, T056, T057]
+    prompt_file: "tasks/WP08-packaging-remainder.md"
+
+  - id: WP09
+    title: "Release workflow: build-producer, platform wheels, smoke-wheels, SBOM, attestation (events-release gated)"
+    dependencies: [WP08, WP11]
+    owned_files:
+      - ".github/workflows/release.yml"
+      - ".github/workflows/ci-nightly.yml"
+      - "RELEASE_CHECKLIST.md"
+      - "CONTRIBUTING.md"
+      - "tests/release/test_release_ci_ownership.py"
+      - "tests/release/test_release_producer_stages.py"
+      - "scripts/release/producer_smoke.py"
+    requirement_refs: [FR-040, FR-041, FR-042, FR-043]
+    subtasks: [T058, T059, T060, T061, T062, T063]
+    prompt_file: "tasks/WP09-release-workflow.md"
+
+  - id: WP10
+    title: "Integration: end-to-end default install, AC-036 measurement, mid-flight Mission, final gate pass (events-release gated)"
+    dependencies: [WP01, WP02, WP03, WP04, WP05, WP06, WP07, WP08, WP09, WP11]
+    owned_files:
+      - "tests/integration/test_event_producer_e2e.py"
+      - "tests/integration/test_event_producer_degraded.py"
+      - "tests/_perf_helpers.py"
+      - "tests/perf/test_event_producer_overhead.py"
+    requirement_refs: [FR-038, FR-043, NFR-001, NFR-002, NFR-004, NFR-006, NFR-007]
+    subtasks: [T064, T065, T066, T067, T068, T069, T070]
+    prompt_file: "tasks/WP10-integration-and-final-gate.md"
+
+  - id: WP11
+    title: "Events-release consumer: pin fetch, schema-backed validator, AC-029, released comparator fixtures, floor bump (events-release gated)"
+    dependencies: [WP04]
+    owned_files:
+      - "services/event-producer/gradle/events-pin.properties"
+      - "services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/schema/**"
+      - "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/schema/**"
+      - "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/released/RegistryDataSubsetTest.java"
+      - "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/released/ReleasedComparatorFixturesTest.java"
+      - "tests/contract/spec_kitty_events_consumer/**"
+      - "tests/architectural/test_no_committed_events_schema.py"
+      - ".kittify/release/shared-package-compatibility.json"
+      - ".github/workflows/check-spec-kitty-events-alignment.yml"
+      - "tests/architectural/pinning_rule_inventory.json"
+      - "uv.lock"
+    requirement_refs: [FR-005, FR-006, FR-013, FR-014, FR-015, FR-017, FR-040]
+    subtasks: [T071, T072, T073, T074, T075, T076, T077]
+    prompt_file: "tasks/WP11-events-release-consumer.md"
