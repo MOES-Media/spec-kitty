@@ -25,7 +25,7 @@
       "wp": null
     },
     "#1248": {
-      "evidence_ref": "WP07 clears the canonical-producer-exempt marker (spec FR, plan 4.4)",
+      "evidence_ref": "WP12 clears the canonical-producer-exempt marker (WP07 split, refinement R6)",
       "fr": null,
       "nfr": null,
       "repo": null,
@@ -34,7 +34,7 @@
       "source_file": "spec.md",
       "title": "<fill at WP-implementation time>",
       "verdict": "in-mission",
-      "wp": "WP07"
+      "wp": "WP12"
     },
     "#3283": {
       "evidence_ref": "baseline hazard cited in plan 10; context only",
