@@ -152,7 +152,7 @@ Method: for each touched file or concept, grep `tests/architectural`, `tests/ci`
 | `status/emit.py`, `coordination/outbound.py`, `status/lifecycle_events.py`, `retrospective/lifecycle_events.py`, `decisions/emit.py` | `tests/architectural/test_status_events_writes_gate.py`, `test_mission_write_discipline.py`, `test_no_write_side_rederivation.py`, `test_ledger_floor.py` | write-site ledgers; mission-id/root re-derivation; `drain_posture`/`ledger_posture` referenced only in named places | seam calls add no write site and no `drain_posture` reference; the client resolves the root only through `resolve_canonical_root` |
 | `runtime/next/_internal_runtime/engine.py::_append_event` | `test_mission_write_discipline.py` rule 1 (run-log rewrite), `tests/contract/test_identity_contract_matrix.py` (`run.events.jsonl`), `tests/contract/spec_kitty_events_consumer/test_consumer_contract.py` | append-only stays; journal shape | stamping adds two keys; update the matrix expectation |
 | CLI (`doctor` sibling) | `tests/architectural/test_completion_manifest_freshness.py`, `test_docs_cli_reference_parity.py`, `tests/docs/test_build_cli_reference.py`, `tests/architectural/test_destructive_op_routing.py` | completion manifest and CLI reference must match the live Typer tree; destructive-op literals | regenerate `src/specify_cli/_completion_manifest.json` (`python -m specify_cli.completion --regenerate`) and `docs/api/cli-commands.md`; the Python side deletes nothing |
-| `state/contract.py` (three new surfaces) | `tests/architectural/test_lifted_root_gitignore_contract.py`, `tests/specify_cli/test_state_contract.py`, `tests/state/` | state-surface registry vs gitignore and roots | register publish log, fault log, clock state (a root outside the work tree needs a new `StateRoot` member or a `GIT_COMMON_DIR` note; decided in WP07) |
+| `state/contract.py` (three new surfaces) | `tests/architectural/test_lifted_root_gitignore_contract.py`, `tests/specify_cli/test_state_contract.py`, `tests/state/` | state-surface registry vs gitignore and roots | register publish log, fault log, clock state (a root outside the work tree needs a new `StateRoot` member or a `GIT_COMMON_DIR` note; decided in WP06) |
 | path literals | `tests/architectural/test_no_dead_src_path_literals.py`, `tests/audit/test_no_legacy_path_literals.py` | new `.kittify/events/...` literals in `src/` | literals live in one constants module |
 | exempt markers | `tests/architectural/test_lifted_lint.py`, `scripts/lint_canonical_producers.py`, `scripts/canonical_producer_lint_baseline.txt` | marker semantics, baseline | markers cleared per data-model section 8; baseline not widened; persisted-line mode added to the lint |
 | lane lists | `tests/specify_cli/migration/test_rebuild_state.py` (the synthesized event chain from `_LANE_ORDER`/`_VALID_LANES`), the acceptance tests of `_LEGACY_NOT_DONE_LANES`, `tests/specify_cli/status/test_lane_uninitialized.py` (its docstring still says `_VALID_LANES` derives from `Lane`); `tests/architectural/` names no census list | P23 | first task of WP07 is the census (FR-034); characterisation tests per list (section 14); all three named in WP07's blast radius |
@@ -244,8 +244,8 @@ Hunks this mission makes in `status/adapters.py`, each in its own commit: (A) th
 |---|---|---|---|---|
 | `Lane` | `status/models.py` | StrEnum, 11 members including non-persisted `uninitialized` | the authority | n/a |
 | `CANONICAL_LANES` | `src/specify_cli/status_lanes.py` | nine-string literal in an import-light module | stays literal (reviewed exception, reason: that module must not import status orchestration; WP07 confirms the import direction, and if `models` already imports it the tuple stays the source) | value equality with the post-genesis `Lane` members |
-| `_VALID_LANES` | `migration/rebuild_state.py` | frozenset of eight (no `in_review`) | `frozenset(CANONICAL_LANES) - {"in_review"}`, the exclusion explicit with a comment | equality with the pre-change literal |
-| `_LANE_ORDER` | same | ordered five-step history path | stays literal, reviewed exception ("a path, not a vocabulary"); members written as `Lane.X.value` | order and value equality |
+| `_VALID_LANES` | `migration/rebuild_state.py` | frozenset of eight (no `in_review`) | `frozenset(CANONICAL_LANES) - {"in_review"}`, the exclusion explicit with a comment; new import `CANONICAL_LANES` from `specify_cli.status_lanes` | equality with the pre-change literal |
+| `_LANE_ORDER` | same | ordered five-step history path | stays literal, reviewed exception ("a path, not a vocabulary"); no import added | order and value equality |
 | `_LEGACY_NOT_DONE_LANES` | `acceptance/__init__.py` | tuple, order significant, includes alias `doing` | selected by name from `Lane`, `doing` an explicit alias constant, order kept | order and value equality |
 | `_PRE_APPROVED_LANE_VALUES` | `consolidation/done_bookkeeping.py` | frozenset of four | selected by name from `Lane` | value equality |
 
@@ -265,6 +265,8 @@ Rule: a WP that adds a file or workflow owns every gate edit it forces; a chokep
 | `status/adapters.py`, `tests/status/conftest.py` | seam wiring (WP06) | WP06 | sole owners, as before |
 | `_baselines.yaml`, `dead_symbol_allowlist.yaml`, `engine.py`, lint script | marker clearing and stamping (WP07) | WP07 | unchanged; WP07 no longer owns the doctor sibling |
 | completion manifest, CLI reference | doctor sibling | WP06 | the sibling and its regeneration land together; the sibling is WP06's because the thinness gate (WP06) floors on all three new modules and `events_retention` needs only the `retain` protocol of WP05 |
+| seam call sites, emitter route, census | FR-002 to FR-004, AC-004 | WP06 (all of them) | the engine stamping and gate (b) are WP07's, so no gate precedes its edit; rule (e) uses "within" |
+| events-pin fetch task, `events-pin.properties`, AC-029 test, comparator fixtures | first reader of released events artifacts | WP02 (waits for the release) | other readers: WP04 direct, WP07 (AC-019 schema validation) via WP04, WP08 floor bump |
 | `release.yml`, `ci-nightly.yml`, release docs, `test_release_ci_ownership.py` assertions | release wiring (WP09) | WP09 | |
 | `check_dist_set.py`, `dist-set.json`, `check_exact_install.py`, fixtures, events floor | wheel machinery (WP08) | WP08 | |
 
@@ -278,9 +280,31 @@ Checked and left: `test_no_dead_modules.py` and `test_status_module_boundary.py`
 - (b) `_append_event` writes exactly `event_id,row_version,event_type,timestamp,payload`.
 - (c) The emission-area module census (`status/`, `events/`, `retrospective/`, `decisions/` plus the three new files) equals a pinned list, so a new module fails.
 - (d) The client imports none of `_broadcast_status_transition`, `_broadcast_lifecycle_envelope`, `_envelope_bookkeeping`.
-- (e) For every existing Python file of the plan section 4.2 table: the set of top-level functions, classes and methods, and the set of imports, equal the base commit's plus the table's new names. A helper such as `_mint_id`, or an import of `uuid`, `ulid`, `hashlib`, `datetime`, `secrets` or `random`, added to `emit.py`, `lifecycle_events.py` or `engine.py` fails. Rules (a) to (d) alone pin symbols only for the new modules and count modules, so they cannot catch logic added inside an existing allowed file, which is the main route by which logic would leak into Python. The pinned base sets are priced debt: the owner refreshes them when an unrelated change on `main` adds a name, and they are deleted with (c) when #6193 retires the Python writers.
+- (e) For every existing Python file of the plan section 4.2 table: the set of top-level functions, classes and methods, and the set of imports, lie within the base commit's plus that file's row of the table (names and imports). A helper such as `_mint_id`, or an import of `uuid`, `ulid`, `hashlib`, `datetime`, `secrets` or `random` outside the file's row, added to `emit.py`, `lifecycle_events.py` or `rebuild_state.py` fails; `engine.py` may add only `ulid`. "Within" (not "equal to") lets a row's edit land in a later WP than the gate. Rules (a) to (d) alone pin symbols only for the new modules and count modules, so they cannot catch logic added inside an existing allowed file, which is the main route by which logic would leak into Python. The pinned base sets are priced debt: the owner refreshes them when an unrelated change on `main` adds a name, and they are deleted with (c) when #6193 retires the Python writers.
 
-Mutations (AC-012): a copy of the client gaining an id mint, a timestamp, a schema import, a publish-log read, the bridge's envelope code or an extra module; a copy of `producer_faults.py` with a clock read outside `_now_utc`; a copy of `emit.py` with an added helper or an added `import uuid`. The client's allowed capabilities pass: stderr line, bound resolution, child termination, breaker, fault-log append and read, opaque identifier copy, root resolution, retention pass-through.
+Mutations (AC-012): a copy of the client gaining an id mint, a timestamp, a schema import, a publish-log read, the bridge's envelope code or an extra module; a copy of `producer_faults.py` with a clock read outside `_now_utc`; a copy of `emit.py` with an added helper or an added `import uuid`; a copy of `engine.py` or `rebuild_state.py` with an import absent from its row. The client's allowed capabilities pass: stderr line, bound resolution, child termination, breaker, fault-log append and read, opaque identifier copy, root resolution, retention pass-through.
+
+Per-file base of rule (e) (sweep of every existing file of plan 4.2; "none" = no new name, no new import). Imports are `(module, name)` pairs at any depth.
+
+| File | New names | New imports |
+|---|---|---|
+| `status/adapters.py` | `_dispatch_handlers`, `ensure_producer_client` | `status.producer_client`, `status.producer_faults.record_fault` (`hosted_posture` deleted) |
+| `status/zeitgeist_bridge.py` | none | `specify_cli.core.hosted_posture` |
+| `status/emit.py`, `coordination/outbound.py`, `coordination/status_transition.py`, `status/lifecycle_events.py`, `decisions/emit.py` | none | none |
+| `retrospective/lifecycle_events.py` | none | one function-local fan-out name from `specify_cli.status` |
+| `events/runtime_moments.py` | `emit_decision_authority_denied` | none (`hosted_posture` deleted) |
+| `runtime/next/_internal_runtime/events.py` | `emit_decision_authority_denied` on `RuntimeEventEmitter` and `NullEmitter` | none |
+| `events/decision_log.py` | `DecisionGitLog.emit_decision_authority_denied` | none |
+| `runtime/next/runtime_bridge_retrospective.py` | `_BufferingRuntimeEmitter.emit_decision_authority_denied` | none |
+| `runtime/next/_internal_runtime/engine.py` | none (`_append_event`, `_authorize_audit_answer` change in place) | `ulid` |
+| `status/__init__.py` | none | the client's public names |
+| `status/models.py`, `status_lanes.py` | none | none |
+| `migration/rebuild_state.py` | none | `specify_cli.status_lanes.CANONICAL_LANES` |
+| `acceptance/__init__.py` | the `doing` alias constant | `Lane` (existing `specify_cli.status` import), `CANONICAL_LANES` (existing `status_lanes` import) |
+| `consolidation/done_bookkeeping.py` | none | `Lane` at runtime |
+| `migration/mission_state.py`, `state/contract.py` | none | none |
+
+Excluded from (e): `scripts/lint_canonical_producers.py` (its own tests), `tests/status/conftest.py`, generated files. Journal route: the layer test caps `runtime -> specify_cli` edges, so the engine imports nothing from `specify_cli`; the chain is `engine` -> `DecisionGitLog` (wrapper from `emitter_for_engine`) -> `_BufferingRuntimeEmitter` -> `RuntimeMomentProducer`. Non-`NullEmitter` fakes in tests (`tests/runtime/test_bridge_engine.py`) gain the method; `test_runtime_emitter_seam.py` (one Protocol class, one registration site) is unchanged and listed as implicated.
 
 ## 17 Traceability (plan section 14)
 
@@ -304,3 +328,38 @@ Mutations (AC-012): a copy of the client gaining an id mint, a timestamp, a sche
 | C-001 to C-008 | 4.2 (C-002/003/004 via gates), 3.1 (C-007), 6 (C-008), 15 |
 | G-1 to G-13 | 3.4, R-13 |
 
+## 18 Spec touch-ups (plan section 15, exact wording)
+
+Not edited in the spec; the orchestrator applies them.
+1. **FR-027**, add: "The allowed Python surface is the file, symbol and new-import list of plan section 4.2; the gate fails on any other new module or function in the status and emission area, and on a new top-level name or import in an existing file of that list beyond that file's row; the list is its data."
+2. **FR-028 / data-model section 6** (F-2), add: "Python forwards the raw `ledger.retention.*` values from `.kittify/config.yaml` unread; Java applies the defaults 20 and 30 and validates them, returning the named policy error that `doctor` renders."
+3. **C-008** (F-3), replace with: "The events PR follows spec-kitty-events#92 for the `dataschema` base URI, the `lamportclock` type, lifted-member lists and minimal-envelope timing, and for type names except the operator-ruled prefix `ai.spec-kitty` and the INTERIM names of data-model section 3, which that PR is asked to adopt; the `source` tie-break added to the total-order key goes to that PR to confirm (OD-EVENTS)."
+4. **data-model section 4 clockless definition** (F-4), replace the sentence with: "A clockless row has no `lamportclock` member at all; a present value that is not an integer in 0..2^31-1 (out of range, `null`, a string, a boolean) is not clockless but an error row." and in the error-row list: "a `lamportclock` that is not an integer in 0..2^31-1".
+5. **FR-046 / AC-033**: replace "CI-enforced" by "enforced by a targeted test added by this mission (no CI job runs the generator's `check` today)".
+6. **data-model section 6 Retain** (F-6), add: "An unreadable, unparseable or absent committed ledger makes that Mission's items kept ('facts unavailable'); AC-013 covers it."
+7. **FR-023**, state that the `retain` operation's failures are `policy_error` or kept-with-reason replies, not event faults.
+8. **FR-029**, replace "or a lock file present" by "or a live lock record (a Python-owned lock sidecar holding a non-empty parsable lock record younger than the stale threshold; an empty or truncated sidecar is not a lock; the sidecar's presence alone is not a lock; `clock.lock` is never a lock fact)".
+9. **FR-030 / AC-013 / data-model section 6**: replace "no file opened for write" by "no candidate file opened for write"; add "Retain takes `clock.lock` around each candidate delete, re-checks eligibility and length under it, and maps a lock timeout or delete failure to kept-with-reason; a two-process test races produce against retain".
+10. **FR-026**, append: "The client may read the wall clock only to stamp its own fault-log row's `at` and to name the UTC day file, in `producer_faults.py` alone; never for an event." **AC-012**: "the timestamp mutation is applied to the client module; a second mutation adds a clock read to `producer_faults.py` outside its one clock function."
+11. **FR-026 / data-model FaultLogRow**: "the fault-count window is the fault-log day files whose name date lies within the raw `max_age_days` of today; with that value absent or non-numeric, every file present."
+12. **data-model section 3, rows "Run journal"**, emission point: "persisted by `engine._append_event`; reaches the seam through the `RuntimeEventEmitter` chain (`RuntimeMomentProducer._publish_journalled`), never by an import of `specify_cli` into `runtime`. `DecisionAuthorityDenied` is carried by a new Protocol method `emit_decision_authority_denied`; `SignificanceEvaluated` by the existing `emit_significance_evaluated`."
+
+## 19 ADR plan (plan section 13, item 3)
+
+ADR 2026-10-13-2 D-1, D-2, D-3 need amending. Amend it in place (an "Amendment" section, as ADR 2026-10-06-1 did) for the three departures (CloudEvents rows supersede "flat rows" for new rows; publish log, fault log and clock are an added read path; the local-tier list gains three files): one authority per decision. Add one new ADR `docs/adr/4.x/2026-10-14-1-event-producer-java-native-binary-behind-thin-python-client.md` for what no ADR owns (Java strangler producer, native platform wheels, pure fallback wheel, unsigned binaries, released-artifact schema delivery) and update `docs/adr/4.x/index.md`. AC-033 checks the amendment names D-1, D-2, D-3.
+
+## 20 Campsite text (plan section 11)
+
+**Campsite-clean (Standing Order 2).** (1) WP01's first commit, distinct and docs-only: the stale "PyPI Release" paragraph of `AGENTS.md` (says `release.yml` is absent) and the matching line of `scripts/release/README.md`. (2) WP06's first commit folds the three `try/except` ladders of the `fire_*` functions in `status/adapters.py` behind one private helper (the one touched surface where the edit adds branching), characterised by `tests/status/test_saas_fanout_timeout.py` and `test_drain_fanout.py`. (3) WP06's edits to `status/emit.py` (1570 lines), `lifecycle_events.py` and `engine.py` are call sites and keyword additions with no new branch, so no extraction is justified (one line per surface in the WP prompt). The orchestrator dispatches a campsite scout on `status/emit.py` and `events/runtime_moments.py` before WP06; findings fold or defer under `RECONCILE_CHANGE_SCOPE_TENSIONS`. Sonar was not measured (no access): unmeasured, not clean.
+
+## 21 Lock fact detail (plan section 8)
+
+- **Lock fact = the content of a Python-owned lock sidecar, never its presence.** `kernel.locks` truncates but never unlinks a sidecar on release, so every advanced run directory keeps an empty `state.json.lock`. A run is locked iff its sidecar holds a non-empty parsable `LockRecord` younger than the stale threshold (60 s, `kernel.locks.STALE_AFTER_S_DEFAULT`); an empty sidecar is no lock; an unreadable one (a Windows mandatory lock refuses the read) keeps the run. Java reads bytes and never takes or tests an OS lock on a Python-owned file (different advisory-lock families). `clock.lock` is never a lock fact. Unfinished step: a run journal without `MissionRunCompleted`. AC-013 fixtures: sidecar released by the real Python primitive (eligible), live record (kept), stale record (eligible), unreadable (kept).
+
+## 22 Doctor rendering detail (plan section 8)
+
+- **Doctor pass-through rendering.** `doctor events` prints binary presence, fault count in the window (fault-log day files whose name date lies within the raw `max_age_days` of today; absent or non-numeric: every file present; no Python default), last class, notices apart, and the `migrate backfill-identity` hint when `mission-id-missing` faults exist; `doctor events-retention` renders the reply lists (repo-relative). `--json` uses `cli/json_contract`. Both live in `_event_producer_doctor.py`; Python renders and counts only.
+
+## 23 Retain versus produce detail (plan section 8)
+
+- **Retain versus produce.** For each candidate publish-log file `Retain` takes `clock.lock` (bounded by `deadline_ms`), re-checks eligibility and the file's length and newest row under it, then deletes; a lock timeout or delete failure (a Windows sharing violation) is kept-with-reason (`busy`, `delete-failed`). Two-process test: `produce` racing `retain --apply` loses no row reported produced. Fault-log and run-journal candidates have writers that touch only the current day or a live run, which eligibility excludes.
