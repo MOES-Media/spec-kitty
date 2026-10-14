@@ -1,0 +1,29 @@
+schema: review-refute/v1
+complete: true
+phase: plan
+batch: 1
+verdicts:
+  - id: PLAN-FIT-001
+    verdict: confirmed
+    reason: kernel.locks release truncates and never unlinks (G3) so every run dir that advanced keeps state.json.lock, and plan section 8 / FR-029 define the lock fact as "a lock file present", which would make advanced run journals permanently ineligible (fails safe, so corrected severity 3) while planted-lock fixtures pass.
+  - id: PLAN-FIT-002
+    verdict: refuted
+    reason: Plan section 8 deletes whole files only and never a run directory, so state.json stays and _require_run_state raises RunStateMissing only when state.json is absent; deleting just run.events.jsonl cannot trigger it (engine appends in "a" mode), so the claimed failure is not produced by the plan as written.
+  - id: PLAN-FIT-003
+    verdict: refuted
+    reason: FR-004 and AC-001 already require lane-worktree and subdirectory starts to reach one publish log and an unresolvable start to be rejected; the finding asks for an algorithm statement and a parity gate for submodule and ceiling edge layouts without showing the plan yields a wrong build.
+  - id: PLAN-FIT-004
+    verdict: refuted
+    reason: research.md (R-7 pyproject row and the alignment-workflow row) already names the shared-package-compatibility manifest and check-spec-kitty-events-alignment as touched at the floor bump, WP08 owns the bump, and the CLI floor range legitimately need not equal the Java pin version, so no wrong build follows.
+  - id: PLAN-FIT-005
+    verdict: confirmed
+    reason: spec AC-029 [FR-005] is absent from plan.md (grep shows it is the only AC not reachable directly or through a range) and the section 14 FR-005 row maps only to ACs 001 to 004, so no planned gate fails an injected data member; narrow traceability omission, corrected severity 2.
+  - id: PLAN-FIT-006
+    verdict: refuted
+    reason: row_version already appears in plan-carryover.md (the example journal row) as the member name, the plan pins it for the Python writer, and the finding shows no concrete wrong build, only a cross-repo naming risk that a gate constant would not change.
+  - id: PLAN-FIT-007
+    verdict: refuted
+    reason: Plan section 1 reuses install_tools.py only for Gradle (a zip, which it handles) and states the GraalVM exact build, pins and install route are WP01 feasibility outputs (plan section 17, R-12), so the missing installer mechanism is deferred detail, not a wrong build.
+  - id: PLAN-FIT-008
+    verdict: refuted
+    reason: ulid is a declared dependency already imported directly in src/charter and src/specify_cli with no layer-rule ledger, FR-035 says stamping only, and the plan's thinness gate forbids ulid only in the three new client modules, so engine._append_event using ulid.ULID() is the unambiguous reading.

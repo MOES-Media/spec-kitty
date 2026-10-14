@@ -1,0 +1,28 @@
+schema: review-verify/v1
+complete: true
+phase: plan
+results:
+  - id: PLAN-FRESH-001
+    status: resolved
+    reason: Section 4.2 rows now name the permitted new imports (ulid for engine.py as decisions/emit.py already imports it and pyproject declares python-ulid; CANONICAL_LANES for rebuild_state.py; Lane for acceptance/__init__.py), gate (e) compares against base plus the row, and self-mutation covers an out-of-row import in engine.py and rebuild_state.py.
+  - id: PLAN-FRESH-002
+    status: resolved
+    reason: One route is stated and matches the code (engine -> DecisionGitLog -> _BufferingRuntimeEmitter -> RuntimeMomentProducer._publish_journalled); the existing emit_significance_evaluated call in _record_significance is filled, DecisionAuthorityDenied gets a new Protocol method with Null, DecisionGitLog, buffering and producer implementations plus a call in _authorize_audit_answer (which gains an emitter parameter passed by _apply_decision_answer), engine.py gains no specify_cli import, and all files are in the 4.2 table and WP06.
+  - id: PLAN-FRESH-003
+    status: resolved
+    reason: The ownership rule, the WP06 and WP07 rows and campsite (3) now agree (seam call sites, emitter route, engine denial call, census in WP06; stamping, gate (b), lanes, markers in WP07), gate (b) is explicitly WP07 and the census uses a stubbed client, with shared files edited in dependency order.
+  - id: PLAN-FRESH-004
+    status: resolved
+    reason: WP02 now depends on the events release for the pin, registry-driven AC-029 test and comparator fixtures (the rest starting now), and WP08 lists the events release for the floor bump.
+  - id: PLAN-FRESH-005
+    status: resolved
+    reason: The marker row now lists decision_log.py and mission_state.py alongside the other marker files, so markers 3 and 4 are inside the allowed-surface table.
+  - id: PLAN-FRESH-006
+    status: resolved
+    reason: research.md now says the state/contract.py StateRoot decision is made in WP06, matching plan.md.
+  - id: PLAN-FRESH-007
+    status: resolved
+    reason: The WP06 dependency cell now reads "none blocking on #6164 (hunk handling: section 12)", consistent with section 12.
+  - id: PLAN-FRESH-008
+    status: resolved
+    reason: plan.md is now 45,313 bytes, below the previous 45,690 and within the roughly 45 KB budget (the rest of the headroom is thin).

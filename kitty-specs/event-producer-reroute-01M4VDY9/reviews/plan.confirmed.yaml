@@ -1,0 +1,508 @@
+schema: review-findings/v1
+complete: true
+phase: plan
+mission: event-producer-reroute-01M4VDY9
+source: plan.merged.yaml filtered by plan-refute-1..7
+findings:
+- id: PLAN-FIT-001
+  lens: Architecture (blast radius, contracts preserved)
+  severity: 4
+  title: Retention treats "a lock file present" as a held lock, but the repo's lock primitive leaves its
+    sidecar behind after release
+  evidence:
+  - artifact: "plan.md \xA7 8 (Mission open, 'Lock facts: a lock file present'); spec.md FR-029"
+  - code: src/kernel/locks.py::_LockCore.release (truncates, never unlinks; guarantee G3) and ::_os_lock
+      (fcntl.flock / msvcrt.locking)
+  - code: docs/adr/4.x/2026-10-08-1-serialise-run-dir-advance.md (per-run lock sidecar <run_dir>/state.json.lock
+      through kernel.locks.machine_file_lock)
+  claim: 'Every run directory that ever took the run-cursor lock keeps an empty state.json.lock for good,
+    so "file present" is true for essentially every run that has advanced once. Implemented as written,
+    Retain either never finds an eligible run journal (retention silently does nothing in a real repo
+    while the AC-013 fixtures, which plant a lock file, pass), or a Java reader that tries FileChannel.tryLock
+    to test "held" does not interlock with Python''s flock on Linux/macOS (different advisory-lock families)
+    and would report a live Python holder as free and delete under it. The plan names no held-lock test
+    that both runtimes agree on.
+
+    '
+  remediation: 'Define the lock fact in plan section 8 as the lock sidecar''s content, not its presence:
+    the sidecar holds a non-empty parsable LockRecord (the format of kernel.locks.LockRecord / read_lock_record)
+    whose age is below the stale threshold; an empty or truncated sidecar is not a lock. Add two AC-013
+    fixtures: a sidecar released by the real Python primitive (empty, run eligible) and one with a live
+    record (run kept). State that Java never takes or tests an OS lock on Python-owned sidecars.
+
+    '
+  refuter_reason: kernel.locks release truncates and never unlinks (G3) so every run dir that advanced
+    keeps state.json.lock, and plan section 8 / FR-029 define the lock fact as "a lock file present",
+    which would make advanced run journals permanently ineligible (fails safe, so corrected severity 3)
+    while planted-lock fixtures pass.
+- id: PLAN-FIT-005
+  lens: Spec fidelity (traceability)
+  severity: 3
+  title: AC-029 (FR-005 falsifier) appears nowhere in the plan and FR-005 is mapped only to AC-001 to
+    AC-004
+  evidence:
+  - artifact: "plan.md \xA7 14 row 'FR-001 to FR-005 ... ACs 001 to 004', \xA7 9 (Gradle gates list)"
+  - artifact: "spec.md \xA7 6 AC-029 [FR-005]: data key set is a subset of the persisted row's keys plus\
+      \ lifted-member rules, floor over every section 3 type, mutation injects a member"
+  claim: 'Every other AC and G id is reachable in the plan (directly or through a range); AC-029 is not,
+    and the traceability row sends FR-005 to the wrong ACs. FR-005 (''the producer emits nothing beyond
+    the persisted row'') is the guard against the producer injecting meta.json or environment data into
+    published events; with no planned test, the Java mapping code is built with no gate that fails when
+    it adds a member.
+
+    '
+  remediation: "Add AC-029 to the Gradle gate list in \xA7 9 (domain-level test over every type of data-model\
+    \ section 3, driven by the registry, with the floor and the injected-member mutation) and correct\
+    \ the \xA7 14 row to 'FR-005: 1 (envelope), 9; AC-029'.\n"
+  refuter_reason: spec AC-029 [FR-005] is absent from plan.md (grep shows it is the only AC not reachable
+    directly or through a range) and the section 14 FR-005 row maps only to ACs 001 to 004, so no planned
+    gate fails an injected data member; narrow traceability omission, corrected severity 2.
+- id: PLAN-SEQ-001
+  lens: Phasing - each WP leaves main green
+  severity: 4
+  title: WP01 adds a pull_request workflow but its fleet-verdict registration is owned by WP09, so WP01
+    is red on its own
+  evidence:
+  - artifact: "plan.md \xA7 11 (WP01 creates event-producer.yml skeleton; WP09 owns fleet verdict registration)\
+      \ and \xA7 9 CI home"
+  - code: scripts/ci/fleet_verdict.py::PR_WORKFLOWS (closed set) and applicable_workflows raising 'PR
+      workflow inventory changed'
+  - code: tests/ci/test_fleet_verdict.py::test_all_existing_pr_workflows_are_registered (asserts applicable_workflows(ROOT,
+      ...) == PR_WORKFLOWS against the real tree)
+  - artifact: tracer-tooling-friction.md ('Easy to miss')
+  claim: 'WP01 creates .github/workflows/event-producer.yml with a pull_request trigger. The closed inventory
+    test and the fleet verdict script fail on any PR-triggered workflow not in PR_WORKFLOWS, and the registration
+    (fleet_verdict.py, ci-fleet-verdict.yml, test_fleet_verdict.py) is assigned to WP09 (eight WPs later).
+    WP01 therefore cannot be green or approved on its own gates, contradicting the section 11 claim that
+    every WP leaves its lane green. An implementer following the table either ships a red WP01 or edits
+    WP09''s chokepoint files. The same ownership split applies to tests/architectural/test_no_duplicate_suite_execution.py
+    for the new workflow_call workflow producer-native.yml.
+
+    '
+  remediation: 'Move the fleet-verdict registration (fleet_verdict.py, ci-fleet-verdict.yml, test_fleet_verdict.py)
+    and any duplicate-suite ledger row for event-producer.yml and producer-native.yml into WP01, the WP
+    that creates the workflows; keep WP09 only for release.yml and the nightly call. Update the chokepoint
+    sentence in section 11 accordingly.
+
+    '
+  refuter_reason: plan section 9 gives event-producer.yml a pull_request trigger and WP01 creates it,
+    while fleet_verdict.py applicable_workflows raises on an unregistered PR workflow and test_all_existing_pr_workflows_are_registered
+    asserts equality on the real tree, yet registration is assigned to WP09 (the research.md duplicate-suite
+    ledger row for producer-native.yml has the same split); severity 3 is adequate.
+- id: PLAN-SEQ-002
+  lens: Write-scope chokepoints
+  severity: 3
+  title: WP01 needs the hatch hook and a stub wheel but pyproject.toml and the hook are WP08's sole-owner
+    scope, and WP08 depends on WP01
+  evidence:
+  - artifact: "plan.md \xA7 11 WP01 ('stub wheel with hook'), WP08 ('sole owner of pyproject.toml'; depends\
+      \ on WP01), final sentence of \xA7 11"
+  - artifact: "plan.md \xA7 3.1 (hook path scripts/release/hatch_build_producer.py, pyproject [tool.hatch.build.targets.wheel.hooks.custom])"
+  claim: 'The WP01 exit criterion is that a stub wheel built WITH THE HOOK installs and runs on each OS,
+    and section 11 says WP08''s stub-binary wheel build "is exercised in WP01 already". But the hook file
+    and the pyproject.toml table are owned by WP08, which runs after WP01. Either WP01 writes the hook
+    and edits pyproject.toml (violating the sole-owner rule and creating a WP01/WP08 merge conflict on
+    pyproject.toml and scripts/release/) or WP01 exercises a throwaway hook that does not prove WP08''s.
+
+    '
+  remediation: 'Assign the hook, its pyproject.toml table and the minimal stub-wheel packaging test to
+    WP01 (the risky-first WP), and make WP08 the owner of the remainder (check_dist_set, dist-set.json,
+    check_exact_install, shared_build_artifacts, docs); or state that WP01 uses an out-of-tree throwaway
+    hook and that WP08 must re-prove all three OS legs with the real one.
+
+    '
+  refuter_reason: WP01 exit criteria require a stub wheel built with the hook while section 3.1/3.2 and
+    the WP table give the hook file and the pyproject.toml table solely to WP08, which depends on WP01;
+    severity 2 to 3 since a throwaway spike hook is a cheap resolution.
+- id: PLAN-SEQ-007
+  lens: Campsite-clean first commit
+  severity: 3
+  title: The campsite commit is a docs paragraph fix, not the Standing Order 2 campsite of the surfaces
+    the mission will change, and it has no owning WP
+  evidence:
+  - artifact: "plan.md \xA7 11 'Campsite-clean (Standing Order 2)'"
+  - code: .kittify/charter/charter.md Standing Order 2 ('campsite-cleaning the surfaces it will touch
+      first ... extract/decompose over-long functions ... dispatch a campsite scout on god-surfaces')
+  - code: src/specify_cli/status/adapters.py::fire_saas_fanout, fire_lifecycle_saas_fanout, fire_resolved_binding_fanout
+      (three near-identical gate and breadcrumb bodies the mission edits)
+  - code: 'AGENTS.md section ''PyPI Release'' (verified: still states release.yml is absent)'
+  claim: 'The first commit is distinct and behaviour-preserving, which is right, but its content is an
+    AGENTS.md/README staleness fix unrelated to the code surfaces the mission touches (status/adapters.py,
+    status/emit.py, runtime engine.py, release.yml). The plan states no Sonar was measured and does not
+    justify the absence of the tidy-first step on the god surfaces, nor dispatch a scout. The commit is
+    also in no WP''s scope, so no implementer owns it, and its edit of AGENTS.md (the shared agent contract
+    file) is unassigned.
+
+    '
+  remediation: 'Assign the campsite commit to WP01 (docs) and add a per-WP rule: WP06 and WP07 each open
+    with a distinct, behaviour-preserving tidy commit on the surfaces in their section 4.2 rows (for example
+    folding the duplicated fire_* bodies behind one helper before the gate edits) or record a one-line
+    justification per surface that the planned edits are deletions and wiring only; record Sonar as unmeasured,
+    not as clean.
+
+    '
+  refuter_reason: Charter Standing Order 2 requires tidy-first on touched surfaces and a scout on god-surfaces;
+    plan section 11 limits the campsite to an AGENTS.md docs fix while status/emit.py (1570 lines) and
+    the three fire_* bodies in status/adapters.py are edited with no tidy step or per-surface justification
+    (severity corrected to 2, process compliance rather than a wrong build).
+- id: PLAN-SEQ-009
+  lens: Baseline method captured before the first change
+  severity: 2
+  title: The baseline says
+  evidence:
+  - artifact: "plan.md \xA7 10 and \xA7 17; research.md \xA7 9 item 3 and the closing note ('neither id\
+      \ appears in this repository')"
+  - code: '.github/actions/warmup/action.yml (cites #3283 venv-lock bootstrap cascade)'
+  - code: 'docs/reports/test-sanitation/assertive-test-suite-sanitation-01KZME3P/issue-matrix.md (#3283,
+      #3284 rows; #3284 base 27 failures + 3 teardown errors)'
+  claim: 'The claim is wrong, so the lock-timeout rule (''rerun once alone'') is an invented definition
+    and #3284''s known-red set is not a stated baseline input. Because the method captures red empirically
+    it is still workable, but the empirical capture alone cannot tell a #3284 failure from an environment
+    flake, and the charter rule needs an issue opened for pre-existing failures before continuing, which
+    the plan converts into ''report to the operator''.
+
+    '
+  remediation: 'Replace the ''not in repository'' statements with these citations; define the lock-timeout
+    rule from the warmup action contract; seed baseline-red.txt with the #3284 node ids as ''known red,
+    tracked'' and say who opens the charter-required issue (operator, before WP01 proceeds past it).
+
+    '
+  refuter_reason: research.md lines 180 and 206 and plan section 17 say
+- id: PLAN-VERIFY-001
+  lens: Gate-implication audit / revert discipline (vacuity by empty set)
+  severity: 4
+  title: src/specify_cli/_native/ is not gitignored; the plan relies on it and AC-038 is vacuous in CI
+  evidence:
+  - artifact: research.md section 3 ('the directory is gitignored') and section 10 ('developers copy a
+      built binary into the gitignored _native/'); plan.md section 3.2 (file list has no .gitignore) and
+      section 3.1 (C-007, AC-038)
+  - code: .gitignore (no _native entry; 'git check-ignore -v src/specify_cli/_native/spec-kitty-event-producer'
+      prints nothing)
+  - code: pyproject.toml [tool.hatch.build.targets.wheel].packages includes src/specify_cli; [tool.hatch.build.targets.sdist].include
+      has 'src/**/*'
+  claim: 'The plan states the _native/ directory is gitignored. It is not, and .gitignore is not in the
+    changed-file list. Hatch honours .gitignore for both the wheel (packages) and the sdist (src/**/*),
+    so a locally copied binary is not excluded: a hook-off ''uv build'' or ''python -m build'' on a developer
+    machine ships the binary in the pure wheel and the sdist, and ''git status'' offers it for commit.
+    AC-038 and the new test_packaging_safety assertions (''sdist and hook-off wheel contain no binary'')
+    are also vacuous in CI, because a CI checkout never has a binary in _native/; they pass whether or
+    not the exclusion works.
+
+    '
+  remediation: 'Add .gitignore entries for src/specify_cli/_native/ (a directory pattern) to the WP08
+    file list. Make the packaging test plant a stub file in src/specify_cli/_native/ (untracked) and assert
+    it is absent from the hook-off wheel and the sdist, and present only when the hook is on (force_include).
+    Correct research.md section 3 and 10 accordingly.
+
+    '
+  refuter_reason: .gitignore has no _native entry (git check-ignore prints nothing), research.md sections
+    3 and 10 wrongly claim it is gitignored, so a locally copied binary would be picked up by hatch and
+    offered to git, and CI-side AC-038 assertions with no planted file are vacuous (severity 3 is arguable,
+    4 is high but the packaging gap is real).
+- id: PLAN-VERIFY-004
+  lens: Silent-success / OS-specific tests
+  severity: 3
+  title: Artifact round-trip drops the executable bit; the wheel then carries a non-executable binary
+    on Linux and macOS
+  evidence:
+  - artifact: plan.md section 3.3 item 2 (producer artifacts uploaded by producer-native.yml, downloaded
+      in build-release, wheels built there); research.md section 3 test row ('executable bit preserved')
+  - code: .github/workflows/release.yml (actions/upload-artifact / download-artifact are used for release-distributions)
+  - artifact: "plan.md \xA7 3.1 (force_include of the binary), \xA7 3.3 step 2 (download the three producer\
+      \ artifacts, then build wheels), \xA7 2"
+  - code: hatchling 1.31.0 builders/utils.py::normalize_file_permissions (755 only if st_mode has the
+      owner exec bit) and builders/wheel.py (external_attr from file stat)
+  claim: 'actions/upload-artifact does not keep file permission bits, so the binary downloaded in build-release
+    is mode 0644 and hatch''s force_include records that mode in the wheel; pip installs a non-executable
+    file. The planned packaging test uses a stub built in the same job (mode preserved), so it cannot
+    see this. The smoke-wheels job would go red but with a misleading ''crash'' or ''binary-missing''
+    cause, and the macOS and Linux wheels are only proven on their own OS legs.
+
+    '
+  remediation: 'Have the hook set mode 0755 explicitly on non-Windows platform tags (or tar the binary
+    in the artifact), and have check_dist_set.py --verify-binaries assert the member''s mode bits in the
+    zip external attributes for the Linux and macOS wheels (mutation: a 0644 member fails).
+
+    '
+  also_ids:
+  - PLAN-RELEASE-002
+  refuter_reason: Plan section 3.3 builds wheels in build-release from artifacts downloaded via download-artifact,
+    which does not preserve mode bits, and hatch force_include takes the wheel mode from the file stat
+    while the planned packaging test (research.md row for test_packaging_safety) uses a same-job stub,
+    so a 0644 binary in the Linux/macOS wheels is neither prevented nor caught by the check_dist_set gate
+    (severity 3 stands).
+- id: PLAN-VERIFY-005
+  lens: Silent-success / file locking
+  severity: 3
+  title: Retain deletes whole publish-log files without taking the clock lock; a concurrent produce can
+    report produced and lose the row
+  evidence:
+  - artifact: plan.md section 8 ('calls delete on whole files'; 'opens no file for write in retain') and
+      section 7 (one clock.lock held across stamp and append)
+  - artifact: research.md section 5 ('retention never lists clock.json or clock.lock'); spec.md FR-029
+      ('holds no lock')
+  claim: 'The only serialisation point is clock.lock, held by produce across stamp, dedupe and append.
+    Retain does not take it. On Linux and macOS a delete between produce''s open and append unlinks the
+    inode and the appended row is lost while the reply says produced; on Windows the delete fails with
+    a sharing violation that the plan does not map to kept-with-reason. A Mission can be closed, old and
+    outside keep_runs yet still receive a late retrospective or lifecycle row, so the window is real.
+    The "lock facts" input of FR-029 is also ambiguous because clock.lock always exists.
+
+    '
+  remediation: 'Specify that Retain takes clock.lock (bounded by deadline_ms) around each candidate delete
+    and re-checks eligibility and file length under the lock; map a delete failure to kept-with-reason.
+    Define "lock facts" as lock files of other writers, never clock.lock. Add a two-process test (produce
+    racing retain --apply on an eligible file).
+
+    '
+  refuter_reason: Plan sections 7 and 8 and research section 5 show produce holding clock.lock across
+    append while retain deletes whole files with no lock and no re-check, and no section handles the delete-versus-append
+    race; severity is overstated to 2 because it needs an explicit --apply on a closed, old Mission file
+    concurrent with a late row.
+- id: PLAN-VERIFY-006
+  lens: Gates (pin verification) / canonical authority
+  severity: 3
+  title: verify-pins builds a second pin-vs-build checker as a Gradle task instead of extending gradle_pin_check.py;
+    implicated pin tests missed
+  evidence:
+  - artifact: plan.md section 9 CI home ('verify-pins (installer checksum, pin file vs build declarations
+      as a Gradle task)') and section 1 (reuse of install_tools.py)
+  - code: contracts/tools/gradle_pin_check.py (one authority parameterised by Subproject for contracts/
+      and acceptance-jvm/; module docstring)
+  - code: contracts/tools/verify_pins.py (action-pin rule scoped to contracts*.yml; DEFAULT_PINS is contracts/tools/pins.json)
+  - code: tests/contract/test_gradle_pin_check.py, tests/contract/test_verify_pins.py (not in R-7)
+  claim: 'The repository already has one authority for ''the build uses the version pins.json pins'',
+    with a precedent of adding a Subproject per Gradle build (acceptance-jvm). The plan writes a third
+    mechanism in Gradle, contradicting charter Standing Order 6 (unification, one authority) and leaving
+    the existing check blind to the new build. The test files that pin the existing checker are absent
+    from R-7, and verify_pins.py does not police the new workflow''s uses: lines (scope is contracts*.yml),
+    which the plan''s ''SHA-pinned action versions (WP09)'' leaves unenforced.
+
+    '
+  remediation: 'Add services/event-producer as a third Subproject in gradle_pin_check.py (extend tests/contract/test_gradle_pin_check.py
+    with planted mismatches and a floor on compared values) and run verify_pins.py with --pins services/event-producer/tools/pins.json
+    --workflow for the new workflows (or state that action pinning is intentionally unenforced). Add both
+    test files to R-7.
+
+    '
+  refuter_reason: plan.md section 9 specifies a new Gradle-task pin-vs-build check although contracts/tools/gradle_pin_check.py
+    is the parameterised single authority (contracts and acceptance-jvm Subprojects), and neither test_gradle_pin_check.py
+    nor test_verify_pins.py appears anywhere in plan or research; severity 2.
+- id: PLAN-VERIFY-008
+  lens: Revert discipline / gate-implication audit
+  severity: 3
+  title: Lane-list consolidation treats four differently-shaped lists as duplicates of Lane; deriving
+    them changes behaviour
+  evidence:
+  - artifact: plan.md section 4.2 ('literal lane tuples replaced by values derived from Lane/CANONICAL_LANES
+      ... constants only') and section 4.4
+  - code: src/specify_cli/migration/rebuild_state.py::_LANE_ORDER (five-step history path), ::_VALID_LANES
+      (eight lanes, no in_review)
+  - code: src/specify_cli/acceptance/__init__.py::_LEGACY_NOT_DONE_LANES (contains 'doing', not a Lane
+      member)
+  - code: src/specify_cli/consolidation/done_bookkeeping.py::_PRE_APPROVED_LANE_VALUES (four-member subset)
+  - code: tests/specify_cli/migration/test_rebuild_state.py, tests/specify_cli/status/test_lane_uninitialized.py
+      (docstring still says _VALID_LANES derives from Lane)
+  claim: 'These are not copies of the full vocabulary: one is an ordered migration path, one is a deliberately
+    legacy set, one contains an alias, one is a subset. ''Derive from Lane/CANONICAL_LANES'' implemented
+    literally (for example frozenset(CANONICAL_LANES) for _VALID_LANES, or CANONICAL_LANES order for _LANE_ORDER)
+    changes rebuild_state''s synthesized event chain and the acceptance not-done set. The plan labels
+    the change ''constants only'', so no behavioural test is required, and a revert would not fail any
+    test.
+
+    '
+  remediation: 'Say per list how it is derived (subset selected by name from Lane, alias kept explicit)
+    or that it stays and is registered as a reviewed exception in the census gate with a reason. Add a
+    characterisation test per changed list (value equality with the pre-change literal) committed red-first,
+    and name test_rebuild_state.py and the acceptance tests in the WP07 blast radius.
+
+    '
+  refuter_reason: The cited code differs per list (ordered five-step _LANE_ORDER, eight-lane _VALID_LANES,
+    alias-bearing _LEGACY_NOT_DONE_LANES, four-member _PRE_APPROVED_LANE_VALUES) while plan row 4.2 says
+    only "derived from Lane/CANONICAL_LANES" and "constants only", with no per-list derivation or characterisation
+    test and no rebuild_state or acceptance test named; severity 2.
+- id: PLAN-RELEASE-001
+  lens: release/packaging feasibility (provenance)
+  severity: 4
+  title: Reusable producer-native.yml is not told which ref to build, so a workflow_dispatch republish
+    builds the binary from the dispatching branch, not the release tag
+  evidence:
+  - artifact: "plan.md \xA7 2 CI shape; \xA7 3.3 step 1 (build-producer 'uses the reusable workflow')"
+  - code: '.github/workflows/release.yml::env.RELEASE_REF and build-release ''Check out repository'' (ref:
+      ${{ env.RELEASE_REF }}); workflow-level env is not visible inside a called workflow'
+  claim: release.yml supports workflow_dispatch with an 'tag' input (github.ref is then the dispatching
+    branch). build-release explicitly checks out RELEASE_REF, but the plan's reusable workflow has no
+    stated ref input, so its checkout defaults to github.sha. The native binary would then be compiled
+    from a different commit than the wheels' Python sources and the tag, while the manifest's 'source
+    commit' is only recorded, never compared. Smoke passes, the dist-set check passes, and the published
+    binary is not from the tagged source (a provenance and Standing Order 9 integrity hole).
+  remediation: Give producer-native.yml a required 'ref' input, pass RELEASE_REF from release.yml (and
+    github.sha from event-producer.yml), check out that ref, and add a build-release step that fails unless
+    every producer-manifest.json 'source commit' equals 'git rev-parse HEAD' of the release checkout.
+    Pin the 'build-producer ref input' in test_release_ci_ownership.py.
+  refuter_reason: Plan 2/3.3 calls the reusable workflow with no ref input, release.yml's RELEASE_REF
+    is a workflow-level env not visible to a called workflow, and the manifest's source commit is only
+    recorded, so a workflow_dispatch republish could build the binary from the dispatching ref (severity
+    3, dispatch path only).
+- id: PLAN-RELEASE-003
+  lens: release/packaging feasibility (dist-set equality)
+  severity: 3
+  title: Platform wheel tags are both 'measured from the binary' and 'pinned in dist-set.json'; the two
+    disagree on a first real release
+  evidence:
+  - artifact: "plan.md \xA7 2 table (tag 'measured from the binary's glibc symbols', macOS 'measured minos');\
+      \ \xA7 3.2 (dist-set.json pins the expected list of tags); \xA7 3.3 step 2 (check_dist_set.py: set\
+      \ equals dist-set.json)"
+  - code: scripts/release/ has no check_dist_set.py yet; hatchling takes the tag verbatim from build_data['tag']
+  claim: A binary built in a manylinux_2_28 container typically needs a lower maximum GLIBC_ symbol (for
+    example 2.17) than 2.28, and a macOS binary's minos depends on how native-image passes the deployment
+    target. If the hook derives the tag from the measurement, the wheel name will not equal the pinned
+    manylinux_2_28/macosx_11_0 tag and check_dist_set.py (the release gate) fails on the first tag; if
+    it uses the pinned tag, the 'measured' claim is decoration. The plan does not say which one governs.
+  remediation: "Make dist-set.json the single authority for the tag (the floor) and turn the measurement\
+    \ into an assertion: fail the leg when the measured maximum GLIBC_ version exceeds the pinned manylinux\
+    \ floor or the measured minos exceeds the pinned macOS floor. Say so in \xA7 2 and give the hook the\
+    \ tag from dist-set.json, not from the binary."
+  refuter_reason: Plan 2 says the wheel tag is measured from the binary while dist-set.json pins it (research
+    38 and 54 repeat the split), and neither document says which governs, so a measured 2.17 against a
+    pinned manylinux_2_28 would fail check_dist_set on the first release (severity 2, loud failure not
+    silent).
+- id: PLAN-SHIM-001
+  lens: allowed-surface gate testability (FR-027)
+  severity: 4
+  title: Gate cannot detect a new function in an existing allowed file, so the FR-027 "other new module
+    or function" clause is untestable as designed
+  evidence:
+  - artifact: "plan.md \xA7 4.2 (gate paragraph, rules (a) and (c)); spec.md FR-027, AC-012"
+  - code: src/specify_cli/status/emit.py, src/specify_cli/status/lifecycle_events.py, src/runtime/next/_internal_runtime/engine.py
+      (listed in the 4.2 table by symbol, but never symbol-pinned by the gate)
+  claim: 'Rule (a) pins the exact top-level symbol set only for the three NEW modules; rule (c) is a module-level
+    census. The 4.2 table lists allowed symbols in about a dozen EXISTING files, but nothing checks them.
+    A WP agent can add an id-minting, row-building or validation helper inside emit.py, lifecycle_events.py
+    or engine.py and every rule passes. That is the main route by which logic leaks into Python, and AC-012
+    ("new Python logic outside the allowed surface of FR-027 fails") has no mutation that would catch
+    it (the listed mutations all target "a copy" of the client).
+
+    '
+  remediation: 'Add rule (e): for every existing file in the 4.2 table, pin the full AST set of top-level
+    functions, classes and methods at the base commit plus the table''s allowed new names; a new name
+    fails. Add a floor (all table files found, set sizes above zero) and a self-mutation case that adds
+    a helper (for example _mint_id) to a copy of emit.py and must fail. State in 4.2 that the table''s
+    "changed" symbols may change bodies but not gain callees from uuid/ulid/hashlib/datetime (extend the
+    import-allowlist rule to those hunks, or pin the import set of each file).
+
+    '
+  refuter_reason: Section 4.2 says the gate fails on any new module or function in the emission area,
+    but rules (a) to (d) pin symbols only for the three new modules and census modules, so a helper added
+    in emit.py, lifecycle_events.py or engine.py passes (severity 3 is more apt than 4).
+- id: PLAN-SHIM-002
+  lens: allowed-surface gate testability (FR-027)
+  severity: 3
+  title: Thinness gate bans json.loads outside the reply reader, but fault_summary and the doctor window
+    must parse the fault log
+  evidence:
+  - artifact: "plan.md \xA7 4.1 (fault_summary, count and last class for doctor), \xA7 4.2 gate rule (a)\
+      \ 'no json.loads outside the reply reader', \xA7 8 doctor rendering"
+  - artifact: data-model.md FaultLogRow (doctor derives count and last class from fault rows, notices
+      counted apart)
+  claim: 'Counting fault rows (not notice rows) in the retention window and reporting the last class requires
+    reading and decoding the fault-log JSONL in Python. Rule (a) forbids json.loads anywhere but the reply
+    reader, and the exact top-level symbol set per module is pinned to the table, which lists no fault-log
+    reader. An implementer must either break the gate, hide the parse (eval/regex), or push the count
+    into Java (not in the protocol). The "window" is also undefined on the Python side: it is the file-age
+    window of Java''s retention policy, but Python holds no policy.
+
+    '
+  remediation: 'Name the second allowed decode site in the 4.1/4.2 table (a single function such as producer_faults._read_fault_rows)
+    and permit json.loads there only. Define the Python window as file-name dates compared to today with
+    the raw max_age_days forwarded, or have doctor ask Java (a read-only `faults` field in the retain
+    dry-run reply) so Python only renders. Pick one and state it; add it to the gate''s floor and mutation
+    cases.
+
+    '
+  refuter_reason: fault_summary in producer_faults.py must decode the fault-log JSONL and apply a file-age
+    window, yet gate rule (a) bans json.loads outside the reply reader and the symbol set lists no fault-log
+    reader, so the plan is self-contradictory (severity 2 to 3).
+- id: PLAN-SHIM-003
+  lens: seam can carry the client as described
+  severity: 3
+  title: Seam busy and timeout branches would record producer faults for every handler, including the
+    Zeitgeist handler
+  evidence:
+  - artifact: "plan.md \xA7 4.2 table row status/adapters.py ('busy and timeout branches call record_fault');\
+      \ spec.md FR-023 last sentence"
+  - code: src/specify_cli/status/adapters.py::fire_saas_fanout, fire_lifecycle_saas_fanout (the except
+      _FanoutHandlerBusyError / except TimeoutError branches sit inside the generic 'for handler in _saas_handlers'
+      loop)
+  claim: 'The loop is shared by all registered handlers. With drain on, a slow Zeitgeist handler (a real,
+    bounded 10 s case) would be recorded as a producer fault with class timeout or busy, with a stderr
+    warning saying the event was not produced, though the producer was never involved. The plan does not
+    say how the branch knows the dropped handler was the client''s. The `except Exception` branch is not
+    listed, which is fine only if the client is a total catch; that is stated nowhere in the plan.
+
+    '
+  remediation: 'In 4.2 state that the branches call record_fault only when the dropped handler is the
+    client''s (compare _handler_key(handler) with the client handler''s key, or give the client handler
+    an attribute the branch reads), and add the Zeitgeist-timeout case to AC-006''s tests (no producer
+    fault row). State that the client handler never raises (outermost catch) so the generic except branch
+    needs no change.
+
+    '
+  refuter_reason: The busy and TimeoutError branches in adapters.py sit inside the loop shared by all
+    handlers and the plan says they call record_fault without restricting it to the client's handler,
+    so a slow Zeitgeist handler would log a bogus producer fault (severity 2).
+- id: PLAN-SHIM-004
+  lens: Python-shim minimality and seam carrying
+  severity: 3
+  title: Client timeout rule is undefined for small seam bounds and requires importing a private function
+    from adapters (cycle)
+  evidence:
+  - artifact: "plan.md \xA7 4.1 (effective_client_timeout reads status.adapters._saas_fanout_timeout_s),\
+      \ \xA7 5 Timeouts ('capped at bound - 1.0 s when the bound is smaller')"
+  - code: src/specify_cli/status/adapters.py::_saas_fanout_timeout_s (private; accepts any finite float
+      from SPEC_KITTY_SAAS_FANOUT_TIMEOUT, including values in (0, 1] and non-positive values which run
+      the handler inline)
+  claim: 'For a bound of 1.0 the cap yields 0 and for 0.5 a negative timeout; the plan gives neither a
+    floor nor a behaviour, so an implementer will pass a zero or negative deadline_ms (every row times
+    out, or an immediate exit 75). For a disabled bound (<= 0) the plan says only that the client still
+    applies its own timeout (3.0 s default). Separately, the client importing a private name from adapters.py,
+    which in turn imports the client in ensure_producer_client, is a circular import and trips the SR-2
+    facade rule the plan cites in section 9.
+
+    '
+  remediation: 'Specify the function completely: bound <= 0 gives the default; 0 < bound <= 1.0 gives
+    bound/2 (or a stated floor such as 50 ms); otherwise min(default, bound - 1.0). Add boundary cases
+    to AC-006 (0.5, 1.0, 1.5, 0, negative). Have adapters.py inject the bound resolver into ensure_producer_client(bound=_saas_fanout_timeout_s)
+    so the client imports nothing from adapters and the private name stays private.
+
+    '
+  refuter_reason: Section 5 caps the timeout at bound - 1.0 s, which is zero or negative for bounds of
+    1.0 or less that _saas_fanout_timeout_s accepts, and the plan defines no floor or behaviour (severity
+    2; the circular-import aspect is secondary).
+- id: PLAN-SHIM-006
+  lens: fault recording is not logic creep
+  severity: 2
+  title: Client must stamp fault-row time and the UTC day file name, which FR-026 and AC-012 forbid ("timestamps");
+    the carve-out is only in the plan
+  evidence:
+  - artifact: "plan.md \xA7 4.2 gate (a) 'no datetime outside producer_faults.py'; \xA7 15 touch-ups (no\
+      \ FR-026 amendment); data-model.md fault log path (UTC date of the fault's at)"
+  - artifact: spec.md FR-026 ('must not ... mint ids, timestamps or clocks'), AC-012 (mutation adds a
+      timestamp)
+  claim: 'The fault log file is named by the UTC date of the fault''s at, so Python must read the clock.
+    The plan permits this in one module but the spec still forbids it, and AC-012''s timestamp mutation
+    is ambiguous about which module it targets. Inconsistent contract text invites either a failing gate
+    or a second, hidden clock helper.
+
+    '
+  remediation: 'Add a spec touch-up in section 15: FR-026 allows the client to read the wall clock for
+    the fault row''s own `at` and the day file name only, never for an event. State in AC-012 that the
+    timestamp mutation is applied to producer_client.py (not producer_faults.py) and that producer_faults.py
+    has a second mutation (a clock read feeding anything but the fault row). Keep the single-writer rule
+    for fault rows as already planned.
+
+    '
+  refuter_reason: FR-026 and AC-012 forbid client timestamps and clocks outright while plan 4.2 exempts
+    datetime in producer_faults.py (fault rows and day file names need a clock) and section 15 has no
+    matching FR-026 touch-up, so a literal AC-012 gate and the plan's gate disagree; severity overstated,
+    corrected to 1 (text inconsistency, fix is a one-line touch-up).

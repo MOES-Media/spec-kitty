@@ -1,0 +1,29 @@
+schema: review-refute/v1
+complete: true
+phase: plan
+batch: 4
+verdicts:
+  - id: PLAN-VERIFY-005
+    verdict: confirmed
+    reason: Plan sections 7 and 8 and research section 5 show produce holding clock.lock across append while retain deletes whole files with no lock and no re-check, and no section handles the delete-versus-append race; severity is overstated to 2 because it needs an explicit --apply on a closed, old Mission file concurrent with a late row.
+  - id: PLAN-VERIFY-006
+    verdict: confirmed
+    reason: plan.md section 9 specifies a new Gradle-task pin-vs-build check although contracts/tools/gradle_pin_check.py is the parameterised single authority (contracts and acceptance-jvm Subprojects), and neither test_gradle_pin_check.py nor test_verify_pins.py appears anywhere in plan or research; severity 2.
+  - id: PLAN-VERIFY-007
+    verdict: refuted
+    reason: The plan puts the GraalVM archive URL and sha256 in the installer-consumed pins.json, records the archive sha256 in the manifest, and defers the exact per-OS release and flags to WP01 (research.md open-facts list), so this asks for provisioning detail rather than showing a wrong build.
+  - id: PLAN-VERIFY-008
+    verdict: confirmed
+    reason: The cited code differs per list (ordered five-step _LANE_ORDER, eight-lane _VALID_LANES, alias-bearing _LEGACY_NOT_DONE_LANES, four-member _PRE_APPROVED_LANE_VALUES) while plan row 4.2 says only "derived from Lane/CANONICAL_LANES" and "constants only", with no per-list derivation or characterisation test and no rebuild_state or acceptance test named; severity 2.
+  - id: PLAN-VERIFY-009
+    verdict: refuted
+    reason: The empty-registry and empty-fixture cases are already floored by the spec floor rule (AC-008 floor of all nine fixtures, AC-029 floor of every section-3 type resolved, AC-019 at least one fixture per type); only AC-002 lacks a floor, which is not a wrong-build scenario on its own.
+  - id: PLAN-VERIFY-010
+    verdict: refuted
+    reason: The finding asks the plan to decide an aggregator membership detail, and the cited tests (test_nightly_escalation.py, test_dual_mode_contract.py) contain no needs or job-set assertion for nightly-summary, so no concrete wrong outcome is evidenced.
+  - id: PLAN-VERIFY-011
+    verdict: refuted
+    reason: StateRoot.GIT_INTERNAL does exist but the research row only hedges a root-mapping choice made in WP07 with state-contract and tests/state tests already listed, and the two cited tests are not shown to fail under any plan-built change.
+  - id: PLAN-VERIFY-012
+    verdict: refuted
+    reason: The matrix builder patches specify_cli.status.fire_lifecycle_saas_fanout with a lambda taking **kwargs, which still receives envelope= and silently accepts the added row=, and dropping the drain read only makes the call more reachable, so the plan change does not break surface 5.

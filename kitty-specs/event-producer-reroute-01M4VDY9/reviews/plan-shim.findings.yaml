@@ -1,0 +1,111 @@
+schema: review-findings/v1
+complete: true
+phase: plan
+lens_group: shim
+mission: event-producer-reroute-01M4VDY9
+findings:
+  - id: PLAN-SHIM-001
+    lens: allowed-surface gate testability (FR-027)
+    severity: 4
+    title: Gate cannot detect a new function in an existing allowed file, so the FR-027 "other new module or function" clause is untestable as designed
+    evidence:
+      - artifact: "plan.md § 4.2 (gate paragraph, rules (a) and (c)); spec.md FR-027, AC-012"
+      - code: "src/specify_cli/status/emit.py, src/specify_cli/status/lifecycle_events.py, src/runtime/next/_internal_runtime/engine.py (listed in the 4.2 table by symbol, but never symbol-pinned by the gate)"
+    claim: >
+      Rule (a) pins the exact top-level symbol set only for the three NEW modules; rule (c) is a module-level census.
+      The 4.2 table lists allowed symbols in about a dozen EXISTING files, but nothing checks them. A WP agent can add
+      an id-minting, row-building or validation helper inside emit.py, lifecycle_events.py or engine.py and every rule
+      passes. That is the main route by which logic leaks into Python, and AC-012 ("new Python logic outside the allowed
+      surface of FR-027 fails") has no mutation that would catch it (the listed mutations all target "a copy" of the client).
+    remediation: >
+      Add rule (e): for every existing file in the 4.2 table, pin the full AST set of top-level functions, classes and
+      methods at the base commit plus the table's allowed new names; a new name fails. Add a floor (all table files
+      found, set sizes above zero) and a self-mutation case that adds a helper (for example _mint_id) to a copy of emit.py
+      and must fail. State in 4.2 that the table's "changed" symbols may change bodies but not gain callees from
+      uuid/ulid/hashlib/datetime (extend the import-allowlist rule to those hunks, or pin the import set of each file).
+  - id: PLAN-SHIM-002
+    lens: allowed-surface gate testability (FR-027)
+    severity: 3
+    title: Thinness gate bans json.loads outside the reply reader, but fault_summary and the doctor window must parse the fault log
+    evidence:
+      - artifact: "plan.md § 4.1 (fault_summary, count and last class for doctor), § 4.2 gate rule (a) 'no json.loads outside the reply reader', § 8 doctor rendering"
+      - artifact: "data-model.md FaultLogRow (doctor derives count and last class from fault rows, notices counted apart)"
+    claim: >
+      Counting fault rows (not notice rows) in the retention window and reporting the last class requires reading and
+      decoding the fault-log JSONL in Python. Rule (a) forbids json.loads anywhere but the reply reader, and the exact
+      top-level symbol set per module is pinned to the table, which lists no fault-log reader. An implementer must either
+      break the gate, hide the parse (eval/regex), or push the count into Java (not in the protocol). The "window" is also
+      undefined on the Python side: it is the file-age window of Java's retention policy, but Python holds no policy.
+    remediation: >
+      Name the second allowed decode site in the 4.1/4.2 table (a single function such as producer_faults._read_fault_rows)
+      and permit json.loads there only. Define the Python window as file-name dates compared to today with the raw
+      max_age_days forwarded, or have doctor ask Java (a read-only `faults` field in the retain dry-run reply) so Python
+      only renders. Pick one and state it; add it to the gate's floor and mutation cases.
+  - id: PLAN-SHIM-003
+    lens: seam can carry the client as described
+    severity: 3
+    title: Seam busy and timeout branches would record producer faults for every handler, including the Zeitgeist handler
+    evidence:
+      - artifact: "plan.md § 4.2 table row status/adapters.py ('busy and timeout branches call record_fault'); spec.md FR-023 last sentence"
+      - code: "src/specify_cli/status/adapters.py::fire_saas_fanout, fire_lifecycle_saas_fanout (the except _FanoutHandlerBusyError / except TimeoutError branches sit inside the generic 'for handler in _saas_handlers' loop)"
+    claim: >
+      The loop is shared by all registered handlers. With drain on, a slow Zeitgeist handler (a real, bounded 10 s case)
+      would be recorded as a producer fault with class timeout or busy, with a stderr warning saying the event was not
+      produced, though the producer was never involved. The plan does not say how the branch knows the dropped handler was
+      the client's. The `except Exception` branch is not listed, which is fine only if the client is a total catch; that
+      is stated nowhere in the plan.
+    remediation: >
+      In 4.2 state that the branches call record_fault only when the dropped handler is the client's (compare
+      _handler_key(handler) with the client handler's key, or give the client handler an attribute the branch reads), and
+      add the Zeitgeist-timeout case to AC-006's tests (no producer fault row). State that the client handler never raises
+      (outermost catch) so the generic except branch needs no change.
+  - id: PLAN-SHIM-004
+    lens: Python-shim minimality and seam carrying
+    severity: 3
+    title: Client timeout rule is undefined for small seam bounds and requires importing a private function from adapters (cycle)
+    evidence:
+      - artifact: "plan.md § 4.1 (effective_client_timeout reads status.adapters._saas_fanout_timeout_s), § 5 Timeouts ('capped at bound - 1.0 s when the bound is smaller')"
+      - code: "src/specify_cli/status/adapters.py::_saas_fanout_timeout_s (private; accepts any finite float from SPEC_KITTY_SAAS_FANOUT_TIMEOUT, including values in (0, 1] and non-positive values which run the handler inline)"
+    claim: >
+      For a bound of 1.0 the cap yields 0 and for 0.5 a negative timeout; the plan gives neither a floor nor a behaviour,
+      so an implementer will pass a zero or negative deadline_ms (every row times out, or an immediate exit 75). For a
+      disabled bound (<= 0) the plan says only that the client still applies its own timeout (3.0 s default). Separately,
+      the client importing a private name from adapters.py, which in turn imports the client in ensure_producer_client,
+      is a circular import and trips the SR-2 facade rule the plan cites in section 9.
+    remediation: >
+      Specify the function completely: bound <= 0 gives the default; 0 < bound <= 1.0 gives bound/2 (or a stated floor
+      such as 50 ms); otherwise min(default, bound - 1.0). Add boundary cases to AC-006 (0.5, 1.0, 1.5, 0, negative).
+      Have adapters.py inject the bound resolver into ensure_producer_client(bound=_saas_fanout_timeout_s) so the client
+      imports nothing from adapters and the private name stays private.
+  - id: PLAN-SHIM-005
+    lens: protocol keeps the client uninterpreting
+    severity: 2
+    title: seam_args are serialised with default=str, so objects such as WPStatusChangeMetadata reach the child as repr strings; no consumer is specified
+    evidence:
+      - artifact: "plan.md § 5 Operations (seam_args); research.md protocol shape (json.dumps default=str); data-model.md ProduceRequest"
+      - code: "src/specify_cli/status/emit.py::_saas_fan_out (passes metadata=WPStatusChangeMetadata.from_status_event(...) and repo_root=Path)"
+    claim: >
+      FR-004 says the producer reads the row only. seam_args carries a dataclass repr (possibly with object addresses,
+      absolute paths) that no Java type reads; it adds nondeterministic bytes to the request, widens the surface for NFR-006
+      leaks into the child, and invites a future "small" Python serializer for it (interpretation).
+    remediation: >
+      Either drop seam_args from protocol v1 (keep row, slot, start_path, deadline_ms), or pin it to JSON-native scalar
+      kwargs only (wp_id, from_lane, to_lane, mission_slug, mission_id) chosen by an explicit list in 4.2. Also state which
+      kwarg is start_path (repo_root) and what the client sends when it is None (the plan should say the client sends
+      null and Java refuses with root-unresolvable, not the process working directory).
+  - id: PLAN-SHIM-006
+    lens: fault recording is not logic creep
+    severity: 2
+    title: Client must stamp fault-row time and the UTC day file name, which FR-026 and AC-012 forbid ("timestamps"); the carve-out is only in the plan
+    evidence:
+      - artifact: "plan.md § 4.2 gate (a) 'no datetime outside producer_faults.py'; § 15 touch-ups (no FR-026 amendment); data-model.md fault log path (UTC date of the fault's at)"
+      - artifact: "spec.md FR-026 ('must not ... mint ids, timestamps or clocks'), AC-012 (mutation adds a timestamp)"
+    claim: >
+      The fault log file is named by the UTC date of the fault's at, so Python must read the clock. The plan permits this
+      in one module but the spec still forbids it, and AC-012's timestamp mutation is ambiguous about which module it
+      targets. Inconsistent contract text invites either a failing gate or a second, hidden clock helper.
+    remediation: >
+      Add a spec touch-up in section 15: FR-026 allows the client to read the wall clock for the fault row's own `at` and
+      the day file name only, never for an event. State in AC-012 that the timestamp mutation is applied to
+      producer_client.py (not producer_faults.py) and that producer_faults.py has a second mutation (a clock read feeding
+      anything but the fault row). Keep the single-writer rule for fault rows as already planned.

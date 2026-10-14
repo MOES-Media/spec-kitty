@@ -1,0 +1,67 @@
+schema: review-verify/v1
+complete: true
+phase: plan
+results:
+- id: PLAN-FIT-001
+  status: resolved
+  reason: Plan 8 and R-6 P19 now define the lock fact as non-empty parsable LockRecord content younger than 60 s, Java reads bytes only, four AC-013 fixtures including the real-primitive empty sidecar;
+    kernel/locks.py symbols verified.
+- id: PLAN-FIT-005
+  status: resolved
+  reason: AC-029 is now a named :domain gate in plan 9 with floor and injected-member mutation, and the 14 and R-17 FR-005 rows map to it.
+- id: PLAN-SEQ-001
+  status: resolved
+  reason: Fleet-verdict registration, ci-fleet-verdict.yml, test_fleet_verdict.py and the duplicate-suite ledger rows moved to WP01 in plan 9, 11 and R-15; the cited files exist.
+- id: PLAN-SEQ-002
+  status: resolved
+  reason: Hook, pyproject hook table, .gitignore and minimal stub-wheel test are assigned to WP01 in plan 3.2, 11 and R-15; WP08 keeps the remainder.
+- id: PLAN-SEQ-007
+  status: resolved
+  reason: Campsite now has WP01 docs commit, WP06 first-commit fold into _dispatch_handlers (listed in 4.2 allowed symbols), a per-surface justification for WP07, and Sonar recorded as unmeasured; named
+    characterisation tests exist.
+- id: PLAN-SEQ-009
+  status: resolved
+  reason: 'Plan 10 and R-9 now cite #3283 (warmup action) and #3284 (issue matrix row, verified) with a lock-timeout rule and known-red-tracked recording; not seeding node ids is justified because the matrix
+    lists none.'
+- id: PLAN-VERIFY-001
+  status: resolved
+  reason: Plan 3.1 and R-3 add the .gitignore entry (WP01), a planted untracked stub in the packaging test so it is not vacuous, and research P20 and section 10 are corrected; .gitignore confirmed to lack
+    the entry in the checkout.
+- id: PLAN-VERIFY-004
+  status: resolved
+  reason: Hook chmods 0755 on non-Windows tags and check_dist_set --verify-binaries asserts zip mode bits with a 0644 mutation (plan 3.1, 3.3, 3.4, R-3).
+- id: PLAN-VERIFY-005
+  status: resolved
+  reason: Plan 8 makes Retain take clock.lock per candidate delete with re-check, maps lock timeout or delete failure to kept-with-reason, excludes clock.lock from lock facts and adds a two-process produce-versus-retain
+    test.
+- id: PLAN-VERIFY-006
+  status: resolved
+  reason: Plan 9 extends gradle_pin_check.py with a third Subproject plus planted mismatches and floor, runs verify_pins.py on the new workflows, and R-7 and the baseline include both test files; files
+    verified to exist.
+- id: PLAN-VERIFY-008
+  status: resolved
+  reason: Plan 4.4 and R-14 state per-list treatment (explicit subset, alias constant, reviewed literal exceptions), red-first characterisation tests per list, and name test_rebuild_state.py and acceptance
+    tests in WP07 blast radius.
+- id: PLAN-RELEASE-001
+  status: resolved
+  reason: producer-native.yml takes a required ref input, release.yml passes the RELEASE_REF expression and event-producer.yml github.sha, build-release compares manifest source commit to HEAD, and a test
+    pins the input (plan 2, 3.4).
+- id: PLAN-RELEASE-003
+  status: resolved
+  reason: Plan 2 makes dist-set.json the single tag authority with the hook given the tag from it and the measured glibc and minos turned into floor assertions.
+- id: PLAN-SHIM-001
+  status: resolved
+  reason: Gate rule (e) pins the top-level name set and import set of every existing table file against the base commit with a floor and a helper-added-to-emit.py self-mutation (plan 4.2).
+- id: PLAN-SHIM-002
+  status: resolved
+  reason: Second decode site _read_fault_rows is named in 4.1 and the gate, the doctor window is defined as file-name dates against the raw max_age_days with Python rendering only, and a spec touch-up is
+    listed.
+- id: PLAN-SHIM-003
+  status: resolved
+  reason: 4.2 restricts busy and timeout record_fault to client handler keys (_handler_key exists in adapters.py), states handlers never raise, and AC-006 adds the slow Zeitgeist handler case.
+- id: PLAN-SHIM-004
+  status: resolved
+  reason: Plan 5 gives a complete timeout formula (checked at 0.5, 1.0, 1.5, 10, <=0), AC-006 boundary cases, and the resolver is injected by adapters.py so the client imports nothing private.
+- id: PLAN-SHIM-006
+  status: resolved
+  reason: Plan 15 item 10 adds the FR-026 carve-out limited to producer_faults.py _now_utc and restates AC-012 mutations on the client module and a producer_faults.py clock mutation; gate (a) and 4.1 agree.

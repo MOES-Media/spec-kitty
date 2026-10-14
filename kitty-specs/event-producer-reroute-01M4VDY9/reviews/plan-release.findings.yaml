@@ -1,0 +1,121 @@
+schema: review-findings/v1
+complete: true
+phase: plan
+lens_group: release
+mission: event-producer-reroute-01M4VDY9
+findings:
+  - id: PLAN-RELEASE-001
+    lens: >-
+      release/packaging feasibility (provenance)
+    severity: 4
+    title: >-
+      Reusable producer-native.yml is not told which ref to build, so a workflow_dispatch republish builds the binary from the dispatching branch, not the release tag
+    evidence:
+      - artifact: "plan.md § 2 CI shape; § 3.3 step 1 (build-producer 'uses the reusable workflow')"
+      - code: ".github/workflows/release.yml::env.RELEASE_REF and build-release 'Check out repository' (ref: ${{ env.RELEASE_REF }}); workflow-level env is not visible inside a called workflow"
+    claim: >-
+      release.yml supports workflow_dispatch with an 'tag' input (github.ref is then the dispatching branch). build-release explicitly checks out RELEASE_REF, but the plan's reusable workflow has no stated ref input, so its checkout defaults to github.sha. The native binary would then be compiled from a different commit than the wheels' Python sources and the tag, while the manifest's 'source commit' is only recorded, never compared. Smoke passes, the dist-set check passes, and the published binary is not from the tagged source (a provenance and Standing Order 9 integrity hole).
+    remediation: >-
+      Give producer-native.yml a required 'ref' input, pass RELEASE_REF from release.yml (and github.sha from event-producer.yml), check out that ref, and add a build-release step that fails unless every producer-manifest.json 'source commit' equals 'git rev-parse HEAD' of the release checkout. Pin the 'build-producer ref input' in test_release_ci_ownership.py.
+  - id: PLAN-RELEASE-002
+    lens: >-
+      release/packaging feasibility (hatch hook / wheel contents)
+    severity: 3
+    title: >-
+      The binary round-trips through upload-artifact/download-artifact, which drops the executable bit, and hatchling takes the wheel member mode from the file on disk
+    evidence:
+      - artifact: "plan.md § 3.1 (force_include of the binary), § 3.3 step 2 (download the three producer artifacts, then build wheels), § 2"
+      - code: "hatchling 1.31.0 builders/utils.py::normalize_file_permissions (755 only if st_mode has the owner exec bit) and builders/wheel.py (external_attr from file stat)"
+    claim: >-
+      A binary downloaded from an artifact arrives 0644. The hook's force_include then ships it non-executable on the Linux and macOS wheels, pip installs it 0644, spawn fails with a permission error, and the client reports 'binary-missing' on every event (research.md reply table). Only smoke-wheels catches it, after the whole release pipeline. The packaging test described (research.md R-3: 'executable bit preserved') uses a locally built stub and cannot see this round trip.
+    remediation: >-
+      State in § 3.1/3.3 that the hook (or the step before it) must set the exec bit explicitly (chmod 0755 on the staged copy the hook force_includes; for Windows nothing), and add a packaging test that builds a wheel from a file deliberately created 0644 and asserts the wheel member is 0755. Alternatively upload the binary inside a tar so the mode survives.
+  - id: PLAN-RELEASE-003
+    lens: >-
+      release/packaging feasibility (dist-set equality)
+    severity: 3
+    title: >-
+      Platform wheel tags are both 'measured from the binary' and 'pinned in dist-set.json'; the two disagree on a first real release
+    evidence:
+      - artifact: "plan.md § 2 table (tag 'measured from the binary's glibc symbols', macOS 'measured minos'); § 3.2 (dist-set.json pins the expected list of tags); § 3.3 step 2 (check_dist_set.py: set equals dist-set.json)"
+      - code: "scripts/release/ has no check_dist_set.py yet; hatchling takes the tag verbatim from build_data['tag']"
+    claim: >-
+      A binary built in a manylinux_2_28 container typically needs a lower maximum GLIBC_ symbol (for example 2.17) than 2.28, and a macOS binary's minos depends on how native-image passes the deployment target. If the hook derives the tag from the measurement, the wheel name will not equal the pinned manylinux_2_28/macosx_11_0 tag and check_dist_set.py (the release gate) fails on the first tag; if it uses the pinned tag, the 'measured' claim is decoration. The plan does not say which one governs.
+    remediation: >-
+      Make dist-set.json the single authority for the tag (the floor) and turn the measurement into an assertion: fail the leg when the measured maximum GLIBC_ version exceeds the pinned manylinux floor or the measured minos exceeds the pinned macOS floor. Say so in § 2 and give the hook the tag from dist-set.json, not from the binary.
+  - id: PLAN-RELEASE-004
+    lens: >-
+      release/packaging feasibility (Standing Order 9 / needs edges)
+    severity: 3
+    title: >-
+      build-release's existing if-guard does not require build-producer to have succeeded
+    evidence:
+      - artifact: "plan.md § 3.3 steps 1-2 (build-release 'adds needs: [nightly-gate, build-producer]'; Standing Order 9 claim in § 3.4)"
+      - code: ".github/workflows/release.yml::build-release.if (!cancelled() && (needs.nightly-gate.result == 'success' || waived skip)) checks only nightly-gate"
+    claim: >-
+      A status function (!cancelled()) in an if: disables the implicit 'all needs succeeded' check, so a FAILED build-producer does not skip build-release. It runs, and the only thing stopping it is an incidental artifact-download failure or check_dist_set.py. The Standing Order 9 chain is thus enforced by accident, and a waiver-skipped nightly-gate plus a skipped build-producer (same if) would silently build only the pure wheel and fail late.
+    remediation: >-
+      Extend build-release's if with 'needs.build-producer.result == success', state it in § 3.3, and pin it in test_release_ci_ownership.py (the test already parametrizes over build-release and publish-pypi).
+  - id: PLAN-RELEASE-005
+    lens: >-
+      release/packaging feasibility (toolchain install)
+    severity: 3
+    title: >-
+      contracts/tools/install_tools.py cannot install the per-OS GraalVM archives the plan puts in tools/pins.json, yet is described as 'reused unchanged'
+    evidence:
+      - artifact: "plan.md § 1 Build (install_tools.py --pins services/event-producer/tools/pins.json --only gradle, reused unchanged); § 2 Toolchain pin (GraalVM archive URL and sha256 in tools/pins.json)"
+      - code: "contracts/tools/install_tools.py::_unpack_tool, _unpack_tarball (one url per tool, no per-OS selection; a .tar.gz must hold its declared 'binary' at the archive root; a .zip adds <top>/bin to PATH)"
+    claim: >-
+      The installer has one URL per tool and assumes either a zip with <top>/bin or a tarball with the binary at its root. A GraalVM JDK is a .tar.gz with a top directory on Linux, Contents/Home/bin on macOS, and a .zip on Windows, so none of the three layouts installs and there is no per-OS entry. Gradle (--only gradle) works; GraalVM does not. The sentence 'verified before unpack, reused unchanged' therefore does not cover the native toolchain, the one artifact whose provenance matters most.
+    remediation: >-
+      Decide in the plan how GraalVM is installed on each leg: either a SHA-pinned setup action plus a post-install step that compares the archive sha256 and 'native-image --version' to pins.json, or an explicit extension of install_tools.py (per-OS url/sha256 map, JDK layouts) with its tests; list the file in § 3.2/§ 1 and the tests it touches. Do not claim 'unchanged' for GraalVM.
+  - id: PLAN-RELEASE-006
+    lens: >-
+      release/packaging feasibility (Windows native)
+    severity: 3
+    title: >-
+      gethostname via ws2_32 returns WSANOTINITIALISED in a native image that never initialised Winsock
+    evidence:
+      - artifact: "plan.md § 7 nodeid (hostname through an FFM downcall to ws2_32 on Windows); § 2 WP01 exit criteria; § 16 unverified (Windows/Java hostname agreement)"
+    claim: >-
+      Python's socket module calls WSAStartup at import, which is why Python's gethostname works. A GraalVM native binary that does not load the JDK networking library has no WSAStartup call; ws2_32!gethostname then fails (-1, WSANOTINITIALISED) and the nodeid, the sha256 of hostname:username, is wrong or throws, breaking AC-039 on the Windows leg only, which WP01 will find but the plan has no stated remedy for.
+    remediation: >-
+      In § 7 and the WP01 exit criteria, specify calling WSAStartup (version 2.2) once through the same FFM downcall before gethostname (and WSACleanup), or use GetComputerNameExW(ComputerNameDnsHostname) and prove equality with Python's value in the live AC-039 test. Record the choice before WP03.
+  - id: PLAN-RELEASE-007
+    lens: >-
+      release/packaging feasibility (wheel parity)
+    severity: 3
+    title: >-
+      The pure wheel is built from the sdist but the platform wheels from the (test-mutated) checkout, with no parity check between them
+    evidence:
+      - artifact: "plan.md § 3.1 ('platform wheels are built from the checkout'), § 3.3 step 2 (python -m build --wheel --outdir dist per platform)"
+      - code: ".github/workflows/release.yml::build-release ('Run tests' runs tests/release before 'Build distributions'; the 'Verify wheel contents' comment says release tests can mutate the checkout); 'python -m build' default builds the wheel from the sdist"
+    claim: >-
+      python -m build (default) produces the pure wheel via sdist-to-wheel, while the platform wheels are built directly from a working tree that tests/release has already run in. Hatchling honours .gitignore but not untracked non-ignored debris, so a platform wheel can contain files the pure wheel (and the tested wheel) does not, or miss tracked content the sdist include list pulls in. The four wheels are advertised as the same product; nothing proves it.
+    remediation: >-
+      Add a check in check_dist_set.py (or a build-release step) that, for every platform wheel, member list and per-member sha256 equal the pure wheel's except the three _native/ members and METADATA/WHEEL/RECORD; alternatively build platform wheels in a clean 'git worktree'/clean checkout step. Add the mutation (one extra file) to the dist-set tests.
+  - id: PLAN-RELEASE-008
+    lens: >-
+      Java-only rule consistency (fork F1)
+    severity: 3
+    title: >-
+      Fork F1 lists two Python files but the plan's release machinery needs more Python, so the operator would rule on an understated scope
+    evidence:
+      - artifact: "plan.md § 16 F1 (hook + check_dist_set.py only); § 2 (measuring glibc symbols and minos, producer-manifest.json, 'smoke script' on three OS); § 3.2 (check_dist_set.py --verify-binaries re-hashing wheel members, edits to check_exact_install.py)"
+      - code: "scripts/release/ currently holds only Python (check_exact_install.py, validate_release.py, ...)"
+    claim: >-
+      The Java-only ruling excepts thin pass-through shims of the strangler; a build hook, hash-verifying set-check, tag-measuring step, manifest writer and smoke script are release tooling that is neither Java nor a strangler shim. F1 recommends option (a) ('no product logic') but --verify-binaries and manifest handling are security-relevant verification logic, and the manifest writer/tag measurement have no stated language at all. The fork is therefore decided on an incomplete list, and option (b)'s dismissal ('adds a JVM dependency to the Python release path') ignores that build-release already needs the producer artifacts and could run a Gradle task from a JDK it sets up.
+    remediation: >-
+      Enumerate in F1 every new non-Java file (hook, check_dist_set.py with --verify-binaries, manifest writer and tag measurement, smoke script, check_exact_install.py edits) and state, per file, whether it can be Java (Gradle task or the launcher itself emitting its manifest) and what cost; keep the hook as the only unavoidable Python file in the recommendation, or get the operator ruling on the full list.
+  - id: PLAN-RELEASE-009
+    lens: >-
+      release/packaging feasibility (Linux container leg)
+    severity: 2
+    title: >-
+      Building in a manylinux_2_28 container from a GitHub Actions job needs more than a pinned image
+    evidence:
+      - artifact: "plan.md § 2 table (ubuntu-24.04, build in a pinned manylinux_2_28 container); research.md § 2 per-OS recipe"
+    claim: >-
+      JavaScript actions (checkout, upload-artifact, setup-java, the SHA-pinned MSVC/attest actions where used) run inside the container with the runner's Node, which needs a compatible glibc, and the image needs git, a C toolchain and zlib-devel for native-image. The plan names only the image digest and a musl fallback; WP01 would find each of these piecemeal.
+    remediation: >-
+      Add to the WP01 exit criteria that the container leg runs checkout and upload-artifact inside the image (or builds with docker run on a host checkout) and lists the installed build prerequisites in pins.json; keep the musl fallback decision recorded as stated.
