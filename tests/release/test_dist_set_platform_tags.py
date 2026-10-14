@@ -1,6 +1,6 @@
 """``scripts/release/dist-set.json`` is the single authority for the producer wheel tags (mission event-producer-reroute, plan 2).
 
-It must hold exactly the three legs ``producer-native.yml`` builds, with the pinned platform tags, plus the ``sdist`` and ``pure_wheels``
+It must hold exactly the three legs ``event-producer.yml`` builds, with the pinned platform tags, plus the ``sdist`` and ``pure_wheels``
 keys WP08's checker reads. Every rule has a floor (legs found) and mutation cases (remove a leg, add an unexpected one, bend a tag).
 """
 
@@ -18,7 +18,7 @@ pytestmark = [pytest.mark.fast]
 
 ROOT = Path(__file__).resolve().parents[2]
 DIST_SET = ROOT / "scripts" / "release" / "dist-set.json"
-PRODUCER_NATIVE = ROOT / ".github" / "workflows" / "producer-native.yml"
+PRODUCER_NATIVE = ROOT / ".github" / "workflows" / "event-producer.yml"
 
 EXPECTED_TAGS = {
     "linux-x86_64": "py3-none-manylinux_2_28_x86_64",
@@ -32,7 +32,8 @@ def _workflow_legs(workflow: Path) -> list[str]:
     document = yaml.safe_load(workflow.read_text(encoding="utf-8"))
     jobs = document["jobs"]
     legs: list[str] = []
-    for body in jobs.values():
+    # Only the job that builds the native image: the smoke job runs the same legs but builds nothing.
+    for body in (jobs["native"],):
         matrix = (body.get("strategy") or {}).get("matrix") or {}
         legs.extend(str(entry["leg"]) for entry in matrix.get("include", []) if isinstance(entry, dict) and "leg" in entry)
     return legs
@@ -64,7 +65,7 @@ def violations(data: Any, workflow_legs: list[str]) -> list[str]:
         if expected is not None and wheel["tag"] != expected:
             found.append(f"leg {wheel['leg']} has tag {wheel['tag']}, expected {expected}")
     if sorted(workflow_legs) != sorted(legs):
-        found.append(f"producer-native.yml builds {sorted(workflow_legs)} but dist-set.json lists {sorted(legs)}")
+        found.append(f"event-producer.yml builds {sorted(workflow_legs)} but dist-set.json lists {sorted(legs)}")
     return found
 
 
@@ -75,7 +76,7 @@ def _real() -> dict[str, Any]:
 def test_dist_set_holds_exactly_the_three_legs_the_workflow_builds() -> None:
     legs = _workflow_legs(PRODUCER_NATIVE)
     data = _real()
-    assert len(legs) == 3, "floor: producer-native.yml must declare three matrix legs"
+    assert len(legs) == 3, "floor: event-producer.yml must declare three matrix legs"
     assert violations(data, legs) == []
     assert {w["leg"]: w["tag"] for w in data["platform_wheels"]} == EXPECTED_TAGS
 
@@ -97,7 +98,7 @@ def test_mutation_removing_a_leg_is_red() -> None:
     data["platform_wheels"].pop()
     found = violations(data, _workflow_legs(PRODUCER_NATIVE))
     assert any("legs are" in v for v in found)
-    assert any("producer-native.yml builds" in v for v in found)
+    assert any("event-producer.yml builds" in v for v in found)
 
 
 def test_mutation_adding_an_unexpected_leg_is_red() -> None:
@@ -109,7 +110,7 @@ def test_mutation_adding_an_unexpected_leg_is_red() -> None:
 
 def test_mutation_a_workflow_with_an_extra_leg_is_red() -> None:
     found = violations(_real(), [*_workflow_legs(PRODUCER_NATIVE), "linux-aarch64"])
-    assert any("producer-native.yml builds" in v for v in found)
+    assert any("event-producer.yml builds" in v for v in found)
 
 
 def test_mutation_a_bent_tag_is_red() -> None:

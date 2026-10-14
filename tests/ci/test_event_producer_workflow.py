@@ -1,7 +1,7 @@
-"""Guard tests for ``event-producer.yml``, ``producer-native.yml`` and the shared smoke action (mission event-producer-reroute, WP01).
+"""Guard tests for ``event-producer.yml`` (which also builds the native image) and the shared smoke action (mission event-producer-reroute, WP01).
 
 Every rule is a function over a parsed workflow document, so each is proved twice: the real file passes it, and a deep copy with one
-mutation fails it for that rule. A rule that found nothing to judge fails (no vacuous pass). No job of either workflow may run pytest:
+mutation fails it for that rule. A rule that found nothing to judge fails (no vacuous pass). No job of the workflow may run pytest:
 the pin and glue tests run in the router lanes that own them, and a pytest call here would be a duplicate per-change suite execution
 (``tests/architectural/test_no_duplicate_suite_execution.py``).
 """
@@ -24,7 +24,7 @@ pytestmark = pytest.mark.fast
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = ROOT / ".github" / "workflows"
 EVENT_PRODUCER = WORKFLOWS / "event-producer.yml"
-PRODUCER_NATIVE = WORKFLOWS / "producer-native.yml"
+RETIRED_PRODUCER_NATIVE = WORKFLOWS / "producer-native.yml"
 SMOKE_ACTION = ROOT / ".github" / "actions" / "producer-smoke" / "action.yml"
 TOOLS = ROOT / "services" / "event-producer" / "tools"
 DIST_SET = ROOT / "scripts" / "release" / "dist-set.json"
@@ -113,9 +113,11 @@ def pin_step_violations(document: dict[str, Any]) -> list[str]:
     problems = []
     if "uv run --frozen --no-sync python contracts/tools/gradle_pin_check.py" not in texts:
         problems.append("no gradle_pin_check step")
-    for needle in ("--pins services/event-producer/tools/pins.json", "producer-native.yml", "event-producer.yml"):
+    for needle in ("--pins services/event-producer/tools/pins.json", "--workflow .github/workflows/event-producer.yml"):
         if needle not in texts:
             problems.append(f"verify_pins call lacks {needle}")
+    if "producer-native.yml" in texts:
+        problems.append("verify_pins still names the folded producer-native.yml")
     for mode in ("floor", "tamper", "module", "sbom"):
         if f"expect-failure.sh {mode}" not in texts:
             problems.append(f"no expect-failure.sh {mode} step")
@@ -153,15 +155,9 @@ def event_producer() -> dict[str, Any]:
     return load(EVENT_PRODUCER)
 
 
-@pytest.fixture(scope="module")
-def native() -> dict[str, Any]:
-    return load(PRODUCER_NATIVE)
-
-
-def test_no_job_of_either_workflow_runs_pytest(event_producer: dict[str, Any], native: dict[str, Any]) -> None:
-    assert len(all_run_texts(event_producer)) > 5 and len(all_run_texts(native)) > 5, "floor: the scan must see the run steps"
+def test_no_job_of_the_workflow_runs_pytest(event_producer: dict[str, Any]) -> None:
+    assert len(all_run_texts(event_producer)) > 10, "floor: the scan must see the run steps"
     assert pytest_violations(event_producer) == []
-    assert pytest_violations(native) == []
 
 
 def test_mutation_a_pytest_step_is_red(event_producer: dict[str, Any]) -> None:
@@ -170,9 +166,8 @@ def test_mutation_a_pytest_step_is_red(event_producer: dict[str, Any]) -> None:
     assert len(pytest_violations(mutated)) == 1
 
 
-def test_no_continue_on_error_anywhere(event_producer: dict[str, Any], native: dict[str, Any]) -> None:
+def test_no_continue_on_error_anywhere(event_producer: dict[str, Any]) -> None:
     assert continue_on_error_violations(event_producer) == []
-    assert continue_on_error_violations(native) == []
     mutated = copy.deepcopy(event_producer)
     mutated["jobs"]["native-smoke"]["continue-on-error"] = True
     assert continue_on_error_violations(mutated) == ["native-smoke"]
@@ -180,7 +175,7 @@ def test_no_continue_on_error_anywhere(event_producer: dict[str, Any], native: d
 
 def test_triggers_and_path_filters(event_producer: dict[str, Any]) -> None:
     on = triggers(event_producer)
-    assert set(on) == {"pull_request", "push"}
+    assert set(on) == {"pull_request", "push", "workflow_dispatch", "workflow_call"}
     assert on["pull_request"]["paths"] == on["push"]["paths"]
     assert on["push"]["branches"] == ["main"]
     paths = set(on["pull_request"]["paths"])
@@ -190,9 +185,9 @@ def test_triggers_and_path_filters(event_producer: dict[str, Any]) -> None:
         "pyproject.toml",
         ".github/actions/producer-smoke/**",
         ".github/workflows/event-producer.yml",
-        ".github/workflows/producer-native.yml",
     ):
         assert needed in paths
+    assert ".github/workflows/producer-native.yml" not in paths, "producer-native.yml is folded into this workflow"
     assert not any(p.startswith("src/specify_cli/_native") for p in paths), "the gitignored native directory is never a trigger path"
 
 
@@ -226,9 +221,8 @@ def test_gradle_test_is_a_three_os_matrix_running_the_full_check(event_producer:
     assert matrix_violations(sticky["jobs"]["gradle-test"], "os", THREE_OS) == ["fail-fast is not false"]
 
 
-def test_the_live_node_id_is_exported_and_required_only_in_gradle_test(event_producer: dict[str, Any], native: dict[str, Any]) -> None:
+def test_the_live_node_id_is_exported_and_required_only_in_gradle_test(event_producer: dict[str, Any]) -> None:
     assert node_id_violations(event_producer) == []
-    assert node_id_violations(native) == []
     mutated = copy.deepcopy(event_producer)
     mutated["jobs"]["native-smoke"]["steps"].append({"run": "echo REQUIRE_LIVE_NODE_ID=1 >> $GITHUB_ENV"})
     assert node_id_violations(mutated) == ["native-smoke sets REQUIRE_LIVE_NODE_ID (only gradle-test may)"]
@@ -248,11 +242,10 @@ def test_native_smoke_runs_the_three_legs_through_the_shared_action(event_produc
     assert job["needs"] == "native"
 
 
-def test_the_native_job_calls_producer_native_with_the_commit_under_test(event_producer: dict[str, Any]) -> None:
+def test_the_native_job_builds_in_this_workflow_with_no_reusable_call(event_producer: dict[str, Any]) -> None:
     job = jobs(event_producer)["native"]
-    assert job["uses"] == "./.github/workflows/producer-native.yml"
-    assert job["with"]["ref"] == "${{ github.sha }}"
-    assert job["with"]["enforce_start_gate"] is True
+    assert "uses" not in job, "the native build is folded into this workflow, not called"
+    assert not RETIRED_PRODUCER_NATIVE.exists(), "producer-native.yml is folded away (the reusable-workflow ceiling)"
 
 
 def test_the_terminal_gate_needs_every_job_and_requires_success(event_producer: dict[str, Any]) -> None:
@@ -270,33 +263,47 @@ def test_the_terminal_gate_needs_every_job_and_requires_success(event_producer: 
     assert "gate is not self-starting (always())" in gate_violations(mutated)
 
 
-def test_root_jobs_carry_the_fork_guard(event_producer: dict[str, Any], native: dict[str, Any]) -> None:
+def test_root_jobs_carry_the_fork_guard(event_producer: dict[str, Any]) -> None:
     for name in ("verify-pins", "gradle-test", "native"):
         assert GUARD in str(jobs(event_producer)[name]["if"]), name
-    assert GUARD in str(jobs(native)["build"]["if"])
+        assert "github.event_name == 'workflow_dispatch'" in str(jobs(event_producer)[name]["if"]), name
+        assert "github.event_name == 'pull_request'" in str(jobs(event_producer)[name]["if"]), name
 
 
-# --- producer-native.yml ----------------------------------------------------------------------------------------
+# --- the folded native build ------------------------------------------------------------------------------------
 
 
-def test_producer_native_is_reusable_and_dispatchable_only(native: dict[str, Any]) -> None:
-    on = triggers(native)
-    assert set(on) == {"workflow_call", "workflow_dispatch"}
+def test_mode_and_ref_inputs_are_exposed_through_workflow_call_and_dispatch(event_producer: dict[str, Any]) -> None:
+    on = triggers(event_producer)
     for trigger in ("workflow_call", "workflow_dispatch"):
-        assert on[trigger]["inputs"]["ref"]["required"] is True
+        inputs = on[trigger]["inputs"]
+        assert set(inputs) == {"mode", "ref"}, trigger
+        assert inputs["mode"]["default"] == "pr", trigger
+        assert inputs["mode"]["required"] is False, trigger
+        assert inputs["ref"]["required"] is False, trigger
+    assert on["workflow_dispatch"]["inputs"]["mode"]["options"] == ["pr", "release"]
+    assert on["workflow_call"]["inputs"]["mode"]["type"] == "string"
 
 
-def test_producer_native_builds_the_three_legs_of_dist_set(native: dict[str, Any]) -> None:
-    job = jobs(native)["build"]
+def test_mode_selects_the_start_gate_and_the_ref(event_producer: dict[str, Any]) -> None:
+    steps = jobs(event_producer)["native"]["steps"]
+    package = next(s for s in steps if s.get("name", "").startswith("Package the leg"))
+    assert "inputs.mode != 'release'" in package["env"]["ENFORCE"], "the warm start gate is held in pr mode only"
+    checkout = next(s for s in steps if "actions/checkout" in str(s.get("uses", "")))
+    assert checkout["with"]["ref"] == "${{ inputs.ref }}"
+
+
+def test_the_native_job_builds_the_three_legs_of_dist_set(event_producer: dict[str, Any]) -> None:
+    job = jobs(event_producer)["native"]
     assert matrix_violations(job, "leg", THREE_LEGS) == []
     assert matrix_values(job, "runs-on") == THREE_OS
     legs = {w["leg"] for w in json.loads(DIST_SET.read_text(encoding="utf-8"))["platform_wheels"]}
     assert matrix_values(job, "leg") == legs
 
 
-def test_producer_native_pins_its_toolchain_and_floors(native: dict[str, Any]) -> None:
-    text = PRODUCER_NATIVE.read_text(encoding="utf-8")
-    steps = jobs(native)["build"]["steps"]
+def test_the_native_job_pins_its_toolchain_and_floors(event_producer: dict[str, Any]) -> None:
+    text = EVENT_PRODUCER.read_text(encoding="utf-8")
+    steps = jobs(event_producer)["native"]["steps"]
     run = " ".join(str(s.get("run", "")) for s in steps)
     assert "install-graalvm.sh" in run
     assert 'kind == "container-image"' in run, "the manylinux image is read from pins.json, not written twice"
@@ -309,29 +316,15 @@ def test_producer_native_pins_its_toolchain_and_floors(native: dict[str, Any]) -
     assert "strip" not in run, "the macOS binary is never stripped"
 
 
-def test_producer_native_uploads_the_binary_manifest_and_sbom(native: dict[str, Any]) -> None:
-    uploads = [s for s in jobs(native)["build"]["steps"] if "upload-artifact" in str(s.get("uses", ""))]
+def test_the_native_job_uploads_the_binary_manifest_and_sbom(event_producer: dict[str, Any]) -> None:
+    uploads = [s for s in jobs(event_producer)["native"]["steps"] if "upload-artifact" in str(s.get("uses", ""))]
     assert [u["with"]["name"] for u in uploads] == ["producer-${{ matrix.leg }}", "producer-sbom"]
     assert all(u["with"]["if-no-files-found"] == "error" for u in uploads)
 
 
-def test_every_uses_line_of_both_workflows_is_pinned_and_the_manifest_passes_verify_pins(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_every_uses_line_is_pinned_and_the_manifest_passes_verify_pins(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     tool = load_tool(monkeypatch, ROOT / "contracts" / "tools" / "verify_pins.py", "verify_pins_under_test", syspath=ROOT / "contracts" / "tools")
-    code = tool.main(
-        [
-            "--root",
-            str(ROOT),
-            "--pins",
-            str(TOOLS / "pins.json"),
-            "--workflow",
-            str(PRODUCER_NATIVE),
-            "--workflow",
-            str(EVENT_PRODUCER),
-            "--pins-only",
-        ]
-    )
+    code = tool.main(["--root", str(ROOT), "--pins", str(TOOLS / "pins.json"), "--workflow", str(EVENT_PRODUCER), "--pins-only"])
     out = capsys.readouterr().out
     assert code == 0, out
     assert "uses_lines=0" not in out
@@ -339,7 +332,7 @@ def test_every_uses_line_of_both_workflows_is_pinned_and_the_manifest_passes_ver
 
 def test_verify_pins_goes_red_on_an_unpinned_use(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     tool = load_tool(monkeypatch, ROOT / "contracts" / "tools" / "verify_pins.py", "verify_pins_mutation", syspath=ROOT / "contracts" / "tools")
-    text = PRODUCER_NATIVE.read_text(encoding="utf-8")
+    text = EVENT_PRODUCER.read_text(encoding="utf-8")
     assert "actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8" in text
     planted = tmp_path / "planted.yml"
     planted.write_text(text.replace("actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8", "actions/checkout@v5"), encoding="utf-8")
