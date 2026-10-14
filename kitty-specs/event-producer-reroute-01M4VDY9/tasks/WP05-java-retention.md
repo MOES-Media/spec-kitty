@@ -2,7 +2,6 @@
 work_package_id: WP05
 title: 'Java retention: Retain use case, committed-ledger and lock-record readers, launcher retain operation'
 dependencies:
-- WP03
 - WP04
 requirement_refs:
 - FR-028
@@ -22,7 +21,14 @@ subtasks:
 history: []
 agent_profile: java-jenny
 authoritative_surface: services/event-producer/application/
-create_intent: []
+create_intent:
+- services/event-producer/application/src/main/java/ai/speckitty/producer/application/retain/**
+- services/event-producer/application/src/test/java/ai/speckitty/producer/application/retain/**
+- services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/ledger/**
+- services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/ledger/**
+- services/event-producer/launcher/src/main/java/ai/speckitty/producer/launcher/retain/**
+- services/event-producer/launcher/src/main/resources/META-INF/services/ai.speckitty.producer.launcher.OperationHandler
+- services/event-producer/launcher/src/test/java/ai/speckitty/producer/launcher/retain/**
 execution_mode: code_change
 model: ''
 owned_files:
@@ -31,6 +37,12 @@ owned_files:
 - services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/ledger/**
 - services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/ledger/**
 - services/event-producer/launcher/src/main/java/ai/speckitty/producer/launcher/retain/**
+- services/event-producer/launcher/src/main/resources/META-INF/services/ai.speckitty.producer.launcher.OperationHandler
+- services/event-producer/launcher/src/main/resources/META-INF/native-image/ai.speckitty/producer-retain/**
+- services/event-producer/adapter/src/main/resources/META-INF/native-image/ai.speckitty/producer-ledger/**
+- services/event-producer/launcher/src/test/java/ai/speckitty/producer/launcher/retain/**
+- services/event-producer/adapter/src/test/resources/ledger/**
+- services/event-producer/launcher/src/test/resources/retain/**
 role: implementer
 tags: []
 tracker_refs: []
@@ -54,7 +66,7 @@ Implement `Retain` in Java: candidate listing, facts, policy, whole-file deletio
 
 ## Context
 
-Plan section 8 (all of it), 4.3; research R-6, R-21, R-23. **Refinement of the plan (defect found, see tasks-overview.md):** WP05 depends on WP04 as well as WP03, because the `retain` operation is dispatched by the launcher WP04 builds; the plan's graph (WP05 after WP03 only) would have two WPs editing the launcher entry concurrently. The Python `doctor` is a pass-through (WP06). Unaffected by the events release.
+Plan section 8 (all of it), 4.3; research R-6, R-21, R-23. **Refinement of the plan (defect found, see tasks-overview.md R1):** WP05 depends on WP04 (not only WP03; WP03 is implied transitively and no longer listed), because it needs WP04's `OperationHandler` interface and the ports at compile time. The registration mechanism is `ServiceLoader` with one WP05-owned provider-configuration file, so WP05 edits **no** WP04 file. The Python `doctor` is a pass-through (WP06). Unaffected by the events release.
 
 ## Subtask T029: Ports and facts
 
@@ -74,11 +86,11 @@ Plan section 8 (all of it), 4.3; research R-6, R-21, R-23. **Refinement of the p
 
 ## Subtask T033: Launcher registration
 
-**Steps**: `launcher/.../retain/**` registers the operation at WP04's registration point; reply `eligible`, `kept` (with reasons), `deleted`, `policy_error`; no absolute path in any reply (NFR-006).
+**Steps**: `launcher/.../retain/**` implements `OperationHandler` for `retain` and registers it by the WP05-owned file `META-INF/services/ai.speckitty.producer.launcher.OperationHandler` (WP04's dispatcher loads it with `ServiceLoader`; red test first: before this file `retain` replies `refused`, after it replies per the policy; the `native-smoke` leg proves the provider survives the native build); reply `eligible`, `kept` (with reasons), `deleted`, `policy_error`; no absolute path in any reply (NFR-006). The two-process produce/retain race test (T032) lives in `launcher/src/test/java/.../launcher/retain/**`, which this WP owns. **Native-image metadata:** this WP's own directories `producer-retain` (launcher) and `producer-ledger` (adapter).
 
 ## Gates
 
-`gradle -p services/event-producer test`; JaCoCo floors as WP02/WP04. No Python. Red-first, revert-checked.
+`gradle -p services/event-producer check` (JaCoCo floors are enforced by `check`). No Python. Red-first, revert-checked.
 
 ## Definition of Done
 
@@ -91,6 +103,14 @@ Deleting under a lock that Python also reads (the Python fault-log reader is in 
 ## Reviewer Guidance
 
 Check fail-closed paths, that eligibility is re-checked under the lock, and that no write-mode open of a candidate exists.
+
+## Tests, markers, jobs
+
+All Java: `gradle-test` three-OS matrix (`check`).
+
+## Recorded out-of-map edits
+
+None.
 
 ## Implementation command
 

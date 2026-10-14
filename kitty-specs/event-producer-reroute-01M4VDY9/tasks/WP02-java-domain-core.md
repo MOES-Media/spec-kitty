@@ -27,7 +27,16 @@ subtasks:
 history: []
 agent_profile: java-jenny
 authoritative_surface: services/event-producer/domain/
-create_intent: []
+create_intent:
+- services/event-producer/domain/src/main/**
+- services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/ids/**
+- services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/clock/**
+- services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/order/**
+- services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/envelope/**
+- services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/retention/**
+- services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/fault/**
+- services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/protocol/**
+- services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/arch/**
 execution_mode: code_change
 model: ''
 owned_files:
@@ -75,11 +84,14 @@ WP01 verdict PASS (read `research/wp01-feasibility.md`). If it is HALT, stop.
 
 ## Subtask T012: `clock` value type
 
-**Steps**: red tests for integer 0..2^31-1, successor, overflow above 2^31-1 refused as `clock-overflow` (no wrap). **Covers** FR-012 (value side).
+**Steps**: red tests for integer 0..2^31-1, successor, overflow above 2^31-1 refused as `clock-overflow` (no wrap). The value type rejects every non-integer JSON form (see T013 for the error-row cases `null`, string, boolean, fractional, negative). **Covers** FR-012 (value side).
 
 ## Subtask T013: `order` (comparator, dedupe, error rows)
 
-**Steps**: red tests from the nine data-model section 4 fixtures as test-local inputs (floor: all nine; example 4 is the naive counter-example). Comparator: Lamport, then `time`, then `id`, `(time, id)` fallback for clockless rows, the `source` tie-break as the spec states. Dedupe-then-order on `(source, id)`; error rows (unparseable `time`, non-normalising or missing `id`, clock out of range) listed with line position, absent from the ordered list; ordered + errors + collapsed = rows read (AC-009). Permutation test (AC-008 against a test-local reference). **Covers** FR-013 (Java comparator), FR-016 (dedupe key), AC-008, AC-009.
+**Steps**: red tests from the nine data-model section 4 fixtures as test-local inputs (floor: all nine; example 4 is the naive counter-example). Comparator: Lamport, then `time`, then `id`, `(time, id)` fallback for clockless rows, the `source` tie-break as the spec states. Dedupe-then-order on `(source, id)`; error rows (unparseable `time`, non-normalising or missing `id`, clock out of range) listed with line position, absent from the ordered list; ordered + errors + collapsed = rows read (AC-009). Permutation test (AC-008 against a test-local reference).
+**Mutants (each asserted red, so the tests cannot pass against a comparator that ignores the rule):** (1) the naive comparator (example 4); (2) a comparator without the `source` tie-break (example 7); (3) dedupe on the raw `id` instead of `(source, id)` (example 8); (4) an invalid duplicate survivor, or no conflict reported (example 9); (5) a comparator that **drops an error row** (AC-009). The "all nine" floor is asserted, and error rows are compared as a **multiset** (position, reason), so a dropped or duplicated error row fails. The same mutant table is reused by WP11 T075 for the released run.
+**Non-integer `lamportclock` (spec touch-up 4):** error rows with the named reason, never clockless, for each of `null`, `"5"`, `true`, `1.5` and `-1`; the member **absent** is clockless (ordered by `(time, id)`); `2^31` stays the out-of-range case of fixture 9. A reader that coerces `"5"` or `true` to an integer, or treats `null` as absent, fails these cases.
+**Covers** FR-013 (Java comparator), FR-016 (dedupe key), AC-008, AC-009.
 
 ## Subtask T014: `envelope` model
 
@@ -91,15 +103,15 @@ WP01 verdict PASS (read `research/wp01-feasibility.md`). If it is HALT, stop.
 
 ## Subtask T016: ArchUnit and coverage
 
-**Steps**: ArchUnit test in `:domain`: only `java.base`; no class reads a clock, environment variable or file. Each rule carries a floor (scanned count above zero) and a self-mutation case. JaCoCo floors configured (95% line, 90% branch) via additive edit of `domain/build.gradle.kts` (WP01 file, serial edit). **Covers** NFR-005.
+**Steps**: ArchUnit test in `:domain`: only `java.base`; no class reads a clock, environment variable or file. Each rule carries a floor (scanned count above zero) and a self-mutation case. The JaCoCo floors (95% line, 90% branch) are already wired into `check` by WP01 (T003); this WP only has to meet them, with no build-file edit. **Covers** NFR-005.
 
 ## Gates
 
-`gradle -p services/event-producer :domain:test :domain:jacocoTestCoverageVerification`; `gradle -p services/event-producer test`. No Python in this WP. Red-first per behaviour (own commit before implementation, red on base, green on tip, revert-checked).
+`gradle -p services/event-producer :domain:check` (runs the JaCoCo verification) and `gradle -p services/event-producer check`; `test` alone does not enforce the floors. No Python in this WP. Red-first per behaviour (own commit before implementation, red on base, green on tip, revert-checked).
 
 ## Definition of Done
 
-T011 to T016 done; floors met; ArchUnit green with self-mutation cases; no dependency outside `java.base`.
+T011 to T016 done; floors met (`check` green); ArchUnit green with self-mutation cases; no dependency outside `java.base`.
 
 ## Risks
 
@@ -108,6 +120,10 @@ Over-modelling the registry (keep it data-driven); sort-key `source` tie-break i
 ## Reviewer Guidance
 
 Verify nine fixtures are all exercised, UUID refusal is complete, and nothing in `:domain` touches a clock or file.
+
+## Recorded out-of-map edits
+
+None. Greenfield trees under `services/event-producer/domain/` are listed in `create_intent`.
 
 ## Implementation command
 

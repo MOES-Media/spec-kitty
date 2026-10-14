@@ -1,9 +1,10 @@
 ---
 work_package_id: WP03
-title: 'Java :adapter file-system side: lock, clock store, publish log, repo locator, node identity'
+title: 'Java ports and :adapter file-system side: lock, clock store, publish log, repo locator, node identity'
 dependencies:
 - WP02
 requirement_refs:
+- FR-004
 - FR-011
 - FR-012
 - FR-019
@@ -15,6 +16,7 @@ planning_base_branch: feat/event-producer-reroute-6185
 merge_target_branch: feat/event-producer-reroute-6185
 branch_strategy: Planning artifacts for this mission were generated on feat/event-producer-reroute-6185. During /spec-kitty.implement this WP may branch from a dependency-specific base, but completed changes must merge back into feat/event-producer-reroute-6185 unless the human explicitly redirects the landing branch.
 subtasks:
+- T079
 - T017
 - T018
 - T019
@@ -24,10 +26,20 @@ subtasks:
 history: []
 agent_profile: java-jenny
 authoritative_surface: services/event-producer/adapter/
-create_intent: []
+create_intent:
+- services/event-producer/application/src/main/java/ai/speckitty/producer/application/port/**
+- services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/json/**
+- services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/fs/**
+- services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/repo/**
+- services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/identity/**
+- services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/clock/**
+- services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/publishlog/**
+- services/event-producer/adapter/src/main/resources/META-INF/native-image/ai.speckitty/producer-adapter-fs/**
 execution_mode: code_change
 model: ''
 owned_files:
+- services/event-producer/application/src/main/java/ai/speckitty/producer/application/port/**
+- services/event-producer/adapter/src/main/resources/META-INF/native-image/ai.speckitty/producer-adapter-fs/**
 - services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/json/**
 - services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/fs/**
 - services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/repo/**
@@ -40,12 +52,14 @@ owned_files:
 - services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/identity/**
 - services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/clock/**
 - services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/publishlog/**
+- services/event-producer/adapter/src/test/resources/publishlog/**
+- services/event-producer/adapter/src/test/resources/identity/**
 role: implementer
 tags: []
 tracker_refs: []
 ---
 
-# WP03: Java :adapter file-system side: lock, clock store, publish log, repo locator, node identity
+# WP03: Java ports and :adapter file-system side: lock, clock store, publish log, repo locator, node identity
 
 ## ⚡ Do This First: Load Agent Profile
 
@@ -59,11 +73,19 @@ Use the `/spk-charter-profile-load` skill to load the agent profile specified in
 
 ## Objective
 
-Implement the file-system side of `:adapter`: JSON, lock, clock store, publish-log writer, repo locator, node identity.
+Define the `:application` port interfaces (interface-only), then implement the file-system side of `:adapter` against them: JSON, lock, clock store, publish-log writer, repo locator, node identity.
 
 ## Context
 
 Plan sections 1 (`:adapter`), 7 (clock state file), 8 (placement) and data-model section 7; research R-5, R-6. WP03 owns the `adapter/json` package that later WPs (WP05, WP11) consume. Dependencies are already settled in WP01's verification metadata; add none. Unaffected by the events release.
+
+**Ports are authored here (tasks-overview R4).** `:adapter` depends on `:application` and implements its ports, so the interface-only port package `application/port/**` is owned by this WP (not WP04) and lands first. WP04's `Produce` consumes the ports. A port signature that WP04 finds wrong is changed by WP04 as a **recorded second-editor edit** of `application/port/**` with the reason in the WP04 notes; it is never forked into a second interface.
+
+**Check open PRs** on the owned files before the first commit (none known to overlap).
+
+## Subtask T079: Ports as interfaces (first task, red-free)
+
+**Steps**: in `ai.speckitty.producer.application.port` write the interfaces only, no behaviour and no framework import: `RowSchemaValidator`, `PublishLog`, `ClockStore`, `RepoLocator`, `NodeIdentity`, `Clock`, shaped by plan sections 1, 5, 7 and data-model sections 1, 2, 6, 7. Each adapter class of T017 to T021 declares `implements` on its port. `:application` ArchUnit rules (no `:adapter`, no Jackson) are WP04's `ArchitectureTest`; this task adds no test. **Validation**: `gradle -p services/event-producer :application:compileJava :adapter:compileJava`.
 
 ## Subtask T017: `json` and `fs` helpers
 
@@ -71,7 +93,7 @@ Plan sections 1 (`:adapter`), 7 (clock state file), 8 (placement) and data-model
 
 ## Subtask T018: `repo` locator
 
-**Steps**: red tests, then resolve the git common dir by reading `.git` (file or directory) and `commondir`, never spawning git; primary checkout plus two worktrees fixtures. **Covers** FR-012 (anchor).
+**Steps**: red tests, then resolve the git common dir by reading `.git` (file or directory) and `commondir`, never spawning git; primary checkout plus two worktrees fixtures. **Canonical-root derivation (FR-004):** the publish-log location (`.kittify/events/` under the canonical repository root, parity with `core.paths.resolve_canonical_root`) is derived from a start path; red tests with parity fixtures show that a primary checkout, a linked worktree, a coordination worktree and a Mission **subdirectory** start path all give the **same** publish-log path; a start path with no repository above it is `root-unresolvable` (surfaced by WP04 T025 as `rejected`). **Covers** FR-004 (Java side), FR-012 (anchor).
 
 ## Subtask T019: `clock` store
 
@@ -83,19 +105,30 @@ Plan sections 1 (`:adapter`), 7 (clock state file), 8 (placement) and data-model
 
 ## Subtask T021: `identity` node id
 
-**Steps**: SHA-256 of `hostname:username`, first 12 hex; hostname through an FFM `gethostname` downcall (`ws2_32` on Windows); username from `LOGNAME`, `USER`, `LNAME`, `USERNAME`, then `user.name`. Golden test with at least two injected `hostname:username` strings against values from `identity/project.py::generate_node_id` (generated by running the real Python function, committed as fixtures); a per-OS CI step in `event-producer.yml` compares live values (additive edit, serial after WP01). **Covers** FR-011, AC-039.
+**Steps**: SHA-256 of `hostname:username`, first 12 hex; hostname through an FFM `gethostname` downcall (`ws2_32` on Windows); username from `LOGNAME`, `USER`, `LNAME`, `USERNAME`, then `user.name`. 
+**Golden fixtures (synthetic strings only, the repository is public):** `generate_node_id()` takes no arguments, so expected values are produced by running the real Python function with its two inputs patched, once, and committing the output as `adapter/src/test/resources/identity/nodeid-golden.json` (hostnames and usernames such as `host-a` and `user-a`, never a real host or user):
+```
+uv run --frozen python -c "import getpass, json, socket; from unittest import mock; from specify_cli.identity.project import generate_node_id; rows = []
+for host, user in (('host-a', 'user-a'), ('host-b', 'user-b')):
+    with mock.patch.object(socket, 'gethostname', return_value=host), mock.patch.object(getpass, 'getuser', return_value=user):
+        rows.append({'hostname': host, 'username': user, 'nodeid': generate_node_id()})
+print(json.dumps(rows))"
+```
+Add a third case with `USER` unset and `user.name` set (Java's chain differs from `getpass`'s password-database fallback, so this case documents the intended Java behaviour with a synthetic name). **Live comparison on every OS:** the Java test compares `NodeIdentity` with the environment value `PRODUCER_LIVE_PY_NODE_ID` that each leg of the `gradle-test` matrix exports (WP01 T007, a step already in `event-producer.yml`; this WP edits no workflow). Under `CI` a missing `PRODUCER_LIVE_PY_NODE_ID` **fails** the test; it is skipped only outside CI. **Covers** FR-011, AC-039.
 
 ## Subtask T022: Concurrency and byte tests
 
-**Steps**: a primary checkout plus two worktrees, N concurrent processes: no repeated `(nodeid, lamportclock)`, strictly increasing per node; log deleted with state kept raises the next stamp; state deleted recovers from the log. Byte-identical golden line file (from the real serializer) for AC-034; scan that no absolute home path or username is written (NFR-006).
+**Steps**: a primary checkout plus two worktrees, N concurrent processes: no repeated `(nodeid, lamportclock)`, strictly increasing per node; log deleted with state kept raises the next stamp; state deleted recovers from the log. Byte-identical golden line file (from the real serializer) for AC-034; scan that no absolute home path or username is written (NFR-006). **AC to leg:** AC-010, AC-034 and AC-039 are asserted on all three legs of the `gradle-test` matrix (WP01 T007); a leg that is absent turns the terminal gate red, it is never skipped.
+
+**Native-image metadata:** every class this WP adds that Jackson, the FFM downcall or the lock code reaches by reflection is registered under `adapter/src/main/resources/META-INF/native-image/ai.speckitty/producer-adapter-fs/` (this WP's own directory). The `native-smoke` job builds the real launcher on every path-matching pull request, so a missing registration turns it red in the WP that introduces the class; the first red-first commit of T017 adds a native-smoke expectation (a reply that exercises the new class) before the metadata.
 
 ## Gates
 
-`gradle -p services/event-producer :adapter:test` and full `test`; JaCoCo `:adapter` 80%. No Python. Red-first, revert-check on lock ordering and state-first order.
+`gradle -p services/event-producer :adapter:check` and full `check` (JaCoCo `:adapter` 80% is enforced by `check`, not `test`). No Python. Red-first, revert-check on lock ordering and state-first order.
 
 ## Definition of Done
 
-T017 to T022 done; kill-point tests green; golden nodeid green on all three OS in CI.
+T079 and T017 to T022 done; kill-point tests green; golden and live nodeid green on all three OS in CI; native-smoke green.
 
 ## Risks
 
@@ -104,6 +137,14 @@ Windows `LockFileEx` semantics; FFM availability in the native image (proved in 
 ## Reviewer Guidance
 
 Check the lock is held across the whole stamp-to-append span and that no code path rewrites an existing publish-log line.
+
+## Tests, markers, jobs
+
+All Java: run by the `gradle-test` three-OS matrix (`check`). No Python test files.
+
+## Recorded out-of-map edits
+
+None. (This WP edits no build file and no workflow.)
 
 ## Implementation command
 

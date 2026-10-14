@@ -11,6 +11,7 @@
         "WP01"
       ],
       "write_scope": [
+        ".github/actions/producer-smoke/**",
         ".github/workflows/ci-fleet-verdict.yml",
         ".github/workflows/event-producer.yml",
         ".github/workflows/producer-native.yml",
@@ -30,10 +31,12 @@
         "services/event-producer/gradle/wrapper/**",
         "services/event-producer/launcher/build.gradle.kts",
         "services/event-producer/launcher/src/main/java/ai/speckitty/producer/launcher/spike/**",
-        "services/event-producer/launcher/src/main/resources/META-INF/native-image/**",
+        "services/event-producer/launcher/src/main/resources/META-INF/native-image/ai.speckitty/producer-spike/**",
         "services/event-producer/settings.gradle.kts",
         "services/event-producer/tools/**",
+        "tests/architectural/test_build_glue_thin.py",
         "tests/architectural/test_no_duplicate_suite_execution.py",
+        "tests/ci/test_event_producer_workflow.py",
         "tests/ci/test_fleet_verdict.py",
         "tests/contract/test_gradle_pin_check.py",
         "tests/cross_cutting/packaging/test_producer_stub_wheel.py",
@@ -41,6 +44,7 @@
       ],
       "predicted_surfaces": [
         "api",
+        "artifact-rendering",
         "legacy-cleanup",
         "tracker-integration"
       ],
@@ -109,12 +113,16 @@
         "services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/json/**",
         "services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/publishlog/**",
         "services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/repo/**",
+        "services/event-producer/adapter/src/main/resources/META-INF/native-image/ai.speckitty/producer-adapter-fs/**",
         "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/clock/**",
         "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/fs/**",
         "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/identity/**",
         "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/json/**",
         "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/publishlog/**",
-        "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/repo/**"
+        "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/repo/**",
+        "services/event-producer/adapter/src/test/resources/identity/**",
+        "services/event-producer/adapter/src/test/resources/publishlog/**",
+        "services/event-producer/application/src/main/java/ai/speckitty/producer/application/port/**"
       ],
       "predicted_surfaces": [
         "api",
@@ -126,17 +134,42 @@
       "parallel_group": 2
     },
     {
+      "lane_id": "lane-i",
+      "wp_ids": [
+        "WP09"
+      ],
+      "write_scope": [
+        ".github/workflows/ci-nightly.yml",
+        ".github/workflows/release.yml",
+        "CONTRIBUTING.md",
+        "RELEASE_CHECKLIST.md",
+        "tests/release/test_release_ci_ownership.py",
+        "tests/release/test_release_producer_stages.py"
+      ],
+      "predicted_surfaces": [
+        "api",
+        "artifact-rendering",
+        "tracker-integration"
+      ],
+      "depends_on_lanes": [
+        "lane-h"
+      ],
+      "parallel_group": 2
+    },
+    {
       "lane_id": "lane-d",
       "wp_ids": [
         "WP04"
       ],
       "write_scope": [
-        "services/event-producer/application/src/main/java/ai/speckitty/producer/application/port/**",
         "services/event-producer/application/src/main/java/ai/speckitty/producer/application/produce/**",
         "services/event-producer/application/src/test/java/ai/speckitty/producer/application/ArchitectureTest.java",
         "services/event-producer/application/src/test/java/ai/speckitty/producer/application/produce/**",
         "services/event-producer/launcher/src/main/java/ai/speckitty/producer/launcher/*.java",
-        "services/event-producer/launcher/src/test/**"
+        "services/event-producer/launcher/src/main/resources/META-INF/native-image/ai.speckitty/producer-launcher/**",
+        "services/event-producer/launcher/src/test/java/ai/speckitty/producer/launcher/e2e/**",
+        "services/event-producer/launcher/src/test/java/ai/speckitty/producer/launcher/protocol/**",
+        "services/event-producer/launcher/src/test/resources/protocol/**"
       ],
       "predicted_surfaces": [
         "api",
@@ -154,16 +187,21 @@
       ],
       "write_scope": [
         "services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/ledger/**",
+        "services/event-producer/adapter/src/main/resources/META-INF/native-image/ai.speckitty/producer-ledger/**",
         "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/ledger/**",
+        "services/event-producer/adapter/src/test/resources/ledger/**",
         "services/event-producer/application/src/main/java/ai/speckitty/producer/application/retain/**",
         "services/event-producer/application/src/test/java/ai/speckitty/producer/application/retain/**",
-        "services/event-producer/launcher/src/main/java/ai/speckitty/producer/launcher/retain/**"
+        "services/event-producer/launcher/src/main/java/ai/speckitty/producer/launcher/retain/**",
+        "services/event-producer/launcher/src/main/resources/META-INF/native-image/ai.speckitty/producer-retain/**",
+        "services/event-producer/launcher/src/main/resources/META-INF/services/ai.speckitty.producer.launcher.OperationHandler",
+        "services/event-producer/launcher/src/test/java/ai/speckitty/producer/launcher/retain/**",
+        "services/event-producer/launcher/src/test/resources/retain/**"
       ],
       "predicted_surfaces": [
         "api"
       ],
       "depends_on_lanes": [
-        "lane-c",
         "lane-d"
       ],
       "parallel_group": 4
@@ -177,10 +215,14 @@
         ".github/workflows/check-spec-kitty-events-alignment.yml",
         ".kittify/release/shared-package-compatibility.json",
         "services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/schema/**",
+        "services/event-producer/adapter/src/main/resources/META-INF/native-image/ai.speckitty/producer-schema/**",
         "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/schema/**",
+        "services/event-producer/adapter/src/test/resources/schema/**",
         "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/released/RegistryDataSubsetTest.java",
         "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/released/ReleasedComparatorFixturesTest.java",
+        "services/event-producer/gradle/events-fetch.gradle.kts",
         "services/event-producer/gradle/events-pin.properties",
+        "services/event-producer/launcher/src/test/java/ai/speckitty/producer/launcher/binding/**",
         "tests/architectural/pinning_rule_inventory.json",
         "tests/architectural/test_no_committed_events_schema.py",
         "tests/contract/spec_kitty_events_consumer/**",
@@ -227,10 +269,22 @@
         "tests/architectural/test_producer_fault_enum.py",
         "tests/architectural/test_publish_log_single_writer.py",
         "tests/architectural/test_seam_census.py",
+        "tests/architectural/test_status_module_boundary.py",
+        "tests/next/test_engine_commit_primitives.py",
+        "tests/next/test_internal_runtime_coverage.py",
+        "tests/next/test_mission_run_back_reference.py",
+        "tests/next/test_runtime_bridge_unit.py",
+        "tests/runtime/test_bridge_decision_log_flush.py",
+        "tests/runtime/test_bridge_engine.py",
+        "tests/specify_cli/events/test_decision_log.py",
+        "tests/specify_cli/events/test_runtime_moments_unit.py",
         "tests/specify_cli/status/test_event_producer_doctor.py",
         "tests/status/conftest.py",
+        "tests/status/test_conftest_restores_zeitgeist_registry.py",
         "tests/status/test_drain_fanout.py",
+        "tests/status/test_emit_fanout_after_adapter.py",
         "tests/status/test_producer_client.py",
+        "tests/status/test_producer_client_windows.py",
         "tests/status/test_producer_faults.py",
         "tests/status/test_producer_seam_wiring.py",
         "tests/status/test_saas_fanout_timeout.py"
@@ -242,31 +296,7 @@
         "tracker-integration"
       ],
       "depends_on_lanes": [
-        "lane-d",
         "lane-e"
-      ],
-      "parallel_group": 5
-    },
-    {
-      "lane_id": "lane-i",
-      "wp_ids": [
-        "WP09"
-      ],
-      "write_scope": [
-        ".github/workflows/ci-nightly.yml",
-        ".github/workflows/release.yml",
-        "CONTRIBUTING.md",
-        "RELEASE_CHECKLIST.md",
-        "scripts/release/producer_smoke.py",
-        "tests/release/test_release_ci_ownership.py",
-        "tests/release/test_release_producer_stages.py"
-      ],
-      "predicted_surfaces": [
-        "api"
-      ],
-      "depends_on_lanes": [
-        "lane-h",
-        "lane-k"
       ],
       "parallel_group": 5
     },
@@ -281,16 +311,10 @@
         "docs/adr/4.x/2026-10-14-1-event-producer-java-native-binary-behind-thin-python-client.md",
         "docs/adr/4.x/index.md",
         "docs/context/system-events.md",
-        "scripts/canonical_producer_lint_baseline.txt",
-        "scripts/lint_canonical_producers.py",
         "src/specify_cli/.contextive/**",
         "src/specify_cli/acceptance/__init__.py",
         "src/specify_cli/consolidation/done_bookkeeping.py",
-        "src/specify_cli/migration/mission_state.py",
         "src/specify_cli/migration/rebuild_state.py",
-        "tests/architectural/_baselines.yaml",
-        "tests/architectural/dead_symbol_allowlist.yaml",
-        "tests/architectural/test_exemption_ledger.py",
         "tests/architectural/test_single_lane_list.py",
         "tests/contract/test_identity_contract_matrix.py",
         "tests/cross_cutting/encoding/test_contextive_event_producer_terms.py",
@@ -299,14 +323,38 @@
       ],
       "predicted_surfaces": [
         "api",
+        "artifact-rendering",
         "legacy-cleanup",
         "tracker-integration"
       ],
       "depends_on_lanes": [
-        "lane-f",
-        "lane-k"
+        "lane-f"
       ],
       "parallel_group": 6
+    },
+    {
+      "lane_id": "lane-l",
+      "wp_ids": [
+        "WP12"
+      ],
+      "write_scope": [
+        "scripts/canonical_producer_lint_baseline.txt",
+        "scripts/lint_canonical_producers.py",
+        "src/specify_cli/migration/mission_state.py",
+        "tests/architectural/_baselines.yaml",
+        "tests/architectural/dead_symbol_allowlist.yaml",
+        "tests/architectural/test_exemption_ledger.py"
+      ],
+      "predicted_surfaces": [
+        "api",
+        "artifact-rendering",
+        "legacy-cleanup"
+      ],
+      "depends_on_lanes": [
+        "lane-g",
+        "lane-k"
+      ],
+      "parallel_group": 7
     },
     {
       "lane_id": "lane-j",
@@ -315,30 +363,26 @@
       ],
       "write_scope": [
         "tests/_perf_helpers.py",
+        "tests/integration/_native_binary.py",
         "tests/integration/test_event_producer_degraded.py",
         "tests/integration/test_event_producer_e2e.py",
+        "tests/integration/test_native_binary_helper.py",
         "tests/perf/test_event_producer_overhead.py"
       ],
       "predicted_surfaces": [
-        "api"
+        "api",
+        "artifact-rendering"
       ],
       "depends_on_lanes": [
-        "lane-a",
-        "lane-b",
-        "lane-c",
-        "lane-d",
-        "lane-e",
-        "lane-f",
-        "lane-g",
-        "lane-h",
         "lane-i",
-        "lane-k"
+        "lane-k",
+        "lane-l"
       ],
-      "parallel_group": 7
+      "parallel_group": 8
     }
   ],
-  "computed_at": "2026-10-14T07:27:42.843472+00:00",
+  "computed_at": "2026-10-14T07:54:08.020454+00:00",
   "computed_from": "dependency_graph+ownership",
   "planning_artifact_wps": [],
-  "planning_commit_sha": "19d48b4622c961d5d2d2677a27f27827690a8da6"
+  "planning_commit_sha": "feef42948e06af59f9b44c9d2853064169161e93"
 }
