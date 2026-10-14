@@ -217,9 +217,9 @@
         "services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/schema/**",
         "services/event-producer/adapter/src/main/resources/META-INF/native-image/ai.speckitty/producer-schema/**",
         "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/schema/**",
+        "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/schema/released/RegistryDataSubsetTest.java",
+        "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/schema/released/ReleasedComparatorFixturesTest.java",
         "services/event-producer/adapter/src/test/resources/schema/**",
-        "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/released/RegistryDataSubsetTest.java",
-        "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/released/ReleasedComparatorFixturesTest.java",
         "services/event-producer/gradle/events-fetch.gradle.kts",
         "services/event-producer/gradle/events-pin.properties",
         "services/event-producer/launcher/src/test/java/ai/speckitty/producer/launcher/binding/**",
@@ -381,8 +381,8 @@
       "parallel_group": 8
     }
   ],
-  "computed_at": "2026-10-14T07:54:08.020454+00:00",
+  "computed_at": "2026-10-14T08:04:53.331968+00:00",
   "computed_from": "dependency_graph+ownership",
   "planning_artifact_wps": [],
-  "planning_commit_sha": "feef42948e06af59f9b44c9d2853064169161e93"
+  "planning_commit_sha": "5f72fa341a13baa045c11cbbbee6c11b8957fd1d"
 }

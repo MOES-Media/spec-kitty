@@ -99,7 +99,7 @@ Plan sections 1, 4.2 (Journal route, Mission identity), 5 (protocol), 9; data-mo
 
 ## Subtask T028: End-to-end launcher tests and hygiene
 
-**Steps**: launcher tests that spawn the JVM build with the real file-system adapters on a temp repo and a **test-local validator injected through a test-only `Wiring` factory** (the default binding fails closed and is covered by T023): one valid row appended; re-fire gives one line; no write under `kitty-specs/` (AC-016 Java half; FR-038); scan of authored members for home paths and usernames (AC-035); JaCoCo `:application` 90%. NFR-007: at most one row per `(source, id)`.
+**Steps**: launcher tests that spawn the JVM build with the real file-system adapters on a temp repo and a **test-local validator injected through a test-only `Wiring` factory** (the default binding fails closed and is covered by T023): one valid row appended; re-fire gives one line; no write under `kitty-specs/` (AC-016 Java half; FR-038); scan of authored members for home paths and usernames (AC-035); JaCoCo `:application` 90%. NFR-007: at most one row per `(source, id)`. **Native-smoke expectation (first real exercise of the adapters):** commit `launcher/src/test/resources/protocol/smoke-request.json`, a well-formed `produce` request that the fail-closed default replies to with `rejected` (exit 0). The shared smoke action (WP01 T008) runs it against the native binary on each leg, so `Wiring`, the Jackson reply path, the repo locator and the dispatcher are built and run natively; a missing registration in `producer-launcher` or in WP03's `producer-adapter-fs` surfaces here, and WP04 fixes it (see the table below). The write path (FFM `gethostname`, lock, publish log) stays unreached until WP11 replaces the file with a valid-row request.
 
 ## Gates
 
@@ -107,7 +107,7 @@ Plan sections 1, 4.2 (Journal route, Mission identity), 5 (protocol), 9; data-mo
 
 ## Definition of Done
 
-T023 to T028 done; protocol versioning tested (`v` 2 gives 64); fail-closed default tested with an accept-all mutation red; golden protocol fixtures committed; coverage floors met; native-smoke green.
+T023 to T028 done; protocol versioning tested (`v` 2 gives 64); fail-closed default tested with an accept-all mutation red; golden protocol fixtures committed; coverage floors met; native-smoke green with `protocol/smoke-request.json` (reply `rejected`).
 
 ## Risks
 
@@ -126,6 +126,7 @@ All Java: `gradle-test` three-OS matrix (`check`); the launcher end-to-end tests
 | File | Edit | Reason and order |
 |---|---|---|
 | `launcher/.../launcher/spike/**` and `META-INF/native-image/ai.speckitty/producer-spike/**` (WP01) | delete | WP04 replaces the spike; WP01 is closed; own commit, first in WP04 |
+| `adapter/src/main/resources/META-INF/native-image/ai.speckitty/producer-adapter-fs/**` (WP03) | fix-only, if the first native run in this WP shows a missing registration | recorded with the reason; WP03's metadata could not be exercised before this WP |
 | `application/.../port/**` (WP03) | only if a signature must change | recorded with the reason in the WP notes; no second interface |
 
 ## Implementation command

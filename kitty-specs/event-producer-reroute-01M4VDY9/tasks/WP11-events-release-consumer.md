@@ -31,8 +31,8 @@ create_intent:
 - services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/schema/**
 - services/event-producer/adapter/src/main/resources/META-INF/native-image/ai.speckitty/producer-schema/**
 - services/event-producer/launcher/src/test/java/ai/speckitty/producer/launcher/binding/**
-- services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/released/RegistryDataSubsetTest.java
-- services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/released/ReleasedComparatorFixturesTest.java
+- services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/schema/released/RegistryDataSubsetTest.java
+- services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/schema/released/ReleasedComparatorFixturesTest.java
 - tests/architectural/test_no_committed_events_schema.py
 - tests/architectural/pinning_rule_inventory.json
 execution_mode: code_change
@@ -45,8 +45,8 @@ owned_files:
 - services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/schema/**
 - services/event-producer/adapter/src/test/resources/schema/**
 - services/event-producer/launcher/src/test/java/ai/speckitty/producer/launcher/binding/**
-- services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/released/RegistryDataSubsetTest.java
-- services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/released/ReleasedComparatorFixturesTest.java
+- services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/schema/released/RegistryDataSubsetTest.java
+- services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/schema/released/ReleasedComparatorFixturesTest.java
 - tests/contract/spec_kitty_events_consumer/**
 - tests/architectural/test_no_committed_events_schema.py
 - .kittify/release/shared-package-compatibility.json
@@ -92,18 +92,18 @@ One definition, the same in every gated WP (tasks-overview section 2): "complete
 
 ## Subtask T074: AC-029 guard (FR-005)
 
-**Steps**: `RegistryDataSubsetTest` in the `:domain` test package `released` (WP11 owns that package; WP02 owns the other test packages): over every type of data-model section 3 driven by the registry, assert the `data` key set is a subset of the persisted row's keys (for lifecycle rows, its `payload`) plus the lifted-member rules (`actorbinding` only for a structured actor). Floor: every section 3 type resolved. Mutation: an injected member (a `meta.json` or environment value) fails. **Covers** FR-005, AC-029.
+**Steps**: `RegistryDataSubsetTest` in the `:adapter` test package `schema.released` (under WP11's `adapter/src/test/.../adapter/schema/**`; it drives the `:domain` envelope and `order` classes from the `:adapter` test classpath, because the fetch script and the extracted registry are `:adapter` build outputs and `:domain` depends on `java.base` only and has no pre-wired fetch hook, R3/R9 of the overview): over every type of data-model section 3 driven by the registry, assert the `data` key set is a subset of the persisted row's keys (for lifecycle rows, its `payload`) plus the lifted-member rules (`actorbinding` only for a structured actor). Floor: every section 3 type resolved. Mutation: an injected member (a `meta.json` or environment value) fails. **Covers** FR-005, AC-029.
 
 ## Subtask T075: Released comparator and nine fixtures
 
-**Steps**: run the released comparator specification and fixtures through the Java `order` package (AC-008 against the released copy; floor all nine; the **mutant table of WP02 T013** (naive, no-source, raw-id dedupe, invalid survivor, dropped error row) is reused here and each mutant must be red against the released fixtures); produce the confirmation list for the events side (INTERIM names, `source` tie-break, `schemaversion`, `dataschema` base URI). **Covers** FR-013, AC-008.
+**Steps**: `ReleasedComparatorFixturesTest` lives in the `:adapter` test package `schema.released` (same reason as T074); run the released comparator specification and fixtures through the `:domain` `order` package from there (AC-008 against the released copy; floor all nine; the **mutant table of WP02 T013** (naive, no-source, raw-id dedupe, invalid survivor, dropped error row) is reused here and each mutant must be red against the released fixtures); produce the confirmation list for the events side (INTERIM names, `source` tie-break, `schemaversion`, `dataschema` base URI). **Covers** FR-013, AC-008.
 
 ## Subtask T076: Floor bump and consumer contract
 
-**Steps**: raise `spec-kitty-events` to `V_E` in `pyproject.toml` (last editor), `uv.lock` follows (`uv lock --check`); extend `tests/contract/spec_kitty_events_consumer/` pinning the new schema surface (removing a schema in the events repo breaks them); update `test_events_dependency_floor_rejects_pre_v10_contract`, `pinning_rule_inventory.json`, `.kittify/release/shared-package-compatibility.json`, `check-spec-kitty-events-alignment.yml`. No path, git or editable override merged. **Covers** FR-040, AC-027.
+**Steps**: raise `spec-kitty-events` to `V_E` in `pyproject.toml` (last editor), `uv.lock` follows (`uv lock --check`); extend `tests/contract/spec_kitty_events_consumer/` pinning the new schema surface (removing a schema in the events repo breaks them); run `tests/architectural/test_pyproject_shape.py` **unchanged** (`test_events_dependency_floor_rejects_pre_v10_contract` there only mutates the dependency to the retired `>=9,<10` range, so a floor bump to `V_E` needs no edit; the file is not owned by WP11 and an edit of it would have to be added to the recorded out-of-map edits and the overview section 4 table with the reason), update `pinning_rule_inventory.json`, `.kittify/release/shared-package-compatibility.json`, `check-spec-kitty-events-alignment.yml`. No path, git or editable override merged. **Covers** FR-040, AC-027.
 
 ## Subtask T084: Bind the schema adapter in the launcher
-**Steps**: red test first, in `launcher/src/test/java/.../launcher/binding/**` (WP11-owned): with the **released** schema adapter bound in `Wiring`, a launcher test with an invalid row replies `rejected` using the released schema, and a valid row of every in-scope type is accepted; the previous default (WP04's fail-closed validator) is replaced, and an accept-all binding is a mutation that must fail. The edit is one binding in `launcher/.../Wiring.java` (WP04's composition root; a recorded second-editor edit). `Wiring` takes the registry-driven validator from `adapter/schema`; the `native-smoke` leg builds the real launcher with the schemas embedded and the metadata of T072. **Covers** FR-006, FR-015, AC-001, AC-002 (the real binary validates).
+**Steps**: red test first, in `launcher/src/test/java/.../launcher/binding/**` (WP11-owned): with the **released** schema adapter bound in `Wiring`, a launcher test with an invalid row replies `rejected` using the released schema, and a valid row of every in-scope type is accepted; the previous default (WP04's fail-closed validator) is replaced, and an accept-all binding is a mutation that must fail. The edit is one binding in `launcher/.../Wiring.java` (WP04's composition root; a recorded second-editor edit). `Wiring` takes the registry-driven validator from `adapter/schema`; the `native-smoke` leg builds the real launcher with the schemas embedded and the metadata of T072. **Native write path:** replace WP04's `launcher/src/test/resources/protocol/smoke-request.json` with a request carrying a valid row of one in-scope type (a recorded second-editor edit), so the shared smoke action takes the write path in the native binary on each leg (FFM `gethostname`, lock, clock store, publish log, schema validation); the `producer-adapter-fs`, `producer-launcher` and `producer-schema` metadata are first exercised end to end here, and a missing registration is fixed in this WP as a fix-only edit of the owning directory. **Covers** FR-006, FR-015, AC-001, AC-002 (the real binary validates).
 
 ## Subtask T077: Gate pass
 
@@ -139,6 +139,8 @@ Confirm nothing from the events repo is committed, sha256 is verified before unz
 |---|---|---|
 | `pyproject.toml` (WP01) | raise the `spec-kitty-events` floor to `V_E` | last editor, after WP01 (R3) |
 | `launcher/src/main/java/ai/speckitty/producer/launcher/Wiring.java` (WP04) | bind the schema-backed validator | replaces the fail-closed default; after WP04 |
+| `launcher/src/test/resources/protocol/smoke-request.json` (WP04) | replace with a valid-row request | makes native-smoke take the write path; after WP04 |
+| `adapter/.../META-INF/native-image/ai.speckitty/producer-adapter-fs/**` (WP03), `launcher/.../META-INF/native-image/ai.speckitty/producer-launcher/**` (WP04) | fix-only, if the first native write path shows a missing registration | recorded with the reason |
 
 ## Implementation command
 

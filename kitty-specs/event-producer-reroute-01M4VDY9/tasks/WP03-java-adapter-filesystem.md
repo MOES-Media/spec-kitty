@@ -93,7 +93,7 @@ Plan sections 1 (`:adapter`), 7 (clock state file), 8 (placement) and data-model
 
 ## Subtask T018: `repo` locator
 
-**Steps**: red tests, then resolve the git common dir by reading `.git` (file or directory) and `commondir`, never spawning git; primary checkout plus two worktrees fixtures. **Canonical-root derivation (FR-004):** the publish-log location (`.kittify/events/` under the canonical repository root, parity with `core.paths.resolve_canonical_root`) is derived from a start path; red tests with parity fixtures show that a primary checkout, a linked worktree, a coordination worktree and a Mission **subdirectory** start path all give the **same** publish-log path; a start path with no repository above it is `root-unresolvable` (surfaced by WP04 T025 as `rejected`). **Covers** FR-004 (Java side), FR-012 (anchor).
+**Steps**: red tests, then resolve the git common dir by reading `.git` (file or directory) and `commondir`, never spawning git; primary checkout plus two worktrees fixtures. **Canonical-root derivation (FR-004):** the publish-log location (`.kittify/events/` under the canonical repository root, parity with `core.paths.resolve_canonical_root`) is derived from a start path; red tests with parity fixtures show that a primary checkout, a linked worktree, a coordination worktree and a Mission **subdirectory** start path all give the **same** publish-log path; a start path with no repository above it is `root-unresolvable` (surfaced by WP04 T025 as `rejected`). **Covers** FR-004 (Java side), FR-012 (anchor), AC-005 (root-unresolvable half).
 
 ## Subtask T019: `clock` store
 
@@ -120,7 +120,7 @@ Add a third case with `USER` unset and `user.name` set (Java's chain differs fro
 
 **Steps**: a primary checkout plus two worktrees, N concurrent processes: no repeated `(nodeid, lamportclock)`, strictly increasing per node; log deleted with state kept raises the next stamp; state deleted recovers from the log. Byte-identical golden line file (from the real serializer) for AC-034; scan that no absolute home path or username is written (NFR-006). **AC to leg:** AC-010, AC-034 and AC-039 are asserted on all three legs of the `gradle-test` matrix (WP01 T007); a leg that is absent turns the terminal gate red, it is never skipped.
 
-**Native-image metadata:** every class this WP adds that Jackson, the FFM downcall or the lock code reaches by reflection is registered under `adapter/src/main/resources/META-INF/native-image/ai.speckitty/producer-adapter-fs/` (this WP's own directory). The `native-smoke` job builds the real launcher on every path-matching pull request, so a missing registration turns it red in the WP that introduces the class; the first red-first commit of T017 adds a native-smoke expectation (a reply that exercises the new class) before the metadata.
+**Native-image metadata:** every class this WP adds that Jackson, the FFM downcall or the lock code reaches by reflection is registered under `adapter/src/main/resources/META-INF/native-image/ai.speckitty/producer-adapter-fs/` (this WP's own directory). **The metadata is unverified until WP04.** In WP03 the only launcher code is WP01's self-contained spike (WP01-owned, deleted by WP04) and WP03 owns no launcher file, `tools/` file or smoke action, so the native binary built by `native-smoke` cannot reach the `json`, `fs`, `clock`, `publishlog` or `identity` classes; `native-image` only checks reachable code. Author the metadata carefully from the JVM tests (a JVM run with the native-image agent, `-agentlib:native-image-agent`, against the adapter tests is the evidence to use) and hand it to WP04, whose `Wiring` makes these classes reachable and whose `native-smoke` expectation (T023/T028) is the first real exercise. A metadata error found there is fixed in `producer-adapter-fs/**` as a recorded fix-only edit of WP04 (WP04 'Recorded out-of-map edits').
 
 ## Gates
 
@@ -128,7 +128,7 @@ Add a third case with `USER` unset and `user.name` set (Java's chain differs fro
 
 ## Definition of Done
 
-T079 and T017 to T022 done; kill-point tests green; golden and live nodeid green on all three OS in CI; native-smoke green.
+T079 and T017 to T022 done; kill-point tests green; golden and live nodeid green on all three OS in CI; adapter-fs native-image metadata written from agent-recorded runs and handed to WP04 for its first native exercise.
 
 ## Risks
 
