@@ -6,6 +6,17 @@ public final class CodePoints {
     private CodePoints() {}
 
     public static int compare(String left, String right) {
-        throw new UnsupportedOperationException("red stub");
+        int i = 0;
+        int j = 0;
+        while (i < left.length() && j < right.length()) {
+            int a = left.codePointAt(i);
+            int b = right.codePointAt(j);
+            if (a != b) {
+                return Integer.compare(a, b);
+            }
+            i += Character.charCount(a);
+            j += Character.charCount(b);
+        }
+        return Integer.compare(left.length() - i, right.length() - j);
     }
 }

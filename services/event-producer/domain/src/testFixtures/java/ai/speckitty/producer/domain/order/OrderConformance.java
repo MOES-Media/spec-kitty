@@ -24,8 +24,12 @@ public final class OrderConformance {
     /** The failures of {@code ordering} on {@code orderCase}, stopping at the first permutation that fails. */
     public static List<String> check(RowOrdering ordering, OrderCase orderCase) {
         int n = orderCase.rows().size();
+        Map<String, String> serialized = new HashMap<>();
+        for (LabeledRow row : orderCase.rows()) {
+            serialized.put(row.label(), RowJson.serialize(row.row()));
+        }
         for (int[] permutation : permutations(n)) {
-            List<String> failures = checkOne(ordering, orderCase, permutation);
+            List<String> failures = checkOne(ordering, orderCase, permutation, serialized);
             if (!failures.isEmpty()) {
                 return failures;
             }
@@ -49,7 +53,7 @@ public final class OrderConformance {
         return failures;
     }
 
-    static List<String> checkOne(RowOrdering ordering, OrderCase orderCase, int[] permutation) {
+    static List<String> checkOne(RowOrdering ordering, OrderCase orderCase, int[] permutation, Map<String, String> serialized) {
         List<Object> input = new ArrayList<>();
         for (int index : permutation) {
             input.add(orderCase.rows().get(index).row());
@@ -62,10 +66,6 @@ public final class OrderConformance {
         }
         List<String> failures = new ArrayList<>();
         String where = " for permutation " + describe(permutation);
-        Map<String, String> serialized = new HashMap<>();
-        for (LabeledRow row : orderCase.rows()) {
-            serialized.put(row.label(), RowJson.serialize(row.row()));
-        }
         List<String> expectedOrdered = new ArrayList<>();
         for (String label : orderCase.ordered()) {
             expectedOrdered.add(serialized.get(label));

@@ -17,6 +17,19 @@ public record OrderKey(int h, int c, Instant t, String i, String s) implements C
 
     @Override
     public int compareTo(OrderKey other) {
-        throw new UnsupportedOperationException("red stub");
+        int byH = Integer.compare(h, other.h);
+        if (byH != 0) {
+            return byH;
+        }
+        int byC = Integer.compare(c, other.c);
+        if (byC != 0) {
+            return byC;
+        }
+        int byT = t.compareTo(other.t);
+        if (byT != 0) {
+            return byT;
+        }
+        int byI = CodePoints.compare(i, other.i);
+        return byI != 0 ? byI : CodePoints.compare(s, other.s);
     }
 }

@@ -24,7 +24,7 @@ public final class Rows {
     }
 
     public static List<Object> list(Object... values) {
-        return new ArrayList<>(List.of(values));
+        return new ArrayList<>(java.util.Arrays.asList(values));
     }
 
     /** A number kept as its literal text. */
