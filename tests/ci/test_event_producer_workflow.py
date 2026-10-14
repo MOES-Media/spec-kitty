@@ -11,6 +11,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -511,3 +512,59 @@ def test_the_macos_link_targets_the_pinned_floor_on_the_command_line() -> None:
     assert "-H:CCompilerOption=-mmacosx-version-min=11.0" in gradle
     macos = next(w for w in json.loads(DIST_SET.read_text(encoding="utf-8"))["platform_wheels"] if w["leg"] == "macos-arm64")
     assert "macosx_11_0" in macos["tag"], "the flag above and the wheel tag name the same floor"
+
+
+def _install_fake_jdk(tmp_path: Path, launchers: tuple[str, ...]) -> subprocess.CompletedProcess[str]:
+    """Run the real install-graalvm.sh against a tar.gz pin (a stub curl serves the archive) whose JDK holds only `launchers` under bin/.
+
+    native-image stubs print a GraalVM-style version line, so the pinned-version check passes only when the script can execute the launcher.
+    """
+    import tarfile
+
+    jdk = tmp_path / "src" / "graalvm-test-jdk"
+    (jdk / "bin").mkdir(parents=True)
+    for rel in launchers:
+        stub = jdk / "bin" / rel
+        stub.write_text("#!/bin/sh\necho 'native-image 25.0.2 2026-01-20'\n", encoding="utf-8")
+        stub.chmod(0o755)
+    archive = tmp_path / "jdk.tar.gz"
+    with tarfile.open(archive, "w:gz") as tar:
+        tar.add(jdk, arcname="graalvm-test-jdk")
+    pins = tmp_path / "pins.json"
+    pins.write_text(
+        json.dumps(
+            {
+                "tools": [
+                    {
+                        "name": "t",
+                        "kind": "jdk-archive",
+                        "version": "jdk-25.0.2",
+                        "url": "https://example.invalid/x.tar.gz",
+                        "sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    stubs = tmp_path / "stubs"
+    stubs.mkdir()
+    curl = stubs / "curl"
+    curl.write_text(f'#!/bin/sh\nwhile [ "$1" != "--output" ]; do shift; done\ncp "{archive}" "$2"\n', encoding="utf-8")
+    curl.chmod(0o755)
+    env = {**os.environ, "PATH": f"{stubs}{os.pathsep}{os.environ['PATH']}"}
+    env.pop("GITHUB_ENV", None)
+    env.pop("GITHUB_PATH", None)
+    return subprocess.run(["bash", str(TOOLS / "install-graalvm.sh"), "t", str(tmp_path / "dest"), str(pins)], capture_output=True, text=True, check=False, env=env)
+
+
+def test_install_checks_the_version_through_the_windows_cmd_and_exe_launchers(tmp_path: Path) -> None:
+    """GraalVM on Windows has bin/native-image.cmd and bin/java.exe only; the bare path does not exist (rc=127 on the Windows legs)."""
+    result = _install_fake_jdk(tmp_path, ("native-image.cmd", "java.exe"))
+    assert result.returncode == 0, result.stderr
+    assert "install-graalvm: t jdk-25.0.2" in result.stdout
+
+
+def test_install_checks_the_version_through_the_bare_linux_launchers(tmp_path: Path) -> None:
+    result = _install_fake_jdk(tmp_path, ("native-image", "java"))
+    assert result.returncode == 0, result.stderr

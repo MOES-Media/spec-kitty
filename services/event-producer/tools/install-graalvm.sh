@@ -86,7 +86,9 @@ java_home=$("$tools/check-java-home.sh" --find "$dest/unpacked")
 
 if command -v cygpath >/dev/null 2>&1; then java_home=$(cygpath -m "$java_home"); fi
 # Pin check: the toolchain must be the pinned release.
-reported=$("$java_home/bin/native-image" --version 2>&1 | head -n 3)
+# Windows ships bin/native-image.cmd, not the bare name (WP01 CI finding: rc=127 here); the shared helper picks the launcher that exists.
+native_image=$("$tools/check-java-home.sh" --launcher "$java_home" native-image)
+reported=$("$native_image" --version 2>&1 | head -n 3)
 pinned_number="${version#jdk-}"
 case "$reported" in
   *"$pinned_number"*) ;;
