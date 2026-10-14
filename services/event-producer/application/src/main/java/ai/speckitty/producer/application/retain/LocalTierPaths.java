@@ -37,6 +37,28 @@ public final class LocalTierPaths {
 
     /** The shape of {@code path}, or empty when it is not a local-tier candidate. */
     public static Optional<Shape> classify(RelativePath path) {
+        String value = path.value();
+        String name = value.substring(value.lastIndexOf('/') + 1);
+        if (value.equals(MISSIONS_DIR + "/" + name)) {
+            String id = stem(name);
+            return id != null && EventIdForms.isUlid(id) && id.equals(id.toUpperCase(Locale.ROOT))
+                    ? Optional.of(new Shape(LocalKind.PUBLISH_MISSION, id))
+                    : Optional.empty();
+        }
+        if (value.equals(PUBLISH_DIR + "/" + name) && name.startsWith("project-")) {
+            String id = stem(name.substring("project-".length()));
+            return id != null && EventIdForms.isHyphenatedUuid(id) && id.equals(id.toLowerCase(Locale.ROOT))
+                    ? Optional.of(new Shape(LocalKind.PUBLISH_PROJECT, null))
+                    : Optional.empty();
+        }
+        if (value.equals(FAULTS_DIR + "/" + name)) {
+            return faultDay(name) != null ? Optional.of(new Shape(LocalKind.FAULT_DAY, null)) : Optional.empty();
+        }
+        String prefix = RUNS_DIR + "/";
+        if (value.startsWith(prefix) && value.endsWith("/" + JOURNAL_FILE)) {
+            String runId = value.substring(prefix.length(), value.length() - JOURNAL_FILE.length() - 1);
+            return RUN_ID.matcher(runId).matches() ? Optional.of(new Shape(LocalKind.RUN_JOURNAL, runId)) : Optional.empty();
+        }
         return Optional.empty();
     }
 
