@@ -63,7 +63,8 @@ public interface PublishLog {
 
     /**
      * Appends {@code line} (no LF in it) and a LF, starting on a new line when the file ends in a torn one, and syncs the file.
-     * Refused as {@code rejected} when the line holds a raw CR or LF, a BOM or no JSON object.
+     * The answer is true when a torn fragment was found and left in place. Refused as {@code rejected} when the line holds a raw
+     * CR or LF, a BOM or is not exactly one JSON object; nothing is written then.
      */
     ParseResult<Boolean> append(RepoLayout layout, Target target, String line);
 

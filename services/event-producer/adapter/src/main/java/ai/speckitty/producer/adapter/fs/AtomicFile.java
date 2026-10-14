@@ -42,7 +42,7 @@ public final class AtomicFile {
     }
 
     /** Forces a channel's content and metadata to disk. */
-    static void force(FileChannel channel) throws IOException {
+    public static void force(FileChannel channel) throws IOException {
         channel.force(true);
         FORCED.incrementAndGet();
     }
