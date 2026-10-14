@@ -1,0 +1,29 @@
+schema: review-refute/v1
+complete: true
+phase: tasks
+batch: 4
+verdicts:
+  - id: TASKS-COVER-003
+    verdict: confirmed
+    reason: WP06 T036/T037 name only (a) and (f) of AC-003 plus the journal route in T038; no task names the import-free (b), kill-switch (d) or conftest re-registration (e) tests or the revert-check, though severity 3 is a little high since T038 partly covers (c) and T042 mentions the conftest.
+  - id: TASKS-COVER-004
+    verdict: confirmed
+    reason: adapters.py fire_lifecycle_saas_fanout and fire_resolved_binding_fanout take repo_root as a keyword and never put it back into kwargs (only fire_saas_fanout does), and plan hunks A to D and T036/T037 contain no forwarding change.
+  - id: TASKS-COVER-005
+    verdict: confirmed
+    reason: T018 only resolves the git common dir, no task derives the canonical-root publish-log path from worktree or subdirectory starts, and root-unresolvable appears in no WP file (T025 omits it, T065 says Mission checkout).
+  - id: TASKS-COVER-006
+    verdict: confirmed
+    reason: T026 lists two cases only, the slug-only payload case that research assigns to WP04 is absent from the task, and no task asserts the no-stderr, no-fault-row, unchanged-count half of AC-005.
+  - id: TASKS-COVER-007
+    verdict: confirmed
+    reason: T013 and T075 reference the permutation test but name none of the AC-008 mutants or the AC-009 drop-an-error-row mutant that the spec requires to fail.
+  - id: TASKS-COVER-008
+    verdict: confirmed
+    reason: Fixture 9 only has the out-of-range 2^31 value; null, string and boolean lamportclock error rows from touch-up 4 are named in neither T012 nor T013, though severity 2 would fit better.
+  - id: TASKS-COVER-009
+    verdict: confirmed
+    reason: T035 says only in the retention window and names no boundary day, absent or non-numeric max_age_days, or notice-exclusion test, so the window rule has no owning assertion.
+  - id: TASKS-COVER-010
+    verdict: confirmed
+    reason: T045 only covers the census and uninitialized exclusion in the lane lists, and WP04 T024 has no doing-to-in_progress or uninitialized-rejected case, so the AC-020 producer-side observables have no owner; severity is likely overstated (2).

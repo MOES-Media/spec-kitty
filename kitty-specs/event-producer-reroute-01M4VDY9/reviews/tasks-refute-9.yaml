@@ -1,0 +1,29 @@
+schema: review-refute/v1
+complete: true
+phase: tasks
+batch: 9
+verdicts:
+  - id: TASKS-THIN-004
+    verdict: confirmed
+    reason: WP08 (creates check_dist_set.py) depends only on WP01 while WP06 holds the pin over it, T039 states no pin content and no glue mutation, so ordering and mutation gaps are real (severity 2-3 is fair; WP10 final gate limits the damage).
+  - id: TASKS-THIN-005
+    verdict: refuted
+    reason: FR-026 already defines absent or non-numeric max_age_days as every file, FR-028 and T041 require raw forwarding with an "abc" test, so the finding asks for extra gate hardening rather than showing a missing requirement.
+  - id: TASKS-THIN-006
+    verdict: refuted
+    reason: T037 says to edit exactly the symbols of the plan 4.2 rows, which name the repo_root forward, the _publish drain-read removal and emit_significance_evaluated, and T036 plus hunk A cover the drain move and the AC-003 f pin test, so nothing is omitted.
+  - id: TASKS-THIN-007
+    verdict: confirmed
+    reason: T038 requires editing tests/runtime/test_bridge_engine.py, which is absent from WP06 owned_files, and tasks-overview R2 grants out-of-map edits only to WP07 and WP10 (the test_status_module_boundary.py part is weak since T041 only runs it).
+  - id: TASKS-THIN-008
+    verdict: refuted
+    reason: research.md already scopes the choice to a StateRoot member or a GIT_COMMON_DIR note on a declarative StateSurface entry, which does not make Python derive the clock location, so this is at most a nit.
+  - id: TASKS-THIN-009
+    verdict: refuted
+    reason: plan 4.2 last row bounds the lint script to a persisted-line mode with the baseline not widened and fleet_verdict.py is registration-only per WP01 T007, so both are already bounded by the artifacts.
+  - id: TASKS-RELEASE-001
+    verdict: confirmed
+    reason: T005 validation demands a throwaway branch run but producer-native.yml is workflow_call only, event-producer.yml triggers on pull_request or push to main, and no WP step names who pushes or opens a PR, so the HALT verdict has no stated evidence path.
+  - id: TASKS-RELEASE-002
+    verdict: confirmed
+    reason: release.yml triggers only on tag or dispatch, T063 defers workflow_run-type behaviour in one sentence with no items, owner or pass criterion, and the DoD claim of publish blocked on a wrong wheel is covered only by static checks (remediation (a) is overreach and severity 4 is overstated).

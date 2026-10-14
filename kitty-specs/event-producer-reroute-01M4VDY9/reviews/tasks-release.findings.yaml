@@ -1,0 +1,266 @@
+schema: review-findings/v1
+complete: true
+phase: tasks
+lens_group: release
+mission: event-producer-reroute-01M4VDY9
+findings:
+  - id: TASKS-RELEASE-001
+    lens: "pre-merge verifiability of release jobs"
+    severity: 4
+    title: "WP01 \"throwaway branch run\" cannot happen; neither new workflow triggers on a branch push"
+    evidence:
+      - artifact: "tasks/WP01-feasibility-gate-and-build-skeleton.md § T005 Validation ('all three legs green on a throwaway branch run')"
+      - artifact: "tasks/WP01-feasibility-gate-and-build-skeleton.md § T007 (event-producer.yml on pull_request and push to main only); plan.md section 2 (producer-native.yml is workflow_call only)"
+      - code: ".github/workflows/ci-nightly.yml:46 (the only repo precedent for a dispatch-capable workflow is schedule + workflow_dispatch; a workflow_dispatch workflow must exist on the default branch to be dispatched)"
+    claim: >
+      The feasibility gate (the HALT decision for the whole mission) needs real runs on macos-14 and windows-2022, but
+      producer-native.yml is workflow_call only and event-producer.yml fires only on pull_request or push to main. A
+      throwaway branch push triggers nothing. No WP step opens a PR, adds a workflow_dispatch trigger, or says who pushes
+      (agents have no push right; the draft PR is created only at the end of sk-implement). As written the PASS/HALT
+      verdict in T010 has no executable evidence path and the implementer would either fabricate it or stall.
+    remediation: >
+      Add to WP01 a T005b step: give producer-native.yml a workflow_dispatch trigger (input ref) in addition to workflow_call,
+      and state that the ORCHESTRATOR pushes the lane to a draft PR (or a named scratch branch the operator authorises) after
+      the skeleton commit so event-producer.yml runs; WP01 then records the run ids and per-leg conclusions fetched with
+      gh run view in research/wp01-feasibility.md. T010 must cite those run ids; no PASS without them. State the push
+      owner explicitly, since the safety rules forbid the WP agent pushing.
+  - id: TASKS-RELEASE-002
+    lens: "pre-merge verifiability of release jobs"
+    severity: 4
+    title: "WP09 has no pre-merge execution of the real wheel-assembly path; deferral is one vague sentence with no owner or post-merge plan"
+    evidence:
+      - artifact: "tasks/WP09-release-workflow.md § T063 ('workflow_run-type behaviour cannot be proven from a PR (record what is only confirmable on a release candidate)')"
+      - artifact: "tasks/WP09-release-workflow.md § Definition of Done ('publish blocked when any wheel or checksum is wrong')"
+      - code: ".github/workflows/release.yml:3-18 (triggers: tag push and workflow_dispatch only)"
+      - code: ".github/workflows/release.yml:76-77 (build-release needs nightly-gate, which fails closed without a PAT secret)"
+    claim: >
+      release.yml runs only on a tag or a dispatch of the default-branch copy, so every WP09 stage (build-producer call,
+      checksum continuity, three platform-wheel builds with the real binaries, check_dist_set --verify-binaries,
+      smoke-wheels, SBOM, attestation, publish needs-graph) is unexecuted until the 4.0 tag. The only pre-merge evidence
+      is static (test_release_ci_ownership.py reading YAML). T063 mentions "release candidate" but names no items, no
+      owner, no pass criterion, and the DoD claim "publish blocked when a wheel or checksum is wrong" is asserted by
+      static needs-edge tests, not by an executed negative case. rc tags publish to the real PyPI, so "confirm on an rc"
+      is not a harmless rehearsal. The mission could merge with a release path never run once.
+    remediation: >
+      (a) Factor the assembly (checksum continuity, platform-wheel builds, check_dist_set, check_exact_install --wheel-tag,
+      content loop, twine check, smoke-wheels) into a reusable workflow release-wheels.yml that release.yml calls AND
+      event-producer.yml calls on every PR with the freshly built native artifacts; only publish/attest/GitHub-release stay
+      release-only. (b) Add a deliberately corrupted-artifact negative run on the PR (flip one byte of a binary / drop a
+      wheel; the job must go red) to make the DoD executable. (c) In T063 replace the sentence by a table in
+      research/wp09-deferred-verification.md: each item confirmable only on a tag (attestation, OIDC publish,
+      nightly-gate interplay, verify-pypi-installability on multi-wheel index), who runs it, on which tag/Test-PyPI
+      equivalent, and the pass criterion; state in the mission PR body that these are unproven pre-merge.
+  - id: TASKS-RELEASE-003
+    lens: "workflow conventions / gates"
+    severity: 4
+    title: "WP09 T063 gate \"verify_pins.py --workflow\" is unsatisfiable on release.yml and ci-nightly.yml"
+    evidence:
+      - artifact: "tasks/WP09-release-workflow.md § T063 ('verify_pins.py --workflow for touched workflows')"
+      - artifact: "plan.md section 9 'Pin tooling'; tasks/WP01 § T005 ('SHA-pinned actions only')"
+      - code: ".github/workflows/release.yml:58,112,331 (actions/checkout@v6, tag-pinned, not a 40-hex commit)"
+      - code: ".github/workflows/release.yml:128,130 (uv sync without --no-install-project; .venv/bin/pip install)"
+      - code: "contracts/tools/verify_pins.py:10-26 (UNPINNED_USES and UNPINNED_INSTALL are violations; prelude must be setup-uv python 3.12 + uv sync --frozen --no-install-project)"
+    claim: >
+      verify_pins.py would report UNPINNED_USES and UNPINNED_INSTALL on the existing release.yml regardless of what WP09
+      adds, so the gate is red on base and either blocks WP09 forever or gets waved through as "pre-existing". The same
+      tool is also contracts-scoped (its docstring says it is not repo-wide). Meanwhile the new jobs in release.yml still
+      need SHA-pinned new actions (attest, upload) without a checkable rule.
+    remediation: >
+      Scope the check: WP09 runs verify_pins.py --workflow only on producer-native.yml and event-producer.yml (WP01 files),
+      and for release.yml adds a WP09-owned test in tests/release/test_release_producer_stages.py asserting that every NEW
+      uses: line (diff against base set) is owner/repo@<40-hex>, with a mutation case. Record in baseline-red that the old
+      @v6 lines are pre-existing and are NOT re-pinned (out of scope) unless the operator asks.
+  - id: TASKS-RELEASE-004
+    lens: "ownership"
+    severity: 4
+    title: "WP09 T061 edits Java build files owned by WP01, and the SBOM plugin contradicts \"WP01 settles the whole dependency set\""
+    evidence:
+      - artifact: "tasks/WP09-release-workflow.md § T061 ('additive edit of services/event-producer/build.gradle.kts and gradle/verification-metadata.xml')"
+      - artifact: "WP09 frontmatter owned_files (neither file listed); wps.yaml lines 7 and 14 list both under WP01"
+      - artifact: "tasks/WP01 § T003 step 3 ('WP01 settles the whole Java dependency set so later WPs add no dependencies')"
+    claim: >
+      WP09 is told to edit two chokepoint files it does not own, and a Gradle SBOM plugin (CycloneDX) is a new build
+      dependency that WP01 explicitly promised would not appear later. Lane computation (tasks-overview R3) keys on
+      owned_files, so the edit is an out-of-map write in a WP that is lane-merged late and cannot reliably regenerate
+      verification-metadata.xml (which requires the Gradle toolchain and network). Also AC-040 SBOM content is not
+      verifiable until WP09 runs.
+    remediation: >
+      Move the SBOM Gradle plugin and its verification entries into WP01 T003 (the settled dependency set), with a
+      producer-sbom task whose output is asserted by a Gradle test (components include Jackson, the schema validator and the
+      toolchain). WP09 then only invokes the task and uploads the file. Alternatively add both files to WP09 owned_files and
+      lift WP01's promise, but the first option keeps one dependency set.
+  - id: TASKS-RELEASE-005
+    lens: "ownership"
+    severity: 3
+    title: "Edits outside declared owned_files: dist-set.json in WP08, scripts/release/README.md in WP01, nightly tests in WP09"
+    evidence:
+      - artifact: "tasks/WP08 § T052 (extends scripts/release/dist-set.json); WP08 owned_files omits it (wps.yaml line 27 puts it under WP01 only)"
+      - artifact: "tasks/WP01 § T002 (edits scripts/release/README.md); WP01 owned_files omits it (wps.yaml line 174 puts it under WP08)"
+      - artifact: "tasks/WP09 § T062 (ci-nightly.yml gains a smoke path)"
+      - code: ".github/workflows/ci-nightly.yml:1616 (nightly-summary needs list is closed)"
+      - code: "tests/ci/test_nightly_exit_code_honesty.py:318 (pins the nightly aggregate needs set); tests/ci/test_nightly_timeout_headroom.py; tests/architectural/test_dual_mode_contract.py reference ci-nightly.yml"
+    claim: >
+      tasks-overview lists dist-set.json and README.md as shared (WP01 then WP08), but owned_files cannot list both, so the
+      later editor writes outside its map. WP09 changes ci-nightly.yml, whose job set and aggregate needs are pinned by
+      tests in tests/ci and tests/architectural that WP09 does not own, so the change turns those red with nobody
+      responsible. The "gate edits land with the file they check" rule (plan section 11) is violated for nightly.
+    remediation: >
+      Declare the chokepoint explicitly: record in WP08 and WP01 prompts "out-of-map edit, last editor" (as done for the
+      pyproject.toml floor) or add the paths to the later WP's owned_files with a dependency guarantee (WP08 depends on
+      WP01 so this is safe). For nightly: either add the pinning tests (test_nightly_exit_code_honesty.py,
+      test_nightly_timeout_headroom.py, the gate-coverage inventory tests) to WP09 owned_files and name them in T062/T063
+      runs, or drop the nightly edit and let event-producer.yml carry AC-036 numbers (it already runs native-smoke).
+  - id: TASKS-RELEASE-006
+    lens: "cross-OS native jobs"
+    severity: 3
+    title: "WP01 feasibility criteria under-specified: \"starts in under 100 ms warm\" and the macOS/Windows toolchain are not measurable as tasked"
+    evidence:
+      - artifact: "tasks/WP01 § Feasibility gate PASS item 2 and § T009"
+      - artifact: "plan.md section 2 ('Windows x86_64 windows-2022', 'macos-14'); WP01 § T003 step 2 (GraalVM archive pinned by url+sha256, not setup-graalvm)"
+      - code: ".github/workflows/ci-windows.yml:72 (the repo's only Windows job is windows-latest running Python; no native toolchain precedent in any workflow)"
+    claim: >
+      (1) "warm" has no protocol: number of runs, discard count, statistic (median or p95), how the stdin payload is
+      fed, so PASS can be asserted either way and shared hosted runners on Windows and macOS are noisy; the AC-036
+      limits are later derived from these numbers. (2) A hand-pinned GraalVM archive on windows-2022 needs the MSVC
+      environment (vcvars64) for native-image; nothing in T005 says so, and the same applies to macOS needing a
+      MACOSX_DEPLOYMENT_TARGET to satisfy the pinned macosx_11_0 floor (an SDK-default minos can exceed 11.0, which the
+      pass criterion 4 then flags as failure with no listed fallback). (3) FFM downcall support in native-image per OS
+      (registration of downcall descriptors / native-access flags) is claimed, not shown; the existing repo has no Graal
+      workflow to copy.
+    remediation: >
+      Add to the PASS block: warm = median of the last 20 of 25 consecutive spawns of the same stdin payload, threshold on
+      the median with the p95 recorded; script it (tools/measure_start.*) so all three legs use it. Add to T005: Windows
+      leg runs native-image from a vcvars64 shell (name the mechanism and SHA-pin it); macOS leg sets
+      MACOSX_DEPLOYMENT_TARGET=11.0 and records otool -l minos; extend the failure path with a third fallback "raise the
+      pinned floor to the measured value if the operator accepts" so a minos miss is a decision, not an automatic HALT.
+      Require the FFM downcall configuration files to be listed in the feasibility record per OS.
+  - id: TASKS-RELEASE-007
+    lens: "HALT path and gate ordering"
+    severity: 3
+    title: "HALT path is stated but WP01 is not itself bounded: WP01 includes 10 subtasks of unrelated build skeleton before the verdict, and parallel work may start"
+    evidence:
+      - artifact: "tasks/WP01 § Feasibility gate ('Do not continue to WP02'), § T010 (verdict is the last subtask)"
+      - artifact: "tasks-overview.md (WP02, WP08 start from WP01; WP11 depends on WP04)"
+    claim: >
+      The verdict (T010) comes after the registration, fleet-verdict, pin-check and hatch hook work (T003, T006, T007).
+      If a leg HALTs, all of that Python/CI scaffolding, including registered PR workflows and fleet-verdict edits, is
+      already committed and would have to be reverted by the operator. Also nothing prevents the orchestrator from
+      dispatching WP08 (packaging, depends on WP01) once WP01's status reads "done" before the verdict file exists; the
+      gate is a prose instruction inside the WP, not a status or dependency.
+    remediation: >
+      Split WP01 into WP01a (T001 baseline, T003 skeleton pins, T004 spike, T005 producer-native.yml, T008/T009/T010 verdict
+      on a minimal scratch workflow) and WP01b (T006 hook, T007 registration, campsite) with WP01b depending on a recorded
+      PASS; or reorder tasks so T010 precedes T006/T007 with an explicit "mark WP01 for_review only after PASS". Add to the
+      verdict file a machine-checkable line "verdict: PASS" that WP02 T-first-task and WP08 T-first-task assert before
+      starting.
+  - id: TASKS-RELEASE-008
+    lens: "dist set / provenance consistency"
+    severity: 3
+    title: "Attestation and permissions underspecified; \"attaches an attestation\" is not implementable or checkable"
+    evidence:
+      - artifact: "tasks/WP09 § T061 ('publish-pypi re-runs check_dist_set.py and attaches an attestation')"
+      - artifact: "plan.md section 2 Provenance ('publish-pypi attaches an attestation. No reproducibility claim.')"
+      - code: ".github/workflows/release.yml:323-325 (publish-pypi permissions: contents write, id-token write; no attestations: write)"
+      - code: ".github/workflows/release.yml:380 (pypa/gh-action-pypi-publish v1.14.2 already produces PEP 740 attestations by default under trusted publishing)"
+    claim: >
+      Three different things could be meant (GitHub artifact attestation via actions/attest-build-provenance, PEP 740
+      PyPI attestations already emitted by the existing publish action, or a signed SHA256SUMS). The GitHub flavour needs
+      attestations: write in the job permissions, which is absent; the PEP 740 flavour needs no work at all but needs
+      checking that multi-wheel upload keeps it. There is also no stated subject set (all five files plus the SBOM?) nor
+      verification command, so AC-040 and FR-042 cannot be asserted even post-merge. SBOM today is a Python-environment
+      CycloneDX file (release.yml:278-283) while the new producer SBOM is separate: how both are named, attached and kept
+      distinct in softprops files: is not stated (the files: globs at release.yml:358-363 would not match a second sbom).
+    remediation: >
+      Choose and write it down in T061: attest all of dist/* plus both SBOMs with actions/attest-build-provenance (SHA-pinned
+      at WP09 time), add attestations: write and id-token: write to publish-pypi (or a dedicated attest job needing build and
+      smoke), state the subject list, and add a documented post-publish verification command (gh attestation verify) to
+      RELEASE_CHECKLIST.md. Name the producer SBOM (e.g. producer.sbom.cdx.json), add it to the release files: list and to
+      the upload-artifact paths, and extend the ownership test to pin both names.
+  - id: TASKS-RELEASE-009
+    lens: "dist set / provenance consistency"
+    severity: 3
+    title: "Smoke-wheels and native-smoke are two independent implementations of the same check, and the smoke script is declared \"no logic\""
+    evidence:
+      - artifact: "tasks/WP01 § T007/T008 (native-smoke: install stub wheel by path, run bundled binary)"
+      - artifact: "tasks/WP09 § T060 (producer_smoke.py, 'one valid row appended'; thin invocation of the CLI)"
+      - artifact: "tasks/WP08 § T053 (--verify-binaries consumed by WP09)"
+    claim: >
+      WP01 defines the per-OS wheel smoke inline in YAML, WP09 later writes producer_smoke.py for the release; nothing says
+      native-smoke is switched to the script, so the PR-time check and the release-time check drift. A script that
+      creates a repo, calls the lifecycle command and inspects the publish log is test logic, and WP09's "build glue, no
+      logic" claim collides with the F1 bounded-Python ruling (the script is not among the named allowed Python files in
+      operator decision 10: hook, check_dist_set.py, named release-script edits, gradle_pin_check entry).
+    remediation: >
+      Move producer_smoke.py to WP01 (or WP08) as the single smoke entry, make both native-smoke and smoke-wheels call it
+      with the wheel path, and reduce it to: venv install, run the CLI command, assert exit 0 and that the publish-log line
+      exists via a CLI-visible check (no parsing logic). Ask the operator to add it to the F1 allowed list, or write it as a
+      shell/YAML step instead of a Python file; update the thinness gate pin accordingly.
+  - id: TASKS-RELEASE-010
+    lens: "release workflow shape"
+    severity: 3
+    title: "Reusable-workflow job-level 'with:' repeats RELEASE_REF; 'confirm the env context behaviour' is left to implementation with no fallback"
+    evidence:
+      - artifact: "tasks/WP09 § T059 ('repeat the RELEASE_REF expression in the job-level with:; confirm the env context behaviour, plan 17')"
+      - code: ".github/workflows/release.yml:19-21 (RELEASE_TAG and RELEASE_REF are workflow-level env)"
+      - code: ".github/workflows/release.yml:3-18 (ref is the tag name for both triggers; a called workflow's actions/checkout of 'ref' needs refs/tags/<tag> semantics only if a branch of the same name exists)"
+    claim: >
+      The env context is not available in jobs.<id>.with (only github, needs, strategy, matrix, inputs, vars), which is
+      documented, so "confirm" cannot be done from a PR and the plan's repeat-the-expression remedy is the only option;
+      but the test "pins equal texts" is a text-equality check that does not execute. The called workflow also must
+      validate that ref resolves to the SAME commit as the caller's github.sha (workflow_dispatch of a tag input by an
+      operator can check out a tag different from the run's own sha, which breaks the "source commit == git rev-parse HEAD"
+      continuity check if build-release checks out the tag while build-producer builds github.sha).
+    remediation: >
+      Resolve ref once in a first job (outputs.sha = git rev-parse of RELEASE_REF) and pass that SHA to producer-native.yml
+      and to build-release's checkout; make the continuity check compare manifests to that output instead of two
+      independent resolutions. Replace "confirm the env context" by "use github/inputs expressions only", and extend the
+      ownership test to assert the called workflow receives the same SHA output.
+  - id: TASKS-RELEASE-011
+    lens: "dist set / provenance consistency"
+    severity: 2
+    title: "pure_wheels/fallback and sdist handling in build-release: python -m build builds sdist+wheel from sdist; platform wheel build path not specified"
+    evidence:
+      - artifact: "tasks/WP09 § T059 ('builds three platform wheels with the hook env vars, the pure wheel and sdist')"
+      - code: ".github/workflows/release.yml:178 (python -m build) and release.yml:195 (WHEEL_FILE=$(ls dist/*.whl), single-wheel assumption)"
+      - code: "pyproject.toml:141-146 (wheel target packages; sdist include list at :207)"
+    claim: >
+      The exact command for platform wheels is not given (python -m build --wheel with env vars, --no-isolation or not,
+      output directory). A build of the platform wheel from the checkout versus from the sdist matters (the hook file
+      scripts/release/hatch_build_producer.py and the gitignored _native/ must be in the sdist or the wheel-from-sdist
+      path fails or silently drops the hook), and plan 3.1 says the sdist include list is not widened, so building a
+      platform wheel from the sdist cannot work. Must be from the checkout; otherwise the pure and platform wheels come from
+      different source trees.
+    remediation: >
+      State in T059: pure wheel and sdist via python -m build (unchanged); platform wheels via python -m build --wheel
+      --outdir dist from the same checkout (not from the sdist), hook enabled by env, in a loop over dist-set.json platform
+      entries, each with a clean build directory; add a test that the three wheels differ only in tag, binary and
+      PRODUCER.sha256 members relative to the pure wheel.
+  - id: TASKS-RELEASE-012
+    lens: "workflow conventions"
+    severity: 2
+    title: "Nightly pulls three-OS native builds into the release-gating nightly"
+    evidence:
+      - artifact: "tasks/WP09 § T062 (ci-nightly.yml calls the same smoke path)"
+      - code: ".github/workflows/release.yml:49-67 (nightly-gate requires a green ci-nightly for the exact release SHA, fail-closed)"
+      - code: ".github/workflows/ci-nightly.yml:1616 (nightly-summary needs list)"
+    claim: >
+      If the smoke path joins the gating nightly set, a macOS or Windows hosted-runner flake or a GraalVM download outage
+      blocks every release, since the nightly gate fails closed; if it is outside the needs list it silently does not
+      gate. Which is intended is not stated.
+    remediation: >
+      State in T062 whether the smoke job is gating; recommended: non-gating informational job (like sonar) that records the
+      AC-036 numbers, with the release gate relying on smoke-wheels in release.yml itself. If gating, add a rerun policy.
+  - id: TASKS-RELEASE-013
+    lens: "workflow conventions"
+    severity: 1
+    title: "Path filter lists a gitignored/non-existent path"
+    evidence:
+      - artifact: "plan.md section 9 CI home (paths: src/specify_cli/_native/**, src/specify_cli/status/producer_*.py)"
+      - code: ".gitignore entry added by WP01 T006 for src/specify_cli/_native/"
+    claim: >
+      src/specify_cli/_native/** is ignored and never tracked, so the filter can never fire; producer_*.py does not exist
+      before WP06. The tests/architectural/test_workflow_coherence.py family flags dead filter globs for other workflows;
+      confirm it does not scan these paths: keys, otherwise a ledger row is needed.
+    remediation: >
+      Drop the _native/** glob; list src/specify_cli/status/producer_client.py once it exists or use
+      src/specify_cli/status/** with a note; run test_workflow_coherence.py in T007 validation.

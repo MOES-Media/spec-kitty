@@ -1,0 +1,29 @@
+schema: review-refute/v1
+complete: true
+phase: tasks
+batch: 7
+verdicts:
+  - id: TASKS-VERIFY-009
+    verdict: refuted
+    reason: Spec AC-008 itself mandates a test-local reference comparator over the nine fixtures with named mutations, and WP11 T075 reruns the released comparator, so T013 follows the spec.
+  - id: TASKS-VERIFY-010
+    verdict: confirmed
+    reason: WP11 T072/T073 and WP04 T025 list no wrong-sha256, empty-registry or unknown-type negative tests, and no spec or plan text covers them.
+  - id: TASKS-VERIFY-011
+    verdict: confirmed
+    reason: WP06 T035/T041 define fault_summary and _read_fault_rows with no unreadable-log behaviour or test, and spec and plan only cover the unreadable ledger on the Java retention side.
+  - id: TASKS-VERIFY-012
+    verdict: refuted
+    reason: The claim that gates enumerate via git is not evidenced for the new gates, and the tasks give floors and planted-mutation tests per gate plus an untracked stub in WP01, so the finding is a generic worry.
+  - id: TASKS-VERIFY-013
+    verdict: confirmed
+    reason: The fast-tier completeness gate exists as cited and no task or plan text names a marker or job for the new test files.
+  - id: TASKS-VERIFY-014
+    verdict: confirmed
+    reason: contracts.yml path filters do not match services/event-producer, and plan 9 and T007 give event-producer.yml a verify-pins job with no stated gradle_pin_check step.
+  - id: TASKS-VERIFY-015
+    verdict: refuted
+    reason: Plan section 1 and WP01 T002 state the install_tools.py invocation and the Java 25 toolchain, so only wording detail is missing and severity 2 is overstated.
+  - id: TASKS-VERIFY-016
+    verdict: confirmed
+    reason: grep of WP04 and WP06 finds no shared golden protocol fixtures, WP06 uses stub binaries, and the first real client-to-binary test is WP10.

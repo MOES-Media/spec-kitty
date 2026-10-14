@@ -1,0 +1,29 @@
+schema: review-refute/v1
+complete: true
+phase: tasks
+batch: 5
+verdicts:
+  - id: TASKS-COVER-011
+    verdict: confirmed
+    reason: Overview maps AC-026 to WP03 only and WP06 T035 names record_notice without any test of the notice row, stderr line or not-a-fault rule; severity 2 is closer.
+  - id: TASKS-COVER-012
+    verdict: confirmed
+    reason: WP06 T042 asks for a constants module that appears in no plan 4.2 row and no owned_files list, and plan 4.2 says the gate fails any other new module in the area.
+  - id: TASKS-COVER-013
+    verdict: refuted
+    reason: Overview section 2 names the orchestrator as owner via a prerequisite Op and WP11 has an explicit approval gate (T071), so owner and consequence are recorded; a tracker id cannot exist before the PR is opened.
+  - id: TASKS-COVER-014
+    verdict: confirmed
+    reason: AC-012 requires mutants for schema import, log read and bridge envelope code but T039 lists only id mint, clock, uuid and secrets mutants (severity 2 stands).
+  - id: TASKS-COVER-015
+    verdict: confirmed
+    reason: FR-023 last sentence says retain failures are not event faults, yet T041 and the retain steps contain no test that policy_error or a crash writes no fault row.
+  - id: TASKS-COVER-016
+    verdict: confirmed
+    reason: WP07 T046 edits engine.py which only WP06 owns, T042-adjacent WP01 T002 edits scripts/release/README.md owned by WP08, and WP02/03/05 declare create_intent empty for greenfield trees.
+  - id: TASKS-COVER-017
+    verdict: refuted
+    reason: Overview states the red-first and revert-check rule for every behaviour and WP11 T072 is under a red-first heading, so the missing per-WP sentence is redundant and the CI refusal is covered by the generic rule.
+  - id: TASKS-COVER-018
+    verdict: refuted
+    reason: T035 explicitly covers AC-005 for each class, which includes the unwritable-log fallback, so it is a wording gap in the steps rather than an uncovered requirement.

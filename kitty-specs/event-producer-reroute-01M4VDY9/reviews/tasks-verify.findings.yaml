@@ -1,0 +1,204 @@
+schema: review-findings/v1
+complete: true
+phase: tasks
+lens_group: verify
+mission: event-producer-reroute-01M4VDY9
+findings:
+  - id: TASKS-VERIFY-001
+    lens: gates-concrete-and-green-alone
+    severity: 4
+    title: "Windows and macOS Java behaviour (lock, byte identity, node id) has no CI job that runs the Java tests there"
+    evidence:
+      - artifact: "tasks/WP01 § T007 (gradle-test is 'ubuntu, JDK 25'; native-smoke runs a smoke script per OS)"
+      - artifact: "tasks/WP03 § T019/T021/T022 and Risks (Windows LockFileEx; 'golden nodeid green on all three OS in CI')"
+      - artifact: "tasks/WP10 § T069 ('byte-identical lines on all three OS ... via CI legs')"
+      - code: ".github/workflows/ci-windows.yml exists but plan research s8 says 'not extended'"
+    claim: "AC-010 (concurrent stamping, kill points), AC-034 (byte-identical lines on all three OS) and AC-039 (live nodeid vs generate_node_id) are asserted per OS, but the only workflow job that runs Gradle tests is ubuntu-only and native-smoke runs one smoke script. T021 mentions \"a per-OS CI step\" for node id only; no task puts the adapter/application tests (lock, torn line, golden line bytes) on macOS and Windows. Those tests would exist and be green yet never execute where the semantics differ, so the Windows/macOS claims are untested."
+    remediation: "In WP01 T007 make gradle-test (or a new gradle-test-os job) a three-leg matrix (ubuntu-24.04, macos-14, windows-2022) running at least `:adapter:test` and `:application:test`, and name it in the terminal event-producer-gate needs. Add to WP03/WP10 an explicit statement of which AC runs on which leg and fail (not skip) when a leg is absent."
+  - id: TASKS-VERIFY-002
+    lens: test-selection
+    severity: 4
+    title: "WP10 end-to-end tests need a real native binary but no job is named that supplies it; skip-on-missing would pass vacuously"
+    evidence:
+      - artifact: "tasks/WP10 § T065, T067, T068 (default install with platform wheel built via hook, real producer, AC-036) and Risks ('Per-OS legs run only in CI')"
+      - artifact: "tasks/WP01 § T005/T007 (native binary exists only as an uploaded producer-<leg> artifact of producer-native.yml)"
+      - code: "Makefile:69-71 (make test-fast excludes integration/slow); pytest shards run no native build"
+    claim: "Python PR shards never build the GraalVM binary. WP10 tests that need \"a real binary\" and \"AC-036 over a real producer\" have no stated home: not in event-producer.yml native-smoke (smoke script only), not in a shard. If written with the usual skipif/binary-missing fallback they pass without running, which is exactly the vacuous AC-001/AC-018/AC-036 outcome. The performance limits in tests/_perf_helpers.py would also be set from numbers no CI job reproduces."
+    remediation: "In WP10 add a task that wires these tests into event-producer.yml native-smoke (download the producer-<leg> artifact, install the platform wheel by path, run `pytest <named files>` with an env flag REQUIRE_NATIVE_PRODUCER=1 under which a missing binary is a failure, not a skip). State the marker (`integration` plus a new or existing marker excluded from test-fast) and add a planted-missing-binary mutation that must turn the job red."
+  - id: TASKS-VERIFY-003
+    lens: gates-concrete-and-green-alone
+    severity: 3
+    title: "Gate command `gradle -p ... test` does not run JaCoCo coverage verification; coverage floors claimed in WP02-WP05 are unenforced"
+    evidence:
+      - artifact: "tasks/WP03 § Gates ('gradle ... :adapter:test and full test; JaCoCo :adapter 80%')"
+      - artifact: "tasks/WP04 § T028 ('JaCoCo :application 90%'), § Gates ('gradle -p ... test')"
+      - artifact: "tasks/WP05 § Gates ('JaCoCo floors as WP02/WP04')"
+      - artifact: "tasks-overview § 5 Gates ('gradle -p services/event-producer test (... JaCoCo ...)')"
+    claim: "In Gradle, `test` does not depend on jacocoTestCoverageVerification (that hangs off `check`). Only WP02 names `:domain:jacocoTestCoverageVerification`. WP03-WP05 and the CI job (T007 'gradle-test') would pass with coverage below floor unless the build wires it, and nothing says it is wired or tested (no floor-lowering mutation)."
+    remediation: "Make the gate command `gradle -p services/event-producer check` everywhere (WP02-WP05, WP09 SBOM edit, WP11, CI gradle-test), or require WP01 to wire `test.finalizedBy(jacocoTestCoverageVerification)`. Add a WP01 test that lowering a covered class's tests (or raising a floor above actual) turns the build red."
+  - id: TASKS-VERIFY-004
+    lens: gates-concrete-and-green-alone
+    severity: 3
+    title: "`make lint` is `ruff check src/` only; tasks lean on it for scripts/, tests/ and contracts/ glue"
+    evidence:
+      - code: "Makefile:13-14 (`uv run --frozen ruff check src/`)"
+      - code: "Makefile:37-40 (typecheck lists two fixed files); research s8 says mypy is not run in CI"
+      - artifact: "tasks/WP01, WP08, WP09, WP10, WP11 § Gates ('make lint; ruff check and format on the glue'); WP06 § Gates ('mypy on the client modules')"
+    claim: "Most new Python (hatch_build_producer.py, check_dist_set.py, gradle_pin_check.py, all tests) is outside `src/`, so `make lint` is vacuous for it. WP01/WP10 write `ruff check` / `ruff format --check --force-exclude` without paths. \"mypy on the client modules\" has no command; `make typecheck` would not touch the new modules, so the gate cannot go red."
+    remediation: "Give each WP the literal commands: `uv run --frozen ruff check <list of owned .py files>` and `make format-check-files FILES=\"<same list>\"`, plus `uv run --frozen mypy --strict src/specify_cli/status/producer_client.py src/specify_cli/status/producer_faults.py src/specify_cli/cli/commands/_event_producer_doctor.py` (or add them to the Makefile typecheck target in WP06 with a note that it is local-only)."
+  - id: TASKS-VERIFY-005
+    lens: gates-concrete-and-green-alone
+    severity: 3
+    title: "Wall-clock single-door gate (kernel.clock) is not named in any WP, yet `_now_utc` and new scripts/tests are in its scan scope"
+    evidence:
+      - artifact: "tasks/WP06 § T035 (`_now_utc` (the only wall-clock read)); § T043 gate list omits clock bans"
+      - code: "tests/architectural/_clock_gate_scan.py:21 (SCAN_ROOTS = src, tests, scripts)"
+      - code: "src/kernel/clock.py:1-12 (single door; test_clock_import_ban.py / test_clock_call_ban.py ban raw datetime/time.time)"
+    claim: "producer_faults.py reading `datetime.now`/`time.time` inside `_now_utc` (and the thinness rule that allows a wall-clock read only there) contradicts the repo-wide ban unless `_now_utc` calls kernel.clock or is exempted via tests/architectural/_exemptions. The WP06 and WP10 gates never run test_clock_import_ban.py or test_clock_call_ban.py, so the break surfaces only in CI. The thinness mutation for \"a clock outside _now_utc\" must also recognise door calls."
+    remediation: "In WP06 T035 state that `_now_utc` calls `kernel.clock.now_utc_iso()` (or the matching producer) and update thinness rule (a)'s clock vocabulary and its mutation to treat kernel.clock calls as the clock read. Add test_clock_import_ban.py and test_clock_call_ban.py to the WP06/WP08/WP10 gate lists (scripts/ and tests/ are scanned too). Note hashlib.sha256 in scripts is covered by pyproject.toml:2392 but in tests needs inline `# noqa: TID251` justification (check_dist_set tests)."
+  - id: TASKS-VERIFY-006
+    lens: baseline
+    severity: 3
+    title: "Baseline does not capture the non-pytest enforced gates that WP10 later compares against, nor a `make test-fast` run"
+    evidence:
+      - artifact: "tasks/WP01 § T001 (pytest files only, one invocation per file)"
+      - artifact: "tasks/WP10 § T070 ('uv lock --check, spec-kitty regen --check, docs lint, terminology guard ... against the baseline')"
+      - code: "AGENTS.md test policy: 'Baseline is `make test-fast`'; Makefile:69-71"
+    claim: "ruff check/format on touched paths, uv lock --check, spec-kitty regen --check, make docs-lint and the terminology guard are final-gate items but T001 records nothing for them, so a pre-existing red there would be attributed to the mission or silently waved through. AGENTS.md makes `make test-fast` the shared baseline and no WP gate runs it."
+    remediation: "Extend T001 to record, from the same scratch worktree and sha, `make test-fast` counts, `ruff format --check` on the files WP01-WP11 own, `uv lock --check`, `spec-kitty regen --check`, `make docs-lint`, and the terminology test, each with exit code and failing ids. Add `make test-fast` to the WP06, WP07 and WP10 gates with comparison against the baseline."
+  - id: TASKS-VERIFY-007
+    lens: baseline
+    severity: 2
+    title: "WP06 gate runs the whole `tests/status/` directory while stating \"named files only, no whole directories\"; baseline is per-file"
+    evidence:
+      - artifact: "tasks/WP06 § Gates ('tests/status/ ... (named files only, no whole directories)')"
+      - artifact: "tasks/WP01 § T001 step 2 ('one invocation per file, no whole-directory runs')"
+    claim: "Self-contradictory; and a directory run cannot be compared to a per-file baseline, so introduced vs pre-existing red in tests/status cannot be attributed. The charter NO_FULL_HEAVY_SUITES_IN_MISSION is also invoked."
+    remediation: "Replace `tests/status/` with the explicit file list the WP touches or implicates (test_saas_fanout_timeout, test_drain_fanout, test_emit_fanout_after_adapter, test_conftest_restores_zeitgeist_registry, the new tests) and add exactly those files to T001's baseline list."
+  - id: TASKS-VERIFY-008
+    lens: red-first-and-revert-check
+    severity: 3
+    title: "Revert-check is asserted in prose per WP but leaves no evidence a reviewer can inspect, and several ACs have no named mutation"
+    evidence:
+      - artifact: "tasks-overview § 5 ('revert-checked (revert the implementation hunk; the test must fail)'); every WP § Gates ('Red-first ... revert-checked')"
+      - artifact: "tasks/WP02 § T011-T015 (no mutation named); tasks/WP04 § T024-T026; tasks/WP06 § T034, T036, T037 (no mutation named)"
+    claim: "Only the census/thinness gates and a few items (lock ordering, state-first, tracked-path offer) name a concrete mutation. For most behaviours (UUID refusal, clock overflow, effective_client_timeout, busy/timeout fault rows, SHA-before-unzip) there is no recorded revert result. Reviewers (and the closing squad) cannot verify red-first or revert without redoing it, and a vacuous test (assert on a mock, empty loop) passes review unnoticed."
+    remediation: "Require each WP to commit `research/wpNN-redfirst.md` (via safe-commit) with one row per new test: test id, red commit sha on base, revert-hunk description, tail of the failing output. Name in the WP text the mutation for each AC that lacks one (e.g. AC-006: planted client that skips terminate; AC-005 busy: remove timeout bound)."
+  - id: TASKS-VERIFY-009
+    lens: red-first-and-revert-check
+    severity: 2
+    title: "AC-008 permutation test is checked against a \"test-local reference\" written by the same author"
+    evidence:
+      - artifact: "tasks/WP02 § T013 ('Permutation test (AC-008 against a test-local reference)')"
+    claim: "A second comparator coded by the implementer and compared with the production one proves self-consistency, not the order, and can share a bug (assert the model, not the artifact). The nine data-model section 4 fixtures give pinned expected orders; WP11 only repeats this against the released copy."
+    remediation: "In T013 define the permutation test as: for each of the nine fixtures, every shuffled input (seeded, count recorded, floor > 0) must yield the fixture's pinned expected ordered list and error/collapsed sets; forbid a second comparator implementation in test code."
+  - id: TASKS-VERIFY-010
+    lens: silent-success
+    severity: 3
+    title: "Registry-driven validator and fetch task have no unknown-type, empty-registry or checksum-mismatch negative tests"
+    evidence:
+      - artifact: "tasks/WP11 § T072 ('sha256 checked before unzip'), § T073 ('per in-scope type a valid and an invalid line')"
+      - artifact: "tasks/WP04 § T024/T025 (refusals listed: UUID id, bad time, validation failure, row without id)"
+    claim: "Nothing requires that (a) a wrong sha256 fails the fetch, (b) a wheel whose extracted registry or schema set is empty fails the build rather than yielding a validator that accepts everything, (c) a row of a type absent from the registry is `rejected`, not written. Each is a silent-success path: an empty registry plus a permissive lookup produces green tests over zero types."
+    remediation: "Add to T072 red tests: planted wrong sha256 fails before unzip; empty or missing registry fails the build; floor on extracted schema count > 0. Add to T073/T025: unknown type and unknown scope give `rejected` with a named reason; and a floor that the per-type loop iterated every data-model section 3 type."
+  - id: TASKS-VERIFY-011
+    lens: silent-success
+    severity: 3
+    title: "Doctor/health rendering does not say what an unreadable fault log or absent logs report"
+    evidence:
+      - artifact: "tasks/WP06 § T035 (`fault_summary` counts fault rows in the window; `_read_fault_rows`), § T041 (`events_health`, 'counts only')"
+    claim: "If `_read_fault_rows` swallows an unreadable, partly corrupt or permission-denied fault log and `fault_summary` returns 0, `doctor` reports a healthy producer while faults exist. The \"0 faults\" success value is not distinguished from \"could not read\". No test is listed for it."
+    remediation: "Add to T035/T041: unreadable or unparseable fault log yields an explicit `unreadable` status (counted separately, non-zero exit or visible warning from `events_health`), with red tests for a corrupt line, a directory in place of the file and a permission error; a missing log is reported as \"none recorded\", not as a pass."
+  - id: TASKS-VERIFY-012
+    lens: diff-gate-blind-to-untracked
+    severity: 3
+    title: "New-file gates are tested with planted violations but not with untracked ones, except the hook-off wheel test"
+    evidence:
+      - artifact: "tasks/WP01 § T006 (stub 'planted untracked' - only for the wheel test)"
+      - artifact: "tasks/WP06 § T039/T040 (thinness (c) module census, test_publish_log_single_writer, test_seam_census); WP07 § T045 (single lane list), T047 (exemption ledger); WP11 § T072 (test_no_committed_events_schema 'planted-schema mutation')"
+    claim: "A gate that enumerates files via `git ls-files`, `git diff` or a pinned list passes vacuously on a violating file that is not yet tracked (23 architectural tests already use ls-files). The tasks never state how each gate enumerates, and WP11's \"no committed events schema\" must scan build/ legitimately while still catching a stray untracked copy."
+    remediation: "For each new gate state the enumeration (filesystem walk of the named roots, e.g. rglob, not git) and add one mutation per gate that writes the violating file untracked into a tmp copy of the tree. For AC-027 scan the working tree excluding only `services/event-producer/**/build/`, and plant an untracked schema under services/ and under src/."
+  - id: TASKS-VERIFY-013
+    lens: test-selection
+    severity: 3
+    title: "New Python tests carry no stated markers; fast-tier completeness and slow tiers decide whether they ever run"
+    evidence:
+      - code: "tests/architectural/test_fast_tier_marker_completeness.py:1-20 (unmarked tests under FAST_TIER_DIRS fail)"
+      - code: "Makefile:60-71 (FAST_TIER_MARKERS excludes slow/integration); tests/cross_cutting/packaging/test_packaging_safety.py:36 (pytestmark integration)"
+      - artifact: "tasks/WP01 § T006, WP06 § T039-T041, WP08 § T056, WP10 § T065-T068 (no marker named)"
+    claim: "tests/status is a FAST_TIER_DIR (unmarked new test fails the completeness gate); packaging/wheel-building tests are integration/slow and run only in shards. Tasks never name the markers or the shard that runs each new file, so a wheel-building test marked wrongly runs nowhere on PR, and the perf and native tests (see 002) can land in no job."
+    remediation: "Add to each WP a table \"new test file -> marker -> job that runs it\" (e.g. thinness/census: architectural+fast; status tests: fast; stub-wheel and wheel-contents: integration; native/perf: new marker with the event-producer.yml job). Add `tests/architectural/test_fast_tier_marker_completeness.py` and `test_module_shard_registry.py` to WP06 and WP08 gates."
+  - id: TASKS-VERIFY-014
+    lens: test-selection
+    severity: 3
+    title: "Third-Subproject gradle_pin_check is not triggered for later edits to services/event-producer builds"
+    evidence:
+      - code: ".github/workflows/contracts.yml:11-21 (path filter: contracts/**, tests/contract/**, pyproject.toml ...); contracts.yml:72 runs gradle_pin_check.py"
+      - code: "ci-nightly.yml:1437-1485 (acceptance-jvm's equivalent runs nightly only)"
+      - artifact: "tasks/WP01 § T003, T007 (event-producer.yml jobs: verify-pins uses verify_pins.py only)"
+    claim: "gradle_pin_check is what ties the build files to pins.json. After WP01, a PR that edits services/event-producer/build.gradle.kts or tools/pins.json (WP02, WP03, WP09, WP11 all do) does not touch contracts/**, so contracts.yml does not run and the mismatch goes uncaught until WP-unrelated PRs or nightly."
+    remediation: "Add to T007 the step `uv run --frozen --no-sync python contracts/tools/gradle_pin_check.py` (and the pytest of its test file) to the event-producer.yml verify-pins job, with a test in tests/ci asserting that step exists."
+  - id: TASKS-VERIFY-015
+    lens: gates-concrete-and-green-alone
+    severity: 2
+    title: "Bare `gradle` and JDK 25 are assumed in every gate command; no local invocation path is defined"
+    evidence:
+      - artifact: "tasks/WP01 § T003 ('gradle -p services/event-producer build'), all WP § Gates"
+      - artifact: "tasks/WP01 frontmatter (owns gradle/wrapper/**) vs plan s1 (Gradle installed by contracts/tools/install_tools.py)"
+      - code: ".github/workflows/ci-nightly.yml:1495-1503 (installs to RUNNER_TEMP then `gradle -p acceptance-jvm`)"
+    claim: "Agents on a plain checkout have neither Gradle 8.14.5 nor a documented path to it; whether a wrapper or the installed distribution is used is ambiguous. WPs 02-05 and 11 cannot reach \"green alone\" on a clean machine without that."
+    remediation: "In WP01 T003/README state the exact local sequence: `uv run --frozen python contracts/tools/install_tools.py --pins services/event-producer/tools/pins.json --dest <dir> --only gradle` then `<dir>/.../gradle -p services/event-producer check`, and the JDK 25 toolchain provisioning; then every later WP cites that."
+  - id: TASKS-VERIFY-016
+    lens: protocol-contract
+    severity: 3
+    title: "Python client tests use stub binaries and Java tests use fakes; no shared protocol fixtures bind the two before WP10"
+    evidence:
+      - artifact: "tasks/WP06 § T034 ('Tests patch locate_binary; stub binaries')"
+      - artifact: "tasks/WP04 § T027/T028; WP04 Risks ('Protocol shape is the contract for WP06')"
+    claim: "The only real client-to-producer test is WP10 (events-release gated, last). Until then a stub that diverges from the Java reply shape (field names, exit codes 64/75, `v`) lets the client pass its gate while failing against the real binary, so WP06 is \"green alone\" on a fiction."
+    remediation: "In WP04 T027 commit golden request/reply/exit-code fixtures generated by the real launcher (JVM build) under a path WP06 may read, and make WP06's stub binaries and `_classify` tests replay those fixtures; add a WP06 test that runs the JVM-built launcher (java -jar) for one valid and one malformed request, skipped only with an explicit failing marker in CI where Java is present."
+  - id: TASKS-VERIFY-017
+    lens: gates-concrete-and-green-alone
+    severity: 3
+    title: "Checksum-continuity and manifest-commit checks (AC-032) live as workflow shell with only a structural test"
+    evidence:
+      - artifact: "tasks/WP09 § T059 ('fails unless every manifest source commit equals git rev-parse HEAD and recomputes each sha256'); § Gates ('mutation (a missing wheel fails the release)')"
+      - code: ".github/workflows/release.yml:167 (tests/release run on text of the workflow; behaviour of steps unprovable from a PR)"
+    claim: "tests/release/test_release_ci_ownership.py pins names and `needs` edges, not behaviour. Inline shell that compares commits and hashes has no executable test, so AC-032 and G-8 would be checked by reading YAML. Only the missing-wheel mutation is named."
+    remediation: "Put the check in a script owned by WP08/WP09 (e.g. a `--verify-manifests` mode of check_dist_set.py) with unit tests and mutations (wrong source commit, tampered binary byte, missing manifest, extra wheel), and let release.yml only call it; assert the call and `needs` edge in test_release_ci_ownership."
+  - id: TASKS-VERIFY-018
+    lens: gates-concrete-and-green-alone
+    severity: 2
+    title: "Thinness build-glue pin does not exist when WP01 and WP08 ship the glue; \"green alone\" relies on reviewer reading"
+    evidence:
+      - artifact: "tasks/WP01 § Gates ('the producer-client thinness gate does not exist yet (WP06) but the hook file must hold no runtime logic')"
+      - artifact: "tasks/WP08 § Gates ('before then, read the rule and keep to it'); WP06 § T039 (build-glue pin)"
+    claim: "hatch_build_producer.py, check_dist_set.py and the check_exact_install edit land with no automated no-logic check; WP06 later pins them, so a violation by WP01/WP08 becomes a WP06 failure (cross-WP rework) or goes unnoticed."
+    remediation: "Add to WP01 and WP08 a small AST test (import allowlist, no id/clock/schema/hashing beyond file sha) over their own glue file, which WP06 then folds into the thinness gate; or reorder so WP06's pin is written first against the WP01 files."
+  - id: TASKS-VERIFY-019
+    lens: per-AC-test-strategy
+    severity: 2
+    title: "AC-005 and AC-006 sub-cases (unresolvable root, seam busy-skip and TimeoutError faults) have no task step"
+    evidence:
+      - code: "spec.md AC-005 ('rejected for ... an unresolvable root ...'), AC-006 ('A seam busy-skip and TimeoutError each yield a fault row')"
+      - artifact: "tasks/WP04 § T025 (rejected list lacks unresolvable root); tasks/WP06 § T036 (busy and timeout branches, but 'unresolvable root' absent)"
+    claim: "The task text for T025/T034-T036 omits the unresolvable-root rejection and does not say which task asserts that the fault row records the busy-skip and the TimeoutError separately, so they are likely dropped or done only on one path."
+    remediation: "Add to T025 and T035/T036 explicit red tests for: unresolvable root -> `rejected` fault; busy-skip -> fault row; TimeoutError -> fault row; each asserting `--json` body and exit code unchanged (AC-005)."
+  - id: TASKS-VERIFY-020
+    lens: per-AC-test-strategy
+    severity: 2
+    title: "AC-039 golden node-id fixtures: generate_node_id() takes no arguments, so generation method is unspecified; fixture hygiene unstated"
+    evidence:
+      - code: "src/specify_cli/identity/project.py:240-249 (generate_node_id reads socket.gethostname and getpass.getuser)"
+      - artifact: "tasks/WP03 § T021 ('at least two injected hostname:username strings against values from identity/project.py::generate_node_id')"
+    claim: "Producing expected values for injected strings requires monkeypatching gethostname/getuser (and Java's chain LOGNAME, USER, LNAME, USERNAME, user.name differs from getpass's pwd fallback). The task does not say how, nor that fixture hostnames/usernames must be synthetic (public repo), nor that a real-host live comparison runs in CI."
+    remediation: "Specify a committed regeneration script (patches gethostname/getuser, prints JSON) run in WP03, synthetic strings only (no real host or user), plus the CI step comparing the live Java value with the live Python value on each OS; add a case where USER is unset and user.name is used."
+  - id: TASKS-VERIFY-021
+    lens: test-selection
+    severity: 3
+    title: "Windows process-termination and stub behaviour for the Python client is untested although a Windows wheel ships"
+    evidence:
+      - artifact: "tasks/WP06 § T034 ('terminate own child by handle'), AC-006 (no child remains)"
+      - artifact: "research.md s8 ('ci-windows.yml ... not extended'; 'cannot prove a built wheel')"
+    claim: "Termination semantics, argv quoting and stub-binary form differ on Windows; WP06 tests run on Linux shards only, and WP09 smoke-wheels proves one valid row, not timeout/orphan behaviour. The Windows timeout path of AC-006 is therefore unverified in the shipped wheel."
+    remediation: "Add to WP06 a windows_ci-marked subset (client timeout terminates a hanging stub, no orphan) and register it for ci-windows.yml, or extend WP09 smoke-wheels with a hanging-stub leg on Windows; if deliberately out of scope, record it as a residual in tasks-overview."

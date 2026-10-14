@@ -1,0 +1,29 @@
+schema: review-refute/v1
+complete: true
+phase: tasks
+batch: 8
+verdicts:
+  - id: TASKS-VERIFY-017
+    verdict: confirmed
+    reason: WP09 T059 puts the source-commit and sha256 recompute in the workflow while the only named test is the structural test_release_ci_ownership.py and the single missing-wheel mutation; severity 3 is arguably high since check_dist_set.py --verify-binaries covers only the binary re-hash.
+  - id: TASKS-VERIFY-018
+    verdict: confirmed
+    reason: WP01 Gates admits the thinness gate does not exist yet and WP08 says to read the rule before WP06 pins the files, so no automated check covers the glue in the interim (minor).
+  - id: TASKS-VERIFY-019
+    verdict: confirmed
+    reason: spec AC-005 lists an unresolvable root as a rejected case, yet no task text in any WP mentions it, and T036 names busy and timeout branches without separate fault-row assertions.
+  - id: TASKS-VERIFY-020
+    verdict: confirmed
+    reason: identity/project.py generate_node_id takes no arguments (gethostname and getpass.getuser), and T021 does not say how injected strings are produced nor require synthetic fixture values in a public repo.
+  - id: TASKS-VERIFY-021
+    verdict: confirmed
+    reason: research.md says ci-windows.yml is not extended, WP06 and tasks-overview carry no Windows termination test or recorded residual, so the Windows leg of AC-006 is unverified; severity 3 slightly generous.
+  - id: TASKS-THIN-001
+    verdict: confirmed
+    reason: WP09 creates scripts/release/producer_smoke.py, which is absent from the closed F1 Python list in plan and tasks-overview and from the T039 build-glue pin.
+  - id: TASKS-THIN-002
+    verdict: confirmed
+    reason: T042 requires path literals in one constants module while plan 4.2 and rules (a)/(c) place no such module, so the implementer must break T042 or the gate.
+  - id: TASKS-THIN-003
+    verdict: confirmed
+    reason: T039 mutations all edit existing files and neither T039 nor plan rule (c) states a filesystem walk or an untracked-new-module mutation case.

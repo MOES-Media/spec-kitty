@@ -1,0 +1,91 @@
+schema: review-findings/v1
+complete: true
+phase: tasks
+lens_group: thin
+mission: event-producer-reroute-01M4VDY9
+findings:
+  - id: TASKS-THIN-001
+    lens: build-glue-bounded-allowance
+    severity: 4
+    title: "WP09 adds a new Python file (producer_smoke.py) outside the F1 bounded allowance and outside the build-glue pin"
+    evidence:
+      - artifact: "tasks/WP09-release-workflow.md frontmatter owned_files and § T060"
+      - artifact: "plan.md § 13 item 2 and § 4.2 build-glue pin (F1 list: hatch hook, check_dist_set.py, check_exact_install.py --wheel-tag, gradle_pin_check.py third Subproject entry)"
+      - artifact: "tasks-overview.md Python allowance paragraph (same closed list, no smoke script)"
+    claim: "scripts/release/producer_smoke.py is a new Python script that WP09 owns and creates. The operator's F1 ruling (operator-inputs decision 10) names the only new or edited Python allowed for packaging and release, and a smoke script is not on it. T060 says it is 'a thin invocation of the CLI (build glue, no logic)', but nothing pins that, and the WP06 build-glue pin lists four files and omits this one. research.md section 14 describes the smoke script as appending 'one valid row' and asserting 'binary-missing absent', which is behaviour with assertions, not a pass-through. It is also a second smoke script per OS in WP01 T009 ('a smoke script per OS') with unspecified language."
+    remediation: "Either (a) drop producer_smoke.py: run the smoke as inline workflow shell steps invoking the installed CLI per OS, tested by test_release_producer_stages.py; or (b) escalate to the operator to extend the F1 list explicitly, then add the file to the T039 build-glue pin (closed import allowlist, no producer/envelope/id/clock/schema code, a mutation case) and to tasks-overview.md and plan 13.2. State the language and form of WP01's per-OS smoke script in T009 the same way."
+  - id: TASKS-THIN-002
+    lens: allowed-surface-list
+    severity: 4
+    title: "T042 creates 'one constants module' for path literals; no such module is in plan 4.2 and rules (a)/(c) would reject it"
+    evidence:
+      - artifact: "tasks/WP06-python-client-and-seam.md § T042 ('path literals in one constants module') and create_intent (no constants module listed)"
+      - artifact: "plan.md § 4.2 (FR-027: 'the gate fails on any other new module or function in the status and emission area'); research.md § 16 rule (a) exact top-level symbol set per module and rule (c) pinned module census"
+      - artifact: "research.md line 156 (path-literal gates: 'literals live in one constants module')"
+    claim: "The research hint that path literals live in a constants module has been carried into T042 without placing it. A new module under status/ fails the pinned census (c) and the 'equals the plan 4.1 table' symbol rule (a); putting the constants into producer_faults.py adds top-level names that are not in the table's symbol set. T039/AC-030 also needs 'the publish-log constant' to exist in a scanned module and be found by the floor. As written the implementer must break either T042 or the gate."
+    remediation: "Decide the home in T042 and the plan 4.2 table: put the fault-log, publish-log and clock-state path constants in producer_faults.py (or state/contract.py), add those names to the producer_faults.py row and to the rule (a) symbol set, name the constant the AC-030 scan keys on, and state that T039 reads the same table. Otherwise add the module to the 4.2 table and the rule (c) pinned list."
+  - id: TASKS-THIN-003
+    lens: thinness-gate-red-first
+    severity: 3
+    title: "T039 has no mutation for an untracked/new violating file; rule (c) census scan method unspecified"
+    evidence:
+      - artifact: "tasks/WP06-python-client-and-seam.md § T039 (self-mutations: client id mint, producer_faults clock, emit.py import uuid, engine/rebuild_state secrets)"
+      - artifact: "plan.md § 4.2 Gate (c) 'emission-area module census equals a pinned list'; research.md § 16 rule (c)"
+    claim: "All listed mutations edit copies of existing files. None plants a NEW file (for example status/_mint_id.py or events/new_helper.py) that is untracked, so the census rule (c), the headline rule that stops a new Python module, is never shown to see an untracked file. Nothing in T039 says the census walks the filesystem rather than git ls-files or a diff, which would pass vacuously on an uncommitted new file (the failure mode of diff-based gates)."
+    remediation: "In T039 state that (c) enumerates by filesystem walk of status/, events/, retrospective/, decisions/ (not git), and add a mutation case that writes an untracked new module into a tmp copy of the tree and a new function into an existing table file, both expected red; add a floor that the walk finds all three new modules."
+  - id: TASKS-THIN-004
+    lens: thinness-gate-build-glue-pin
+    severity: 3
+    title: "Build-glue pin in WP06 depends on files WP08 creates, and has no defined test or mutation"
+    evidence:
+      - artifact: "tasks/WP06-python-client-and-seam.md § T039 ('build-glue pin (hook, check_dist_set.py, check_exact_install.py --wheel-tag, gradle_pin_check.py entry hold no runtime logic)')"
+      - artifact: "tasks/WP08-packaging-remainder.md Gates ('after WP06 it runs; before then, read the rule') and Context; tasks-overview.md graph (WP08<-WP01, WP06<-WP04,WP05: parallel, no order)"
+      - artifact: "tasks/WP01 (hatch_build_producer.py, gradle_pin_check.py entry land in WP01)"
+    claim: "check_dist_set.py and the --wheel-tag edit are created in WP08, which has no ordering against WP06. T039 requires 'every module and table file found' (floor) yet two pinned glue files may not exist when the gate lands, or WP06 merges first and WP08 then lands unvetted files, so the pin is either vacuous or red. T039 also does not say what the pin asserts (closed import allowlist? no uuid/datetime/ulid/hashlib/jsonschema/spec_kitty_events references? what for an edit of an existing file like check_exact_install.py or a single dict entry in gradle_pin_check.py?) and lists no mutation for it, contrary to the lens 'tested with a forbidden-import mutation'."
+    remediation: "Make WP06 depend on WP08 (or move the pin to a WP after both, e.g. WP10 T-gate). Specify the pin: for the three new-or-wholly-owned files a closed import allowlist and no references to envelope/id/clock/schema names; for the edited files a base-plus-allowed diff of names and imports like rule (e). Add mutations: hatch hook with import uuid, check_dist_set.py with datetime.now, check_exact_install.py with a spec_kitty_events import; each red. Tolerate absence only through an explicit per-file 'not yet landed' list that WP08's DoD empties."
+  - id: TASKS-THIN-005
+    lens: runtime-shim-no-logic
+    severity: 3
+    title: "No gate or mutation keeps retention defaults and parsing out of the doctor sibling and fault_summary"
+    evidence:
+      - artifact: "tasks/WP06-python-client-and-seam.md § T041 (only a test that 'abc' reaches Java unchanged) and § T035 ('fault_summary ... in the retention window')"
+      - artifact: "spec.md FR-028 ('Python forwards the raw values unread; Java applies the defaults 20 and 30'), FR-026 (window = day files within the raw max_age_days; absent or non-numeric means every file)"
+      - artifact: "plan.md § 4.3, § 8; research.md § 16 mutation list (no doctor mutation)"
+    claim: "FR-028 says forward 'unread' but FR-026 requires Python to turn max_age_days into a date window for the fault count. T035/T041 do not say how a non-numeric or absent value is handled, nor forbid a default of 20 or 30, int()/float() coercion in the doctor path, or a policy_error decision in Python. The thinness gate rule (a) covers imports and symbols only, and the mutation list has nothing for the doctor sibling, so a Python-side default or validation (the retention decision lives in Java per OD-RETAIN) would pass every gate."
+    remediation: "In T035 pin the only numeric reading of max_age_days to fault_summary (absent or non-numeric means every file, no default substituted) and in T041 state doctor passes the value without conversion. Add to T039 an AST rule: no literal 20 or 30 and no int()/float()/isdigit on config values in _event_producer_doctor.py, with mutations (a default 30 in doctor; int(keep_runs) in doctor) expected red. Add the same pins to the AC list."
+  - id: TASKS-THIN-006
+    lens: seam-call-sites
+    severity: 3
+    title: "T037 and T036 omit three plan 4.2 seam changes (repo_root forwarding, _publish drain read removal, emit_significance_evaluated fill)"
+    evidence:
+      - artifact: "tasks/WP06-python-client-and-seam.md § T036 and § T037 ('edit exactly the symbols of plan 4.2 rows ... hands the persisted row as row=')"
+      - artifact: "plan.md § 4.2 rows lifecycle_events.py ('forward repo_root'), events/runtime_moments.py ('_publish drain read dropped', 'emit_significance_evaluated filled; today a no-op'); spec.md FR-004 (lifecycle fire forwards repo_root to handlers)"
+      - code: "src/specify_cli/status/adapters.py:382 (fire_lifecycle_saas_fanout takes repo_root and uses it only for the drain gate at :393)"
+    claim: "The call-site subtask names only 'row=' hand-over. The lifecycle fire forwarding repo_root so the PRODUCER resolves the canonical root (FR-004, AC-001), dropping the hosted_posture drain read in runtime_moments._publish with C-003 gate relocated to the Zeitgeist handler, and filling the today-no-op emit_significance_evaluated are all in the plan table but have no step, test or AC link in T036/T037/T038. Missing the first leaves a lane-worktree lifecycle event with no start_path; missing the second keeps drain gating the producer, contradicting C-003 ('producer fires with drain off')."
+    remediation: "Add to T037 explicit steps and red-first tests for: fire_lifecycle_saas_fanout forwarding repo_root to handlers; runtime_moments._publish dropping the drain read with the pin test (AC-003 f) covering the journal Zeitgeist handler; emit_significance_evaluated filled and asserted by the census. Cite the plan rows by name."
+  - id: TASKS-THIN-007
+    lens: allowed-surface-list
+    severity: 2
+    title: "T038 edits tests/runtime/test_bridge_engine.py, which no WP owns"
+    evidence:
+      - artifact: "tasks/WP06-python-client-and-seam.md § T038 ('Fakes in tests/runtime/test_bridge_engine.py gain the method') versus owned_files (no tests/runtime/ entry)"
+    claim: "The edit is required (Protocol gains a method) but the file is absent from every WP's owned_files, so ownership validation or lane write-scope checks will flag it, and tests/architectural/test_status_module_boundary.py (T041 __all__ change) is likewise not owned."
+    remediation: "Add tests/runtime/test_bridge_engine.py and tests/architectural/test_status_module_boundary.py (if an edit is needed) to WP06 owned_files and wps.yaml, or state they need no edit."
+  - id: TASKS-THIN-008
+    lens: runtime-shim-no-logic
+    severity: 2
+    title: "T042 leaves the StateRoot/GIT_COMMON_DIR handling as 'decide and record'"
+    evidence:
+      - artifact: "tasks/WP06-python-client-and-seam.md § T042 ('decide StateRoot/GIT_COMMON_DIR handling and record it')"
+      - artifact: "plan.md § 7 (clock state anchored at git common dir, Java-owned, OD-CLOCK)"
+    claim: "An open design choice inside a Python declaration task invites Python to model the clock location (a Java concern). The clock-state surface should be a pure declaration."
+    remediation: "State the answer in T042 (declare the surface as the plan section 7 path with no Python derivation of the git common dir) or reference the data-model row; make the gitignore check AC-023 the only behaviour."
+  - id: TASKS-THIN-009
+    lens: build-glue-bounded-allowance
+    severity: 2
+    title: "Unbounded Python edits to lint script and fleet_verdict.py sit outside both the F1 list and gate (e)"
+    evidence:
+      - artifact: "tasks/WP07 § T047 (scripts/lint_canonical_producers.py 'gains persisted-line mode')"
+      - artifact: "tasks/WP01 § T007 (scripts/ci/fleet_verdict.py::PR_WORKFLOWS registration); research.md § 16 'Excluded from (e)'"
+    claim: "Both are listed in plan 4.2 or the WP01 row as tooling, but the gate excludes the lint script from (e) and nothing bounds what 'persisted-line mode' adds; fleet_verdict.py is not in the F1 list at all. Neither is runtime logic, but the thinness story is stated as closed lists."
+    remediation: "In tasks-overview.md Python allowance, name both as tooling exceptions with their bound (fleet_verdict.py: set-membership entries only; lint script: scan-mode flag, no new baseline entries) and have the reviewer guidance check it."

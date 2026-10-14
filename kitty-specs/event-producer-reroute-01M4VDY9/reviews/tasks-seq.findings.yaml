@@ -1,0 +1,213 @@
+schema: review-findings/v1
+complete: true
+phase: tasks
+lens_group: seq
+mission: event-producer-reroute-01M4VDY9
+findings:
+  - id: TASKS-SEQ-001
+    lens: order
+    severity: 4
+    title: "WP03 (adapters) is sequenced before WP04 (the ports the adapters implement)"
+    evidence:
+      - artifact: "plan.md § 1 (module table: :application holds ports PublishLog, ClockStore, RepoLocator, NodeIdentity, Clock; :adapter may depend on :application)"
+      - artifact: "wps.yaml § WP03 (dependencies [WP02]; owned_files only adapter/**) and § WP04 (owns application/port/**)"
+      - artifact: "tasks/WP04-java-produce-and-protocol.md § T023 ('Ports in application.port: RowSchemaValidator, PublishLog, ClockStore, RepoLocator, NodeIdentity, Clock')"
+      - artifact: "tasks/WP03-java-adapter-filesystem.md (no mention of any port interface; subtasks T017-T022 build lock, clock store, publish log, repo locator, node identity)"
+    claim: >
+      The module layout makes :adapter depend on :application and implement its ports, but the ports are authored in
+      WP04, one WP AFTER the adapters. WP03 depends only on WP02 (:domain), so its classes cannot declare
+      'implements PublishLog/ClockStore/RepoLocator/NodeIdentity' at all. Either WP03 writes free-standing classes
+      and WP04 must later edit WP03-owned adapter files to add the implements clauses (an ownership violation and a
+      hidden rework), or WP03 invents its own interfaces that WP04 then has to reconcile. The plan section 11 graph
+      has the same inversion; the tasks author inherited it and did not flag it as a refinement (R1-R3 only cover
+      WP05).
+    remediation: >
+      Move the interface-only port package (application/port/** minus RowSchemaValidator if it must wait for WP11's
+      adapter, which can stay a WP04 port) into WP03 (add it to WP03 owned_files and a first red-free subtask 'ports
+      as interfaces'), make WP03 depend on the :application build skeleton (already WP01), and keep WP04 for Produce,
+      protocol and launcher. Record it as refinement R4 in tasks-overview.md section 3. Alternative: reorder so the
+      ports land in WP02 (domain-adjacent, interface only) and the ArchUnit :application rule stays in WP04.
+  - id: TASKS-SEQ-002
+    lens: seq
+    severity: 4
+    title: "Native-image reachability metadata and spike removal have no owner after WP01"
+    evidence:
+      - artifact: "wps.yaml § WP01 owned_files (launcher/src/main/java/.../launcher/spike/**, launcher/src/main/resources/META-INF/native-image/**)"
+      - artifact: "wps.yaml § WP04 owned_files (launcher/src/main/java/.../launcher/*.java, launcher/src/test/** only)"
+      - artifact: "tasks/WP04-java-produce-and-protocol.md § T023 ('first commit deletes WP01's launcher/.../spike/** and its native-image entries only if superseded')"
+      - artifact: "tasks/WP11-events-release-consumer.md § T072 (schemas 'embedded as native-image resources')"
+      - artifact: "tasks/WP03-java-adapter-filesystem.md Risks (FFM availability in the native image 'proved in WP01')"
+      - artifact: "tasks/WP01-feasibility-gate-and-build-skeleton.md § T007 (native-smoke job runs on every PR via event-producer.yml)"
+    claim: >
+      The real producer needs native-image metadata that the spike cannot have: Jackson record/DTO reflection (WP03/WP04),
+      the FFM downcall descriptor for nodeid (WP03), and resource-config for the schemas and registry (WP11). Every
+      one of those files lives under META-INF/native-image/**, owned only by WP01. No later WP lists it, yet
+      native-smoke (WP01 T007) builds the real launcher on all three OS for every path-matching PR, so a WP that adds
+      reflected classes without metadata turns the gate red. WP04 is also told to delete WP01-owned spike/** files
+      it does not own. A required file is owned by an earlier WP, which is the 'no WP's required file is owned by a
+      later/earlier-and-closed WP' defect the sequencing lens exists to catch.
+    remediation: >
+      Either give the metadata a per-WP location (each WP owns its own file, for example
+      META-INF/native-image/ai.speckitty/producer-<wp>/reflect-config.json, merged automatically by native-image) and
+      add that path to WP03, WP04 and WP11 owned_files, or declare META-INF/native-image/** and spike/** as a
+      serial chokepoint in tasks-overview.md section 4 with WP04 (spike deletion) and WP11 (resource-config) named as
+      later editors and mirrored as recorded out-of-map edits in their frontmatter. Add a native-smoke red-first
+      check to the first subtask of WP03 so missing metadata is caught in the WP that introduces the class.
+  - id: TASKS-SEQ-003
+    lens: seq
+    severity: 3
+    title: "Several serial edits touch files owned by another WP and are absent from owned_files and lane write_scope"
+    evidence:
+      - artifact: "tasks-overview.md § 4 (chokepoint table lists Gradle build files, dist-set.json and scripts/release/README.md as multi-WP) and § 3 R2 (only 'marker comment removal' and 'ledger rows' are declared out-of-map)"
+      - artifact: "wps.yaml § WP08 owned_files (README.md yes, dist-set.json no) vs tasks/WP08-packaging-remainder.md § T052 (extends dist-set.json)"
+      - artifact: "tasks/WP02-java-domain-core.md § T016 (edits domain/build.gradle.kts, a WP01 file)"
+      - artifact: "tasks/WP11-events-release-consumer.md Context (edits adapter/build.gradle.kts and pyproject.toml floor)"
+      - artifact: "tasks/WP09-release-workflow.md § T061 or SBOM step (edits services/event-producer/build.gradle.kts and gradle/verification-metadata.xml)"
+      - artifact: "lanes.json § lane-h, lane-b, lane-k, lane-i write_scope (none lists those files)"
+      - code: "scripts/release/README.md:11 (no stale release.yml-absent line; the only stale 'release.yml is not present' text is AGENTS.md:379-381)"
+    claim: >
+      The chokepoint table says these files are edited serially by several WPs, but the machine-readable ownership
+      (wps.yaml owned_files, and lanes.json write_scope derived from it) names a single owner, so each later edit is
+      outside the editing WP's scope and will be flagged by diff-scope review or blocked by a scope guard. Missing:
+      WP08 -> scripts/release/dist-set.json; WP02/WP03/WP11/WP09 -> WP01's *.gradle.kts and
+      verification-metadata.xml; WP11 -> pyproject.toml; WP01 T002 -> scripts/release/README.md (owned by WP08).
+      Also, the README edit appears unnecessary: only AGENTS.md carries the stale 'PyPI Release' claim.
+    remediation: >
+      List an explicit 'recorded out-of-map edits' block (file, WP, reason, ordering) in each editing WP's frontmatter
+      or body and extend tasks-overview.md R2 to cover them all, so reviewers have an allowlist. Drop the
+      scripts/release/README.md edit from WP01 T002 (or confirm the stale line exists first). Where an edit is large
+      (WP09 SBOM into the Java build), prefer moving the Gradle part into a Java-owned WP rather than a python-pedro/ivan WP.
+  - id: TASKS-SEQ-004
+    lens: order
+    severity: 3
+    title: "WP05->WP04 refinement: the registration point is unspecified, so the stated reason and the ownership do not match"
+    evidence:
+      - artifact: "tasks-overview.md § 3 R1 and tasks/WP05-java-retention.md Context ('two WPs editing the launcher entry concurrently')"
+      - artifact: "tasks/WP04-java-produce-and-protocol.md § T026 ('retain is routed to a registration point WP05 fills; until then retain replies refused')"
+      - artifact: "tasks/WP05-java-retention.md § T033 ('registers the operation at WP04's registration point')"
+      - artifact: "wps.yaml § WP04 (owns launcher/*.java) and § WP05 (owns launcher/retain/** only)"
+    claim: >
+      The dependency itself is right (WP05 needs WP04's handler interface and port package at compile time), but the
+      justification and the mechanism are inconsistent. WP05 owns only launcher/retain/**; if registration is an
+      explicit table or call in a launcher/*.java class (WP04's), WP05 must edit a WP04 file, which is not in its
+      owned_files. If it is ServiceLoader, it needs a META-INF/services resource (unowned) and native-image service
+      metadata (see TASKS-SEQ-002). Because WP05 would not touch WP04 files, the 'concurrent writes' reason in R1 is
+      not what forces the edge; the compile-time interface is. WP03 is also a redundant dependency of WP05
+      (transitive through WP04).
+    remediation: >
+      In WP04 T026 fix the mechanism: an interface OperationHandler plus a registry class where the handler list is
+      assembled by a single method that WP05 does NOT edit (for example the launcher discovers handlers in
+      launcher/retain via an explicit one-line addition that WP04 pre-wires as an import of a WP05-owned factory
+      class with a stub), or add the one registration file to WP05 owned_files. Reword R1 to 'compile-time dependency
+      on the handler interface'. Reduce WP05 dependencies to [WP04].
+  - id: TASKS-SEQ-005
+    lens: order
+    severity: 3
+    title: "Events-release gate semantics differ between WPs and over-gate WP09 and WP07"
+    evidence:
+      - artifact: "tasks/WP11-events-release-consumer.md § T071 ('blocks approval, not authoring')"
+      - artifact: "tasks/WP07-journal-stamping-lanes-markers-docs.md § T044 ('STOP; WP07 is not started')"
+      - artifact: "tasks/WP09-release-workflow.md § T058 ('STOP; WP09 is not started or approved')"
+      - artifact: "wps.yaml § WP07 dependencies [WP06, WP11]; § WP09 [WP08, WP11]; § WP10 [... WP11]"
+      - artifact: "tasks-overview.md § 2 (WP07, WP09, WP10, WP11 'each start with a precondition task')"
+    claim: >
+      WP11 may be authored before the release, yet WP07, WP09 and WP10 declare 'not started' until WP11 is complete,
+      and WP11 cannot complete (be approved) before the release, so the entire tail (WP07, WP09, WP10) is idle until
+      the external PR is released, even though most of their work reads no released artifact: WP09 edits release.yml,
+      ci-nightly.yml and docs; WP07's lane consolidation (T045), marker clearing and ADRs need none of the events
+      schemas, and only AC-019 and the pin do. 'WP11 complete' is also ambiguous (approved, merged, or done). This
+      sequences all non-gated work behind a foreign release and makes the critical path external. The gate itself is
+      present in each gated WP, which is correct; the strength differs.
+    remediation: >
+      Use one definition in all four WPs: the precondition blocks APPROVAL and the schema-reading subtasks (T046
+      journal validation, AC-019, WP10 measurements), not authoring. Change WP09's and WP07's gate text accordingly,
+      and in wps.yaml keep dependency WP11 only where code or build files are actually consumed (WP07: yes for the
+      pyproject floor and installed schemas; WP09: keep WP08 only plus a gate on approval). Define 'complete' as
+      'WP11 approved with the pin naming the released wheel' in tasks-overview.md section 2.
+  - id: TASKS-SEQ-006
+    lens: seq
+    severity: 3
+    title: "WP01 verdict (T010) comes after CI registration and the other non-spike work"
+    evidence:
+      - artifact: "tasks/WP01-feasibility-gate-and-build-skeleton.md § T001-T010 order (T006 hook, T007 workflow plus fleet-verdict registration precede T008-T010 measurements and verdict)"
+      - artifact: "tasks/WP01 'Feasibility gate' section (HALT: write research/wp01-feasibility.md, stop)"
+      - artifact: "plan.md § 11 (WP01 'risky first')"
+    claim: >
+      The HALT criterion is real and measurable (four PASS conditions, two fallbacks, stop-and-report), which is good.
+      But the decisive evidence is T008 (stub wheel on each OS) and T009/T010, which run after T007 has registered two
+      workflows in the shared fleet-verdict gate and ledger. If a leg HALTs, WP01 has already changed a shared CI
+      chokepoint (fleet_verdict.py, ci-fleet-verdict.yml, test_fleet_verdict.py) and added a pyproject hook table for
+      a mission that may not proceed, and the HALT text tells the agent only to stop WP02, not to roll those back.
+      Also the verdict depends on GitHub runners for macOS and Windows, which the WP does not say how to obtain
+      before a push.
+    remediation: >
+      Reorder to T001 baseline, campsite, T003 skeleton, T004 spike, T005 producer-native.yml, then T008/T009/T010 spike
+      measurements and an interim verdict; make T006 (hook) and T007 (fleet-verdict registration, event-producer.yml)
+      follow a PASS. State in the HALT text what is left in the tree (spike and evidence only) and name the runner
+      access assumption.
+  - id: TASKS-SEQ-007
+    lens: seq
+    severity: 2
+    title: "WP01 first commit is the baseline artifact, not the docs-only campsite that plan 11 requires"
+    evidence:
+      - artifact: "plan.md § 11 Campsite-clean (1): 'WP01's first commit, docs-only'"
+      - artifact: "tasks/WP01 § T001 (first task, committed with safe-commit) then § T002 campsite 'Own commit, docs(campsite)'"
+      - artifact: "tasks/WP06-python-client-and-seam.md Commit order step 1 (campsite 2 first: correct)"
+    claim: >
+      T001 commits research/baseline-red.txt before the campsite, so the campsite is the second commit; plan 11 says
+      first. WP06 gets it right (campsite first), so the tidy-first discipline is only half applied in WP01. The
+      baseline must be captured on the base sha, but nothing forces it to be committed first.
+    remediation: >
+      Reword T001 to 'capture on the base sha; commit the result after T002' (or state that the baseline commit is
+      a mission artifact exempt from the first-commit rule). The campsite stays the first code-bearing commit.
+  - id: TASKS-SEQ-008
+    lens: seq
+    severity: 3
+    title: "Open-PR overlap check is generic and stale; real overlaps exist on pyproject.toml, uv.lock, the compatibility file, fleet-verdict and cli-commands.md"
+    evidence:
+      - artifact: "tasks-overview.md § 4 closing line ('about 19 open PRs is normal here')"
+      - artifact: "wps.yaml § WP01 (pyproject.toml, ci-fleet-verdict.yml), § WP06 (docs/api/cli-commands.md), § WP07 (docs/adr/4.x/2026-10-13-2-*.md), § WP11 (uv.lock, .kittify/release/shared-package-compatibility.json, pyproject.toml)"
+      - code: "open PR #6205 touches pyproject.toml, uv.lock, .kittify/release/shared-package-compatibility.json and the ADR docs/adr/4.x/2026-10-13-2-the-event-ledger-is-the-publication-seam-default-on-with-local-retention.md (gh pr list --json files, read-only, 4 open PRs seen)"
+      - code: "open PR #6148 touches .github/workflows/ci-fleet-verdict.yml; open PR #5540 touches docs/api/cli-commands.md"
+    claim: >
+      The overview defers the open-PR check to the orchestrator with a stale count (4 PRs open now, not about 19) and
+      names no concrete overlap. #6205 adopts a spec-kitty-events floor and rewrites the same three files WP11 owns
+      (pyproject.toml floor, uv.lock, the compatibility JSON), plus the ADR file WP07 edits; WP11 will conflict or need
+      a rebase and its 'floor bump is the only pyproject change' assertion is tied to a moving base. #6148 edits the
+      fleet-verdict workflow WP01 registers workflows in.
+    remediation: >
+      Add a short 'known overlaps' table to tasks-overview.md section 4 (PR, file, WP, action: rebase before the lane
+      starts, or take theirs), and add a one-line 'check open PRs on owned_files before first commit' step to WP01, WP06,
+      WP07 and WP11. Replace 'about 19' with the live count at dispatch time. Limit of this review: only gh pr list file
+      lists were checked, not diff hunks, so conflict severity per file is unconfirmed.
+  - id: TASKS-SEQ-009
+    lens: seq
+    severity: 2
+    title: "Parallel markers are asserted for WP05/WP11 and WP06/WP11 without noting the shared Gradle and lock files"
+    evidence:
+      - artifact: "tasks-overview.md § 3 ('Genuinely parallel ... WP05 and WP11 beside each other ... WP06 beside WP11')"
+      - artifact: "lanes.json § lane-e, lane-k parallel_group 4; lane-f group 5 (WP06 does not depend on lane-k)"
+      - artifact: "tasks/WP11-events-release-consumer.md Context (additive edit of adapter/build.gradle.kts)"
+    claim: >
+      Write scopes of WP05, WP06 and WP11 are disjoint on the owned_files listed, and the lane graph in lanes.json is
+      consistent with wps.yaml (acyclic, each depends_on_lanes matches the WP edges, group numbers monotone). But WP11
+      edits WP01's adapter/build.gradle.kts and verification-metadata.xml while WP05 (adapter/ledger) runs in the
+      same group and may need a build or test-dependency line as well; neither WP states who edits the adapter build
+      file first, so a merge conflict is possible at merge time.
+    remediation: >
+      Add to WP05 and WP11 a statement that all adapter build-file edits are made in WP11 or in WP05, and state
+      the merge order (WP05 then WP11, lane-e before lane-k), or list adapter/build.gradle.kts as an explicitly
+      serial chokepoint in tasks-overview.md section 4.
+  - id: TASKS-SEQ-010
+    lens: order
+    severity: 1
+    title: "Redundant transitive dependencies"
+    evidence:
+      - artifact: "wps.yaml § WP05 dependencies [WP03, WP04]; § WP10 dependencies [WP01..WP09, WP11]"
+    claim: >
+      WP03 is implied by WP04 for WP05, and WP10 lists every WP although WP09 and WP07 already imply most of them.
+      Harmless and acyclic, but the redundant edges make the graph and the lane depends_on_lanes (lane-j lists ten
+      lanes) harder to audit.
+    remediation: >
+      Keep only the direct edges (WP05: WP04; WP10: WP07, WP09, WP11, WP06 if wanted) or add a comment that WP10 is
+      listed on all WPs deliberately.
