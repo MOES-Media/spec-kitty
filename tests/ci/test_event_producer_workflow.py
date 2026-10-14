@@ -401,6 +401,70 @@ def test_java_home_without_bin_java_fails_closed(tmp_path: Path) -> None:
     assert _check("--find", str(tmp_path / "unpacked")).returncode == 1, "the lib/svm decoy alone is never a JAVA_HOME"
 
 
+def _bare_root(root: Path, files: tuple[str, ...]) -> Path:
+    jdk = root / "bare-jdk"
+    for rel in files:
+        target = jdk / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("#!/bin/sh\n", encoding="utf-8")
+    return jdk
+
+
+def _refuses_root_without_native_image(script: Path, jdk: Path) -> bool:
+    result = subprocess.run(["bash", str(script), str(jdk)], capture_output=True, text=True, check=False)
+    return result.returncode == 1 and "JAVA_HOME_INVALID" in result.stderr
+
+
+def test_java_home_root_without_native_image_is_refused(tmp_path: Path) -> None:
+    """A root holding bin/java (or java.exe) but neither bin/native-image nor native-image.cmd is not a JAVA_HOME."""
+    script = TOOLS / "check-java-home.sh"
+    for launchers in (("bin/java",), ("bin/java.exe",)):
+        assert _refuses_root_without_native_image(script, _bare_root(tmp_path / launchers[0].replace("/", "_"), launchers))
+    complete = _bare_root(tmp_path / "complete", ("bin/java", "bin/native-image.cmd"))
+    assert subprocess.run(["bash", str(script), str(complete)], capture_output=True, text=True, check=False).returncode == 0
+
+
+def test_mutation_a_root_check_that_drops_the_native_image_requirement_is_caught(tmp_path: Path) -> None:
+    text = (TOOLS / "check-java-home.sh").read_text(encoding="utf-8")
+    needle = ' && { [ -f "$d/bin/native-image" ] || [ -f "$d/bin/native-image.cmd" ]; }'
+    assert text.count(needle) == 1, "the native-image clause moved: update this control"
+    mutated = tmp_path / "check-java-home.sh"
+    mutated.write_text(text.replace(needle, ""), encoding="utf-8")
+    jdk = _bare_root(tmp_path, ("bin/java",))
+    assert not _refuses_root_without_native_image(mutated, jdk), "the control must go red: the mutated script accepts a root without native-image"
+
+
+WRAPPER_PROPERTIES = ROOT / "services" / "event-producer" / "gradle" / "wrapper" / "gradle-wrapper.properties"
+PINS_JSON = TOOLS / "pins.json"
+
+
+def wrapper_sha_violations(properties: str, pins: dict[str, Any]) -> list[str]:
+    """Findings when the wrapper's distributionSha256Sum is absent or differs from the pinned Gradle archive sha256."""
+    gradle = [tool for tool in pins["tools"] if tool["name"] == "gradle"]
+    if len(gradle) != 1:
+        return ["pins.json does not hold exactly one gradle tool"]
+    found = re.findall(r"^distributionSha256Sum=(\S*)\s*$", properties, flags=re.MULTILINE)
+    if len(found) != 1:
+        return [f"expected one distributionSha256Sum line, found {len(found)}"]
+    if found[0] != gradle[0]["sha256"]:
+        return [f"distributionSha256Sum {found[0]} differs from the pinned gradle sha256 {gradle[0]['sha256']}"]
+    return []
+
+
+def test_the_wrapper_checksum_equals_the_pinned_gradle_sha() -> None:
+    pins = json.loads(PINS_JSON.read_text(encoding="utf-8"))
+    assert wrapper_sha_violations(WRAPPER_PROPERTIES.read_text(encoding="utf-8"), pins) == []
+
+
+def test_mutation_a_corrupted_or_missing_wrapper_checksum_is_red() -> None:
+    pins = json.loads(PINS_JSON.read_text(encoding="utf-8"))
+    real = WRAPPER_PROPERTIES.read_text(encoding="utf-8")
+    sha = next(tool["sha256"] for tool in pins["tools"] if tool["name"] == "gradle")
+    corrupted = real.replace(sha, sha[:-1] + ("0" if sha[-1] != "0" else "1"))
+    assert corrupted != real and wrapper_sha_violations(corrupted, pins)
+    assert wrapper_sha_violations(real.replace(f"distributionSha256Sum={sha}\n", ""), pins)
+
+
 def test_install_script_uses_the_checked_root_and_hashes_from_stdin() -> None:
     text = (TOOLS / "install-graalvm.sh").read_text(encoding="utf-8")
     assert "check-java-home.sh" in text and "--find" in text
@@ -540,7 +604,7 @@ def _install_fake_jdk(tmp_path: Path, launchers: tuple[str, ...]) -> subprocess.
                         "kind": "jdk-archive",
                         "version": "jdk-25.0.2",
                         "url": "https://example.invalid/x.tar.gz",
-                        "sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
+                        "sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),  # noqa: TID251 — checksum of a synthetic test archive, not charter freshness hashing
                     }
                 ]
             }
