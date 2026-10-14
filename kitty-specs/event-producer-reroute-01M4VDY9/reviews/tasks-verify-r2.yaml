@@ -1,0 +1,31 @@
+schema: review-verify/v1
+complete: true
+phase: tasks
+results:
+  - id: TASKS-FRESH-001
+    status: resolved
+    reason: "The two released tests moved to :adapter test package schema.released in WP11 T074/T075, wps.yaml owned_files, lanes.json, tasks.md and overview R3 consistently, so they sit on the classpath of the module that applies the fetch script and :domain stays java.base only; the plan.md WP11 row still says a :domain test file but plan.md is authoritative-superseded noise only."
+  - id: TASKS-FRESH-002
+    status: resolved
+    reason: "WP03 now states its adapter-fs metadata is unverified until WP04 and drops the false native-smoke claim, WP04 gains the native-smoke request file plus a fix-only out-of-map row for producer-adapter-fs, and overview R5 limits the per-WP gate to WP04, WP05 and WP11, with no contradiction found in the touched WPs."
+  - id: TASKS-FRESH-003
+    status: resolved
+    reason: "WP01 T008 now defines a fixed find for .kittify/events/publish *.jsonl asserting exactly one non-empty one-line file, and WP09 T060 repeats that lookup; no remaining 'file the CLI reports' wording exists in the task set."
+  - id: TASKS-FRESH-004
+    status: resolved
+    reason: "WP11 T076 now says test_pyproject_shape.py is run unchanged and I verified in the checkout that test_events_dependency_floor_rejects_pre_v10_contract only mutates the dependency to the retired >=9,<10 range so a floor bump needs no edit, with the out-of-map path stated if an edit ever proves necessary."
+  - id: TASKS-FRESH-005
+    status: resolved
+    reason: "WP01 T007 now runs the full check of all four subprojects on all three legs with no narrowing and names the WP05 retention race and WP04 launcher e2e as the reason, and overview R12(a) is aligned to the same wording."
+  - id: TASKS-FRESH-006
+    status: resolved
+    reason: "WP06 T036 adds three named red-first, revert-checked tests (N>=3 batch against a hanging stub asserting one spawn and N fault rows with a never-opening-breaker mutation, disabled bound, and lowered override) in WP06-owned test files, and the Covers line points to them."
+  - id: TASKS-FRESH-007
+    status: resolved
+    reason: "WP03 T018 now carries AC-005 (root-unresolvable half) and WP06 T041 carries AC-013 (dry-run pass-through asserted by the stub) in their Covers lines, matching the section 8.2 table."
+  - id: TASKS-FRESH-008
+    status: resolved
+    reason: "WP06 T038 now says 'the Mission directory' and a grep of the tasks directory finds no remaining 'feature directory' prose."
+  - id: NIT-WP01-PUSH
+    status: resolved
+    reason: "WP01 Evidence path now has the agent commit T003 to T008 (stub wheel and shared smoke action included) before the orchestrator pushes, explicitly allows a second push for a workflow defect with run ids recorded per push, resumes at T009, and overview R12(d) matches."

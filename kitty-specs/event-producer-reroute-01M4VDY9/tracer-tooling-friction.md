@@ -38,3 +38,10 @@ Seeded at plan time (Standing Order 3); append during implementation, assess at 
 - A Java test class in a Gradle subproject can only see build outputs of that subproject: the events wheel fetch task applied in `:adapter` leaves nothing on the `:domain` test classpath, and `:domain` (java.base only) cannot depend on `:adapter`. Tests that read fetched artifacts belong in the subproject that applies the fetch script.
 - `native-image` checks only reachable code, so a native-smoke job cannot validate reflection metadata of classes the launcher does not yet reach; the smoke action reads request files from the launcher test resources so each WP can widen reachability without editing the action.
 - No CLI command reports a publish-log path (NFR-006 bars absolute paths in replies), so a smoke that asserts on the log has to find it by a fixed `find` under the scratch repository.
+
+## Seen while fixing the tasks review (round 3)
+
+- `tests/integration` and `tests/perf` are collected by directory outside any per-PR job (nightly `integration-next`, `integration-slice`), and `integration-next` is a member of `nightly-summary.needs`. A new test there that fails closed when a native binary is absent (here keyed on `CI`) would turn the release nightly red; the fail-on-missing switch has to be a flag only the building job sets.
+- Gradle's `jacocoTestCoverageVerification` is skipped when a project has no execution data, so a floor-breach test aimed at an empty subproject stays green; the breach test needs a project that has code (a probe build sharing the convention script, with a positive control).
+- A Gradle subproject's test classpath sees another subproject's tests only through `java-test-fixtures`; moving a test between subprojects therefore moves its shared fixtures' build wiring into the earlier WP's build files, which are settled once.
+- `AGENTS.md` ties any `__init__.py` change to a version bump and a `CHANGELOG.md` entry, while the spec forbids assigning a version; the entry is owned by one WP and the bump is declared not performed.
