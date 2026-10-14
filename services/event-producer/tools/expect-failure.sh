@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+# Negative controls of the event producer build (WP01 T003): each step PLANTS a defect and passes only when the build goes red for
+# the right reason (the gate's own message in the output, not just any red). A green planted run, or a red for another reason, fails.
+#
+#   expect-failure.sh [floor|tamper|module|sbom|all]     (default: all)
+#
+# Run from anywhere; it works on services/event-producer. GRADLE overrides the launcher (default: the committed wrapper).
+set -uo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+project="$(cd "$here/.." && pwd)"
+gradle="${GRADLE:-$project/gradlew}"
+mode="${1:-all}"
+failures=0
+steps=0
+
+log="$(mktemp)"
+scratch=""
+trap 'rm -f "$log"; [ -z "$scratch" ] || rm -rf "$scratch"' EXIT
+
+pass() { steps=$((steps + 1)); echo "PASS: $1"; }
+fail() { steps=$((steps + 1)); failures=$((failures + 1)); echo "FAIL: $1"; }
+
+# expect_green <label> <command...>
+expect_green() {
+  local label="$1"; shift
+  if "$@" >"$log" 2>&1; then pass "$label"; else fail "$label (build was red)"; tail -20 "$log"; fi
+}
+
+# expect_red <label> <required output text> <command...>
+expect_red() {
+  local label="$1" needle="$2"; shift 2
+  if "$@" >"$log" 2>&1; then
+    fail "$label (the planted defect was accepted: build green)"
+  elif grep -qF -- "$needle" "$log"; then
+    pass "$label"
+  else
+    fail "$label (red, but without '$needle' in the output)"; tail -20 "$log"
+  fi
+}
+
+floor() {
+  # Positive control first: the probe has code and a test, so it measures something.
+  expect_green "floor probe measures and passes at its own floor" "$gradle" --no-daemon -p "$here/floor-probe" check
+  expect_red "coverage floor breach (genuine shortfall) goes red" "lines covered ratio is 0.50, but expected minimum is 0.51" \
+    "$gradle" --no-daemon -p "$here/floor-probe" check -PjacocoLineFloor=0.51
+  expect_red "coverage floor breach (jacocoLineFloor=1.01) goes red" "Rule violated" \
+    "$gradle" --no-daemon -p "$here/floor-probe" check -PjacocoLineFloor=1.01
+  expect_red "an unparseable floor fails closed" "jacoco-floors: the line floor is not a decimal ratio" \
+    "$gradle" --no-daemon -p "$here/floor-probe" check -PjacocoLineFloor=high
+}
+
+tamper() {
+  # A planted checksum change must fail dependency verification. Run against a COPY; the committed file is never touched.
+  scratch="$(mktemp -d)"
+  mkdir -p "$scratch/ep"
+  (cd "$project" && tar --exclude=build --exclude=.gradle --exclude='*/build' -cf - .) | (cd "$scratch/ep" && tar -xf -)
+  local metadata="$scratch/ep/gradle/verification-metadata.xml"
+  if ! grep -q '<sha256 value="' "$metadata"; then fail "tamper: no checksum to plant in $metadata"; return; fi
+  # Replace the first 8 hex digits of every recorded checksum with 00000000.
+  sed -i.bak -E 's/(<sha256 value=")[0-9a-f]{8}/\100000000/' "$metadata" && rm -f "$metadata.bak"
+  expect_red "tampered verification metadata fails the build" "Dependency verification failed" \
+    "$scratch/ep/gradlew" --no-daemon -p "$scratch/ep" :adapter:compileJava
+  rm -rf "$scratch"; scratch=""
+}
+
+module() {
+  expect_green "module dependency rules hold on the real build" "$gradle" --no-daemon -p "$project" verifyModuleDependencyRules
+  expect_red "planted :adapter main -> :domain dependency goes red" "verifyModuleDependencyRules VIOLATION" \
+    "$gradle" --no-daemon -p "$project" verifyModuleDependencyRules -PplantAdapterDomainMain=true
+}
+
+sbom() {
+  scratch="$(mktemp -d)"
+  local pins="$here/pins.json"
+  local toolchain
+  toolchain="$(jq -r '[.tools[] | select(.kind == "jdk-archive")][0].sha256' "$pins")"
+  printf '{"components":[{"name":"jackson-core","version":"3.2.1"}]}\n' > "$scratch/good-sbom.json"
+  printf '{"toolchain_sha256":"%s"}\n' "$toolchain" > "$scratch/good-manifest.json"
+  printf '{"components":[{"name":"something-else","version":"1"}]}\n' > "$scratch/no-dep-sbom.json"
+  printf '{"toolchain_sha256":"0000000000000000000000000000000000000000000000000000000000000000"}\n' > "$scratch/no-toolchain-manifest.json"
+  printf '{"components":[]}\n' > "$scratch/empty-sbom.json"
+  expect_green "SBOM check passes on a good SBOM and manifest (positive control)" "$here/check-sbom.sh" "$scratch/good-sbom.json" "$scratch/good-manifest.json" "$pins"
+  expect_red "planted SBOM without a pinned dependency fails" "names no versioned jackson-core component" \
+    "$here/check-sbom.sh" "$scratch/no-dep-sbom.json" "$scratch/good-manifest.json" "$pins"
+  expect_red "planted empty SBOM fails" "names no versioned jackson-core component" \
+    "$here/check-sbom.sh" "$scratch/empty-sbom.json" "$scratch/good-manifest.json" "$pins"
+  expect_red "planted manifest without the embedded toolchain fails" "is not a pinned jdk-archive sha256" \
+    "$here/check-sbom.sh" "$scratch/good-sbom.json" "$scratch/no-toolchain-manifest.json" "$pins"
+  rm -rf "$scratch"; scratch=""
+}
+
+case "$mode" in
+  floor) floor ;;
+  tamper) tamper ;;
+  module) module ;;
+  sbom) sbom ;;
+  all) floor; tamper; module; sbom ;;
+  *) echo "expect-failure: unknown step '$mode'" >&2; exit 2 ;;
+esac
+
+echo "expect-failure: steps=$steps failures=$failures"
+[ "$steps" -gt 0 ] && [ "$failures" -eq 0 ]
