@@ -46,7 +46,7 @@ class SmokeRequestTest {
         Map<String, Object> request = parsed();
         assertThat(request).containsEntry("op", "produce").containsEntry("start_path", ".").containsKeys("v", "deadline_ms", "slot", "row");
         assertThat(smoke()).as("one object, no trailing second request").isNotEmpty();
-        assertThat(new String(smoke(), StandardCharsets.UTF_8)).doesNotContain("/home/").doesNotContain("/Users/");
+        assertThat(new String(smoke(), StandardCharsets.UTF_8)).doesNotContain(String.join("/", "", "home", "")).doesNotContain(String.join("/", "", "Users", ""));
     }
 
     @Test

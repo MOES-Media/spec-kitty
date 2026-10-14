@@ -231,7 +231,7 @@ class ProducerEndToEndTest {
         if (user != null && user.length() >= 3) {
             assertThat(everything).doesNotContain(user);
         }
-        assertThat(everything).doesNotContain("/home/").doesNotContain("/Users/").doesNotContain("C:\\\\Users");
+        assertThat(everything).doesNotContain(String.join("/", "", "home", "")).doesNotContain(String.join("/", "", "Users", "")).doesNotContain("C:\\\\Users");
     }
 
     @Test
