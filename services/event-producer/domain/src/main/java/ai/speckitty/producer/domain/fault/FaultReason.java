@@ -23,11 +23,16 @@ public enum FaultReason {
 
     /** The name written on the wire and in the fault log. */
     public String wire() {
-        throw new UnsupportedOperationException("red stub");
+        return wire;
     }
 
     /** The class named by {@code wire}, empty for anything outside the vocabulary. */
     public static Optional<FaultReason> fromWire(String wire) {
-        throw new UnsupportedOperationException("red stub");
+        for (FaultReason reason : values()) {
+            if (reason.wire.equals(wire)) {
+                return Optional.of(reason);
+            }
+        }
+        return Optional.empty();
     }
 }
