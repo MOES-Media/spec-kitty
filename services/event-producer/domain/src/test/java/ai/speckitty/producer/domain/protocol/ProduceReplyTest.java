@@ -32,7 +32,12 @@ class ProduceReplyTest {
         assertThat(overflow.reasonClass()).isEqualTo(FaultReason.CLOCK_OVERFLOW);
         for (RefusalReason reason : RefusalReason.values()) {
             ProduceReply refused = new ProduceReply(1, Outcome.REFUSED, null, null, reason, null, "d");
-            assertThat(refused.reasonClass()).isEqualTo(reason == RefusalReason.CLOCK_OVERFLOW ? FaultReason.CLOCK_OVERFLOW : FaultReason.REJECTED);
+            FaultReason expected = switch (reason) {
+                case CLOCK_OVERFLOW -> FaultReason.CLOCK_OVERFLOW;
+                case BUSY -> FaultReason.BUSY;
+                default -> FaultReason.REJECTED;
+            };
+            assertThat(refused.reasonClass()).isEqualTo(expected);
             assertThat(reason.faultClass()).isEqualTo(refused.reasonClass());
         }
         assertThatThrownBy(() -> new ProduceReply(1, Outcome.REFUSED, ID, null, null, null, null)).isInstanceOf(IllegalArgumentException.class);
@@ -90,7 +95,8 @@ class ProduceReplyTest {
     void theWireVocabulariesArePinned() {
         assertThat(java.util.Arrays.stream(Outcome.values()).map(Outcome::wire).toList()).containsExactly("produced", "skipped_duplicate", "refused");
         assertThat(java.util.Arrays.stream(RefusalReason.values()).map(RefusalReason::wire).toList()).containsExactly(
-                "root-unresolvable", "id-not-ulid", "time-unparseable", "schema-invalid", "type-unknown", "clock-overflow", "nodeid-unavailable");
+                "root-unresolvable", "id-not-ulid", "time-unparseable", "schema-invalid", "type-unknown", "clock-overflow", "nodeid-unavailable",
+                "validator-unavailable", "busy", "project-unresolved");
         assertThat(Outcome.fromWire("refused")).contains(Outcome.REFUSED);
         assertThat(Outcome.fromWire("disabled")).isEmpty();
         assertThat(RefusalReason.fromWire("type-unknown")).contains(RefusalReason.TYPE_UNKNOWN);
