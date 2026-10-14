@@ -44,6 +44,7 @@ PR_WORKFLOWS = frozenset(
         "release-readiness.yml",
         "check-spec-kitty-events-alignment.yml",
         "contracts.yml",
+        "event-producer.yml",
     }
 )
 AGGREGATE = "ci-aggregate.yml"
