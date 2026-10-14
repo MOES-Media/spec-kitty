@@ -307,7 +307,9 @@ class FileClockStoreTest {
         }
         assertThat(verdicts).containsExactly(
                 "BEFORE_STATE_WRITE free=false", "AFTER_STATE_WRITE free=false", "AFTER_APPEND free=false");
-        assertThat(ExclusiveLock.acquire(ClockPaths.lockFile(layout), 100)).isPresent();
+        try (ExclusiveLock free = ExclusiveLock.acquire(ClockPaths.lockFile(layout), 100).orElse(null)) {
+            assertThat(free).isNotNull();
+        }
     }
 
     @ParameterizedTest
@@ -351,7 +353,9 @@ class FileClockStoreTest {
             } catch (Killed expected) {
                 // the producer died here
             }
-            assertThat(ExclusiveLock.acquire(ClockPaths.lockFile(layout), 200)).as(point.name()).isPresent();
+            try (ExclusiveLock free = ExclusiveLock.acquire(ClockPaths.lockFile(layout), 200).orElse(null)) {
+                assertThat(free).as(point.name()).isNotNull();
+            }
         }
     }
 }
