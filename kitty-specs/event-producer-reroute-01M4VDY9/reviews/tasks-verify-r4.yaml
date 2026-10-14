@@ -1,0 +1,19 @@
+schema: review-verify/v1
+complete: true
+phase: tasks
+results:
+  - id: TASKS-FRESH3-001
+    status: resolved
+    reason: "WP01 verify-pins now calls gradle_pin_check.py as a script with no pytest (the pin tests carry the corpus marker and run in the router tests-contract-tools lane, which fires on tests/contract/** and contracts/**, as checked in ci-router.yml), WP10 T083 adds the (event-producer.yml, native-e2e) AUTHORIZED_PER_CHANGE_SUITE_JOBS row in the same commit as the job (the stale-row check forbids earlier), records it in section 4 and the WP10 table, runs the gate file, keeps one pytest per leg, and the sweep of WP01 and WP09 (release.yml and ci-nightly.yml are NON_CHANGE_TRIGGERED rows) finds no other change-triggered job reaching pytest."
+  - id: TASKS-FRESH3-002
+    status: resolved
+    reason: "The spike test path is now in WP01 owned_files, wps.yaml and lane-a of lanes.json, WP04 and tasks-overview section 4 record its deletion with the spike, and the no-:domain-leak pin is a WP01-owned root build.gradle.kts verification task (verifyModuleDependencyRules) with a planted-failure floor in tools/expect-failure.sh instead of an ArchUnit test in a later WP subproject; WP01 and WP04 owned_files are disjoint and the lane graph is acyclic."
+  - id: TASKS-FRESH3-003
+    status: resolved
+    reason: "WP10 gains an Evidence path section (agent reports ready, orchestrator pushes with operator authorisation, run ids and per-leg conclusions recorded in research/wp10-measurements.md, limits set from them, second push confirms, planted-mutation red shown by a recorded scratch run), its Definition of Done cites run ids, and WP01 and overview R12 (d2) no longer claim the WP01 push is the only one."
+  - id: TASKS-FRESH3-004
+    status: resolved
+    reason: "WP10 guard (1) now has an explicit allowlist of the three real-binary files plus test_native_binary_helper.py, which only exercises the function under a monkeypatched environment, and guard (2) is scoped to the three real-binary files, so the guard is no longer red on its own helper test."
+  - id: TASKS-FRESH2-005
+    status: resolved
+    reason: "The WP01 spike entry-class test under launcher/src/test/java/.../launcher/spike/** is now owned by WP01 (owned_files, wps.yaml, lanes.json lane-a), its deletion is a recorded out-of-map edit in WP04's first commit and in overview section 4, and no other WP owns an overlapping launcher test path."
