@@ -13,7 +13,7 @@
       "wp": "WP07"
     },
     "#1200": {
-      "evidence_ref": "<link or commit>",
+      "evidence_ref": "glossary rows deferred by the spec; cited for context, no work owed here",
       "fr": null,
       "nfr": null,
       "repo": null,
@@ -21,7 +21,7 @@
       "scope": null,
       "source_file": "spec.md",
       "title": "<fill at WP-implementation time>",
-      "verdict": "unknown",
+      "verdict": "not-applicable",
       "wp": null
     },
     "#1248": {
