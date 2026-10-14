@@ -37,7 +37,7 @@
       "wp": "WP07"
     },
     "#4182": {
-      "evidence_ref": "<link or commit>",
+      "evidence_ref": "cited for golden-file provenance only; no work owed",
       "fr": null,
       "nfr": null,
       "repo": null,
@@ -45,7 +45,7 @@
       "scope": null,
       "source_file": "spec.md",
       "title": "<fill at WP-implementation time>",
-      "verdict": "unknown",
+      "verdict": "not-applicable",
       "wp": null
     },
     "#5231": {
