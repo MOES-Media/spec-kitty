@@ -96,6 +96,18 @@
       "verdict": "not-applicable",
       "wp": null
     },
+    "#6117": {
+      "evidence_ref": "strangler pattern reference; context only",
+      "fr": null,
+      "nfr": null,
+      "repo": null,
+      "sc": null,
+      "scope": null,
+      "source_file": null,
+      "title": null,
+      "verdict": "not-applicable",
+      "wp": null
+    },
     "#6164": {
       "evidence_ref": "either landing order works (plan 12); no work owed against it",
       "fr": null,
