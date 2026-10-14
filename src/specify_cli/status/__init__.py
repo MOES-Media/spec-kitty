@@ -208,12 +208,12 @@ from .progress import (
 )
 from .adapters import (
     ensure_runtime_moment_producer,
-    fire_lifecycle_saas_fanout,
+    fire_lifecycle_fanout,
     fire_resolved_binding_fanout,
-    fire_saas_fanout,
-    register_lifecycle_saas_fanout_handler,
+    fire_status_fanout,
+    register_lifecycle_fanout_handler,
     register_resolved_binding_fanout_handler,
-    register_saas_fanout_handler,
+    register_status_fanout_handler,
 )
 from .bootstrap import (
     BootstrapResult,
@@ -648,9 +648,9 @@ __all__ = [
     "is_dossier_snapshot",
     "merge_event_log_files",
     "merge_event_log_texts",
-    "register_lifecycle_saas_fanout_handler",
+    "register_lifecycle_fanout_handler",
     "register_resolved_binding_fanout_handler",
-    "register_saas_fanout_handler",
+    "register_status_fanout_handler",
     "summarize",
     "uninitialized_status_error",
     # WP03 (fsm-write-path-integrity-01M1TZV6, FR-010): the raw append
@@ -670,9 +670,9 @@ __all__ = [
     "materialize_to_json",
     "reconcile_status_snapshot",
     "ensure_runtime_moment_producer",
-    "fire_lifecycle_saas_fanout",
+    "fire_lifecycle_fanout",
     "fire_resolved_binding_fanout",
-    "fire_saas_fanout",
+    "fire_status_fanout",
     "WPStatusChangeMetadata",
     "read_events",
     "read_events_lenient",

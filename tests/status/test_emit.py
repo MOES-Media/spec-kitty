@@ -1241,7 +1241,7 @@ class TestSaasFanOut:
         def _handler(**kwargs):
             captured.append(dict(kwargs))
 
-        adapters.register_saas_fanout_handler(_handler)
+        adapters.register_status_fanout_handler(_handler)
         _saas_fan_out(event, "034-test-feature", None)
 
         assert len(captured) == 1, "fan-out handler must be invoked exactly once"
@@ -1274,7 +1274,7 @@ class TestSaasFanOut:
             to_lane=Lane.CLAIMED,
         )
         captured: list[dict] = []
-        adapters.register_saas_fanout_handler(lambda **kwargs: captured.append(dict(kwargs)))
+        adapters.register_status_fanout_handler(lambda **kwargs: captured.append(dict(kwargs)))
         _saas_fan_out(event, "034-test-feature", None)
         assert len(captured) == 1
 
@@ -1291,8 +1291,8 @@ class TestSaasFanOut:
         with patch("specify_cli.status.adapters.logger") as mock_logger:
             # Should not raise. After P1.3 the warning is logged by the
             # adapter (specify_cli.status.adapters) rather than by
-            # status.emit, since the try/except moved into fire_saas_fanout.
-            adapters.register_saas_fanout_handler(_boom)
+            # status.emit, since the try/except moved into fire_status_fanout.
+            adapters.register_status_fanout_handler(_boom)
             _saas_fan_out(event, "034-test-feature", None)
             mock_logger.warning.assert_called_once()
 
@@ -1302,7 +1302,7 @@ class TestSaasFanOut:
         def _boom(**kwargs):
             raise RuntimeError("network down")
 
-        adapters.register_saas_fanout_handler(_boom)
+        adapters.register_status_fanout_handler(_boom)
         _seed_planned(feature_dir, "WP01", slug="034-test-feature")
         event = emit_status_transition(
             TransitionRequest(
@@ -1836,7 +1836,7 @@ class TestGenesisSaasFanOutCompatibilityGate:
         def fake_saas(**kwargs: object) -> None:
             captured.append(dict(kwargs))
 
-        _adapters.register_saas_fanout_handler(fake_saas)
+        _adapters.register_status_fanout_handler(fake_saas)
         try:
             # Ensure the capability flag reports no genesis support (mirror current 5.2.0 reality)
             with patch.object(emit_module, "_EVENTS_SUPPORTS_GENESIS", False):
@@ -1883,7 +1883,7 @@ class TestGenesisSaasFanOutCompatibilityGate:
         def fake_saas(**kwargs: object) -> None:
             captured.append(dict(kwargs))
 
-        _adapters.register_saas_fanout_handler(fake_saas)
+        _adapters.register_status_fanout_handler(fake_saas)
         try:
             # Simulate 6.0.0+ (genesis-aware events installed)
             with patch.object(emit_module, "_EVENTS_SUPPORTS_GENESIS", True):
@@ -1925,7 +1925,7 @@ class TestGenesisSaasFanOutCompatibilityGate:
         def fake_saas(**kwargs: object) -> None:
             captured.append(dict(kwargs))
 
-        _adapters.register_saas_fanout_handler(fake_saas)
+        _adapters.register_status_fanout_handler(fake_saas)
         try:
             with patch.object(emit_module, "_EVENTS_SUPPORTS_GENESIS", False):
                 normal_event = StatusEvent(
@@ -1961,7 +1961,7 @@ class TestGenesisSaasFanOutCompatibilityGate:
         def fake_saas(**kwargs: object) -> None:
             captured.append(dict(kwargs))
 
-        _adapters.register_saas_fanout_handler(fake_saas)
+        _adapters.register_status_fanout_handler(fake_saas)
         try:
             with patch.object(emit_module, "_EVENTS_SUPPORTS_GENESIS", True):
                 normal_event = StatusEvent(

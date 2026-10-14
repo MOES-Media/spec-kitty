@@ -1,12 +1,12 @@
 """Reusable SaaS-sink mock fixtures for WP09 (T041).
 
 The canonical SaaS fanout boundary is
-:func:`specify_cli.status.adapters.fire_saas_fanout`.  The
+:func:`specify_cli.status.adapters.fire_status_fanout`.  The
 ``mock_saas_sink`` fixture patches that boundary in *both* its
-import-time location (``specify_cli.status.adapters.fire_saas_fanout``)
+import-time location (``specify_cli.status.adapters.fire_status_fanout``)
 and in the public package location where ``coordination.outbound`` performs
 its architecture-compliant lazy import
-(``from specify_cli.status import fire_saas_fanout``).
+(``from specify_cli.status import fire_status_fanout``).
 
 A separate file (not directly auto-loaded by pytest) keeps this fixture
 opt-in: tests that want to assert on outbound traffic do
@@ -60,25 +60,25 @@ class _RecordingSink:
 
 @pytest.fixture
 def mock_saas_sink(monkeypatch: pytest.MonkeyPatch) -> Iterator[_RecordingSink]:
-    """Patch ``fire_saas_fanout`` at every observable boundary.
+    """Patch ``fire_status_fanout`` at every observable boundary.
 
     Yields a :class:`_RecordingSink` that captures every call.
 
     Boundaries patched:
-      * ``specify_cli.status.adapters.fire_saas_fanout`` — the canonical
+      * ``specify_cli.status.adapters.fire_status_fanout`` — the canonical
         import path. Existing callers that import the symbol at module
         load time see the patched version.
-      * ``specify_cli.status.fire_saas_fanout`` — the package-root
+      * ``specify_cli.status.fire_status_fanout`` — the package-root
         re-export. ``coordination.outbound`` imports this symbol lazily,
         so SaaS-enabled tests must patch it too or they can fall through
         to registered real sync handlers.
-      * ``specify_cli.status.emit.fire_saas_fanout`` — emit.py imports
+      * ``specify_cli.status.emit.fire_status_fanout`` — emit.py imports
         the symbol at its module top, so monkeypatching the source alone
         does not catch its already-bound reference.
 
     The fixture is **safe to combine** with ``coordination.outbound.``
     ``queue_saas_emission`` because that helper performs a lazy
-    ``from specify_cli.status import fire_saas_fanout`` inside
+    ``from specify_cli.status import fire_status_fanout`` inside
     ``_send_to_saas`` — so the patched package attribute is read
     fresh on every call.
     """
@@ -86,11 +86,11 @@ def mock_saas_sink(monkeypatch: pytest.MonkeyPatch) -> Iterator[_RecordingSink]:
 
     # Primary boundary
     monkeypatch.setattr(
-        "specify_cli.status.adapters.fire_saas_fanout",
+        "specify_cli.status.adapters.fire_status_fanout",
         sink,
     )
     monkeypatch.setattr(
-        "specify_cli.status.fire_saas_fanout",
+        "specify_cli.status.fire_status_fanout",
         sink,
     )
 
@@ -99,9 +99,9 @@ def mock_saas_sink(monkeypatch: pytest.MonkeyPatch) -> Iterator[_RecordingSink]:
     try:
         import specify_cli.status.emit  # noqa: PLC0415
 
-        if hasattr(specify_cli.status.emit, "fire_saas_fanout"):
+        if hasattr(specify_cli.status.emit, "fire_status_fanout"):
             monkeypatch.setattr(
-                "specify_cli.status.emit.fire_saas_fanout",
+                "specify_cli.status.emit.fire_status_fanout",
                 sink,
             )
     except ImportError:

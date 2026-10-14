@@ -47,7 +47,7 @@ class TestFanOutPreservation:
         def fake_saas(**kwargs: object) -> None:
             captured.append(dict(kwargs))
 
-        adapters.register_saas_fanout_handler(fake_saas)
+        adapters.register_status_fanout_handler(fake_saas)
 
         try:
             _seed_planned(feature_dir, "WP01")
@@ -95,11 +95,11 @@ class TestFanOutPreservation:
             assert event is not None
             assert event.to_lane == Lane.CLAIMED
             # ``force`` now travels inside the ``metadata=WPStatusChangeMetadata``
-            # object (S107 cleanup) rather than as a top-level fire_saas_fanout()
+            # object (S107 cleanup) rather than as a top-level fire_status_fanout()
             # kwarg. The #1141 breadcrumb still surfaces it: adapters._fanout_force
             # duck-types ``metadata.force`` when no top-level ``force`` is present,
             # so the diagnostic keeps reporting the real flag.
-            assert ("fire_saas_fanout: wp_id=WP01 from=planned to=claimed force=False handlers=0") in caplog.text
+            assert ("fire_status_fanout: wp_id=WP01 from=planned to=claimed force=False handlers=0") in caplog.text
         finally:
             adapters.reset_handlers()
 
@@ -110,7 +110,7 @@ class TestFanOutPreservation:
         def boom(**kwargs: object) -> None:
             raise RuntimeError("handler exploded")
 
-        adapters.register_saas_fanout_handler(boom)
+        adapters.register_status_fanout_handler(boom)
 
         try:
             _seed_planned(feature_dir, "WP01")
@@ -139,7 +139,7 @@ class TestFanOutSeam:
     def test_single_fan_out_false_records_zero_adapter_calls(self, feature_dir: Path) -> None:
         adapters.reset_handlers()
         captured: list[dict[str, object]] = []
-        adapters.register_saas_fanout_handler(lambda **kwargs: captured.append(dict(kwargs)))
+        adapters.register_status_fanout_handler(lambda **kwargs: captured.append(dict(kwargs)))
         try:
             _seed_planned(feature_dir, "WP01")
             event = emit_status_transition(
@@ -160,7 +160,7 @@ class TestFanOutSeam:
     def test_batch_fan_out_false_records_zero_adapter_calls(self, feature_dir: Path) -> None:
         adapters.reset_handlers()
         captured: list[dict[str, object]] = []
-        adapters.register_saas_fanout_handler(lambda **kwargs: captured.append(dict(kwargs)))
+        adapters.register_status_fanout_handler(lambda **kwargs: captured.append(dict(kwargs)))
         try:
             _seed_planned(feature_dir, "WP01")
             events = emit_status_transition_batch(
@@ -191,7 +191,7 @@ class TestFanOutSeam:
     def test_batch_fan_out_default_fires_once_per_event(self, feature_dir: Path) -> None:
         adapters.reset_handlers()
         captured: list[dict[str, object]] = []
-        adapters.register_saas_fanout_handler(lambda **kwargs: captured.append(dict(kwargs)))
+        adapters.register_status_fanout_handler(lambda **kwargs: captured.append(dict(kwargs)))
         try:
             _seed_planned(feature_dir, "WP01")
             emit_status_transition_batch(

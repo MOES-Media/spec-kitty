@@ -270,7 +270,7 @@ def test_runtime_moment_producer_payload_passes_strict_validation(tmp_path: Path
     record = {"event_type": event_type, "timestamp": "2026-09-13T21:00:00+00:00", "payload": payload.model_dump(mode="json")}
     (run_dir / "run.events.jsonl").write_text(json.dumps(record, sort_keys=True) + "\n", encoding="utf-8")
     published: list[dict[str, Any]] = []
-    monkeypatch.setattr("specify_cli.status.fire_lifecycle_saas_fanout", lambda **kwargs: published.append(kwargs))
+    monkeypatch.setattr("specify_cli.status.fire_lifecycle_fanout", lambda **kwargs: published.append(kwargs))
 
     producer = RuntimeMomentProducer.for_mission(feature_dir=feature_dir, mission_slug="demo-mission", mission_type="software-dev")
     getattr(producer, _RUNTIME_EMIT_METHOD[event_type])(payload)

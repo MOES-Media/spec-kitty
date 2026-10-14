@@ -81,7 +81,7 @@ from .resolved_binding import ResolvedBinding
 from .wp_state import annotate
 from . import store as _store
 from . import reducer as _reducer
-from .adapters import fire_resolved_binding_fanout, fire_saas_fanout
+from .adapters import fire_resolved_binding_fanout, fire_status_fanout
 from .locking import feature_status_lock
 from .mission_write import mission_lock_key
 from .transition_pipeline import PreparedTransition, prepare_transition
@@ -1376,7 +1376,7 @@ def build_resolved_actor(
        surfaces are now typed :data:`~specify_cli.status.models.ActorField`
        (``str | dict``), and ``decode_actor`` guards the ``from_dict`` round-trip,
        so a caller may pass this dict as the claim/review transition ``actor`` and
-       it reaches ``_saas_fan_out`` (``fire_saas_fanout(actor=event.actor, …)``)
+       it reaches ``_saas_fan_out`` (``fire_status_fanout(actor=event.actor, …)``)
        uncorrupted. The ``emit_status_transition`` ``# NOSONAR`` hub was NOT
        inflated — the guard reads a projected string via ``actor_identity_str``.
        The off-transition binding change additionally bridges through the
@@ -1516,7 +1516,7 @@ def _saas_fan_out(
 ) -> None:
     """Conditionally fan out a SaaS telemetry event via the registered handlers.
 
-    Routes through specify_cli.status.adapters.fire_saas_fanout, which
+    Routes through specify_cli.status.adapters.fire_status_fanout, which
     is non-raising and a no-op when no sync handler has been registered
     (e.g., 0.1x branch or test environments without sync imported).
     Canonical status persistence is never affected by handler failures.
@@ -1544,10 +1544,10 @@ def _saas_fan_out(
     # WPStatusChangeMetadata lives in the CORE status layer (not sync/INTEGRATION),
     # so importing it here does not cross the CORE→INTEGRATION boundary that
     # test_integration_boundary.py enforces; the actual SaaS wiring still routes
-    # only through the status/adapters observer registry (fire_saas_fanout).
+    # only through the status/adapters observer registry (fire_status_fanout).
     from specify_cli.status.wp_status_metadata import WPStatusChangeMetadata
 
-    fire_saas_fanout(
+    fire_status_fanout(
         wp_id=event.wp_id,
         from_lane=str(event.from_lane),
         to_lane=str(event.to_lane),

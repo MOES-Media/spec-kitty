@@ -218,8 +218,8 @@ def test_ensure_registers_exactly_one_zeitgeist_handler_per_slot() -> None:
     try:
         adapters.ensure_zeitgeist_moment_handlers()
         adapters.ensure_zeitgeist_moment_handlers()  # idempotent
-        assert [h.__qualname__ for h in adapters._saas_handlers] == ["saas_moment_handler"]
-        assert [h.__qualname__ for h in adapters._lifecycle_saas_handlers] == ["lifecycle_moment_handler"]
+        assert [h.__qualname__ for h in adapters._status_handlers] == ["saas_moment_handler"]
+        assert [h.__qualname__ for h in adapters._lifecycle_handlers] == ["lifecycle_moment_handler"]
         assert [h.__qualname__ for h in adapters._resolved_binding_handlers] == ["resolved_binding_moment_handler"]
     finally:
         adapters.ensure_zeitgeist_moment_handlers()
@@ -383,7 +383,7 @@ def test_import_tail_honours_the_moment_handler_gate(gate_var: str) -> None:
     import': ``SPEC_KITTY_NO_MOMENT_HANDLERS`` is its own name, the
     ``SPEC_KITTY_SYNC_DISABLE`` kill switch folds in, and the deprecated
     ``SPEC_KITTY_SYNC_MINIMAL_IMPORT`` alias is still honored."""
-    script = "from specify_cli.status import adapters\nprint(len([h for h in adapters._saas_handlers if h.__module__.endswith('zeitgeist_bridge')]))\n"
+    script = "from specify_cli.status import adapters\nprint(len([h for h in adapters._status_handlers if h.__module__.endswith('zeitgeist_bridge')]))\n"
     gated_env = dict(os.environ)
     gated_env[gate_var] = "1"
     ungated_env = {k: v for k, v in os.environ.items() if k not in ("SPEC_KITTY_NO_MOMENT_HANDLERS", "SPEC_KITTY_SYNC_DISABLE", "SPEC_KITTY_SYNC_MINIMAL_IMPORT")}
@@ -444,7 +444,7 @@ def _fire_transition(**overrides: Any) -> None:
         "metadata": _transition_metadata(),
     }
     kwargs.update(overrides)
-    adapters.fire_saas_fanout(**kwargs)
+    adapters.fire_status_fanout(**kwargs)
 
 
 def test_transition_broadcasts_one_moment_plus_its_liveness_frames(monkeypatch: pytest.MonkeyPatch, resolved_credential: list[Path]) -> None:
@@ -670,7 +670,7 @@ def test_non_volatile_lifecycle_types_broadcast_nothing(monkeypatch: pytest.Monk
     recorder = OfferRecorder().install(monkeypatch)
     caplog.set_level(logging.DEBUG, logger=bridge.__name__)
 
-    adapters.fire_lifecycle_saas_fanout(
+    adapters.fire_lifecycle_fanout(
         envelope={"event_type": "WPCreated", "payload": {"mission_slug": "demo-mission", "wp_id": "WP01"}},
         log_path=None,
     )
@@ -954,7 +954,7 @@ def test_lifecycle_slot_resolves_credentials_from_the_log_path(monkeypatch: pyte
     OfferRecorder().install(monkeypatch)
     feature_dir = tmp_path / "kitty-specs" / "demo-mission"
 
-    adapters.fire_lifecycle_saas_fanout(
+    adapters.fire_lifecycle_fanout(
         envelope={
             "event_type": "MissionClosed",
             "payload": {"mission_slug": "demo-mission", "mission_number": 1, "mission_type": "software-dev"},
@@ -1205,7 +1205,7 @@ def test_started_phase_with_an_unrelated_extra_field_is_still_rejected(
     }
 
     with caplog.at_level(logging.WARNING):
-        adapters.fire_lifecycle_saas_fanout(
+        adapters.fire_lifecycle_fanout(
             envelope={"event_type": "SpecifyStarted", "event_id": _EVENT_ID, "payload": payload},
             log_path=None,
         )
@@ -1505,11 +1505,11 @@ def test_lifecycle_started_and_completed_events_broadcast_through_the_shared_pat
 ) -> None:
     """No duplicate lifecycle emitter is introduced: the six Specify/Plan/Tasks
     x Started/Completed beats reach the relay through the exact same
-    ``fire_lifecycle_saas_fanout`` slot MissionCreated already uses -- the
+    ``fire_lifecycle_fanout`` slot MissionCreated already uses -- the
     events#77 pin bump alone is what unlocked them (no new call site)."""
     recorder = OfferRecorder(outcome="sent").install(monkeypatch)
 
-    adapters.fire_lifecycle_saas_fanout(
+    adapters.fire_lifecycle_fanout(
         envelope={
             "event_id": "01JME2E2E2E2E2E2E2E2E2E2E3",
             "event_type": event_type,

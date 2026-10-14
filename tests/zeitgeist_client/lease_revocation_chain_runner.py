@@ -161,7 +161,7 @@ class Chain(TransactionTestCase):
         mission.mkdir(parents=True)
 
         def status(cwd=checkout_a):
-            adapters.fire_saas_fanout(
+            adapters.fire_status_fanout(
                 mission_slug="001-chain",
                 wp_id="WP01",
                 from_lane="planned",

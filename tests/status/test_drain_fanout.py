@@ -1,8 +1,8 @@
 """Drain gates the three status fan-out wrappers, the runtime-moment
 producer, and the bridge's outcome logging.
 
-``fire_saas_fanout``, ``fire_resolved_binding_fanout`` and
-``fire_lifecycle_saas_fanout`` must spawn no thread and call no handler when
+``fire_status_fanout``, ``fire_resolved_binding_fanout`` and
+``fire_lifecycle_fanout`` must spawn no thread and call no handler when
 drain is off, while the import-time ``moment_handlers_disabled_reason()``
 registration gate stays untouched and still composes with the new per-call
 gate. The runtime-moment producer must publish nothing under drain-off
@@ -42,18 +42,18 @@ def _clean_registry() -> Any:
 
 
 # ---------------------------------------------------------------------------
-# fire_saas_fanout / fire_resolved_binding_fanout / fire_lifecycle_saas_fanout
+# fire_status_fanout / fire_resolved_binding_fanout / fire_lifecycle_fanout
 # ---------------------------------------------------------------------------
 
 
 class TestFireSaasFanoutDrainGate:
     def test_no_handler_invoked_under_drain_off(self, drain_off: None, monkeypatch: pytest.MonkeyPatch) -> None:
         spy = Mock(name="saas-handler")
-        adapters.register_saas_fanout_handler(spy)
+        adapters.register_status_fanout_handler(spy)
         bounded = Mock(name="_run_fanout_handler_bounded")
         monkeypatch.setattr(adapters, "_run_fanout_handler_bounded", bounded)
 
-        adapters.fire_saas_fanout(wp_id="WP01", from_lane="planned", to_lane="claimed")
+        adapters.fire_status_fanout(wp_id="WP01", from_lane="planned", to_lane="claimed")
 
         bounded.assert_not_called()
         spy.assert_not_called()
@@ -61,9 +61,9 @@ class TestFireSaasFanoutDrainGate:
     def test_handler_invoked_exactly_once_under_drain_on(self) -> None:
         """Baseline regression guard (root fixture: drain on)."""
         spy = Mock(name="saas-handler")
-        adapters.register_saas_fanout_handler(spy)
+        adapters.register_status_fanout_handler(spy)
 
-        adapters.fire_saas_fanout(wp_id="WP01", from_lane="planned", to_lane="claimed")
+        adapters.fire_status_fanout(wp_id="WP01", from_lane="planned", to_lane="claimed")
 
         spy.assert_called_once()
 
@@ -92,20 +92,20 @@ class TestFireResolvedBindingFanoutDrainGate:
 class TestFireLifecycleSaasFanoutDrainGate:
     def test_no_handler_invoked_under_drain_off(self, drain_off: None, monkeypatch: pytest.MonkeyPatch) -> None:
         spy = Mock(name="lifecycle-handler")
-        adapters.register_lifecycle_saas_fanout_handler(spy)
+        adapters.register_lifecycle_fanout_handler(spy)
         bounded = Mock(name="_run_fanout_handler_bounded")
         monkeypatch.setattr(adapters, "_run_fanout_handler_bounded", bounded)
 
-        adapters.fire_lifecycle_saas_fanout(event_type="MissionRunStarted")
+        adapters.fire_lifecycle_fanout(event_type="MissionRunStarted")
 
         bounded.assert_not_called()
         spy.assert_not_called()
 
     def test_handler_invoked_exactly_once_under_drain_on(self) -> None:
         spy = Mock(name="lifecycle-handler")
-        adapters.register_lifecycle_saas_fanout_handler(spy)
+        adapters.register_lifecycle_fanout_handler(spy)
 
-        adapters.fire_lifecycle_saas_fanout(event_type="MissionRunStarted")
+        adapters.fire_lifecycle_fanout(event_type="MissionRunStarted")
 
         spy.assert_called_once()
 
@@ -149,7 +149,7 @@ class TestRepoScopedGateReadsTheEmittingRepo:
     repo A was gated on repo B's config whenever CWD was repo B.
     """
 
-    def test_fire_saas_fanout_publishes_for_the_emitting_repo_even_when_cwd_is_a_drain_off_repo(
+    def test_fire_status_fanout_publishes_for_the_emitting_repo_even_when_cwd_is_a_drain_off_repo(
         self,
         tmp_path: Path,
         canonical_home: None,
@@ -161,13 +161,13 @@ class TestRepoScopedGateReadsTheEmittingRepo:
         monkeypatch.chdir(repo_b)
 
         spy = Mock(name="saas-handler")
-        adapters.register_saas_fanout_handler(spy)
+        adapters.register_status_fanout_handler(spy)
 
-        adapters.fire_saas_fanout(wp_id="WP01", from_lane="planned", to_lane="claimed", repo_root=repo_a)
+        adapters.fire_status_fanout(wp_id="WP01", from_lane="planned", to_lane="claimed", repo_root=repo_a)
 
         spy.assert_called_once()
 
-    def test_fire_saas_fanout_skips_for_the_emitting_repo_even_when_cwd_is_a_drain_on_repo(
+    def test_fire_status_fanout_skips_for_the_emitting_repo_even_when_cwd_is_a_drain_on_repo(
         self,
         tmp_path: Path,
         canonical_home: None,
@@ -179,9 +179,9 @@ class TestRepoScopedGateReadsTheEmittingRepo:
         monkeypatch.chdir(repo_b)
 
         spy = Mock(name="saas-handler")
-        adapters.register_saas_fanout_handler(spy)
+        adapters.register_status_fanout_handler(spy)
 
-        adapters.fire_saas_fanout(wp_id="WP01", from_lane="planned", to_lane="claimed", repo_root=repo_a)
+        adapters.fire_status_fanout(wp_id="WP01", from_lane="planned", to_lane="claimed", repo_root=repo_a)
 
         spy.assert_not_called()
 
@@ -203,7 +203,7 @@ class TestRepoScopedGateReadsTheEmittingRepo:
 
         spy.assert_called_once()
 
-    def test_fire_lifecycle_saas_fanout_reads_the_emitting_repo(
+    def test_fire_lifecycle_fanout_reads_the_emitting_repo(
         self,
         tmp_path: Path,
         canonical_home: None,
@@ -215,9 +215,9 @@ class TestRepoScopedGateReadsTheEmittingRepo:
         monkeypatch.chdir(repo_b)
 
         spy = Mock(name="lifecycle-handler")
-        adapters.register_lifecycle_saas_fanout_handler(spy)
+        adapters.register_lifecycle_fanout_handler(spy)
 
-        adapters.fire_lifecycle_saas_fanout(event_type="MissionRunStarted", repo_root=repo_a)
+        adapters.fire_lifecycle_fanout(event_type="MissionRunStarted", repo_root=repo_a)
 
         spy.assert_called_once()
 

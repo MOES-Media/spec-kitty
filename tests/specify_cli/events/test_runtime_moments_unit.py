@@ -104,7 +104,7 @@ def _stamped(payload: BaseModel, **identity: str) -> dict[str, Any]:
 @pytest.fixture
 def published(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     captured: list[dict[str, Any]] = []
-    monkeypatch.setattr("specify_cli.status.fire_lifecycle_saas_fanout", lambda **kwargs: captured.append(kwargs))
+    monkeypatch.setattr("specify_cli.status.fire_lifecycle_fanout", lambda **kwargs: captured.append(kwargs))
     return captured
 
 
@@ -321,7 +321,7 @@ def test_a_fanout_failure_never_raises_into_the_runtime(tmp_path: Path, monkeypa
     def explode(**_kwargs: Any) -> None:
         raise RuntimeError("relay unreachable")
 
-    monkeypatch.setattr("specify_cli.status.fire_lifecycle_saas_fanout", explode)
+    monkeypatch.setattr("specify_cli.status.fire_lifecycle_fanout", explode)
 
     with caplog.at_level(logging.WARNING, logger=PRODUCER_LOGGER):
         _emit(_producer(feature_dir), "DecisionInputAnswered", payload)

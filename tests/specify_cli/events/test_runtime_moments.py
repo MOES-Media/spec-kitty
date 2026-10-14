@@ -3,7 +3,7 @@
 Acceptance test for the E3 producer at the consolidated ``RuntimeEventEmitter``
 seam. A real mission run is driven through ``decide_next_via_runtime`` and
 ``answer_decision_via_runtime`` (no stubbed engine); the oracle is the run's
-canonical ``run.events.jsonl`` journal and the ``fire_lifecycle_saas_fanout``
+canonical ``run.events.jsonl`` journal and the ``fire_lifecycle_fanout``
 boundary the Zeitgeist moment handler sits behind. Network delivery is out of
 scope here: the fan-out boundary is captured, never sent.
 """
@@ -96,7 +96,7 @@ def published(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[dict[str, Any]]]
     from runtime.next._internal_runtime import events as events_mod
 
     captured: list[dict[str, Any]] = []
-    monkeypatch.setattr("specify_cli.status.fire_lifecycle_saas_fanout", lambda **kwargs: captured.append(kwargs))
+    monkeypatch.setattr("specify_cli.status.fire_lifecycle_fanout", lambda **kwargs: captured.append(kwargs))
     events_mod.reset_runtime_emitter_factory()
     yield captured
     events_mod.reset_runtime_emitter_factory()

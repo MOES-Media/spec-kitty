@@ -154,7 +154,7 @@ def _build_runtime_moment_envelope() -> dict[str, Any]:
     published: list[dict[str, Any]] = []
     with (
         tempfile.TemporaryDirectory() as tmp,
-        patch("specify_cli.status.fire_lifecycle_saas_fanout", side_effect=lambda **kwargs: published.append(kwargs)),
+        patch("specify_cli.status.fire_lifecycle_fanout", side_effect=lambda **kwargs: published.append(kwargs)),
     ):
         root = Path(tmp)
         feature_dir = root / "kitty-specs" / MISSION_SLUG

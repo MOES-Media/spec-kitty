@@ -50,9 +50,9 @@ from tests.specify_cli.coordination.test_status_transition import (
 pytestmark = [pytest.mark.unit, pytest.mark.git_repo]
 
 _FAN_OUT_BOUNDARIES = (
-    "specify_cli.status.adapters.fire_saas_fanout",
-    "specify_cli.status.fire_saas_fanout",
-    "specify_cli.status.emit.fire_saas_fanout",
+    "specify_cli.status.adapters.fire_status_fanout",
+    "specify_cli.status.fire_status_fanout",
+    "specify_cli.status.emit.fire_status_fanout",
 )
 
 
@@ -79,7 +79,7 @@ def repo(tmp_path: Path) -> Path:
 def order(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[str]]:
     """Record the relative order of durable commits and SaaS fan-outs.
 
-    Patches the same three ``fire_saas_fanout`` boundaries as
+    Patches the same three ``fire_status_fanout`` boundaries as
     ``tests.conftest_saas_sink.mock_saas_sink`` so every fan-out path (flat
     shell and deferred outbound) lands in one ordered log.
     """

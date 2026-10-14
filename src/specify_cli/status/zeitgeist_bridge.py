@@ -12,8 +12,8 @@ are registered into the existing slots by
 
 Three slots, one broadcast core:
 
-* ``fire_saas_fanout`` (WP lane transitions) → ``WPStatusChanged``;
-* ``fire_lifecycle_saas_fanout`` (mission lifecycle and decision logs) → the
+* ``fire_status_fanout`` (WP lane transitions) → ``WPStatusChanged``;
+* ``fire_lifecycle_fanout`` (mission lifecycle and decision logs) → the
   volatile subset of those logs' event types
   (:data:`spec_kitty_events.zeitgeist_attrs.VOLATILE_EVENT_TYPES`): mission
   created, the specify/plan/tasks Started and Completed phases, and decision
