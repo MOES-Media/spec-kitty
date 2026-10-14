@@ -1,0 +1,1 @@
+{"detail":"time is absent or not an RFC 3339 timestamp","event_id":"01J0000000000000000000F001","op":"produce","outcome":"refused","reason":"time-unparseable","reason_class":"rejected","v":1}

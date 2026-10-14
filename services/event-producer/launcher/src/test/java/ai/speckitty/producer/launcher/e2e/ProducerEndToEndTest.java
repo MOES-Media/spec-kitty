@@ -196,7 +196,9 @@ class ProducerEndToEndTest {
     @Test
     void anUnresolvableRootIsARefusedReplyAndNothingIsCreated(@TempDir Path dir) throws Exception {
         Path bare = Files.createDirectories(dir.resolve("not-a-repo")).toRealPath();
-        Child.Run run = accept(bare, Requests.produce(Requests.laneRow(EVENT), ".", 20000));
+        // The machine's temporary directory may itself hold a stray .git; the ceiling stops the walk at the start directory.
+        Child.Run run = Child.run(Child.jvm(TestMain.class.getName(), "accept"), bare, Requests.produce(Requests.laneRow(EVENT), ".", 20000),
+                Map.of("GIT_CEILING_DIRECTORIES", bare.toString()));
         assertThat(run.exit()).isZero();
         Map<String, Object> reply = parse(run.out());
         assertThat(reply).containsEntry("outcome", "refused").containsEntry("reason", "root-unresolvable").containsEntry("reason_class", "rejected");

@@ -34,12 +34,15 @@ final class Child {
     }
 
     static Run run(List<String> command, Path cwd, byte[] stdin) throws IOException, InterruptedException {
-        Process process = start(command, cwd);
-        return finish(process, stdin);
+        return run(command, cwd, stdin, java.util.Map.of());
     }
 
-    static Process start(List<String> command, Path cwd) throws IOException {
-        return new ProcessBuilder(command).directory(cwd.toFile()).start();
+    /** As {@link #run(List, Path, byte[])} with extra environment variables for the child. */
+    static Run run(List<String> command, Path cwd, byte[] stdin, java.util.Map<String, String> environment)
+            throws IOException, InterruptedException {
+        ProcessBuilder builder = new ProcessBuilder(command).directory(cwd.toFile());
+        builder.environment().putAll(environment);
+        return finish(builder.start(), stdin);
     }
 
     static Run finish(Process process, byte[] stdin) throws IOException, InterruptedException {
