@@ -195,10 +195,12 @@ jobs:
         run: |
           image=$(jq -r '[.tools[] | select(.kind == "container-image")][0].image' services/event-producer/tools/pins.json)
           echo "building in $image"
+          # Fail closed on the host (JAVA_HOME must hold bin/java) and again inside the container, where /graalvm is the mount of it.
+          bash services/event-producer/tools/check-java-home.sh "$JAVA_HOME"
           docker run --rm --user "$(id -u):$(id -g)" \
             -v "$PWD/services/event-producer:/work" -v "$JAVA_HOME:/graalvm:ro" \
             -e JAVA_HOME=/graalvm -e GRADLE_USER_HOME=/work/.gradle-home -e HOME=/work/.home \
-            -w /work "$image" ./gradlew --no-daemon :launcher:nativeCompile cyclonedxBom
+            -w /work "$image" bash -c 'bash tools/check-java-home.sh /graalvm && ./gradlew --no-daemon :launcher:nativeCompile cyclonedxBom'
 
       # macOS: deployment target 11.0 (the minos floor of the macosx_11_0_arm64 tag). The binary is never stripped (ad-hoc signature).
       - name: Build the native image (macOS)

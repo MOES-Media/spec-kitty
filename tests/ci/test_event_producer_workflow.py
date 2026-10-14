@@ -11,6 +11,7 @@ from __future__ import annotations
 import copy
 import json
 import re
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -357,9 +358,59 @@ def test_the_smoke_action_is_shell_only_with_the_documented_inputs() -> None:
     assert '{"v":1,"op":"produce","start_path":"."}' in text, "the inline default request the WP01 spike accepts"
 
 
-@pytest.mark.parametrize("script", ["expect-failure.sh", "check-sbom.sh", "measure-start.sh", "install-graalvm.sh", "package-leg.sh"])
+@pytest.mark.parametrize("script", ["expect-failure.sh", "check-sbom.sh", "measure-start.sh", "install-graalvm.sh", "package-leg.sh", "check-java-home.sh"])
 def test_the_shell_tools_exist_and_are_bash(script: str) -> None:
     path = TOOLS / script
     assert path.is_file()
     assert path.read_text(encoding="utf-8").startswith("#!/usr/bin/env bash\n")
     assert "set -" in path.read_text(encoding="utf-8")
+
+
+def _fake_jdk(root: Path) -> Path:
+    """An unpacked GraalVM-shaped tree: the JDK root plus the lib/svm decoy that holds a native-image but no bin/java."""
+    jdk = root / "unpacked" / "graalvm-test-jdk"
+    for rel in ("bin/java", "bin/native-image", "lib/svm/bin/native-image"):
+        target = jdk / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("#!/bin/sh\n", encoding="utf-8")
+    return jdk
+
+
+def _check(*args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(["bash", str(TOOLS / "check-java-home.sh"), *args], capture_output=True, text=True, check=False)
+
+
+def test_java_home_detection_picks_the_jdk_root_not_lib_svm(tmp_path: Path) -> None:
+    jdk = _fake_jdk(tmp_path)
+    found = _check("--find", str(tmp_path / "unpacked"))
+    assert found.returncode == 0, found.stderr
+    assert found.stdout.strip() == str(jdk)
+    assert _check(str(jdk)).returncode == 0
+
+
+def test_java_home_without_bin_java_fails_closed(tmp_path: Path) -> None:
+    jdk = _fake_jdk(tmp_path)
+    for bad in (str(jdk / "lib" / "svm"), str(tmp_path / "absent"), ""):
+        result = _check(bad)
+        assert result.returncode == 1 and "JAVA_HOME_INVALID" in result.stderr, bad
+    (jdk / "bin" / "java").unlink()
+    assert _check(str(jdk)).returncode == 1, "a root that lost bin/java is refused"
+    assert _check("--find", str(tmp_path / "unpacked")).returncode == 1, "the lib/svm decoy alone is never a JAVA_HOME"
+
+
+def test_install_script_uses_the_checked_root() -> None:
+    text = (TOOLS / "install-graalvm.sh").read_text(encoding="utf-8")
+    assert "check-java-home.sh" in text and "--find" in text
+    assert "-name native-image" not in text, "the root is not derived from the first native-image found (that was lib/svm)"
+
+
+def test_the_container_build_checks_java_home_on_host_and_inside(event_producer: dict[str, Any]) -> None:
+    step = next(s for s in jobs(event_producer)["native"]["steps"] if s.get("name") == "Build the native image (Linux, manylinux_2_28 container)")
+    run = str(step["run"])
+    assert run.index('check-java-home.sh "$JAVA_HOME"') < run.index("docker run"), "the host JAVA_HOME is checked before the mount"
+    assert "check-java-home.sh /graalvm" in run, "and the mount is checked inside the container"
+
+
+def test_expect_failure_runs_the_java_home_controls() -> None:
+    text = (TOOLS / "expect-failure.sh").read_text(encoding="utf-8")
+    assert "javahome) javahome ;;" in text and "all) floor; tamper; module; sbom; javahome ;;" in text

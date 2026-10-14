@@ -41,10 +41,11 @@ case "$url" in
 esac
 rm -f "$archive"
 
-# The archive holds one top directory; macOS nests the JDK under Contents/Home.
-home=$(find "$dest/unpacked" -maxdepth 6 \( -type f -o -type l \) \( -name native-image -o -name native-image.cmd \) -path '*/bin/*' | head -n 1)
-[ -n "$home" ] || { echo "install-graalvm: no bin/native-image in the unpacked archive" >&2; exit 1; }
-java_home=$(cd "$(dirname "$home")/.." && pwd)
+# The archive holds one top directory; macOS nests the JDK under Contents/Home. The JDK root is the directory holding bin/java AND
+# bin/native-image: lib/svm/bin/native-image also exists but is not a JDK root. check-java-home.sh fails closed.
+tools="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+java_home=$("$tools/check-java-home.sh" --find "$dest/unpacked")
+"$tools/check-java-home.sh" "$java_home"
 
 if command -v cygpath >/dev/null 2>&1; then java_home=$(cygpath -m "$java_home"); fi
 # Pin check: the toolchain must be the pinned release.

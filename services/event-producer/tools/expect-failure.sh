@@ -2,7 +2,7 @@
 # Negative controls of the event producer build (WP01 T003): each step PLANTS a defect and passes only when the build goes red for
 # the right reason (the gate's own message in the output, not just any red). A green planted run, or a red for another reason, fails.
 #
-#   expect-failure.sh [floor|tamper|module|sbom|all]     (default: all)
+#   expect-failure.sh [floor|tamper|module|sbom|javahome|all]     (default: all)
 #
 # Run from anywhere; it works on services/event-producer. GRADLE overrides the launcher (default: the committed wrapper).
 set -uo pipefail
@@ -90,6 +90,24 @@ sbom() {
   rm -rf "$scratch"; scratch=""
 }
 
+javahome() {
+  # JAVA_HOME must be the directory holding bin/java (WP01 CI finding: the install script once took lib/svm, a directory that also has
+  # bin/native-image, and the manylinux container mounted a path without bin/java). Plants an unpacked JDK that carries that decoy.
+  local check="$here/check-java-home.sh" jdk
+  scratch="$(mktemp -d)"
+  jdk="$scratch/unpacked/graalvm-test-jdk"
+  mkdir -p "$jdk/bin" "$jdk/lib/svm/bin"
+  : > "$jdk/bin/java"; : > "$jdk/bin/native-image"; : > "$jdk/lib/svm/bin/native-image"
+  chmod +x "$jdk/bin/java" "$jdk/bin/native-image" "$jdk/lib/svm/bin/native-image"
+  expect_green "JAVA_HOME with bin/java and bin/native-image is accepted (positive control)" "$check" "$jdk"
+  expect_red "JAVA_HOME lib/svm (a native-image but no bin/java) is refused" "JAVA_HOME_INVALID" "$check" "$jdk/lib/svm"
+  expect_red "a JAVA_HOME that does not exist is refused" "JAVA_HOME_INVALID" "$check" "$scratch/absent"
+  expect_red "an empty JAVA_HOME value is refused" "JAVA_HOME_INVALID" "$check" ""
+  if [ "$("$check" --find "$scratch/unpacked" 2>"$log")" = "$jdk" ]; then pass "detection picks the JDK root, not the lib/svm decoy"; else fail "detection did not pick the JDK root"; cat "$log"; fi
+  expect_red "detection in a tree without bin/java is refused" "JAVA_HOME_INVALID" "$check" --find "$scratch/unpacked/graalvm-test-jdk/lib"
+  rm -rf "$scratch"; scratch=""
+}
+
 floorgate() {
   # The measured-floor gate of package-leg.sh must go red when the pinned floor is tighter than the binary. Needs a built binary and
   # the toolchain checksum (event-producer.yml runs it after the leg is built). Windows has no floor: nothing to plant.
@@ -114,7 +132,8 @@ case "$mode" in
   tamper) tamper ;;
   module) module ;;
   sbom) sbom ;;
-  all) floor; tamper; module; sbom ;;
+  javahome) javahome ;;
+  all) floor; tamper; module; sbom; javahome ;;
   *) echo "expect-failure: unknown step '$mode'" >&2; exit 2 ;;
 esac
 
