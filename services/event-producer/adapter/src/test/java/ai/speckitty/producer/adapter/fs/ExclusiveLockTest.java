@@ -136,6 +136,26 @@ class ExclusiveLockTest {
         }
     }
 
+    @Test
+    void aThreadThatGivesUpWaitingDoesNotDropTheHoldersLockForOtherProcesses() throws Exception {
+        Path lock = dir.resolve("clock.lock");
+        try (ExclusiveLock holder = ExclusiveLock.acquire(lock, 1_000).orElseThrow()) {
+            assertThat(holder).isNotNull();
+            ExecutorService pool = Executors.newSingleThreadExecutor();
+            try {
+                // the waiter opens its own channel on the file and closes it again when it gives up
+                assertThat(pool.submit(() -> ExclusiveLock.acquire(lock, 150)).get()).isEmpty();
+            } finally {
+                pool.shutdownNow();
+            }
+            Process other = ChildJvm.start(LockChild.class, dir.resolve("other.log"), "try", lock.toString(), "300");
+            int[] codes = ChildJvm.awaitAll(List.of(other), 60);
+            assertThat(codes).as("the other process must still be refused while the holder lives").containsOnly(4);
+        }
+        Process after = ChildJvm.start(LockChild.class, dir.resolve("after.log"), "try", lock.toString(), "5000");
+        assertThat(ChildJvm.awaitAll(List.of(after), 60)).containsOnly(0);
+    }
+
     private static void awaitFile(Path file) throws IOException, InterruptedException {
         long deadline = System.nanoTime() + 30_000_000_000L;
         while (!Files.exists(file)) {

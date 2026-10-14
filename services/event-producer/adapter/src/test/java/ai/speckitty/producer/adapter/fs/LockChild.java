@@ -7,7 +7,8 @@ import java.util.Optional;
 /**
  * Child process of {@link ExclusiveLockTest}. {@code count <lock> <counter> <times>} increments a counter file read-modify-write
  * under the lock, with a pause in the middle that makes an unlocked run lose updates. {@code hold <lock> <ready> <millis>} takes
- * the lock, writes the ready file and sleeps.
+ * the lock, writes the ready file and sleeps. {@code try <lock> <millis>} waits at most that long and exits 0 when it got the lock, 4
+ * when it did not.
  */
 public final class LockChild {
 
@@ -40,6 +41,13 @@ public final class LockChild {
                     Files.writeString(Path.of(args[2]), "held");
                     Thread.sleep(Long.parseLong(args[3]));
                 }
+            }
+            case "try" -> {
+                Optional<ExclusiveLock> held = ExclusiveLock.acquire(lock, Long.parseLong(args[2]));
+                if (held.isEmpty()) {
+                    System.exit(4);
+                }
+                held.get().close();
             }
             default -> System.exit(2);
         }
