@@ -398,10 +398,12 @@ def test_java_home_without_bin_java_fails_closed(tmp_path: Path) -> None:
     assert _check("--find", str(tmp_path / "unpacked")).returncode == 1, "the lib/svm decoy alone is never a JAVA_HOME"
 
 
-def test_install_script_uses_the_checked_root() -> None:
+def test_install_script_uses_the_checked_root_and_hashes_from_stdin() -> None:
     text = (TOOLS / "install-graalvm.sh").read_text(encoding="utf-8")
     assert "check-java-home.sh" in text and "--find" in text
     assert "-name native-image" not in text, "the root is not derived from the first native-image found (that was lib/svm)"
+    # sha256sum given a path with a backslash (a Windows RUNNER_TEMP) prints a leading backslash, which read as a checksum mismatch.
+    assert 'sha256sum <"$archive"' in text and 'sha256sum "$archive"' not in text
 
 
 def test_the_container_build_checks_java_home_on_host_and_inside(event_producer: dict[str, Any]) -> None:

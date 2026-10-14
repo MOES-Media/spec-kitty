@@ -24,10 +24,11 @@ mkdir -p "$dest"
 archive="$dest/graalvm-archive"
 curl --fail --silent --show-error --location --retry 3 --output "$archive" "$url"
 
+# Hash from stdin: sha256sum given a PATH that holds a backslash (a Windows RUNNER_TEMP) prefixes the digest with a backslash.
 if command -v sha256sum >/dev/null 2>&1; then
-  got=$(sha256sum "$archive" | cut -d' ' -f1)
+  got=$(sha256sum <"$archive" | cut -d' ' -f1)
 else
-  got=$(shasum -a 256 "$archive" | cut -d' ' -f1)
+  got=$(shasum -a 256 <"$archive" | cut -d' ' -f1)
 fi
 if [ "$got" != "$want" ]; then
   echo "install-graalvm: CHECKSUM_MISMATCH for $name: pinned $want but downloaded $got" >&2
