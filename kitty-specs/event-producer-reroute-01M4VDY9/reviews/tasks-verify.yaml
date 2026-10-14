@@ -1,0 +1,175 @@
+schema: review-verify/v1
+complete: true
+phase: tasks
+results:
+  - id: TASKS-DECOMP-002
+    status: resolved
+    reason: "WP07 is split: WP12 holds only marker clearing and persisted-line validation (T047, T078) and is the only gated WP of the old four concerns, while WP07 depends on WP06 alone and is ungated in wps.yaml, overview R6 and WP07 body."
+  - id: TASKS-DECOMP-004
+    status: resolved
+    reason: "R13 and WP04 T023 make WP04 own Wiring with a fail-closed default validator (accept-all mutation must fail) and WP11 T084 binds the schema adapter with a launcher test that an invalid row replies rejected, recorded as a second-editor edit; per-WP native-image metadata dirs (R5) cover the reachability gap."
+  - id: TASKS-DECOMP-005
+    status: resolved
+    reason: "WP06 owned_files now include test_bridge_engine.py and every named emitter-fake test file with a census step (grep def emit_significance_evaluated, add the method or prove unreached), WP05 owns launcher/src/test/**/retain/**, WP03 no longer edits event-producer.yml, and WP06/WP07/WP10/WP12 list their second-editor edits in tables in overview section 4 and in each WP body."
+  - id: TASKS-DECOMP-006
+    status: resolved
+    reason: "WP07 T048 now names the owned file tests/specify_cli/migration/test_rebuild_state.py, feeds a pre-stamp legacy run.events.jsonl through the readers, asserts byte-identity, reduced output equal to golden and no rewrite, with a floor and a rewriting-reader mutation."
+  - id: TASKS-DECOMP-007
+    status: resolved
+    reason: "T044, T058, T064 and T071 are removed as subtasks (grep finds them only in overview R6) and replaced by Precondition gate sections; T064 no longer exists and T071's pin confirmation is the first step of T072."
+  - id: TASKS-SEQ-001
+    status: resolved
+    reason: "Overview R4 moves the interface-only application/port/** package into WP03 as first task T079 (added to WP03 owned_files, WP04 keeps Produce, launcher and ArchitectureTest) and WP03 adapters declare implements on those ports."
+  - id: TASKS-SEQ-002
+    status: resolved
+    reason: "R5 gives each WP its own META-INF/native-image/ai.speckitty/producer-<wp> directory in wps.yaml (spike, adapter-fs, launcher, retain, ledger, schema), records WP04's spike deletion as an out-of-map edit, and WP03 T017 adds a native-smoke expectation before metadata."
+  - id: TASKS-SEQ-003
+    status: resolved
+    reason: "Gradle, SBOM, dist-set.json and verification-metadata are settled once in WP01 (R9), WP02/WP09/WP11 no longer edit WP01 build files, the README edit is dropped (R14), and the remaining cross-WP edits (pyproject floor, engine.py, workflows, Wiring) are in the recorded out-of-map tables in overview section 4 and each editing WP."
+  - id: TASKS-SEQ-004
+    status: resolved
+    reason: "R1 is reworded to the compile-time OperationHandler dependency, WP04 T027 fixes the ServiceLoader mechanism with a single WP05-owned META-INF/services provider file (in WP05 owned_files), and WP05 dependencies are reduced to [WP04]."
+  - id: TASKS-SEQ-005
+    status: resolved
+    reason: "Overview section 2 (R6) defines one gate: it blocks approval and released-artifact reading, not authoring, 'WP11 complete' means approved with the pin naming the released wheel, and WP07 is ungated, WP09 depends on WP08 only; every gated WP carries the same Precondition gate wording."
+  - id: TASKS-SEQ-006
+    status: resolved
+    reason: "Not reordered, but the recorded reason holds (the pull_request trigger needs the registration for the scratch run), and the real defect is removed: the registration is its own ci(registration) commit, nothing of the lane merges on HALT, the tree state on HALT and the runner assumption are stated; minor new gap: the evidence path commits only T003-T007 before the push although native-smoke in T007 calls the T008 smoke action."
+  - id: TASKS-SEQ-007
+    status: resolved
+    reason: "WP01 T001 now captures the baseline on the base sha but commits the file after T002, so the docs(campsite) commit stays the first commit of the WP, matching plan 11 and the overview section 6."
+  - id: TASKS-SEQ-008
+    status: resolved
+    reason: "Overview section 4 has a known-overlaps table (PR 6205, 6148, 5540 with file, WP and action), the stale 'about 19' line is gone, and WP01, WP06, WP07 and WP11 each carry a check-open-PRs-before-first-commit step."
+  - id: TASKS-SEQ-010
+    status: resolved
+    reason: "wps.yaml now has WP05 depending on [WP04], WP06 on [WP05] and WP10 on [WP09, WP11, WP12], so the redundant transitive edges are removed and lanes.json depends_on_lanes lists at most three lanes."
+  - id: TASKS-COVER-001
+    status: resolved
+    reason: "WP12 T047 (ii) now requires one persisted row per cleared marker from the real writer (decisions/emit.py, lifecycle_events.py, engine._append_event plus each cleared marker 3, 4, 7) with run-journal kinds only additional, a floor equal to cleared-marker count, and schema-invalid and empty-schema mutations."
+  - id: TASKS-COVER-002
+    status: resolved
+    reason: "WP06 T040 now states the floor (data-model section 3 writers plus standalone and bundled annotation rows), the three self-mutations, the named exemption that fails when an emitter appears, filesystem derivation, and the client-level one-invocation assertion."
+  - id: TASKS-COVER-003
+    status: resolved
+    reason: "WP06 T080 adds one named, revert-checked test per AC-003 sub-observable (b) to (e) with the kill-switch list enumerated from moment_handlers_disabled_reason and a non-empty floor, while T036 covers (f) and the drain-off case."
+  - id: TASKS-COVER-004
+    status: resolved
+    reason: "R11 and WP06 T036 add hunk B2 with a red-first test that fire_lifecycle_saas_fanout and fire_resolved_binding_fanout set kwargs['repo_root'] before dispatch, which matches the code where only fire_saas_fanout re-joins it, and state the slot used."
+  - id: TASKS-COVER-005
+    status: resolved
+    reason: "WP03 T018 adds canonical-root derivation parity tests for primary, linked, coordination worktree and Mission subdirectory, WP04 T025 adds the root-unresolvable reply, WP06 T036 asserts stderr warning with no fault-log row (matching AC-005), and WP10 T065 uses a Mission subdirectory."
+  - id: TASKS-COVER-006
+    status: resolved
+    reason: "WP04 T026 adds slug-only and empty-missionid cases with four mutations and WP10 T066 asserts empty stderr, unchanged fault log and fault_summary and byte-identical exit code and body against a producer-absent run."
+  - id: TASKS-COVER-007
+    status: resolved
+    reason: "WP02 T013 now carries the five-mutant table (naive, no source tie-break, raw-id dedupe, invalid survivor, dropped error row) each asserted red, the all-nine floor and multiset comparison of error rows, and WP11 T075 reuses the table for the released run."
+  - id: TASKS-COVER-008
+    status: resolved
+    reason: "WP02 T013 lists error-row cases for lamportclock null, \"5\", true, 1.5 and -1 and the absent-member clockless case, with 2^31 kept as fixture 9."
+  - id: TASKS-COVER-009
+    status: resolved
+    reason: "WP06 T035 defines the window rule and lists red tests with injected _now_utc for exact boundary, one day older, absent, non-numeric, notice-only day files, and separate assertions for notice rows counted apart and success not resetting."
+  - id: TASKS-COVER-010
+    status: resolved
+    reason: "WP04 T024 asserts doing becoming in_progress and uninitialized rejected with a test-local registry, WP11 T073 repeats them against the released registry, and WP07 T045 states the AC-020 split explicitly."
+  - id: TASKS-COVER-011
+    status: resolved
+    reason: "WP06 T035 has the torn-line notice test (one stderr line, one notice row with repo-relative path and position, fault_summary unchanged) and WP10 T066 adds the end-to-end truncate-then-append case, and AC-026 is mapped to WP03, WP06 and WP10 in the overview."
+  - id: TASKS-COVER-012
+    status: resolved
+    reason: "R10 and WP06 T042 drop the constants module, keep the fault-log path inside record_fault/_read_fault_rows, declare the three paths as StateSurface entries on existing roots (StateRoot.GIT_INTERNAL and PROJECT exist in the code) with a common-dir note, and key the AC-030 gate on the publish-log entry."
+  - id: TASKS-COVER-014
+    status: resolved
+    reason: "WP06 T039 now lists the three AC-012 mutants (schema import, publish-log read, bridge envelope code) on a client copy and a positive allowed-capabilities fixture that must pass."
+  - id: TASKS-COVER-015
+    status: resolved
+    reason: "WP06 T041 adds a red test that a retain policy_error and a stubbed crash or timeout render an error, write zero fault-log rows and leave fault_summary unchanged."
+  - id: TASKS-COVER-016
+    status: resolved
+    reason: "WP06 now owns engine.py, test_bridge_engine.py, the thinness gate and other emitter fakes, WP07/WP10/WP12 record their second-editor edits in tables, and every Java WP carries a create_intent list in frontmatter consistent with wps.yaml."
+  - id: TASKS-VERIFY-001
+    status: resolved
+    reason: "R12(a) and WP01 T007 make gradle-test a ubuntu/macos/windows matrix running check (adapter and application on macOS and Windows) with the terminal event-producer-gate failing on an absent or skipped leg, and WP03 T022 maps AC-010, AC-034 and AC-039 to all three legs."
+  - id: TASKS-VERIFY-002
+    status: resolved
+    reason: "WP10 T083 adds the native-e2e job (three legs, named files, REQUIRE_NATIVE_PRODUCER=1) in event-producer.yml and the terminal gate, with _native_binary.require_native_binary failing on a missing binary and a planted-missing-binary mutation test, so the real-binary tests cannot skip under CI."
+  - id: TASKS-VERIFY-003
+    status: resolved
+    reason: "R9 and WP01 T003 wire JaCoCo verification to check, every WP gate command is gradle check, and a floor-breach test (tools/expect-failure.sh with a raised floor property) runs in verify-pins with a workflow-test assertion."
+  - id: TASKS-VERIFY-005
+    status: resolved
+    reason: "R10 and WP06 T035/T039 make _now_utc return kernel.clock.now_utc() (the function exists in src/kernel/clock.py), extend the thinness clock vocabulary and mutation to kernel.clock calls, and add test_clock_import_ban and test_clock_call_ban to the WP06, WP07, WP08 and WP10 gate lists with the TID251 note."
+  - id: TASKS-VERIFY-007
+    status: resolved
+    reason: "WP06 gates now name explicit test files instead of tests/status/ and WP01 T001 adds exactly those files (test_saas_fanout_timeout, test_drain_fanout, test_emit_fanout_after_adapter, test_conftest_restores_zeitgeist_registry) to the per-file baseline."
+  - id: TASKS-VERIFY-010
+    status: resolved
+    reason: "WP11 T072 adds wrong-sha256-before-unzip, empty-or-missing-registry and schema-count-floor red tests plus a mandatory-task assertion, and T073 plus WP04 T025 reject unknown type and scope with a named reason and a floor that the loop iterated every section 3 type."
+  - id: TASKS-VERIFY-011
+    status: resolved
+    reason: "WP06 T035 makes fault_summary return none recorded, counts or unreadable with red tests for a corrupt line, a directory in place of the file and a permission error, and T041 renders unreadable as a visible warning."
+  - id: TASKS-VERIFY-013
+    status: resolved
+    reason: "Every WP now has a 'Tests, markers, jobs' table mapping each new test file to a marker and the job or shard that runs it, and WP06/WP07/WP08/WP10 gates include test_fast_tier_marker_completeness and test_module_shard_registry."
+  - id: TASKS-VERIFY-014
+    status: resolved
+    reason: "WP01 T007 adds gradle_pin_check.py and its pytest to the verify-pins job of event-producer.yml, explicitly because contracts.yml does not fire on services/event-producer/**, and test_event_producer_workflow.py asserts the step."
+  - id: TASKS-VERIFY-016
+    status: resolved
+    reason: "WP04 T027 commits golden request/reply/exit-code fixtures generated by the real launcher with a drift-failing regeneration test, and WP06 T034 stubs and _classify tests replay them (a java -jar test was not adopted but the stated divergence risk is closed by the drift test, with the real binary in WP10 native-e2e)."
+  - id: TASKS-VERIFY-017
+    status: resolved
+    reason: "R8 and WP08 T082 move checksum continuity into check_dist_set.py --verify-manifests with executable tests and five named mutations plus a wheel-composition test, and WP09 T059 only calls it with the call and step order pinned in test_release_producer_stages.py."
+  - id: TASKS-VERIFY-018
+    status: resolved
+    reason: "R7 moves the build-glue pin to tests/architectural/test_build_glue_thin.py created by WP01 (closed import allowlist, forbidden names, filesystem walk, floor, mutations) with a not-yet-landed list WP08 empties, so glue is gated in the WP that ships it."
+  - id: TASKS-VERIFY-019
+    status: resolved
+    reason: "WP04 T025 and WP06 T036 add explicit tests: root-unresolvable gives stderr warning and no fault-log row (as AC-005 states), busy-skip and TimeoutError each give a fault row in separate tests, each asserting unchanged --json body and exit code."
+  - id: TASKS-VERIFY-020
+    status: resolved
+    reason: "WP03 T021 gives a runnable regeneration command that patches gethostname and getuser, commits synthetic-only goldens (host-a/user-a), adds the USER-unset and user.name case, and a live per-OS comparison via PRODUCER_LIVE_PY_NODE_ID that fails under CI when missing; generate_node_id uses socket.gethostname and getpass.getuser so the patching is valid."
+  - id: TASKS-VERIFY-021
+    status: resolved
+    reason: "WP06 T081 adds a windows_ci-marked subset (client timeout terminates a hanging stub by handle, no orphan, argv with a space) picked up by ci-windows.yml, and the shipped-wheel residual is recorded in overview section 10."
+  - id: TASKS-THIN-001
+    status: resolved
+    reason: "R8 removes producer_smoke.py: the smoke is a shared composite action (YAML and shell) in WP01 used by native-smoke and smoke-wheels and pinned by a test, and grep finds no remaining producer_smoke reference outside the R8 note."
+  - id: TASKS-THIN-002
+    status: resolved
+    reason: "R10 and WP06 T042 place the path literals as StateSurface entries and an inline string in record_fault/_read_fault_rows instead of a new module, so plan 4.2 rules (a) and (c) are not violated and the AC-030 gate keys on the publish-log entry."
+  - id: TASKS-THIN-003
+    status: resolved
+    reason: "WP06 T039 makes rule (c) a filesystem walk of status, events, retrospective and decisions (never git) with a floor that all three new modules are found and mutations that write an untracked status/_mint_id.py and a new function in an existing table file into a temp tree."
+  - id: TASKS-THIN-004
+    status: resolved
+    reason: "R7 removes the WP06 to WP08 ordering problem by putting the single enumerator in WP01's test_build_glue_thin.py with a closed import allowlist, forbidden names, base-plus-allowed diff for edited files, a not-yet-landed list emptied by WP08, named mutations, and WP06 only asserts that file exists and names each plan 13.2 file."
+  - id: TASKS-THIN-007
+    status: resolved
+    reason: "WP06 owned_files in wps.yaml now include tests/runtime/test_bridge_engine.py and tests/architectural/test_status_module_boundary.py, along with the other emitter-fake test files."
+  - id: TASKS-RELEASE-001
+    status: resolved
+    reason: "WP01 'Evidence path' states that the orchestrator pushes the lane and opens an operator-authorised scratch draft PR so event-producer.yml's pull_request trigger runs, T010 must cite run ids (no PASS without them) and the runner assumption is named (R12 d); minor gap: the T008 smoke action that T007 references is committed after the push step."
+  - id: TASKS-RELEASE-002
+    status: resolved
+    reason: "WP09 T063 now names the pre-merge evidence (executable checker tests with mutations, shared smoke on three OS, static graph tests), lists each unexecuted stage with owner, tag and pass criterion in research/wp09-deferred-verification.md, states rc tags hit the real PyPI and the PR body says unproven pre-merge; the reusable pre-merge assembly workflow was not adopted but the vague unowned deferral defect is gone and recorded as an explicit residual in overview section 10."
+  - id: TASKS-RELEASE-003
+    status: resolved
+    reason: "WP09 T063 scopes verify_pins.py --workflow to the two WP01 workflows, treats the old release.yml lines as baseline red recorded in baseline-red.txt, and adds a WP09 test that every new uses: line is owner/repo@40-hex with a tag-pinned mutation that must fail."
+  - id: TASKS-RELEASE-006
+    status: resolved
+    reason: "WP01 defines warm as the median of the last 20 of 25 spawns with p95 recorded via tools/measure-start.sh on all legs, names the vcvars64 environment for Windows and MACOSX_DEPLOYMENT_TARGET=11.0 with otool minos for macOS, and adds the operator-accepted floor-raise third fallback."
+  - id: TASKS-RELEASE-009
+    status: resolved
+    reason: "R8 makes one shared composite action .github/actions/producer-smoke (YAML and shell, no Python) the single smoke used by native-smoke (binary mode) and smoke-wheels (cli mode) with a drift test, removing both the duplication and the F1 conflict."
+  - id: TASKS-RELEASE-011
+    status: resolved
+    reason: "WP09 T059 states pure wheel and sdist via python -m build, platform wheels via python -m build --wheel --outdir dist from the same checkout (not the sdist) in a per-entry loop with a clean build dir, pinned by a test, and WP08 T082 adds the wheel-composition test."
+  - id: TASKS-RELEASE-012
+    status: resolved
+    reason: "WP09 T062 and R12(e) make the nightly producer job non-gating and informational, outside nightly-summary.needs, with a test asserting its absence and the reason, the release gate resting on smoke-wheels."
+  - id: TASKS-RELEASE-013
+    status: resolved
+    reason: "WP01 T007 drops the gitignored src/specify_cli/_native/** glob, WP06 adds src/specify_cli/status/producer_*.py only when the files exist, and test_workflow_coherence.py is run as validation in both."

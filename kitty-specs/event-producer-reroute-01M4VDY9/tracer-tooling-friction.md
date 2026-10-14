@@ -32,3 +32,9 @@ Seeded at plan time (Standing Order 3); append during implementation, assess at 
 - `contracts/tools/verify_pins.py --workflow` is red on `release.yml` and `ci-nightly.yml` on the base commit (tag-pinned actions, non-prelude installs); it cannot gate WP09 as a whole-file check.
 - `tests/architectural/test_no_duplicate_suite_execution.py` treats a plain branch `push` trigger as change-triggered, so a feasibility-only `push` trigger on `producer-native.yml` would need a fleet-verdict registration.
 - `kernel.clock` is the single wall-clock door (`test_clock_import_ban.py`, `test_clock_call_ban.py` scan `src`, `tests` and `scripts`); a client-side `_now_utc` must call it.
+
+## Seen while fixing the tasks review (round 2)
+
+- A Java test class in a Gradle subproject can only see build outputs of that subproject: the events wheel fetch task applied in `:adapter` leaves nothing on the `:domain` test classpath, and `:domain` (java.base only) cannot depend on `:adapter`. Tests that read fetched artifacts belong in the subproject that applies the fetch script.
+- `native-image` checks only reachable code, so a native-smoke job cannot validate reflection metadata of classes the launcher does not yet reach; the smoke action reads request files from the launcher test resources so each WP can widen reachability without editing the action.
+- No CLI command reports a publish-log path (NFR-006 bars absolute paths in replies), so a smoke that asserts on the log has to find it by a fixed `find` under the scratch repository.

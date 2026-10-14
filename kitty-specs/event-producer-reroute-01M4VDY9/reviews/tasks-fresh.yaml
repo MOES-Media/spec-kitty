@@ -1,0 +1,82 @@
+schema: review-findings/v1
+complete: true
+phase: tasks
+lens_group: fresh
+mission: event-producer-reroute-01M4VDY9
+findings:
+  - id: TASKS-FRESH-001
+    lens: build-wiring
+    severity: 3
+    title: "WP11 :domain released tests have no build wiring to the fetched events wheel"
+    evidence:
+      - artifact: "tasks/WP11-events-release-consumer.md § T074, T075 (RegistryDataSubsetTest, ReleasedComparatorFixturesTest live in :domain test package released)"
+      - artifact: "tasks/WP01-feasibility-gate-and-build-skeleton.md § T003 step 6 (only adapter/build.gradle.kts applies gradle/events-fetch.gradle.kts)"
+      - artifact: "wps.yaml WP11 owned_files (no domain/build.gradle.kts; that file is WP01-owned)"
+    claim: "R3/R9 moved the two released tests into :domain, but the optional fetch script is applied only by :adapter. T072 extracts registry and schemas into build/ and embeds them as native-image resources, which are :adapter outputs. :domain depends on java.base only (ArchUnit, WP02) so it cannot depend on :adapter, and domain/build.gradle.kts belongs to WP01 and is never pre-wired. As written WP11 has no legal way to put the registry and nine comparator fixtures on the :domain test classpath, so T074/T075 either cannot run or force an unlisted edit of a WP01 build file, which R9 says must not happen."
+    remediation: "Either have WP01 T003 also pre-wire the same optional apply(from) hook in domain/build.gradle.kts (test scope only, still java.base in main), with WP11 owning the script that adds the extracted directory to the :domain test resources; or move both tests into :adapter test package schema (WP11-owned) and state that they drive the :domain classes from there. Record the choice in T072 and in tasks-overview R9."
+  - id: TASKS-FRESH-002
+    lens: sequencing
+    severity: 3
+    title: "WP03 native-smoke expectation cannot exercise adapter classes; launcher does not reach them until WP04"
+    evidence:
+      - artifact: "tasks/WP03-java-adapter-filesystem.md § Native-image metadata (first red-first commit of T017 adds a native-smoke expectation; a missing registration turns native-smoke red in the WP that introduces the class)"
+      - artifact: "tasks-overview.md R5"
+      - artifact: "tasks/WP04-java-produce-and-protocol.md § T023, T027 (WP04 replaces the spike and owns Wiring and the launcher entry)"
+    claim: "In WP03 the only launcher code is WP01's self-contained spike, owned by WP01 and deleted by WP04. WP03 owns no launcher file, tools/ file or smoke action, so nothing it writes can make the native binary reach json/fs/clock/publishlog/identity classes. native-image only checks reachable code, so the producer-adapter-fs metadata is never tested in WP03 and the promised per-WP red cannot happen. First real exercise is WP04, whose recorded edit list does not allow editing producer-adapter-fs, so a metadata error WP03 authored surfaces as a red in a WP that cannot fix it."
+    remediation: "Drop the WP03 native-smoke claim and state the metadata is unverified until WP04. Move the native-smoke expectation to WP04 T023/T028 (Wiring makes adapter classes reachable). Add producer-adapter-fs/** to WP04's recorded out-of-map edits (fix-only, with reason). Correct R5 so the per-WP gate claim is limited to WP04, WP05 and WP11."
+  - id: TASKS-FRESH-003
+    lens: build-wiring
+    severity: 2
+    title: "Shared smoke action cli mode asserts on 'the file the CLI reports' but no command reports a publish-log path"
+    evidence:
+      - artifact: "tasks/WP01-feasibility-gate-and-build-skeleton.md § T008 (cli mode: test -s on the file the CLI reports)"
+      - artifact: "tasks/WP09-release-workflow.md § T060 (smoke-wheels uses cli mode, expect produced)"
+      - artifact: "tasks/WP06-python-client-and-seam.md § T041 (doctor renders counts only, no path; NFR-006 bars absolute paths in replies)"
+    claim: "No CLI command or reply in the task set reports the publish-log location (doctor events and events-retention render counts only, the Java replies carry no absolute path). The cli-mode contract in T008 and its sole consumer T060 therefore cannot be implemented as written; each implementer will invent a different lookup, and smoke-wheels is only first run on a release tag, so the error would surface there."
+    remediation: "Define the lookup in T008: the action finds the log with a fixed shell glob under the scratch repo (.kittify/events/publish/ recursively, *.jsonl) and asserts exactly one non-empty file with one line. Delete the 'file the CLI reports' wording from T008 and T060."
+  - id: TASKS-FRESH-004
+    lens: ownership
+    severity: 2
+    title: "WP11 T076 instructs editing test_events_dependency_floor_rejects_pre_v10_contract, which no WP owns"
+    evidence:
+      - artifact: "tasks/WP11-events-release-consumer.md § T076 (update test_events_dependency_floor_rejects_pre_v10_contract)"
+      - artifact: "wps.yaml WP11 owned_files; tasks/WP11 § Recorded out-of-map edits (lists only pyproject.toml and Wiring.java)"
+      - artifact: "tests/architectural/test_pyproject_shape.py (the test lives there)"
+    claim: "The test is in tests/architectural/test_pyproject_shape.py, which is neither owned by WP11 nor in its recorded out-of-map table, so the reviewer allowlist of tasks-overview section 4 does not cover it. The test only mutates the dependency to the retired >=9,<10 range, so a floor bump to V_E likely needs no edit at all."
+    remediation: "State in T076 that test_pyproject_shape.py is run unchanged (add it to the gate list), or if an edit proves necessary add it to WP11 recorded out-of-map edits and the section 4 table with the reason."
+  - id: TASKS-FRESH-005
+    lens: coverage
+    severity: 2
+    title: "macOS and Windows gradle-test legs run only adapter and application checks while WP05 and WP04 per-OS semantics sit in launcher"
+    evidence:
+      - artifact: "tasks/WP01-feasibility-gate-and-build-skeleton.md § T007 (macOS and Windows: at least :adapter:check :application:check)"
+      - artifact: "tasks-overview.md R12(a) and section 5 (check on all three legs)"
+      - artifact: "tasks/WP05-java-retention.md § T032, T033 (two-process produce/retain race and delete-under-lock tests in launcher/src/test/.../retain)"
+    claim: "Overview R12(a) and section 5 say gradle-test runs check on three OSes because lock, deletion and byte semantics differ per OS. T007 narrows macOS and Windows to :adapter and :application. WP05's whole-file deletion race and WP04's launcher e2e (AC-016, AC-035) live in :launcher and run on ubuntu only before native-e2e, which is gated on the events release (WP10) and does not run retention at all. Windows delete-while-open semantics for retention are therefore unproven on any OS but Linux."
+    remediation: "Make T007 run full check (all four subprojects) on all three legs, as the overview states, or name the launcher retain race test as an explicit macOS/Windows step. Align R12(a) and T007 wording."
+  - id: TASKS-FRESH-006
+    lens: coverage
+    severity: 2
+    title: "AC-006 batch, breaker and bound-override assertions have no named test in WP06"
+    evidence:
+      - artifact: "spec.md AC-006 (batch of N rows with a hanging stub spawns once then records N faults; bound disabled or lowered by SPEC_KITTY_SAAS_FANOUT_TIMEOUT still ends the stub first)"
+      - artifact: "tasks/WP06-python-client-and-seam.md § T034, T036, T081 (boundary values and busy/timeout fault rows only)"
+    claim: "WP06 is primary for AC-006 but names only the effective_client_timeout boundary cases, the busy and TimeoutError fault rows and the Windows termination subset. The N-row hanging-stub case (one spawn, N fault rows, FR-025 breaker) and the env-override case are never assigned a test, so the breaker and the 'client ends first' guarantee can ship unasserted while the coverage table reports AC-006 covered."
+    remediation: "Add to T034/T036 two named red-first tests: a batch of N rows against a hanging stub asserting one spawn and N fault rows; the disabled-bound and lowered-override cases asserting the client's own timeout fires first. Revert-check the breaker."
+  - id: TASKS-FRESH-007
+    lens: traceability
+    severity: 1
+    title: "Coverage table lists WPs for AC-005 and AC-013 whose bodies never cite them"
+    evidence:
+      - artifact: "tasks-overview.md § 8.2 (AC-005 lists WP03 root; AC-013 lists WP06)"
+      - artifact: "tasks/WP03-java-adapter-filesystem.md § T018 (no AC-005 cite); tasks/WP06-python-client-and-seam.md § T041 (no AC-013 cite)"
+    claim: "Two table entries have no matching Covers line in the named WP, so the table overstates coverage."
+    remediation: "Add AC-005 (root-unresolvable) to WP03 T018 Covers and AC-013 (doctor dry-run pass-through) to WP06 T041 Covers, or remove the entries."
+  - id: TASKS-FRESH-008
+    lens: terminology
+    severity: 1
+    title: "WP06 T038 says 'the feature directory'"
+    evidence:
+      - artifact: "tasks/WP06-python-client-and-seam.md § T038"
+    claim: "Charter terminology rule: Mission is the only canonical term in prose; the rest of the task set says Mission directory."
+    remediation: "Replace with 'the Mission directory'."
