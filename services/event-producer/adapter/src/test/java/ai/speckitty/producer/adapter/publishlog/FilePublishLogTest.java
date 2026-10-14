@@ -169,6 +169,47 @@ class FilePublishLogTest {
         assertThat(log.highestClock(layout)).isEqualTo(OptionalInt.of(9));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"max-in-first-file", "max-in-middle-file", "max-in-last-file"})
+    void highestClockIsTheMaximumWhicheverFileHoldsIt(String where) throws IOException {
+        Path directory = file(layout, mission()).getParent();
+        Files.createDirectories(directory);
+        int max = switch (where) {
+            case "max-in-first-file" -> 0;
+            case "max-in-middle-file" -> 1;
+            default -> 2;
+        };
+        for (int i = 0; i < 3; i++) {
+            int clock = i == max ? 900 : 10 + i;
+            Files.writeString(directory.resolve("f" + i + ".jsonl"), "{\"lamportclock\":" + clock + "}\n");
+        }
+        assertThat(log.highestClock(layout)).isEqualTo(OptionalInt.of(900));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"900,5,7", "5,900,7", "7,5,900", "5,900,900,7"})
+    void highestClockIsTheMaximumWhicheverLineHoldsIt(String clocks) throws IOException {
+        Path path = file(layout, mission());
+        Files.createDirectories(path.getParent());
+        StringBuilder body = new StringBuilder();
+        for (String clock : clocks.split(",")) {
+            body.append("{\"lamportclock\":").append(clock).append("}\n");
+        }
+        Files.writeString(path, body.toString());
+        assertThat(log.highestClock(layout)).isEqualTo(OptionalInt.of(900));
+    }
+
+    @Test
+    void theMaximumInOneFileSurvivesALowerClockInEveryFileVisitedAfterIt() throws IOException {
+        Path directory = file(layout, mission()).getParent();
+        Files.createDirectories(directory);
+        Files.writeString(directory.resolve("a.jsonl"), "{\"lamportclock\":4}\n{\"lamportclock\":800}\n{\"lamportclock\":3}\n");
+        Files.writeString(directory.resolve("b.jsonl"), "{\"lamportclock\":2}\n");
+        Files.writeString(directory.resolve("c.jsonl"), "{\"lamportclock\":1}\n{\"lamportclock\":6}\n");
+        Files.writeString(directory.resolve("d.jsonl"), "{\"lamportclock\":5}\n");
+        assertThat(log.highestClock(layout)).isEqualTo(OptionalInt.of(800));
+    }
+
     @Test
     void highestClockReadsIntegersInRangeOnly() throws IOException {
         Path path = file(layout, mission());

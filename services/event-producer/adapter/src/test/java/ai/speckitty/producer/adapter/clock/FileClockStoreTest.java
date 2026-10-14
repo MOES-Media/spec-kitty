@@ -146,6 +146,25 @@ class FileClockStoreTest {
     }
 
     @Test
+    void theStateIsWrittenThroughTheAtomicFileWriterAndForced() throws IOException {
+        long before = ai.speckitty.producer.adapter.fs.AtomicFile.forcedCount();
+        FileClockStore store = store(p -> {
+            if (p == KillPoint.AFTER_STATE_WRITE) {
+                throw new Killed();
+            }
+        });
+        try {
+            stamp(store, ulid(1));
+        } catch (Killed expected) {
+            // the kill lands after the state write and before any row is appended, so only the state write can have forced
+        }
+        assertThat(ai.speckitty.producer.adapter.fs.AtomicFile.forcedCount()).isGreaterThan(before);
+        try (var siblings = Files.list(state().getParent())) {
+            assertThat(siblings.map(p -> p.getFileName().toString()).filter(n -> n.contains("tmp")).toList()).isEmpty();
+        }
+    }
+
+    @Test
     void stateLostWithNoLogStartsAtOne() throws IOException {
         assertThat(stampedClock(store(FaultInjector.NONE), ulid(1))).isEqualTo(1);
     }
