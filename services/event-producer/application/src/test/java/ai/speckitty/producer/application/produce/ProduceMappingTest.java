@@ -102,13 +102,17 @@ class ProduceMappingTest {
     void nothingBeyondTheRowAndTheEnvelopeAttributesReachesData() {
         for (Map<String, Object> row : List.of(Fixture.laneRow(), Fixture.wpCreatedRow(), Fixture.missionCreatedRow(), annotationRow(), retrospectiveRow())) {
             Fixture f = new Fixture();
+            f.meta = java.util.Optional.of(obj("mission_id", MISSION));
             f.run(row);
             @SuppressWarnings("unchecked")
             Map<String, Object> data = (Map<String, Object>) f.onlyDocument().get("data");
-            Set<String> allowed = new TreeSet<>(row.keySet());
+            Set<String> allowed = new TreeSet<>();
             if (row.get("payload") instanceof Map<?, ?> payload) {
-                allowed = new TreeSet<>();
-                payload.keySet().forEach(k -> allowed.add((String) k));
+                for (Object key : payload.keySet()) {
+                    allowed.add((String) key);
+                }
+            } else {
+                allowed.addAll(row.keySet());
             }
             allowed.add("actorbinding");
             assertThat(data.keySet()).as(row.toString()).isSubsetOf(allowed);
@@ -274,6 +278,7 @@ class ProduceMappingTest {
     @Test
     void anAnnotationRowDropsItsKindConstantAndLiftsItsActor() {
         Fixture f = new Fixture();
+        f.meta = java.util.Optional.of(obj("mission_id", MISSION));
         f.run(annotationRow());
         Map<String, Object> document = f.onlyDocument();
         assertThat(document).containsEntry("type", "ai.spec-kitty.wp.innerstate.changed.v1").containsEntry("subject", "WP01")
@@ -461,7 +466,7 @@ class ProduceMappingTest {
 
     static Map<String, Object> annotationRow() {
         return obj("event_id", EVENT, "wp_id", "WP01", "kind", "annotation", "at", AT, "actor", "claude",
-                "delta", obj("note", "halfway"), "mission_id", MISSION);
+                "delta", obj("note", "halfway"));
     }
 
     static Map<String, Object> retrospectiveRow() {

@@ -18,6 +18,8 @@ import java.util.Objects;
  * @param payloadMember for a payload envelope, the member that is the data; null for a flat row
  * @param constants for a flat row, members that must equal these values (and are dropped, the type carries them)
  * @param actorRule how a structured actor projects, or null when the type lifts no actor
+ * @param dataAliases data members whose legacy string value is written under its canonical value (member to legacy to canonical),
+ *     for example a lane alias; registry data, so the code holds no vocabulary
  */
 public record RegisteredType(
         String type,
@@ -29,7 +31,23 @@ public record RegisteredType(
         String discriminatorValue,
         String payloadMember,
         Map<String, String> constants,
-        ActorRule actorRule) {
+        ActorRule actorRule,
+        Map<String, Map<String, String>> dataAliases) {
+
+    /** A type with no value aliases. */
+    public RegisteredType(
+            String type,
+            String dataschema,
+            String schemaVersion,
+            TypeEntry entry,
+            Shape shape,
+            String discriminatorMember,
+            String discriminatorValue,
+            String payloadMember,
+            Map<String, String> constants,
+            ActorRule actorRule) {
+        this(type, dataschema, schemaVersion, entry, shape, discriminatorMember, discriminatorValue, payloadMember, constants, actorRule, Map.of());
+    }
 
     public RegisteredType {
         Objects.requireNonNull(type, "type");
@@ -38,6 +56,9 @@ public record RegisteredType(
         Objects.requireNonNull(entry, "entry");
         Objects.requireNonNull(shape, "shape");
         constants = Map.copyOf(constants);
+        Map<String, Map<String, String>> aliases = new java.util.LinkedHashMap<>();
+        dataAliases.forEach((member, values) -> aliases.put(member, Map.copyOf(values)));
+        dataAliases = Map.copyOf(aliases);
         boolean payload = shape == Shape.PAYLOAD_ENVELOPE;
         if (payload && (discriminatorMember == null || discriminatorValue == null || payloadMember == null)) {
             throw new IllegalArgumentException("a payload envelope names its discriminator and its payload member");
