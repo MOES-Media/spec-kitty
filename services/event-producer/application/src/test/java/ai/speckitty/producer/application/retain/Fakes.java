@@ -98,9 +98,11 @@ final class Fakes {
     static final class FakeTracked implements TrackedFiles {
         final Map<RelativePath, Tracking> answers = new HashMap<>();
         Tracking otherwise = Tracking.UNTRACKED;
+        Runnable beforeAsk = () -> {};
 
         @Override
         public Map<RelativePath, Tracking> of(RepoLayout layout, Collection<RelativePath> paths) {
+            beforeAsk.run();
             Map<RelativePath, Tracking> result = new LinkedHashMap<>();
             for (RelativePath path : paths) {
                 result.put(path, answers.getOrDefault(path, otherwise));

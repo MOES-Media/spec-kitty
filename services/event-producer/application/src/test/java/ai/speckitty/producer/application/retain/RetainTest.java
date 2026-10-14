@@ -178,7 +178,9 @@ class RetainTest {
         put(file(Fakes.mission(MISSION_A), Duration.ofDays(-400)));
         put(file(Fakes.mission(MISSION_B), Duration.ofDays(-500)));
         RetainReply reply = run(true, policy(n("1"), n("30")));
-        assertThat(reasons(reply.kept())).containsEntry(Fakes.mission(MISSION_B).value(), "within-max-age");
+        assertThat(reasons(reply.kept())).containsEntry(Fakes.mission(MISSION_B).value(), "within-keep-runs")
+                .containsEntry(Fakes.mission(MISSION_A).value(), "within-max-age");
+        assertThat(reply.eligible()).isEmpty();
     }
 
     @Test
@@ -211,7 +213,9 @@ class RetainTest {
         put(file(Fakes.mission(MISSION_A), OLD));
         put(file(Fakes.project(), OLD));
         put(file(Fakes.fault("2024-01-01"), OLD));
+        put(file(Fakes.fault("2026-10-14"), YOUNG));
         put(file(Fakes.journal("r"), OLD));
+        put(file(Fakes.journal("newer"), YOUNG));
         ledger.otherwise = MissionState.OPEN;
         RetainReply reply = run(true, policy(n("1"), n("5")));
         assertThat(ledger.asked).containsExactly(MISSION_A);
@@ -225,6 +229,7 @@ class RetainTest {
         put(file(Fakes.mission(MISSION_A), Duration.ofDays(40)));
         put(file(Fakes.mission(MISSION_B), Duration.ofDays(50)));
         put(file(Fakes.project(), Duration.ofDays(60)));
+        put(file(Fakes.fault("2023-12-31"), Duration.ofDays(500)));
         put(file(Fakes.fault("2024-01-01"), Duration.ofDays(400)));
         put(file(Fakes.fault("2024-01-02"), Duration.ofDays(399)));
         put(file(Fakes.journal("r1"), Duration.ofDays(70)));
@@ -233,10 +238,11 @@ class RetainTest {
         // publish: A (rank 1) and B (rank 2) kept; the project file (rank 3) is outside
         assertThat(kept).containsEntry(Fakes.mission(MISSION_A).value(), "within-keep-runs")
                 .containsEntry(Fakes.mission(MISSION_B).value(), "within-keep-runs");
-        // faults: the newer day is kept, the older is outside; journals: the only one is rank 1
+        // faults: the two newest days are kept, the third is outside; journals: the only one is rank 1
         assertThat(kept).containsEntry(Fakes.fault("2024-01-02").value(), "within-keep-runs")
+                .containsEntry(Fakes.fault("2024-01-01").value(), "within-keep-runs")
                 .containsEntry(Fakes.journal("r1").value(), "within-keep-runs");
-        assertThat(paths(reply.eligible())).containsExactlyInAnyOrder(Fakes.project().value(), Fakes.fault("2024-01-01").value());
+        assertThat(paths(reply.eligible())).containsExactlyInAnyOrder(Fakes.project().value(), Fakes.fault("2023-12-31").value());
     }
 
     @Test
@@ -459,7 +465,12 @@ class RetainTest {
     void aFileThatBecameTrackedBetweenTheListingAndTheLockIsNotDeleted() {
         put(file(Fakes.mission(MISSION_A), OLD));
         put(file(Fakes.mission(MISSION_C), YOUNG));
-        tier.beforeInspect = () -> tracked.answers.put(Fakes.mission(MISSION_A), Tracking.TRACKED);
+        int[] asked = {0};
+        tracked.beforeAsk = () -> {
+            if (asked[0]++ > 0) {
+                tracked.answers.put(Fakes.mission(MISSION_A), Tracking.TRACKED);
+            }
+        };
         RetainReply real = run(false, policy(n("1"), n("5")));
         assertThat(tier.deleteAttempts).isEmpty();
         assertThat(real.deleted()).isEmpty();
