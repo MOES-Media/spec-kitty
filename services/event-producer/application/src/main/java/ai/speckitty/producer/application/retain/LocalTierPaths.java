@@ -55,7 +55,7 @@ public final class LocalTierPaths {
             return faultDay(name) != null ? Optional.of(new Shape(LocalKind.FAULT_DAY, null)) : Optional.empty();
         }
         String prefix = RUNS_DIR + "/";
-        if (value.startsWith(prefix) && value.endsWith("/" + JOURNAL_FILE)) {
+        if (value.startsWith(prefix) && value.length() > prefix.length() + JOURNAL_FILE.length() + 1 && value.endsWith("/" + JOURNAL_FILE)) {
             String runId = value.substring(prefix.length(), value.length() - JOURNAL_FILE.length() - 1);
             return RUN_ID.matcher(runId).matches() ? Optional.of(new Shape(LocalKind.RUN_JOURNAL, runId)) : Optional.empty();
         }
