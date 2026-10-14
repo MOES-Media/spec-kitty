@@ -1,7 +1,7 @@
 {
   "rows": {
     "#1198": {
-      "evidence_ref": "WP07 clears the canonical-producer-exempt marker (spec FR, plan 4.4)",
+      "evidence_ref": "WP12 clears the canonical-producer-exempt marker (WP07 split, refinement R6)",
       "fr": null,
       "nfr": null,
       "repo": null,
@@ -10,7 +10,7 @@
       "source_file": "spec.md",
       "title": "<fill at WP-implementation time>",
       "verdict": "in-mission",
-      "wp": "WP07"
+      "wp": "WP12"
     },
     "#1200": {
       "evidence_ref": "glossary rows deferred by the spec; cited for context, no work owed here",
