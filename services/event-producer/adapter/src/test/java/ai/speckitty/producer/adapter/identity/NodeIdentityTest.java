@@ -143,25 +143,8 @@ class NodeIdentityTest {
             assertThat(required).as("PRODUCER_LIVE_PY_NODE_ID must be set when REQUIRE_LIVE_NODE_ID=1").isFalse();
             assumeTrue(false, "PRODUCER_LIVE_PY_NODE_ID is not set; only the gradle-test legs export it");
         }
-        assertThat(LiveComparison.matches(expected.strip(), new SystemNodeIdentity())).isTrue();
+        assertThat(new SystemNodeIdentity().nodeId()).isEqualTo(expected.strip());
         int cases = golden().size() + 1;
         assertThat(cases).as("cases: the live one plus the golden strings").isGreaterThanOrEqualTo(CASE_FLOOR + 1);
-    }
-
-    @Test
-    void theLiveComparisonGoesRedOnAPlantedMismatch() {
-        NodeIdentity identity = () -> "ec0a1a9494e7";
-        assertThat(LiveComparison.matches("ec0a1a9494e7", identity)).isTrue();
-        assertThat(LiveComparison.matches("ec0a1a9494e8", identity)).isFalse();
-        assertThat(LiveComparison.matches("", identity)).isFalse();
-    }
-
-    /** The comparison under test in the live case. */
-    static final class LiveComparison {
-        private LiveComparison() {}
-
-        static boolean matches(String expected, NodeIdentity identity) {
-            return !expected.isBlank() && expected.equals(identity.nodeId());
-        }
     }
 }
