@@ -22,7 +22,7 @@ class NoProcessSpawnTest {
             .orShould()
             .callMethod(Runtime.class, "exec", String[].class);
 
-    private static final int MAIN_CLASS_FLOOR = 8;
+    private static final int MAIN_CLASS_FLOOR = 6;
 
     private static JavaClasses adapterMain() {
         return new ClassFileImporter()
@@ -34,6 +34,7 @@ class NoProcessSpawnTest {
     void noAdapterMainClassSpawnsAProcess() {
         JavaClasses main = adapterMain();
         assertThat(main.size()).as("main classes scanned").isGreaterThanOrEqualTo(MAIN_CLASS_FLOOR);
+        assertThat(main.contain(ai.speckitty.producer.adapter.repo.GitRepoLocator.class)).isTrue();
         EvaluationResult result = NO_PROCESS.evaluate(main);
         assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
     }

@@ -7,7 +7,6 @@ import ai.speckitty.producer.application.port.RepoLocator;
 import ai.speckitty.producer.application.port.RepoLocator.RepoLayout;
 import ai.speckitty.producer.domain.fault.FaultReason;
 import ai.speckitty.producer.domain.fault.ParseResult;
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -100,7 +99,8 @@ class GitRepoLocatorTest {
     @Test
     void noRepositoryAboveTheStartPathIsRootUnresolvable() throws Exception {
         Path loose = Files.createDirectories(base.resolve("loose/deeper"));
-        GitRepoLocator isolated = new GitRepoLocator(name -> "GIT_CEILING_DIRECTORIES".equals(name) ? base.toRealPath().toString() : null);
+        String ceiling = base.toRealPath().toString();
+        GitRepoLocator isolated = new GitRepoLocator(name -> "GIT_CEILING_DIRECTORIES".equals(name) ? ceiling : null);
         ParseResult<RepoLayout> result = isolated.locate(loose);
         assertThat(result).isInstanceOf(ParseResult.Refused.class);
         ParseResult.Refused<RepoLayout> refused = (ParseResult.Refused<RepoLayout>) result;
@@ -156,13 +156,8 @@ class GitRepoLocatorTest {
         Path odd = Files.createDirectories(base.resolve("odd"));
         Files.writeString(odd.resolve(".git"), "this is not a pointer\n");
         Files.createDirectories(odd.resolve(".kittify"));
-        GitRepoLocator isolated = new GitRepoLocator(name -> "GIT_CEILING_DIRECTORIES".equals(name) ? base.toRealPath().toString() : null);
+        String ceiling = base.toRealPath().toString();
+        GitRepoLocator isolated = new GitRepoLocator(name -> "GIT_CEILING_DIRECTORIES".equals(name) ? ceiling : null);
         assertThat(isolated.locate(odd)).isInstanceOf(ParseResult.Refused.class);
-    }
-
-    @Test
-    void theLocatorNeverSpawnsAProcess() throws IOException {
-        // see NoProcessSpawnTest: the rule is checked there with a planted offender
-        assertThat(GitRepoLocator.class.getName()).startsWith("ai.speckitty.producer.adapter.repo.");
     }
 }
