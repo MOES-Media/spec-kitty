@@ -28,6 +28,7 @@ runs:
       shell: bash
       env:
         WHEEL: ${{ inputs.wheel }}
+        MODE: ${{ inputs.mode }}
       run: |
         set -euo pipefail
         smoke_dir="${RUNNER_TEMP}/producer-smoke"
@@ -35,8 +36,13 @@ runs:
         mkdir -p "$smoke_dir"
         python3 -m venv "$smoke_dir/venv" || python -m venv "$smoke_dir/venv"
         if [ -x "$smoke_dir/venv/bin/python" ]; then py="$smoke_dir/venv/bin/python"; else py="$smoke_dir/venv/Scripts/python.exe"; fi
-        # The files are what is under test (location, exec bit, checksum); dependencies are not.
-        "$py" -m pip install --no-deps --quiet "$WHEEL"
+        if [ "$MODE" = "cli" ]; then
+          # A CLI command imports the package, so the wheel needs its real dependencies.
+          "$py" -m pip install --quiet "$WHEEL"
+        else
+          # Binary mode: the files are what is under test (location, exec bit, checksum); dependencies are not.
+          "$py" -m pip install --no-deps --quiet "$WHEEL"
+        fi
         echo "SMOKE_PY=$py" >> "$GITHUB_ENV"
         echo "SMOKE_DIR=$smoke_dir" >> "$GITHUB_ENV"
 
@@ -45,7 +51,8 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        native=$("$SMOKE_PY" -c "import pathlib, specify_cli; print((pathlib.Path(specify_cli.__file__).parent / '_native').as_posix())")
+        # find_spec locates the package without executing its __init__, which imports the CLI's dependencies (not installed here).
+        native=$("$SMOKE_PY" -c "import importlib.util, pathlib; print((pathlib.Path(next(iter(importlib.util.find_spec('specify_cli').submodule_search_locations))) / '_native').as_posix())")
         binary=$(find "$native" -maxdepth 1 -type f \( -name 'spec-kitty-event-producer' -o -name 'spec-kitty-event-producer.exe' \) | head -n 1)
         [ -n "$binary" ] || { echo "::error::no bundled producer binary under $native"; exit 1; }
         [ -s "$native/PRODUCER.sha256" ] || { echo "::error::PRODUCER.sha256 is missing under $native"; exit 1; }

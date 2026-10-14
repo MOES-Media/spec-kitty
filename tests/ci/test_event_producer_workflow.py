@@ -568,3 +568,23 @@ def test_install_checks_the_version_through_the_windows_cmd_and_exe_launchers(tm
 def test_install_checks_the_version_through_the_bare_linux_launchers(tmp_path: Path) -> None:
     result = _install_fake_jdk(tmp_path, ("native-image", "java"))
     assert result.returncode == 0, result.stderr
+
+
+def _smoke_step(name_prefix: str) -> dict[str, Any]:
+    steps = load(SMOKE_ACTION)["runs"]["steps"]
+    return next(step for step in steps if step["name"].startswith(name_prefix))
+
+
+def test_binary_mode_locates_the_native_dir_without_importing_the_package() -> None:
+    """Importing specify_cli runs its __init__, which needs typer; the dependency-less venv of binary mode has none."""
+    run = _smoke_step("Binary mode")["run"]
+    assert not re.search(r"\bimport\b[^'\"\n]*\bspecify_cli\b", run), "binary mode must not import specify_cli"
+    assert "specify_cli.__file__" not in run
+    assert "find_spec('specify_cli')" in run and "submodule_search_locations" in run
+
+
+def test_cli_mode_installs_the_wheel_with_its_dependencies() -> None:
+    run = _smoke_step("Install the wheel")["run"]
+    cli_branch = run.split('if [ "$MODE" = "cli" ]; then', 1)[1].split("else", 1)[0]
+    assert "pip install" in cli_branch and "--no-deps" not in cli_branch
+    assert "--no-deps" in run.split("else", 1)[1], "binary mode keeps the dependency-less install"
