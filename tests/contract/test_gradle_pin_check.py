@@ -287,3 +287,85 @@ def test_the_real_acceptance_jvm_build_agrees_with_its_pins(tool: Any) -> None:
     # Only the pins.json url-vs-version comparison is live: the build declares no Gradle version and the
     # acceptance-bdd job has no gradle-version input.
     assert report.counts == {"pinned": 1, "compared": 1}
+
+
+# --- services/event-producer scan (#6185 WP01): the same canonical authority, a third subproject ---------------
+
+EP_GRADLE_PIN = "9.0.1"
+EP_PINS = "services/event-producer/tools/pins.json"
+EP_WRAPPER = "services/event-producer/gradle/wrapper/gradle-wrapper.properties"
+
+# The event producer pins gradle (installed, checksum-checked) and commits a wrapper; it has no Gradle plugin of its own in this file.
+_EP_PINS_JSON = """{{
+  "tools": [
+    {{"name": "gradle", "kind": "archive", "version": "{gradle}",
+     "url": "https://example.invalid/distributions/gradle-{gradle}-bin.zip", "sha256": "0"}}
+  ]
+}}
+"""
+_EP_WRAPPER = "distributionUrl=https\\://services.gradle.org/distributions/gradle-{gradle}-bin.zip\n"
+
+
+def _event_producer_tree(tmp_path: Path, *, root: Path | None = None) -> Path:
+    """A repo root holding a clean services/event-producer/ subproject (manifest plus wrapper)."""
+    root = root if root is not None else tmp_path / "root"
+    _write(root, EP_PINS, _EP_PINS_JSON.format(gradle=EP_GRADLE_PIN))
+    _write(root, EP_WRAPPER, _EP_WRAPPER.format(gradle=EP_GRADLE_PIN))
+    return root
+
+
+def test_a_clean_event_producer_tree_is_compared_through_the_whole_repository_scan(tool: Any, tmp_path: Path) -> None:
+    root = _copy(tmp_path)
+    _event_producer_tree(tmp_path, root=root)
+    report = tool.check_all(root)
+    assert report.findings == []
+    assert report.blocked == []
+    # contracts: pinned=2 compared=5; event producer: pinned=1, compared=2 (the manifest url and the wrapper distribution).
+    assert report.counts == {"pinned": 3, "compared": 7}
+
+
+@pytest.mark.parametrize(
+    ("relative", "old", "new", "subjects"),
+    [
+        (EP_PINS, f"gradle-{EP_GRADLE_PIN}-bin.zip", "gradle-9.9.9-bin.zip", [EP_PINS]),
+        (EP_WRAPPER, f"gradle-{EP_GRADLE_PIN}-bin.zip", "gradle-9.9.9-bin.zip", [EP_WRAPPER]),
+        # A bumped version with the old url and the old wrapper disagrees with both.
+        (EP_PINS, f'"version": "{EP_GRADLE_PIN}"', '"version": "9.9.9"', [EP_PINS, EP_WRAPPER]),
+    ],
+    ids=["manifest-url", "wrapper-distribution", "manifest-version"],
+)
+def test_injected_event_producer_drift_is_a_mismatch(tool: Any, tmp_path: Path, relative: str, old: str, new: str, subjects: list[str]) -> None:
+    root = _copy(tmp_path)
+    _event_producer_tree(tmp_path, root=root)
+    _edit(root, relative, old, new)
+    report = tool.check_all(root)
+    assert [(f.code, f.subject) for f in report.findings] == [("GRADLE_PIN_MISMATCH", subject) for subject in subjects]
+    assert report.blocked == []
+    assert report.exit_code == 1
+
+
+def test_an_event_producer_wrapper_that_names_no_version_blocks_instead_of_passing(tool: Any, tmp_path: Path) -> None:
+    root = _copy(tmp_path)
+    _event_producer_tree(tmp_path, root=root)
+    _write(root, EP_WRAPPER, "distributionUrl=https\\://example.invalid/distributions/gradle.zip\n")
+    report = tool.check_all(root)
+    assert [f.code for f in report.blocked] == ["GRADLE_PIN_UNPARSEABLE"]
+    assert report.exit_code == 2
+
+
+def test_an_event_producer_manifest_without_a_gradle_entry_blocks_instead_of_passing(tool: Any, tmp_path: Path) -> None:
+    root = _copy(tmp_path)
+    _event_producer_tree(tmp_path, root=root)
+    _write(root, EP_PINS, '{"tools": []}\n')
+    report = tool.check_all(root)
+    assert [f.code for f in report.blocked] == ["GRADLE_PIN_UNREADABLE"]
+    assert report.exit_code == 2
+
+
+def test_the_real_event_producer_build_agrees_with_its_pins(tool: Any) -> None:
+    report = tool.check_all(REPO_ROOT)
+    assert report.findings == []
+    assert report.blocked == []
+    # contracts: pinned=2 compared=5 or more; acceptance-jvm: pinned=1 compared=1; event producer: pinned=1 compared=2.
+    assert report.counts["pinned"] == 4
+    assert report.counts["compared"] >= 8
