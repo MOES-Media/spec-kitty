@@ -266,7 +266,7 @@ Rule: a WP that adds a file or workflow owns every gate edit it forces; a chokep
 | `_baselines.yaml`, `dead_symbol_allowlist.yaml`, `engine.py`, lint script | marker clearing and stamping (WP07) | WP07 | unchanged; WP07 no longer owns the doctor sibling |
 | completion manifest, CLI reference | doctor sibling | WP06 | the sibling and its regeneration land together; the sibling is WP06's because the thinness gate (WP06) floors on all three new modules and `events_retention` needs only the `retain` protocol of WP05 |
 | seam call sites, emitter route, census | FR-002 to FR-004, AC-004 | WP06 (all of them) | the engine stamping and gate (b) are WP07's, so no gate precedes its edit; rule (e) uses "within" |
-| events-pin fetch task, `events-pin.properties`, AC-029 test, comparator fixtures | first reader of released events artifacts | WP02 (waits for the release) | other readers: WP04 direct, WP07 (AC-019 schema validation) via WP04, WP08 floor bump |
+| events-pin fetch task, `events-pin.properties`, AC-029 test, comparator fixtures | first reader of released events artifacts | WP02 (waits for the release) | other readers: WP04 direct (Java), WP07 (AC-019, Python) from the installed package after WP08's floor bump (WP07 depends on WP08; R-24), WP08 floor bump |
 | `release.yml`, `ci-nightly.yml`, release docs, `test_release_ci_ownership.py` assertions | release wiring (WP09) | WP09 | |
 | `check_dist_set.py`, `dist-set.json`, `check_exact_install.py`, fixtures, events floor | wheel machinery (WP08) | WP08 | |
 
@@ -284,15 +284,16 @@ Checked and left: `test_no_dead_modules.py` and `test_status_module_boundary.py`
 
 Mutations (AC-012): a copy of the client gaining an id mint, a timestamp, a schema import, a publish-log read, the bridge's envelope code or an extra module; a copy of `producer_faults.py` with a clock read outside `_now_utc`; a copy of `emit.py` with an added helper or an added `import uuid`; a copy of `engine.py` or `rebuild_state.py` with an import absent from its row. The client's allowed capabilities pass: stderr line, bound resolution, child termination, breaker, fault-log append and read, opaque identifier copy, root resolution, retention pass-through.
 
-Per-file base of rule (e) (sweep of every existing file of plan 4.2; "none" = no new name, no new import). Imports are `(module, name)` pairs at any depth.
+Per-file base of rule (e), identical to the plan 4.2 rows. Rows for the same file are unioned (the loader merges per file; the marker row's four files also carry the wiring rows `status/lifecycle_events.py`, `decisions/emit.py` and the route row `events/decision_log.py`; comment removal adds no names); (sweep of every existing file of plan 4.2; "none" = no new name, no new import). Imports are `(module, name)` pairs at any depth.
 
 | File | New names | New imports |
 |---|---|---|
 | `status/adapters.py` | `_dispatch_handlers`, `ensure_producer_client` | `status.producer_client`, `status.producer_faults.record_fault` (`hosted_posture` deleted) |
 | `status/zeitgeist_bridge.py` | none | `specify_cli.core.hosted_posture` |
-| `status/emit.py`, `coordination/outbound.py`, `coordination/status_transition.py`, `status/lifecycle_events.py`, `decisions/emit.py` | none | none |
+| `status/emit.py`, `coordination/outbound.py`, `coordination/status_transition.py` | none | none |
+| `status/lifecycle_events.py`, `decisions/emit.py` | none (wiring row unioned with the marker row) | none |
 | `retrospective/lifecycle_events.py` | none | one function-local fan-out name from `specify_cli.status` |
-| `events/runtime_moments.py` | `emit_decision_authority_denied` | none (`hosted_posture` deleted) |
+| `events/runtime_moments.py` | `emit_decision_authority_denied` (plus changed, not new: `JournalRecord.row`, `latest_matching_record`, `_publish_journalled`) | `dataclasses.field` (`hosted_posture` deleted) |
 | `runtime/next/_internal_runtime/events.py` | `emit_decision_authority_denied` on `RuntimeEventEmitter` and `NullEmitter` | none |
 | `events/decision_log.py` | `DecisionGitLog.emit_decision_authority_denied` | none |
 | `runtime/next/runtime_bridge_retrospective.py` | `_BufferingRuntimeEmitter.emit_decision_authority_denied` | none |
@@ -300,9 +301,9 @@ Per-file base of rule (e) (sweep of every existing file of plan 4.2; "none" = no
 | `status/__init__.py` | none | the client's public names |
 | `status/models.py`, `status_lanes.py` | none | none |
 | `migration/rebuild_state.py` | none | `specify_cli.status_lanes.CANONICAL_LANES` |
-| `acceptance/__init__.py` | the `doing` alias constant | `Lane` (existing `specify_cli.status` import), `CANONICAL_LANES` (existing `status_lanes` import) |
+| `acceptance/__init__.py` | the `doing` alias constant | `Lane` (added to its existing `specify_cli.status` import); `CANONICAL_LANES` is not needed (plan 4.4 selects by name) |
 | `consolidation/done_bookkeeping.py` | none | `Lane` at runtime |
-| `migration/mission_state.py`, `state/contract.py` | none | none |
+| `migration/mission_state.py` (marker row), `state/contract.py` | none | none |
 
 Excluded from (e): `scripts/lint_canonical_producers.py` (its own tests), `tests/status/conftest.py`, generated files. Journal route: the layer test caps `runtime -> specify_cli` edges, so the engine imports nothing from `specify_cli`; the chain is `engine` -> `DecisionGitLog` (wrapper from `emitter_for_engine`) -> `_BufferingRuntimeEmitter` -> `RuntimeMomentProducer`. Non-`NullEmitter` fakes in tests (`tests/runtime/test_bridge_engine.py`) gain the method; `test_runtime_emitter_seam.py` (one Protocol class, one registration site) is unchanged and listed as implicated.
 
@@ -363,3 +364,11 @@ ADR 2026-10-13-2 D-1, D-2, D-3 need amending. Amend it in place (an "Amendment" 
 ## 23 Retain versus produce detail (plan section 8)
 
 - **Retain versus produce.** For each candidate publish-log file `Retain` takes `clock.lock` (bounded by `deadline_ms`), re-checks eligibility and the file's length and newest row under it, then deletes; a lock timeout or delete failure (a Windows sharing violation) is kept-with-reason (`busy`, `delete-failed`). Two-process test: `produce` racing `retain --apply` loses no row reported produced. Fault-log and run-journal candidates have writers that touch only the current day or a live run, which eligibility excludes.
+
+## 24 Run-journal row route and Python-side schema source (plan sections 4.2, 11; fresh round 2)
+
+**Row, not envelope (PLAN-FRESH2-001).** In the checkout `JournalRecord` (`events/runtime_moments.py`) holds `line` and `timestamp` only; `latest_matching_record` parses the full journal dict and discards it; `_publish_journalled` builds a bridge-style `envelope` with `moment_event_id` (UUID5 over `_EVENT_ID_NAMESPACE`) and `_with_mission_identity`. Minimal edit: `JournalRecord` gains `row: dict[str, Any] = field(default_factory=dict, compare=False)` (so `JournalRecord(line=4, timestamp=STAMP)` and the `==` assertion of `test_runtime_moments_unit.py` still hold), `latest_matching_record` fills it from the parsed dict, `_publish_journalled` passes `row=record.row` next to the unchanged `envelope=`. Residuals, named with the reason (the Zeitgeist handler, `zeitgeist_bridge._broadcast_lifecycle_envelope`, reads `kwargs["envelope"]` until #6164 deletes it, and Team Kitty upserts on that UUID5): `moment_event_id`, `_EVENT_ID_NAMESPACE`, the `uuid` import, `_with_mission_identity`, the envelope dict. Nothing new is minted. The producer id is `row["event_id"]` only; Java never reads `seam_args["envelope"]`. WP06 rows have no `event_id` yet (WP07 stamps), so the row reaches Java without one and is refused per FR-007's rules (a fault row, no Python id); `_publish_journalled` must not raise or invent one for a legacy journal.
+
+**Tests (red first, WP06).** Blast radius: `tests/specify_cli/events/test_runtime_moments_unit.py` (the only test of `moment_event_id` and `latest_matching_record`; keeps its envelope assertions, gains the new ones), `tests/specify_cli/events/test_runtime_moments.py` (published calls also carry `row`). New assertions, each red on the current code: (1) every publish call has a `row` equal to the `json.loads` of its journal line; (2) `set(row)` is within `{event_id,row_version,event_type,timestamp,payload}` (an envelope passed as `row` has `aggregate_id` and fails); (3) with a journal line stamped with a ULID `event_id`, `row["event_id"]` is that ULID and differs from `envelope["event_id"]`; (4) a hand-built `JournalRecord(line, timestamp)` yields an empty `row` and `_publish_journalled` neither raises nor adds an id. WP07 adds the end-to-end case: a stamped journal line through the real handler into a stubbed-binary-free Java acceptance run yields a publish-log `id` equal to the stamped ULID. Sweep for other Python ids or envelopes reaching the client: `status/emit.py` and `retrospective/lifecycle_events.py` pass persisted rows whose ids are `_generate_ulid()`; `status/lifecycle_events.py::_generate_event_id` falls back to a 32-hex uuid4 and `moment_event_id` is a UUID5, both refused by Java as UUID forms (`rejected`), which is the specified behaviour for legacy rows. Gate (e) does not catch a change of meaning inside a changed function, so tests (1) to (3) are the guard.
+
+**Schema source for WP07 (PLAN-FRESH2-002).** Decision: WP07 depends on WP08 (WP08 needs only WP01 and the events release, so the order is feasible and WP08 stays green alone: floor bump, `uv.lock`, packaging tests). The Python AC-019 gate and the marker-clearing check read the released schemas and registry from the installed `spec_kitty_events` package (resource lookup in the venv), so nothing is committed (`test_no_committed_events_schema.py`) and no fetch path exists beside the pin. Floor: the schema set resolved above zero and the cleared-marker count above zero; the test fails, not skips, when the package lacks them (AC-019). Sweep of the WP table for the same class (a WP reads an artifact whose provider it does not depend on): WP02 (pin task, waits for the release, noted); WP04 (Java reads the pin from WP02 via WP03); WP05, WP06 (stubbed client, no events package use); WP07 (fixed here); WP09 (workflow text only, depends WP08); WP10 (all). No further gap.
