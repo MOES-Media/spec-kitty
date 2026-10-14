@@ -1,6 +1,7 @@
 package ai.speckitty.producer.domain.protocol;
 
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * A {@code retain} request. It never carries facts: the producer derives them.
@@ -15,11 +16,12 @@ public record RetainRequest(int version, String startPath, boolean dryRun, Map<S
         implements Request {
 
     public RetainRequest {
-        throw new UnsupportedOperationException("red stub");
+        RequestChecks.check(version, startPath, deadlineMs);
+        Objects.requireNonNull(policy, "policy");
     }
 
     /** {@code dry_run} is true unless the client sent exactly {@code false}; absent, true and anything else mean true. */
     public static boolean dryRunFrom(Object value) {
-        throw new UnsupportedOperationException("red stub");
+        return !Boolean.FALSE.equals(value);
     }
 }

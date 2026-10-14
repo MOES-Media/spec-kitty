@@ -1,6 +1,8 @@
 package ai.speckitty.producer.domain.protocol;
 
 import ai.speckitty.producer.domain.fault.FaultReason;
+import ai.speckitty.producer.domain.ids.EventIdForms;
+import java.util.Objects;
 
 /**
  * The reply to a {@code produce}: exactly one per request.
@@ -19,11 +21,30 @@ public record ProduceReply(
     public static final int MAX_DETAIL_LENGTH = 500;
 
     public ProduceReply {
-        throw new UnsupportedOperationException("red stub");
+        if (version != Protocol.VERSION) {
+            throw new IllegalArgumentException("unsupported protocol version");
+        }
+        Objects.requireNonNull(outcome, "outcome");
+        boolean refused = outcome == Outcome.REFUSED;
+        if (refused != (reason != null)) {
+            throw new IllegalArgumentException("a reason belongs to a refusal and a refusal needs one");
+        }
+        if (!refused && type == null) {
+            throw new IllegalArgumentException("a produced or skipped reply names its type");
+        }
+        if (refused && notice != null) {
+            throw new IllegalArgumentException("a refusal carries no notice");
+        }
+        if (eventId != null && !EventIdForms.normalizeForOrder(eventId).filter(eventId::equals).isPresent()) {
+            throw new IllegalArgumentException("event id must be normalised");
+        }
+        if (detail != null && (detail.length() > MAX_DETAIL_LENGTH || detail.indexOf('\n') >= 0 || detail.indexOf('\r') >= 0)) {
+            throw new IllegalArgumentException("detail is one line of bounded length");
+        }
     }
 
     /** The fault class a refusal maps to; null unless refused. */
     public FaultReason reasonClass() {
-        throw new UnsupportedOperationException("red stub");
+        return reason == null ? null : reason.faultClass();
     }
 }

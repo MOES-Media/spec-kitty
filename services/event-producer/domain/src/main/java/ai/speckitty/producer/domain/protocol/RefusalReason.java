@@ -25,7 +25,7 @@ public enum RefusalReason {
 
     /** The fault class the client records for this refusal: {@code clock-overflow} or {@code rejected}. */
     public FaultReason faultClass() {
-        throw new UnsupportedOperationException("red stub");
+        return this == CLOCK_OVERFLOW ? FaultReason.CLOCK_OVERFLOW : FaultReason.REJECTED;
     }
 
     public static Optional<RefusalReason> fromWire(String wire) {

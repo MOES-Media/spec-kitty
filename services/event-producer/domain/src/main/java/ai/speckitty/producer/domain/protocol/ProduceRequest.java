@@ -1,6 +1,7 @@
 package ai.speckitty.producer.domain.protocol;
 
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * A {@code produce} request: the persisted row and the call context, passed through uninterpreted.
@@ -17,6 +18,9 @@ public record ProduceRequest(
         implements Request {
 
     public ProduceRequest {
-        throw new UnsupportedOperationException("red stub");
+        RequestChecks.check(version, startPath, deadlineMs);
+        Objects.requireNonNull(row, "row");
+        Objects.requireNonNull(slot, "slot");
+        Objects.requireNonNull(seamArgs, "seamArgs");
     }
 }

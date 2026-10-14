@@ -1,5 +1,8 @@
 package ai.speckitty.producer.domain.protocol;
 
+import ai.speckitty.producer.domain.retention.KeepReason;
+import java.util.Objects;
+
 /**
  * One local-tier file in a {@code retain} reply, with the reason it is eligible or kept.
  *
@@ -9,6 +12,13 @@ package ai.speckitty.producer.domain.protocol;
 public record RetainItem(RelativePath path, String reason) {
 
     public RetainItem {
-        throw new UnsupportedOperationException("red stub");
+        Objects.requireNonNull(path, "path");
+        boolean known = false;
+        for (KeepReason candidate : KeepReason.values()) {
+            known |= candidate.wire().equals(reason);
+        }
+        if (!known && !KeepReason.ELIGIBLE.equals(reason)) {
+            throw new IllegalArgumentException("unknown retention reason");
+        }
     }
 }
