@@ -90,7 +90,26 @@ sbom() {
   rm -rf "$scratch"; scratch=""
 }
 
+floorgate() {
+  # The measured-floor gate of package-leg.sh must go red when the pinned floor is tighter than the binary. Needs a built binary and
+  # the toolchain checksum (producer-native.yml runs it after the leg is built). Windows has no floor: nothing to plant.
+  local leg="${LEG:?set LEG to the leg built on this runner}"
+  case "$leg" in
+    windows-*) pass "floor gate: windows has no pinned floor, nothing to plant"; return ;;
+    linux-*) old="py3-none-manylinux_2_28_x86_64"; planted="py3-none-manylinux_2_10_x86_64" ;;
+    macos-*) old="py3-none-macosx_11_0_arm64"; planted="py3-none-macosx_10_9_arm64" ;;
+    *) fail "floor gate: unknown leg $leg"; return ;;
+  esac
+  scratch="$(mktemp -d)"
+  sed "s/$old/$planted/" "$project/../../scripts/release/dist-set.json" > "$scratch/dist-set.json"
+  grep -q "$planted" "$scratch/dist-set.json" || { fail "floor gate: could not plant a tighter floor"; return; }
+  DIST_SET="$scratch/dist-set.json" expect_red "a binary above the pinned floor is refused" "exceeds the pinned floor" \
+    "$here/package-leg.sh" "$leg" "$scratch/out"
+  rm -rf "$scratch"; scratch=""
+}
+
 case "$mode" in
+  floorgate) floorgate ;;
   floor) floor ;;
   tamper) tamper ;;
   module) module ;;

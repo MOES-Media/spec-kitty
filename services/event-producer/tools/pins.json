@@ -35,6 +35,16 @@
       "sha256": "72edc27ce2dd3c156332144a339c97995745cae291205ed2f9b5cc26aa9cb422",
       "published": "2026-01-20",
       "advisory_feed_checked": "GitHub security advisories of graalvm/graalvm-ce-builds and oracle/graal (none published), checked 2026-10-14; the sha256 equals the vendor's .sha256 file for this archive"
+    },
+    {
+      "name": "manylinux-2-28-x86-64",
+      "kind": "container-image",
+      "version": "manylinux_2_28",
+      "url": "https://quay.io/v2/pypa/manylinux_2_28_x86_64/manifests/sha256:4131ddd7acb9c6c966af02fe7e71edc51e078c2d41f475966697676430bfa2ae",
+      "image": "quay.io/pypa/manylinux_2_28_x86_64@sha256:4131ddd7acb9c6c966af02fe7e71edc51e078c2d41f475966697676430bfa2ae",
+      "sha256": "4131ddd7acb9c6c966af02fe7e71edc51e078c2d41f475966697676430bfa2ae",
+      "published": "2026-10-09",
+      "advisory_feed_checked": "No advisory feed exists for the pypa manylinux images; the image is pinned by manifest digest, is used only to link the Linux native binary against glibc 2.28, and ships nothing into the wheel except that binary. Checked 2026-10-14."
     }
   ]
 }
