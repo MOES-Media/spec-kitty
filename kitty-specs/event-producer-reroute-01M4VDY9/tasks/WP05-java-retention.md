@@ -70,7 +70,7 @@ Plan section 8 (all of it), 4.3; research R-6, R-21, R-23. **Refinement of the p
 
 ## Subtask T029: Ports and facts
 
-**Steps**: `application.retain`: `Retain` use case, ports `LedgerFacts` (the only code that opens a committed ledger; #6193 replaces it) and `LocalTier` (list the candidate files of the local-tier directories and delete one whole file; implemented in `adapter/ledger/**`). Both live in `application.retain`, not in WP03's `application.port`. Candidates come only from local-tier directories (`.kittify/events/publish/...`, `.kittify/events/faults/<UTC date>.jsonl`, run journals), never `kitty-specs/`.
+**Steps**: `application.retain`: `Retain` use case, ports `LedgerFacts` (the only code that opens a committed ledger; #6193 replaces it) and `LocalTier` (list the candidate files of the local-tier directories and delete one whole file; implemented in `adapter/ledger/localtier/` within the owned `adapter/ledger/**` glob; **it survives the #6193 replacement**, which removes only the committed-ledger reader classes behind `LedgerFacts`, not `LocalTier`). Both live in `application.retain`, not in WP03's `application.port`. Candidates come only from local-tier directories (`.kittify/events/publish/...`, `.kittify/events/faults/<UTC date>.jsonl`, run journals), never `kitty-specs/`.
 
 ## Subtask T030: Committed-ledger reader ("Mission open")
 

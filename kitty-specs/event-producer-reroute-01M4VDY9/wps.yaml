@@ -52,7 +52,7 @@ work_packages:
       - "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/protocol/**"
       - "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/arch/**"
       - "services/event-producer/domain/src/testFixtures/**"
-    requirement_refs: [FR-007, FR-008, FR-009, FR-010, FR-012, FR-013, FR-016, FR-029, NFR-003, NFR-005]
+    requirement_refs: [FR-007, FR-008, FR-009, FR-010, FR-012, FR-013, FR-016, FR-028, FR-029, NFR-003, NFR-005]
     subtasks: [T011, T012, T013, T014, T015, T016]
     prompt_file: "tasks/WP02-java-domain-core.md"
 
@@ -163,7 +163,7 @@ work_packages:
       - "tests/next/test_engine_commit_primitives.py"
       - "tests/specify_cli/events/test_decision_log.py"
       - "tests/specify_cli/events/test_runtime_moments_unit.py"
-    requirement_refs: [FR-001, FR-002, FR-003, FR-004, FR-020, FR-022, FR-023, FR-024, FR-025, FR-026, FR-027, FR-030, C-001]
+    requirement_refs: [FR-001, FR-002, FR-003, FR-004, FR-019, FR-020, FR-022, FR-023, FR-024, FR-025, FR-026, FR-027, FR-030, C-001]
     subtasks: [T034, T035, T036, T037, T038, T039, T040, T041, T042, T043, T080, T081]
     prompt_file: "tasks/WP06-python-client-and-seam.md"
 
@@ -231,7 +231,7 @@ work_packages:
       - "tests/perf/test_event_producer_overhead.py"
       - "tests/integration/_native_binary.py"
       - "tests/integration/test_native_binary_helper.py"
-    requirement_refs: [FR-038, FR-043, NFR-001, NFR-002, NFR-004, NFR-006, NFR-007]
+    requirement_refs: [FR-003, FR-026, FR-038, FR-043, NFR-001, NFR-002, NFR-003, NFR-004, NFR-006, NFR-007]
     subtasks: [T065, T066, T067, T068, T069, T070, T083]
     prompt_file: "tasks/WP10-integration-and-final-gate.md"
 

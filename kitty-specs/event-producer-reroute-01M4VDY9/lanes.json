@@ -201,7 +201,8 @@
         "services/event-producer/launcher/src/test/resources/retain/**"
       ],
       "predicted_surfaces": [
-        "api"
+        "api",
+        "legacy-cleanup"
       ],
       "depends_on_lanes": [
         "lane-d"
@@ -384,8 +385,8 @@
       "parallel_group": 8
     }
   ],
-  "computed_at": "2026-10-14T08:39:41.505720+00:00",
+  "computed_at": "2026-10-14T08:47:42.280745+00:00",
   "computed_from": "dependency_graph+ownership",
   "planning_artifact_wps": [],
-  "planning_commit_sha": "47ac89ee478363ec11838ee4130561fde5513fc3"
+  "planning_commit_sha": "7821d6715d8a4d347dda77e65566123f80faa6c9"
 }

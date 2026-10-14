@@ -6,10 +6,13 @@ dependencies:
 - WP11
 - WP12
 requirement_refs:
+- FR-003
+- FR-026
 - FR-038
 - FR-043
 - NFR-001
 - NFR-002
+- NFR-003
 - NFR-004
 - NFR-006
 - NFR-007
@@ -69,7 +72,7 @@ Plan sections 9 (performance, CI home), 13 item 8, 17; research R-9, R-17. Read-
 
 ## Precondition gate: EVENTS RELEASE (blocks approval and the schema-reading and measurement tasks, not authoring)
 
-One definition, the same in every gated WP (tasks-overview section 2): `events-pin.properties` and the `pyproject.toml` floor name the released wheel `V_E` and WP11 is approved. Record `V_E` and the pin sha256 in the WP notes. If not: author what is possible, then **STOP and report**. The mission PR is not marked ready before this passes.
+One definition, the same in every gated WP (tasks-overview section 2): `events-pin.properties` and the `pyproject.toml` floor name the released wheel `V_E` and WP11 is approved. Record `V_E` and the pin sha256 in the WP notes. If not: author what is possible, then **STOP and report**. The mission PR is not marked ready before this passes. **Reviewer approval checklist (the tooling will not stop an early approval):** (1) `services/event-producer/gradle/events-pin.properties` names the released wheel `V_E` and its sha256; (2) the `spec-kitty-events` floor in `pyproject.toml` names `V_E`; (3) WP11 is approved; (4) `V_E` and the pin sha256 are in this WP's notes. Approving without all four is a review defect (external events PR: O-6).
 
 ## Where the real-binary tests run (fail-on-missing only in the one job that builds the binary)
 
@@ -103,10 +106,10 @@ No approval without the run ids. This push is in addition to WP01's feasibility 
 **Steps**: clean venv from the sdist, from the pure wheel, and with no matching wheel: lifecycle command succeeds and warns `binary-missing` (AC-025); editable install works (AC-038 runtime half). **Covers** AC-025, FR-043.
 
 ## Subtask T068: AC-036 measurement
-**Steps**: `tests/_perf_helpers.py` gains relative producer limits (`test_perf_limit_authority.py` rejects absolute ones): `emit_status_transition_batch` with a real producer over the same with a no-op handler, cold and warm, per OS. The perf test runs in the same `native-e2e` job on the three legs, so the numbers that set the limits are reproduced by a CI job; they are recorded in `research/wp10-measurements.md` next to WP01's. On failure apply the NFR-002 contingency: **do not implement batching here; stop and report**, because it requires amending FR-003, FR-026 and AC-004 first (operator decision). **Covers** AC-036, NFR-002.
+**Steps**: `tests/_perf_helpers.py` gains relative producer limits (`test_perf_limit_authority.py` rejects absolute ones): `emit_status_transition_batch` with a real producer over the same with a no-op handler, cold and warm, per OS. The perf test runs in the same `native-e2e` job on the three legs, so the numbers that set the limits are reproduced by a CI job; they are recorded in `research/wp10-measurements.md` next to WP01's. On failure apply the NFR-002 contingency: **do not implement batching here; stop and report**, because it requires amending FR-003, FR-026 and AC-004 first (operator decision). **Covers** AC-036, NFR-002, FR-003 and FR-026 (AC-036 bounds the one-spawn-per-row rule of both).
 
 ## Subtask T069: Hygiene and determinism sweep
-**Steps**: scan fixtures, fault records and the members the producer authors for absolute home paths or usernames (AC-035); same row, clock and node id give byte-identical lines on all three OS (AC-034, via the three legs of `native-e2e` and the `gradle-test` matrix); no BOM, CR or raw newline. **Covers** AC-034, AC-035, NFR-003, NFR-004, NFR-006, NFR-007.
+**Steps**: scan fixtures, fault records and the members the producer authors for absolute home paths or usernames (AC-035); same row, clock and node id give byte-identical lines on all three OS (AC-034, via the three legs of `native-e2e` and the `gradle-test` matrix); no BOM, CR or raw newline. **Covers** AC-034, AC-035, NFR-003 (byte determinism), NFR-004, NFR-006, NFR-007.
 
 ## Subtask T070: Reflexivity check and final gate pass
 **Steps**: confirm no gate depends on the producer for this mission's own events (plan 13.8); run every new gate (thinness, build-glue, census, fault enum, single writer, single lane list, no committed events schema, exemption ledger) with its floor and mutation; every R-7 gate file individually against the baseline; `uv lock --check`, `spec-kitty regen --check`, docs lint, terminology guard; Gradle `check`; record the result list in `research/wp10-measurements.md`. **Covers** AC-028, G-11.

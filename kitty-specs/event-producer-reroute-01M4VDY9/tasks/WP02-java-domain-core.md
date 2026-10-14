@@ -11,6 +11,7 @@ requirement_refs:
 - FR-012
 - FR-013
 - FR-016
+- FR-028
 - FR-029
 - NFR-003
 - NFR-005
