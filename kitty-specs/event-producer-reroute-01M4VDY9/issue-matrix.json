@@ -48,6 +48,18 @@
       "verdict": "not-applicable",
       "wp": null
     },
+    "#3284": {
+      "evidence_ref": "known-red baseline cited in plan 10; context only",
+      "fr": null,
+      "nfr": null,
+      "repo": null,
+      "sc": null,
+      "scope": null,
+      "source_file": null,
+      "title": null,
+      "verdict": "not-applicable",
+      "wp": null
+    },
     "#4182": {
       "evidence_ref": "cited for golden-file provenance only; no work owed",
       "fr": null,
