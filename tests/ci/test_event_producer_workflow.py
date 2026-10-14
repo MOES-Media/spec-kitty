@@ -9,6 +9,7 @@ the pin and glue tests run in the router lanes that own them, and a pytest call 
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import re
 import shutil
@@ -445,6 +446,51 @@ def test_install_script_without_any_zip_extractor_fails_by_name_before_downloadi
     assert result.returncode == 2, (result.returncode, result.stderr)
     assert "install-graalvm: MISSING_TOOL 7z" in result.stderr
     assert not (tmp_path / "dest" / "graalvm-archive").exists(), "nothing was downloaded"
+
+
+def _install_with_a_failing_extractor(tmp_path: Path, script: Path) -> subprocess.CompletedProcess[str]:
+    """Run an install script whose zip extractor (a stub `7z`) prints a line and then execs a program that does not exist: exit 127.
+
+    A fake curl supplies the archive so the checksum passes and the run reaches the extractor. No stderr is redirected by the test.
+    """
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    for tool in (*_INSTALL_TOOLS, "cat", "env", "bash", "sh"):
+        found = shutil.which(tool)
+        if found and tool != "curl":
+            (bindir / tool).symlink_to(found)
+    payload = b"not really a zip"
+    curl_stub = '#!/usr/bin/env bash\nwhile [ "$#" -gt 0 ]; do [ "$1" = "--output" ] && out="$2"; shift; done\nprintf %s "' + payload.decode() + '" > "$out"\n'
+    (bindir / "curl").write_text(curl_stub, encoding="utf-8")
+    (bindir / "7z").write_text("#!/usr/bin/env bash\necho extractor-said-hello\nexec /nonexistent/definitely-missing-tool\n", encoding="utf-8")
+    for stub in ("curl", "7z"):
+        (bindir / stub).chmod(0o755)
+    pins = tmp_path / "pins.json"
+    digest = hashlib.sha256(payload).hexdigest()  # noqa: TID251 -- file-integrity digest of a stub archive, not a charter hash
+    entry = {"name": "t", "kind": "jdk-archive", "version": "jdk-1", "url": "https://example.invalid/x.zip", "sha256": digest}
+    pins.write_text(json.dumps({"tools": [entry]}), encoding="utf-8")
+    bash = shutil.which("bash")
+    assert bash
+    env = {"PATH": str(bindir), "HOME": str(tmp_path)}
+    return subprocess.run([bash, str(script), "t", str(tmp_path / "dest"), str(pins)], capture_output=True, text=True, check=False, env=env)
+
+
+def test_a_failing_extractor_is_never_silent_exit_127(tmp_path: Path) -> None:
+    result = _install_with_a_failing_extractor(tmp_path, TOOLS / "install-graalvm.sh")
+    assert result.returncode == 127, (result.returncode, result.stderr)
+    assert "install-graalvm: FAILED rc=127 at line" in result.stderr, result.stderr
+    assert "7z x -y" in result.stderr, "the FAILED line names the command that failed"
+    assert "extractor-said-hello" in result.stderr, "the extractor's own output is printed, not discarded"
+
+
+def test_every_install_script_traps_errors_with_the_failing_command() -> None:
+    for script, label in (("install-graalvm.sh", "install-graalvm"), ("check-java-home.sh", "check-java-home")):
+        text = (TOOLS / script).read_text(encoding="utf-8")
+        assert "set -Eeuo pipefail" in text
+        assert f'echo "{label}: FAILED rc=$rc at line $LINENO: $BASH_COMMAND" >&2' in text
+    assert ">/dev/null" not in "".join(
+        line for line in (TOOLS / "install-graalvm.sh").read_text(encoding="utf-8").splitlines(keepends=True) if "run_logged" in line or "tar -xzf" in line
+    )
 
 
 def test_the_container_build_checks_java_home_on_host_and_inside(event_producer: dict[str, Any]) -> None:

@@ -6,7 +6,9 @@
 #
 # <pins-tool-name> is a jdk-archive entry of pins.json (graalvm-jdk-linux-x64, graalvm-jdk-macos-aarch64, graalvm-jdk-windows-x64).
 # Exits non-zero on a checksum mismatch, an unknown entry, a missing tool or a native-image whose version differs from the pin.
-set -euo pipefail
+set -Eeuo pipefail
+# A failing command must always say which one, with its exit code: a bare exit 127 with no output cost a CI round on the Windows runner.
+trap 'rc=$?; echo "install-graalvm: FAILED rc=$rc at line $LINENO: $BASH_COMMAND" >&2' ERR
 
 name="${1:?pins tool name}"
 dest="${2:?destination directory}"
@@ -46,6 +48,15 @@ mkdir -p "$dest"
 archive="$dest/graalvm-archive"
 curl --fail --silent --show-error --location --retry 3 --output "$archive" "$url"
 
+# Run a command with all of its output captured in a log that is printed (to stderr) when it fails; nothing is discarded.
+run_logged() {
+  local log="$dest/step.log" rc=0
+  "$@" >"$log" 2>&1 || rc=$?
+  if [ "$rc" -ne 0 ]; then echo "install-graalvm: command exited $rc: $*" >&2; cat "$log" >&2; fi
+  rm -f "$log"
+  return "$rc"
+}
+
 # Hash from stdin: sha256sum given a PATH that holds a backslash (a Windows RUNNER_TEMP) prefixes the digest with a backslash.
 if command -v sha256sum >/dev/null 2>&1; then
   got=$(sha256sum <"$archive" | cut -d' ' -f1)
@@ -60,10 +71,10 @@ fi
 case "$url" in
   *.zip)
     case "${extract[0]}" in
-      unzip) "${extract[@]}" "$archive" -d "$dest/unpacked" >/dev/null ;;
-      *) "${extract[@]}" "-o$dest/unpacked" "$archive" >/dev/null ;;
+      unzip) run_logged "${extract[@]}" "$archive" -d "$dest/unpacked" ;;
+      *) run_logged "${extract[@]}" "-o$dest/unpacked" "$archive" ;;
     esac ;;
-  *) mkdir -p "$dest/unpacked" && tar -xzf "$archive" -C "$dest/unpacked" ;;
+  *) mkdir -p "$dest/unpacked" && run_logged tar -xzf "$archive" -C "$dest/unpacked" ;;
 esac
 rm -f "$archive"
 

@@ -6,7 +6,8 @@
 #                                       A GraalVM JDK also carries lib/svm/bin/native-image, which is NOT a JDK root; it has no bin/java.
 #
 # Every refusal prints JAVA_HOME_INVALID and exits 1.
-set -euo pipefail
+set -Eeuo pipefail
+trap 'rc=$?; echo "check-java-home: FAILED rc=$rc at line $LINENO: $BASH_COMMAND" >&2' ERR
 
 is_jdk_root() {
   local d="$1"
