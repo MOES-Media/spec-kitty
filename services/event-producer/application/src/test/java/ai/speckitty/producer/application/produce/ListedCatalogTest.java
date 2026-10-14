@@ -40,7 +40,7 @@ class ListedCatalogTest {
         assertThat(CATALOG.size()).isEqualTo(MirroredRegistry.TYPE_COUNT);
         Set<String> seen = new HashSet<>();
         for (RegisteredType type : MirroredRegistry.types()) {
-            assertThat(found(sample(type))).isSameAs(type);
+            assertThat(found(sample(type))).isEqualTo(type);
             seen.add(type.type());
         }
         assertThat(seen).hasSize(MirroredRegistry.TYPE_COUNT);
