@@ -11,7 +11,13 @@ public enum RefusalReason {
     SCHEMA_INVALID("schema-invalid"),
     TYPE_UNKNOWN("type-unknown"),
     CLOCK_OVERFLOW("clock-overflow"),
-    NODEID_UNAVAILABLE("nodeid-unavailable");
+    NODEID_UNAVAILABLE("nodeid-unavailable"),
+    /** No schema-backed validator is bound: the producer fails closed and writes nothing. */
+    VALIDATOR_UNAVAILABLE("validator-unavailable"),
+    /** The clock lock was not free within the request's budget. */
+    BUSY("busy"),
+    /** Neither a Mission id nor a project uuid could be found, so no {@code source} can be formed. */
+    PROJECT_UNRESOLVED("project-unresolved");
 
     private final String wire;
 
@@ -23,9 +29,13 @@ public enum RefusalReason {
         return wire;
     }
 
-    /** The fault class the client records for this refusal: {@code clock-overflow} or {@code rejected}. */
+    /** The fault class the client records for this refusal: {@code clock-overflow}, {@code busy} or {@code rejected}. */
     public FaultReason faultClass() {
-        return this == CLOCK_OVERFLOW ? FaultReason.CLOCK_OVERFLOW : FaultReason.REJECTED;
+        return switch (this) {
+            case CLOCK_OVERFLOW -> FaultReason.CLOCK_OVERFLOW;
+            case BUSY -> FaultReason.BUSY;
+            default -> FaultReason.REJECTED;
+        };
     }
 
     public static Optional<RefusalReason> fromWire(String wire) {
