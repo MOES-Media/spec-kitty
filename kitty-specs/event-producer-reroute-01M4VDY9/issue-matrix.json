@@ -73,7 +73,7 @@
       "wp": null
     },
     "#6164": {
-      "evidence_ref": "<link or commit>",
+      "evidence_ref": "either landing order works (plan 12); no work owed against it",
       "fr": null,
       "nfr": null,
       "repo": null,
@@ -81,7 +81,7 @@
       "scope": null,
       "source_file": "spec.md",
       "title": "<fill at WP-implementation time>",
-      "verdict": "unknown",
+      "verdict": "not-applicable",
       "wp": null
     },
     "#6185": {
