@@ -239,7 +239,7 @@ Every FR, NFR, C and G group maps to a section and its ACs in R-17.
 
 ## 15 Spec touch-ups proposed to the orchestrator
 
-Thirteen, not edited here; exact wording in R-18.
+Thirteen; applied to spec.md and data-model.md (wording in R-18).
 
 ## 16 Operator forks
 

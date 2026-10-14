@@ -51,3 +51,8 @@ Seeded at plan time (Standing Order 3); append during implementation, assess at 
 - `tests/architectural/test_no_duplicate_suite_execution.py` treats every change-triggered job that reaches pytest as a duplicate unless it is a row of its closed `AUTHORIZED_PER_CHANGE_SUITE_JOBS` ledger, and its stale-row check refuses a row for a job that does not exist yet; the row must land in the same commit as the job. Running a pin script's own tests inside a new `pull_request` job trips it even when another lane already runs them (here the router's contract-tools lane).
 - A test file placed in a later WP's source tree (a spike test under `launcher/src/test`) is outside every `owned_files` list unless the earlier WP lists the glob; the later WP's deletion of it is then a recorded out-of-map edit.
 - CI-only evidence (per-OS numbers, a job turning red) needs an explicit push path in each WP that depends on it; the agent has no push right.
+
+## Seen while fixing the analysis findings (round 1)
+
+- Prompt file slugs, titles' subtask ids and the id sequence are frozen by the `WPCreated` event; the WP07 slug still names markers after marker clearing moved to WP12, and subtask ids are non-monotonic. Cosmetic.
+- The requirement parser still rejects `C-002` to `C-008`; the tasks-overview table is their only trace, so a mapping fix (C-006 to WP07) is an overview edit only.

@@ -131,7 +131,7 @@ Mapping: an unreadable, truncated, non-JSON or schema-violating reply `malformed
 
 ## 9 LaneVocabulary
 
-`Lane` (StrEnum, `status/models.py`): 11 members including the non-persisted `uninitialized`; the canonical authority. `CANONICAL_LANES` (`status_lanes.py`): 9. `spec_kitty_events.Lane`: 10, aligned in the events PR. Census items: `_VALID_LANES` and `_LANE_ORDER` (`migration/rebuild_state.py`), `_LEGACY_NOT_DONE_LANES` (`acceptance/__init__.py`, includes legacy `doing`), `_PRE_APPROVED_LANE_VALUES` (`consolidation/done_bookkeeping.py`). Six sets in all (the AC-020 floor).
+`Lane` (StrEnum, `status/models.py`): 11 members including the non-persisted `uninitialized`; the canonical authority. `CANONICAL_LANES` (`status_lanes.py`): 9. `spec_kitty_events.Lane`: 10, aligned in the events PR. Census items: `_VALID_LANES` and `_LANE_ORDER` (`migration/rebuild_state.py`), `_LEGACY_NOT_DONE_LANES` (`acceptance/__init__.py`, includes legacy `doing`), `_PRE_APPROVED_LANE_VALUES` (`consolidation/done_bookkeeping.py`). The AC-020 floor of six sets is `Lane`, `CANONICAL_LANES`, `_VALID_LANES`, `_LANE_ORDER`, `_LEGACY_NOT_DONE_LANES`, `_PRE_APPROVED_LANE_VALUES`; the events `Lane` is the aligned external counterpart, not a seventh.
 
 The schema's persisted lane enumeration = genesis, planned, claimed, in_progress, for_review, in_review, approved, done, blocked, canceled. The alias `doing` (`LANE_ALIASES`) is resolved to `in_progress` in `data`. `reason_source`: `operator` (`OPERATOR_REASON_SOURCE`) or `synthetic` (move-task hop), optional, absent for non-cancel moves.
 

@@ -11,4 +11,4 @@ Seeded at plan time; append with date and reason during implementation.
 | Events artifact: pinned released wheel fetched at build time | Charter no-vendoring rule; PyPI is the only release channel. |
 | Publish log per Mission; fault log per UTC day | Gives retention a countable "run" and whole-file deletion. |
 | ADR 2026-10-13-2 amended in place; one new ADR for the delivery decision | One authority per decision. |
-| Python build glue (hook, set-check script) accepted as bounded exception, pending fork F1 | The backend dictates Python. |
+| Python build glue (hook, set-check script) accepted as bounded exception; F1 ruled (a), bounded, 2026-10-14 | The backend dictates Python. |

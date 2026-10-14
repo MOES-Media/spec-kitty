@@ -333,7 +333,7 @@ Excluded from (e): `scripts/lint_canonical_producers.py` (its own tests), `tests
 
 ## 18 Spec touch-ups (plan section 15, exact wording)
 
-Not edited in the spec; the orchestrator applies them.
+Applied to spec.md and data-model.md (all thirteen present); the wording below is the record.
 1. **FR-027**, add: "The allowed Python surface is the file, symbol and new-import list of plan section 4.2; the gate fails on any other new module or function in the status and emission area, and on a new top-level name or import in an existing file of that list beyond that file's row; the list is its data."
 2. **FR-028 / data-model section 6** (F-2), add: "Python forwards the raw `ledger.retention.*` values from `.kittify/config.yaml` unread; Java applies the defaults 20 and 30 and validates them, returning the named policy error that `doctor` renders."
 3. **C-008** (F-3), replace with: "The events PR follows spec-kitty-events#92 for the `dataschema` base URI, the `lamportclock` type, lifted-member lists and minimal-envelope timing, and for type names except the operator-ruled prefix `ai.spec-kitty` and the INTERIM names of data-model section 3, which that PR is asked to adopt; the `source` tie-break added to the total-order key goes to that PR to confirm (OD-EVENTS)."
