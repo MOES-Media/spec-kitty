@@ -56,6 +56,8 @@ FORBIDDEN_TOKENS = frozenset(
     }
 )
 FORBIDDEN_SUBSTRINGS = ("spec_kitty_events", "specify_cli")
+#: Names through which code can import, evaluate or compile text at run time, which would sidestep the import and identifier rules.
+DYNAMIC_IMPORT_NAMES = frozenset({"__import__", "import_module", "importlib", "exec", "eval", "compile", "__builtins__", "builtins"})
 
 
 class Baseline:
@@ -147,6 +149,20 @@ def _forbidden_identifier_violations(tree: ast.AST) -> list[str]:
     return violations
 
 
+def _dynamic_import_violations(tree: ast.AST) -> list[str]:
+    """Flag run-time import machinery. A bare name is judged on its own; an attribute only when it is ``import_module`` or names importlib/builtins
+    (``re.compile`` is not ``compile``)."""
+    found: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and node.id in DYNAMIC_IMPORT_NAMES:
+            found.add(node.id)
+        elif isinstance(node, ast.Attribute) and node.attr in {"import_module", "__import__", "importlib", "builtins"}:
+            found.add(node.attr)
+        elif isinstance(node, ast.ImportFrom) and any(alias.name in DYNAMIC_IMPORT_NAMES for alias in node.names):
+            found.update(alias.name for alias in node.names if alias.name in DYNAMIC_IMPORT_NAMES)
+    return [f"dynamic import machinery {name!r}: imports must be static" for name in sorted(found)]
+
+
 def _imported_modules(tree: ast.AST) -> set[str]:
     modules: set[str] = set()
     for node in ast.walk(tree):
@@ -183,6 +199,7 @@ def wholly_owned_violations(source: str) -> list[str]:
         if isinstance(node, ast.ImportFrom) and node.module == "hashlib" and any(alias.name != "sha256" for alias in node.names):
             violations.append("from hashlib import: only sha256 of a file is allowed")
     violations.extend(_forbidden_identifier_violations(tree))
+    violations.extend(_dynamic_import_violations(tree))
     return violations
 
 
@@ -197,6 +214,7 @@ def edited_violations(source: str, baseline: Baseline) -> list[str]:
     for module in sorted(_imported_modules(tree) - baseline.imports - baseline.allowed_imports):
         violations.append(f"new import {module!r}")
     violations.extend(_forbidden_identifier_violations(tree))
+    violations.extend(_dynamic_import_violations(tree))
     return violations
 
 
@@ -298,3 +316,27 @@ def test_mutation_an_unclassified_release_script_is_red() -> None:
     found = [*_walk_release_scripts(), "producer_envelope.py"]
     classified = {Path(p).name for p in (*WHOLLY_OWNED, *NOT_YET_LANDED)} | BASELINE_RELEASE_SCRIPTS
     assert sorted(set(found) - classified) == ["producer_envelope.py"]
+
+
+DYNAMIC_IMPORT_CASES = {
+    "__import__": '\n_U = __import__("uu" + "id")\n',
+    "importlib.import_module": '\n_U = importlib.import_module("uu" + "id")\n',
+    "bare import_module": '\nfrom importlib import import_module\n_U = import_module("uuid")\n',
+    "exec of import text": '\nexec("import uuid")\n',
+    "eval of import text": "\n_U = eval(\"__import__('uuid')\")\n",
+    "compile of import text": '\n_C = compile("import uuid", "x", "exec")\n',
+    "getattr on builtins": '\n_U = getattr(__builtins__, "__import__")("uuid")\n',
+}
+
+
+@pytest.mark.parametrize("case", sorted(DYNAMIC_IMPORT_CASES))
+def test_mutation_a_dynamic_import_in_the_hook_is_red(case: str) -> None:
+    violations = wholly_owned_violations(_read(WHOLLY_OWNED[0]) + DYNAMIC_IMPORT_CASES[case])
+    assert any("dynamic import" in v for v in violations), (case, violations)
+
+
+@pytest.mark.parametrize("case", sorted(DYNAMIC_IMPORT_CASES))
+def test_mutation_a_dynamic_import_in_edited_glue_is_red(case: str) -> None:
+    relative = "contracts/tools/gradle_pin_check.py"
+    violations = edited_violations(_read(relative) + DYNAMIC_IMPORT_CASES[case], EDITED_EXISTING[relative])
+    assert any("dynamic import" in v for v in violations), (case, violations)
