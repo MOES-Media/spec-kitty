@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+import json
+import os
+import stat
 import subprocess
+import sys
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -23,6 +29,95 @@ from specify_cli.status.store import append_event
 from specify_cli.status.wp_state import wp_state_for
 
 _THIS_DIR = Path(__file__).parent
+
+# ---------------------------------------------------------------------------
+# Stub producer binaries (mission event-producer-reroute, WP06)
+# ---------------------------------------------------------------------------
+#
+# The stubs replay the golden protocol fixtures the Java launcher tests
+# regenerate (services/event-producer/launcher/src/test/resources/protocol/golden),
+# so a stub cannot drift from the real reply shape.
+
+GOLDEN_DIR = _THIS_DIR.parents[1] / "services" / "event-producer" / "launcher" / "src" / "test" / "resources" / "protocol" / "golden"
+
+_STUB_SOURCE = """\
+import json, os, pathlib, sys, time
+here = pathlib.Path(__file__).resolve().parent
+config = json.loads((here / "stub.json").read_text(encoding="utf-8"))
+data = sys.stdin.buffer.read()
+with open(here / "requests.jsonl", "ab") as handle:
+    handle.write(data.replace(b"\\n", b" ") + b"\\n")
+with open(here / "pids.txt", "a", encoding="utf-8") as handle:
+    handle.write(str(os.getpid()) + "\\n")
+if config.get("hang"):
+    time.sleep(config["hang"])
+sys.stdout.write(config.get("reply", ""))
+sys.stdout.flush()
+sys.exit(config.get("exit", 0))
+"""
+
+
+def golden(name: str) -> tuple[str, int]:
+    """The reply text and exit code the real launcher produced for one golden case."""
+    reply = (GOLDEN_DIR / f"{name}.reply").read_text(encoding="utf-8")
+    exit_code = int((GOLDEN_DIR / f"{name}.exit").read_text(encoding="utf-8").strip())
+    return reply, exit_code
+
+
+@dataclass
+class ProducerStub:
+    """A POSIX stub standing in for the native producer: records requests, replays a fixed reply."""
+
+    directory: Path
+    path: Path = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.directory.mkdir(parents=True, exist_ok=True)
+        self.path = self.directory / "stub"
+        self.path.write_text(f"#!{sys.executable}\n{_STUB_SOURCE}", encoding="utf-8")
+        self.path.chmod(self.path.stat().st_mode | stat.S_IXUSR)
+        self.script(reply="", exit_code=0)
+
+    def script(self, *, reply: str = "", exit_code: int = 0, hang: float = 0.0) -> None:
+        (self.directory / "stub.json").write_text(json.dumps({"reply": reply, "exit": exit_code, "hang": hang}), encoding="utf-8")
+
+    def replay(self, golden_name: str) -> None:
+        reply, exit_code = golden(golden_name)
+        self.script(reply=reply, exit_code=exit_code)
+
+    @property
+    def requests(self) -> list[dict[str, Any]]:
+        file = self.directory / "requests.jsonl"
+        if not file.exists():
+            return []
+        return [json.loads(line) for line in file.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+    @property
+    def pids(self) -> list[int]:
+        file = self.directory / "pids.txt"
+        return [int(line) for line in file.read_text(encoding="utf-8").split()] if file.exists() else []
+
+    def survivors(self) -> list[int]:
+        alive = []
+        for pid in self.pids:
+            try:
+                os.kill(pid, 0)
+            except OSError:
+                continue
+            alive.append(pid)
+        return alive
+
+
+@pytest.fixture
+def producer_stub(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> ProducerStub:
+    """A stub binary wired in as the located producer (tests patch ``locate_binary``; there is no env override)."""
+    if sys.platform == "win32":
+        pytest.skip("the shebang stub is POSIX only; the Windows subset has its own file")
+    from specify_cli.status import producer_client
+
+    stub = ProducerStub(tmp_path / "stub-bin")
+    monkeypatch.setattr(producer_client, "locate_binary", lambda: stub.path)
+    return stub
 
 
 # ---------------------------------------------------------------------------
