@@ -4,38 +4,7 @@ artifact_type: spec-kitty.analysis-report
 command: /spec-kitty.analyze
 mission_slug: event-producer-reroute-01M4VDY9
 mission_id: 01M4VDY92YSGZAQVKS3E879VPH
-generated_at: '2026-10-14T08:44:16.186958+00:00'
-analyzer_agent: reviewer-renata
-input_artifacts:
-  spec.md:
-    path: kitty-specs/event-producer-reroute-01M4VDY9/spec.md
-    sha256: 61a69ac04a1399aa5eac77fa84f4562928b85ac0fe39c9ecae6fa7db5f3ddbf5
-  plan.md:
-    path: kitty-specs/event-producer-reroute-01M4VDY9/plan.md
-    sha256: e24313448ce2c482bd23576181bc38a5de2bd922c3d97dbf80d3f1b6fb44857a
-  tasks.md:
-    path: kitty-specs/event-producer-reroute-01M4VDY9/tasks.md
-    sha256: 4b5d5876276cea0f77f6237ff115b0b6caa4d3e61ab04070175979fe9443e65f
-  charter:
-    path: .kittify/charter/charter.yaml
-    sha256: 54d554ac100b0e76760ed99ae6c55757677a0de2402970ef0d39810011dc87f4
-verdict: unknown
-issue_counts:
-  low:
-  critical:
-  info:
-  high:
-  medium:
-findings: []
----
-
----
-schema_version: 1
-artifact_type: spec-kitty.analysis-report
-command: /spec-kitty.analyze
-mission_slug: event-producer-reroute-01M4VDY9
-mission_id: 01M4VDY92YSGZAQVKS3E879VPH
-generated_at: '2026-10-14T08:43:33.000000+00:00'
+generated_at: '2026-10-14T08:44:50.505631+00:00'
 analyzer_agent: reviewer-renata
 input_artifacts:
   spec.md:
@@ -52,11 +21,11 @@ input_artifacts:
     sha256: 54d554ac100b0e76760ed99ae6c55757677a0de2402970ef0d39810011dc87f4
 verdict: ready
 issue_counts:
-  low: 10
-  critical: 0
   high: 0
   medium: 1
-  info: 1
+  critical: 0
+  low: 11
+  info: 0
 findings:
 - id: F-01
   severity: medium
@@ -73,11 +42,11 @@ findings:
 - id: F-04
   severity: low
   category: inconsistency
-  summary: 'plan-carryover.md section D item 1 still says "Python is allowed only for the shim", and spec section 9 sends the reader there for detail; this contradicts the corrected spec section 9 (1) and FR-027, which now allow the FR-035 stamping and the bounded build glue.'
+  summary: plan-carryover.md section D item 1 still says "Python is allowed only for the shim", and spec section 9 sends the reader there for detail; this contradicts the corrected spec section 9 (1) and FR-027, which now allow the FR-035 stamping and the bounded build glue.
 - id: F-05
   severity: low
   category: inconsistency
-  summary: 'The WP01 size note and tasks-overview section 3 say WP01 has "29 owned files"; wps.yaml, the WP01 frontmatter and lanes.json (lane-a) list 31. The sizing statement the fix round added is stale on arrival.'
+  summary: The WP01 size note and tasks-overview section 3 say WP01 has "29 owned files"; wps.yaml, the WP01 frontmatter and lanes.json (lane-a) list 31. The sizing statement the fix round added is stale on arrival.
 - id: F-06
   severity: low
   category: inconsistency
@@ -85,15 +54,15 @@ findings:
 - id: F-07
   severity: low
   category: ambiguity
-  summary: 'WP06 T036 Hunk B2 now asserts start_path on the plain status fire (fire_saas_fanout) as red-first, but that function already re-joins repo_root, so the assertion is green before the change and only the lifecycle assertion is red; and the resolved-binding forwarding edit goes beyond FR-004, which names the lifecycle fire only. Restrict the red-first claim to the lifecycle fire and justify or drop the resolved-binding forwarding.'
+  summary: WP06 T036 Hunk B2 now asserts start_path on the plain status fire (fire_saas_fanout) as red-first, but that function already re-joins repo_root, so the assertion is green before the change and only the lifecycle assertion is red; and the resolved-binding forwarding edit goes beyond FR-004, which names the lifecycle fire only. Restrict the red-first claim to the lifecycle fire and justify or drop the resolved-binding forwarding.
 - id: F-08
   severity: low
   category: ambiguity
-  summary: 'The WP06 lane ATDD commit (stub-level AC-001, committed red "at the start of the seam work, before the hunks of Commit order step 3") has no step in the Commit order list, and the stub-binary test needs the client modules of step 2 to exist, so "red" is either a collection error or a step-2 sub-commit; the overview also describes each WP as an independently green run of commits.'
+  summary: The WP06 lane ATDD commit (stub-level AC-001, committed red "at the start of the seam work, before the hunks of Commit order step 3") has no step in the Commit order list, and the stub-binary test needs the client modules of step 2 to exist, so "red" is either a collection error or a step-2 sub-commit; the overview also describes each WP as an independently green run of commits.
 - id: F-09
   severity: low
   category: decomposition
-  summary: WP05 T029 places the LocalTier implementation (local-tier listing and whole-file deletion) in adapter/ledger/**, the package whose purpose is the committed-ledger reader that mission #6193 replaces; the replacement boundary and the local-tier adapter are conflated. Name a separate adapter package or state that LocalTier survives the replacement.
+  summary: WP05 T029 places the LocalTier implementation (local-tier listing and whole-file deletion) in adapter/ledger/**, the package whose purpose is the committed-ledger reader that mission
 - id: F-10
   severity: low
   category: dependency
@@ -103,7 +72,7 @@ findings:
   category: traceability
   summary: 'Unchanged from the first round and now unrecorded: tasks-overview 8.2 lists supporting WPs whose body never names the AC (AC-025 to WP08; AC-028, AC-032 and AC-039 to WP01), and some WP bodies cover requirements absent from their requirement_refs (WP02 FR-028, WP06 FR-019, WP10 FR-003, FR-026, NFR-003); C-002..C-008 remain traced only in the overview table.'
 - id: F-12
-  severity: info
+  severity: low
   category: hygiene
   summary: 'Size check passes but with little headroom: spec.md 46754 bytes plus data-model.md 21825 bytes is 68579 bytes against the roughly 70 KB bound, leaving about 1.4 KB for any further touch-up.'
 ---
@@ -114,7 +83,7 @@ Analyst profile: reviewer-renata. Checkout state analysed: branch feat/event-pro
 
 ## Verdict
 
-Verdict: ready. No critical and no high finding. One medium finding (F-01, an unwired mutation check) and ten low findings are fixable by small wording edits; one info note. Of the first-round findings F-01 to F-21, every one is either fixed or recorded as an open item, with the residuals listed below as F-03, F-04, F-11.
+Verdict: ready. No critical and no high finding. One medium finding (F-01, an unwired mutation check) and eleven low findings are fixable by small wording edits; and a size-headroom note (F-12). Of the first-round findings F-01 to F-21, every one is either fixed or recorded as an open item, with the residuals listed below as F-03, F-04, F-11.
 
 ## Mechanical checks that passed (scripted, evidence)
 
@@ -199,7 +168,7 @@ Remediation: add the same approval checklist line (pin file and floor name V_E) 
 Where: tasks-overview 8.2 rows AC-025, AC-028, AC-032, AC-039; WP02, WP06, WP10 bodies.
 Remediation: name the AC in the supporting WP body or drop the supporting WP from the row; add FR-019 to WP06 requirement_refs (a wps.yaml and frontmatter edit through the CLI path).
 
-### F-12 Size headroom (info)
+### F-12 Size headroom (low, hygiene)
 spec.md plus data-model.md is 68579 bytes; any further spec touch-up should move wording to plan-carryover.md rather than grow the pair.
 
 ## Charter alignment summary
