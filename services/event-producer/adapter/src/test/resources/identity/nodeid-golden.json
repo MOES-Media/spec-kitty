@@ -1,0 +1,5 @@
+[
+  {"hostname": "host-a", "username": "user-a", "nodeid": "ec0a1a9494e7", "via": "env"},
+  {"hostname": "host-b", "username": "user-b", "nodeid": "b2898072c83a", "via": "env"},
+  {"hostname": "host-c", "username": "user-c", "nodeid": "c15777d71e18", "via": "user.name"}
+]
