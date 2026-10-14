@@ -77,6 +77,14 @@ class EventIdTest {
     }
 
     @Test
+    void aCharacterThatUpperCasesToAnAlphabetLetterIsStillRefused() {
+        // U+017F (long s) upper-cases to S, which is in the alphabet; the id must be ASCII.
+        String longS = new String(Character.toChars(0x17F));
+        assertThat(refused(longS + ULID.substring(1)).reason()).isEqualTo(FaultReason.REJECTED);
+        assertThat(EventIdForms.normalizeForOrder(longS + ULID.substring(1))).isEmpty();
+    }
+
+    @Test
     void everyUuidFormIsRefusedAsRejectedAndSaysSo() {
         List<String> uuids = List.of(
                 "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b",
