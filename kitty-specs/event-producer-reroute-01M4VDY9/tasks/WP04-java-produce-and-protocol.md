@@ -1,6 +1,6 @@
 ---
 work_package_id: WP04
-title: Java :application Produce, launcher protocol and wiring, fault vocabulary, journal-row mission identity
+title: Java :application Produce, launcher protocol and wiring, refusals, journal-row mission identity
 dependencies:
 - WP03
 requirement_refs:
@@ -57,7 +57,7 @@ tags: []
 tracker_refs: []
 ---
 
-# WP04: Java :application Produce, launcher protocol and wiring, fault vocabulary, journal-row mission identity
+# WP04: Java :application Produce, launcher protocol and wiring, refusals, journal-row mission identity
 
 ## ⚡ Do This First: Load Agent Profile
 
@@ -87,11 +87,11 @@ Plan sections 1, 4.2 (Journal route, Mission identity), 5 (protocol), 9; data-mo
 
 ## Subtask T025: Refusals and fault classes
 
-**Steps**: `rejected` (UUID id, bad time, validation failure, row without id, **unresolvable root**, **type absent from the registry**, **unknown scope**), `clock-overflow`, `busy` (lock timeout); a refusal is a reply with a named reason, never an exception. The unresolvable-root reply (start path with no repository above it, from WP03 T018) carries the reason `root-unresolvable` and the client writes no fault-log row for it (there is no root to hold one); the stderr warning still appears. An unknown type or scope is never written (the silent-success path of an empty or permissive registry). AC-005 Java classes. **Covers** FR-022 (Java), AC-005.
+**Steps**: the reason vocabulary is WP02's (T015); this task only uses it and defines none. `rejected` (UUID id, bad time, validation failure, row without id, **unresolvable root**, **type absent from the registry**, **unknown scope**), `clock-overflow`, `busy` (lock timeout); a refusal is a reply with a named reason, never an exception. The unresolvable-root reply (start path with no repository above it, from WP03 T018) carries the reason `root-unresolvable` and the client writes no fault-log row for it (there is no root to hold one); the stderr warning still appears. An unknown type or scope is never written (the silent-success path of an empty or permissive registry). AC-005 Java classes. **Covers** FR-022 (Java), AC-005.
 
 ## Subtask T026: Mission identity (OD-MISSIONID (b))
 
-**Steps**: `missionid` from `row.payload.mission_id` when non-empty, else `meta.json` in `start_path` when that directory holds one, else project-scoped `source` with `subject` = the aggregate, no `missionid`, **no fault**. Java never reads `seam_args`. Tests: empty payload `mission_id` plus `meta.json` gives that `missionid`; no `meta.json` gives project-scoped source (AC-017 Java half); **a slug-only payload** still gets the project-scoped `source` and is never given the slug as `missionid`; an empty-string `missionid` is never emitted. Mutations, each red: the producer refuses such a row, faults it, emits an empty `missionid`, or emits the slug as `missionid`. The client half (no stderr line, no fault-log row, fault count and exit code unchanged) is asserted by WP06 T036 and WP10 T066. **Covers** FR-009.
+**Steps**: `missionid` from `row.payload.mission_id` when non-empty, else `meta.json` in `start_path` when that directory holds one, else project-scoped `source` with `subject` = the aggregate, no `missionid`, **no fault**. Java never reads `seam_args`. Tests: empty payload `mission_id` plus `meta.json` gives that `missionid`; no `meta.json` gives project-scoped source (AC-017 Java half); **a slug-only payload** still gets the project-scoped `source` and is never given the slug as `missionid`; an empty-string `missionid` is never emitted. Mutations, each red: the producer refuses such a row, faults it, emits an empty `missionid`, or emits the slug as `missionid`. The client half (no stderr line, no fault-log row, fault count and exit code unchanged) is asserted by the WP06 T036 project-scoped-reply stub test and, end to end, by WP10 T066. **Covers** FR-009.
 
 ## Subtask T027: Launcher protocol
 

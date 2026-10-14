@@ -81,7 +81,7 @@ work_packages:
     prompt_file: "tasks/WP03-java-adapter-filesystem.md"
 
   - id: WP04
-    title: "Java :application Produce, launcher protocol and wiring, fault vocabulary, journal-row mission identity"
+    title: "Java :application Produce, launcher protocol and wiring, refusals, journal-row mission identity"
     dependencies: [WP03]
     owned_files:
       - "services/event-producer/application/src/main/java/ai/speckitty/producer/application/produce/**"
@@ -151,6 +151,7 @@ work_packages:
       - "tests/architectural/test_producer_fault_enum.py"
       - "tests/architectural/test_publish_log_single_writer.py"
       - "tests/status/test_producer_client_windows.py"
+      - "tests/status/test_producer_state_ignore.py"
       - "tests/status/test_emit_fanout_after_adapter.py"
       - "tests/status/test_conftest_restores_zeitgeist_registry.py"
       - "tests/architectural/test_status_module_boundary.py"

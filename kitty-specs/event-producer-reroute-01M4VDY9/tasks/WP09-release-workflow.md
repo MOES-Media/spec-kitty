@@ -58,7 +58,7 @@ Plan sections 2 (provenance), 3.3, 3.4, 9, 13 item 2; research R-3, R-7, R-12, R
 
 ## Precondition gate: EVENTS RELEASE (blocks approval, not authoring)
 
-One definition, the same in every gated WP (tasks-overview section 2): this WP reads no released artifact, so it is authored now. **It is not approved until WP11 is approved and the pin plus the `pyproject.toml` floor name the released wheel `V_E`**, because the release must publish a CLI whose floor names it. The reviewer checks the pin file. WP09 therefore depends on WP08 only.
+One definition, the same in every gated WP (tasks-overview section 2): this WP reads no released artifact, so it is authored now. **It is not approved until WP11 is approved and the pin plus the `pyproject.toml` floor name the released wheel `V_E`**, because the release must publish a CLI whose floor names it. The reviewer checks the pin file. WP09 therefore depends on WP08 only. **Reviewer approval checklist (the tooling will not stop an early approval):** (1) `services/event-producer/gradle/events-pin.properties` names the released wheel `V_E` and its sha256; (2) the `spec-kitty-events` floor in `pyproject.toml` names `V_E`; (3) WP11 is approved; (4) `V_E` and the pin sha256 are in this WP's notes. Approving without all four is a review defect. The prerequisite events PR is external (tasks-overview section 2); its tracking row is an open item for the orchestrator (O-6).
 
 ## Subtask T059: `build-producer` and `build-release`
 **Steps**: red test first (`test_release_ci_ownership.py`: `build-producer` with its `ref` input, `needs` edges). New job `build-producer` calls `producer-native.yml` passing the release ref; repeat the `RELEASE_REF` expression in the job-level `with:` (`env` unavailable there; a test pins equal texts; confirm the `env` context behaviour, plan 17). `build-release` keeps its name, gains `needs: build-producer`, and runs, in this order:
@@ -72,7 +72,7 @@ One definition, the same in every gated WP (tasks-overview section 2): this WP r
 **Steps**: job with three OS legs installing the matching wheel by path through `.github/actions/producer-smoke` in `cli` mode (`expect: produced`; the `command` input is the cheapest lifecycle command that persists an in-scope row in a scratch repository, chosen here and recorded in the WP notes), and the pure wheel on one leg with `expect: binary-missing`; `publish-pypi` needs both. `native-smoke` (WP01) and `smoke-wheels` use the **same** action; `test_release_producer_stages.py` asserts both `uses: ./.github/actions/producer-smoke` (drift between the PR-time and release-time check is a test failure). `smoke-wheels` runs `cli` mode, which needs the client (WP06) and the schema-backed binding (WP11) in the built wheel; WP09's lane has neither, so the job cannot run in this lane and its only pre-merge evidence is the static graph test and the action's own definition (WP01 T008: the publish log is found by a fixed `find` under the scratch repository, exactly one non-empty file with one line, not by asking the CLI). It first runs on a release tag (tasks-overview section 10). **Covers** FR-043, G-3, G-7.
 
 ## Subtask T061: Attestation and SBOM attach
-**Steps**: `publish-pypi` re-runs `check_dist_set.py` on the downloaded artifact and attaches an attestation, and attaches the `producer-sbom` artifact built by `producer-native.yml` (no Gradle edit here). No reproducibility claim. **Covers** FR-042, AC-040, G-5, G-9.
+**Steps**: `publish-pypi` re-runs `check_dist_set.py` on the downloaded artifact and attaches an attestation, and attaches the `producer-sbom` artifact built by `producer-native.yml` (no Gradle edit here). No reproducibility claim. The AC-040 content check is WP01's `tools/check-sbom.sh`; `publish-pypi` re-runs it on the downloaded `producer-sbom` before attaching it. **Covers** FR-042, AC-040, G-5, G-9.
 
 ## Subtask T062: Nightly and docs
 **Steps**: `ci-nightly.yml` gains a producer job that calls the same smoke path and records the AC-036 numbers. **It is non-gating and informational (like the sonar job):** it is NOT in the `nightly-summary` `needs` list, so a macOS or Windows hosted-runner flake or a GraalVM download outage cannot block a release through the fail-closed `nightly-gate`; the release gate relies on `smoke-wheels` in `release.yml` itself. A test asserts the job is absent from `nightly-summary.needs` and says why. `RELEASE_CHECKLIST.md` and `CONTRIBUTING.md` updated (unsigned macOS and Windows binaries: Gatekeeper/SmartScreen may warn; extra arches out of scope). **Covers** AC-036 (nightly).
@@ -105,7 +105,7 @@ T059 to T063 done; every new stage a `needs` edge; `publish-pypi` unreachable un
 SHA-pinned action versions (plan 17); job-level `with:` context; secrets/OIDC for attestation exist only in the real release; the first real execution is the release candidate.
 
 ## Reviewer Guidance
-Read the workflow graph, not the diff: confirm `publish-pypi` cannot run unless build, set-check and smoke succeeded, and that the deferred table is honest.
+Run the approval checklist of the Precondition gate first. Read the workflow graph, not the diff: confirm `publish-pypi` cannot run unless build, set-check and smoke succeeded, and that the deferred table is honest.
 
 ## Implementation command
 

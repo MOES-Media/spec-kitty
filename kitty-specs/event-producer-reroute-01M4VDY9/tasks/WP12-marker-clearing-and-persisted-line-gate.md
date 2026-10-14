@@ -50,7 +50,7 @@ Clear the `canonical-producer-exempt` markers whose persisted lines validate, ad
 
 ## Context
 
-Split out of the old WP07 (tasks-overview R6): this is the only part of that WP that reads a released artifact, so only it is gated by the events release. Plan 4.4 (markers), data-model section 8; research R-18, R-19, R-24. Python here is lint and gate code plus comment removal, no runtime logic.
+Split out of the old WP07 (tasks-overview R6): this is the only part of that WP that reads a released artifact, so only it is gated by the events release. Plan 4.4 (markers), data-model section 8; research R-18, R-19, R-24. Python here is lint and gate code plus comment removal, no runtime logic. The persisted-line mode of `scripts/lint_canonical_producers.py` is bounded gate tooling (plan 4.2 last row; listed in the tasks-overview section 5 allowance): it loops over the released schemas and the persisted lines and holds no producer, envelope, id, clock or schema-authoring logic. Whether that needs an operator ruling is open item O-3.
 
 ## Precondition gate: EVENTS RELEASE (blocks approval, and the schema-reading tests; not authoring)
 

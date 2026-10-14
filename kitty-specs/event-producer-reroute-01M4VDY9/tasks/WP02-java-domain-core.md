@@ -101,7 +101,7 @@ WP01 verdict PASS (read `research/wp01-feasibility.md`). If it is HALT, stop.
 
 ## Subtask T015: `retention` eligibility, policy; `fault`, `protocol`
 
-**Steps**: red tests: eligible only when outside both limits (not among the newest `keep_runs` AND older than `max_age_days`), Mission not open, no live lock, no unfinished step, over supplied facts only (pure functions); policy defaults 20 and 30; invalid or non-numeric values give a named `policy_error` (AC-031 fixtures live here and in WP05); `fault` reason vocabulary (`binary-missing | crash | timeout | malformed-reply | clock-overflow | rejected | busy`, no `disabled`); `protocol` request/reply value types for `produce` and `retain` (plan section 5, shapes R-4). **Covers** FR-029, FR-028 (policy), NFR-003.
+**Steps**: red tests: eligible only when outside both limits (not among the newest `keep_runs` AND older than `max_age_days`), Mission not open, no live lock, no unfinished step, over supplied facts only (pure functions); policy defaults 20 and 30; invalid or non-numeric values give a named `policy_error` (AC-031 fixtures live here and in WP05); `fault` reason vocabulary (**owned here**; WP04 only uses it) (`binary-missing | crash | timeout | malformed-reply | clock-overflow | rejected | busy`, no `disabled`); `protocol` request/reply value types for `produce` and `retain` (plan section 5, shapes R-4). **Covers** FR-029, FR-028 (policy), NFR-003.
 
 ## Subtask T016: ArchUnit and coverage
 

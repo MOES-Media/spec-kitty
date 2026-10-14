@@ -65,7 +65,7 @@ Prove the whole mission end to end on a default install, take the AC-036 measure
 
 ## Context
 
-Plan sections 9 (performance, CI home), 13 item 8, 17; research R-9, R-17. Read-mostly: tests and measurements. **External dependency: gated on the spec-kitty-events release** (runs against the real released wheel and real binary). Direct dependencies WP09, WP11 and WP12 imply every other WP transitively (tasks-overview R6).
+Plan sections 9 (performance, CI home), 13 item 8, 17; research R-9, R-17. Read-mostly: tests and measurements. **External dependency: gated on the spec-kitty-events release** (runs against the real released wheel and real binary). Direct dependencies WP09, WP11 and WP12 imply every other WP transitively (tasks-overview R6). **ATDD placement (charter C-011).** Acceptance tests are authored red-first in the earliest WP that can run them: the stub-level AC-001 case in WP06 T036 (lane ATDD commit), the Java halves of AC-005 and AC-017 in WP04, the executable checker cases of AC-025 and AC-032 in WP08. This WP re-runs those scenarios end to end against the real binary and the released wheel; **only those real-binary, released-schema runs wait for the events release**, they are not the first red commit of any behaviour.
 
 ## Precondition gate: EVENTS RELEASE (blocks approval and the schema-reading and measurement tasks, not authoring)
 

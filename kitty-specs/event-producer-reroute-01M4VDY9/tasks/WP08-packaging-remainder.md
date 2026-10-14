@@ -90,7 +90,7 @@ Plan sections 3.2 (WP08 row), 3.4; research R-3, R-13; spec G-1, G-2, G-7, G-10,
 
 ## Subtask T057: README and gate pass
 
-**Steps**: `scripts/release/README.md` documents the set-check, manifest-check and exact-install usage. Remove the two "not yet landed" entries (`check_dist_set.py`, the `check_exact_install.py` edit) from `tests/architectural/test_build_glue_thin.py` and run it with all glue present.  Run `tests/release/test_check_exact_install.py test_release_prep.py test_validate_release.py`, packaging tests, `uv lock --check`.
+**Steps**: `scripts/release/README.md` documents the set-check, manifest-check and exact-install usage. Remove the two "not yet landed" entries (`check_dist_set.py`, the `check_exact_install.py` edit) from `tests/architectural/test_build_glue_thin.py` and run it with all glue present. That emptying is not debt; the glue file list itself is bounded by the operator ruling F1 (plan 13.2), recorded in the new ADR (WP07 T050), not in a baseline file. The pinned-list debt of the thinness gate is recorded as stated in WP06 T039.  Run `tests/release/test_check_exact_install.py test_release_prep.py test_validate_release.py`, packaging tests, `uv lock --check`.
 
 ## Gates
 

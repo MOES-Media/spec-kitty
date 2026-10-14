@@ -85,7 +85,7 @@ Plan sections 1 (`:adapter`), 7 (clock state file), 8 (placement) and data-model
 
 ## Subtask T079: Ports as interfaces (first task, red-free)
 
-**Steps**: in `ai.speckitty.producer.application.port` write the interfaces only, no behaviour and no framework import: `RowSchemaValidator`, `PublishLog`, `ClockStore`, `RepoLocator`, `NodeIdentity`, `Clock`, shaped by plan sections 1, 5, 7 and data-model sections 1, 2, 6, 7. Each adapter class of T017 to T021 declares `implements` on its port. `:application` ArchUnit rules (no `:adapter`, no Jackson) are WP04's `ArchitectureTest`; this task adds no test. **Validation**: `gradle -p services/event-producer :application:compileJava :adapter:compileJava`.
+**Steps**: in `ai.speckitty.producer.application.port` write the interfaces only, no behaviour and no framework import: `RowSchemaValidator`, `PublishLog`, `ClockStore`, `RepoLocator`, `NodeIdentity`, `Clock`, shaped by plan sections 1, 5, 7 and data-model sections 1, 2, 6, 7. Each adapter class of T017 to T021 declares `implements` on its port. `:application` ArchUnit rules (no `:adapter`, no Jackson) are WP04's `ArchitectureTest`; this task adds no test. `LedgerFacts` and the retain ports (including local-tier listing and deletion) are **not** authored here: they live in `application.retain`, owned by WP05 (T029). **Validation**: `gradle -p services/event-producer :application:compileJava :adapter:compileJava`.
 
 ## Subtask T017: `json` and `fs` helpers
 
@@ -97,7 +97,7 @@ Plan sections 1 (`:adapter`), 7 (clock state file), 8 (placement) and data-model
 
 ## Subtask T019: `clock` store
 
-**Steps**: `<git-common-dir>/spec-kitty/event-producer/clock.json` (`{"v":1,"nodeid","clock"}`) and `clock.lock`; one exclusive lock held across read, stamp, dedupe, state write, append. State first: temp, fsync, atomic move, then append and fsync. State loss: next stamp = max(state, highest `lamportclock` readable across publish-log files) + 1. A test-only `FaultInjector` port injects the three kill points (AC-010). **Covers** FR-012, AC-010.
+**Steps**: `<git-common-dir>/spec-kitty/event-producer/clock.json` (`{"v":1,"nodeid","clock"}`) and `clock.lock`; one exclusive lock held across read, stamp, dedupe, state write, append. State first: temp, fsync, atomic move, then append and fsync. State loss: next stamp = max(state, highest `lamportclock` readable across publish-log files) + 1. A test-only `FaultInjector` port injects the three kill points (AC-010). **Common-dir anchor (AC-023):** a test with a primary checkout and a linked worktree asserts both resolve the same `<git-common-dir>/spec-kitty/event-producer/clock.json`, and that the path lies outside every working tree (floor: two checkouts; mutation: anchoring the state at the worktree root must fail). **Covers** FR-012, FR-019, AC-010, AC-023.
 
 ## Subtask T020: `publishlog` writer
 
@@ -114,7 +114,7 @@ for host, user in (('host-a', 'user-a'), ('host-b', 'user-b')):
         rows.append({'hostname': host, 'username': user, 'nodeid': generate_node_id()})
 print(json.dumps(rows))"
 ```
-Add a third case with `USER` unset and `user.name` set (Java's chain differs from `getpass`'s password-database fallback, so this case documents the intended Java behaviour with a synthetic name). **Live comparison on every OS:** the Java test compares `NodeIdentity` with the environment value `PRODUCER_LIVE_PY_NODE_ID` that each leg of the `gradle-test` matrix exports (WP01 T007, a step already in `event-producer.yml`; this WP edits no workflow). A missing `PRODUCER_LIVE_PY_NODE_ID` **fails** the test only when `REQUIRE_LIVE_NODE_ID=1`, which only the `gradle-test` legs export (WP01 T007) next to the node id; in any other run (a local `gradle check`, or any CI lane that is not `gradle-test`) it skips with a message. `CI` is not consulted, so no other lane can go red for lack of a Python-side value. **Covers** FR-011, AC-039.
+Add a third case with `USER` unset and `user.name` set (Java's chain differs from `getpass`'s password-database fallback, so this case documents the intended Java behaviour with a synthetic name). **Live comparison on every OS:** the Java test compares `NodeIdentity` with the environment value `PRODUCER_LIVE_PY_NODE_ID` that each leg of the `gradle-test` matrix exports (WP01 T007, a step already in `event-producer.yml`; this WP edits no workflow). A missing `PRODUCER_LIVE_PY_NODE_ID` **fails** the test only when `REQUIRE_LIVE_NODE_ID=1`, which only the `gradle-test` legs export (WP01 T007) next to the node id; in any other run (a local `gradle check`, or any CI lane that is not `gradle-test`) it skips with a message. `CI` is not consulted, so no other lane can go red for lack of a Python-side value. **Floor and mutation (AC-039):** the test counts its cases and fails below three (the live case plus the two synthetic golden strings); a mutation that changes a hash input (hostname and username swapped, or a different truncation length) must fail the golden comparison. **Covers** FR-011, AC-039.
 
 ## Subtask T022: Concurrency and byte tests
 

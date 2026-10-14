@@ -119,7 +119,7 @@ Events release slips (blocks approval of WP09, WP10, WP11, WP12; WP07 is no long
 
 ## Reviewer Guidance
 
-Confirm nothing from the events repo is committed, sha256 is verified before unzip, and the floor bump is the only `pyproject.toml` change after WP01.
+**Approval checklist (the tooling will not stop an early approval):** `events-pin.properties` names the released wheel `V_E` with its sha256, the `pyproject.toml` floor names `V_E`, and `V_E` plus the sha256 are in the WP notes; approving before the prerequisite events PR is released is a review defect. The events PR is external and its tracking row is open item O-6 of tasks-overview. Confirm nothing from the events repo is committed, sha256 is verified before unzip, and the floor bump is the only `pyproject.toml` change after WP01.
 
 ## Tests, markers, jobs
 
