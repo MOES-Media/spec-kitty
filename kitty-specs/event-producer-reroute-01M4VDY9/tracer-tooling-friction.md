@@ -15,3 +15,11 @@ Seeded at plan time (Standing Order 3); append during implementation, assess at 
 ## To append
 
 - Friction met running the targeted gate files, the native-image spike on each OS, and the stub-wheel build.
+
+## Seen while authoring tasks (2026-10-14)
+
+- `spec-kitty agent tasks` (4.0.0rc7) has no `tasks-outline` or `tasks-packages` subcommand; they exist only as slash-command flows. `wps.yaml` and the WP prompt files were written by hand; `agent mission finalize-tasks` is the only CLI step. `agent tasks finalize-tasks` also exists.
+- `tasks.md` is regenerated from `wps.yaml` ("do not edit directly"), so narrative (PR shape, coverage, external dependency) lives in `tasks-overview.md`.
+- The requirement parser reads only `C-001` from the spec's inline constraint paragraph; `C-002` to `C-008` fail as `unknown_spec_id`. Acceptance criteria and gate ids are not requirement ids either, so the AC and G coverage tables are in `tasks-overview.md`.
+- `INVALID_WP_OWNED_FILES_KITTY_SPECS`: a code WP cannot own mission research files; literal new files need `create_intent` in the WP frontmatter.
+- Lane computation merges WPs whose `owned_files` globs overlap; combined with a dependency chain between them this yields `LANE_DEPENDENCY_CYCLE` (twice: `domain/src/**` vs a later `domain` test file; `gradle/**` vs `gradle/events-pin.properties`). Error text names lanes, not the overlapping paths.
