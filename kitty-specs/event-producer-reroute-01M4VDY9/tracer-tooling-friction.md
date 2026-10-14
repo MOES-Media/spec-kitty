@@ -45,3 +45,9 @@ Seeded at plan time (Standing Order 3); append during implementation, assess at 
 - Gradle's `jacocoTestCoverageVerification` is skipped when a project has no execution data, so a floor-breach test aimed at an empty subproject stays green; the breach test needs a project that has code (a probe build sharing the convention script, with a positive control).
 - A Gradle subproject's test classpath sees another subproject's tests only through `java-test-fixtures`; moving a test between subprojects therefore moves its shared fixtures' build wiring into the earlier WP's build files, which are settled once.
 - `AGENTS.md` ties any `__init__.py` change to a version bump and a `CHANGELOG.md` entry, while the spec forbids assigning a version; the entry is owned by one WP and the bump is declared not performed.
+
+## Seen while fixing the tasks review (round 4)
+
+- `tests/architectural/test_no_duplicate_suite_execution.py` treats every change-triggered job that reaches pytest as a duplicate unless it is a row of its closed `AUTHORIZED_PER_CHANGE_SUITE_JOBS` ledger, and its stale-row check refuses a row for a job that does not exist yet; the row must land in the same commit as the job. Running a pin script's own tests inside a new `pull_request` job trips it even when another lane already runs them (here the router's contract-tools lane).
+- A test file placed in a later WP's source tree (a spike test under `launcher/src/test`) is outside every `owned_files` list unless the earlier WP lists the glob; the later WP's deletion of it is then a recorded out-of-map edit.
+- CI-only evidence (per-OS numbers, a job turning red) needs an explicit push path in each WP that depends on it; the agent has no push right.

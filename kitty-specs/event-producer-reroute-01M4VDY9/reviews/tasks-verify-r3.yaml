@@ -1,0 +1,35 @@
+schema: review-verify/v1
+complete: true
+phase: tasks
+results:
+  - id: TASKS-FRESH2-001
+    status: resolved
+    reason: "WP10 now keys fail-on-missing on REQUIRE_NATIVE_PRODUCER=1 alone (CI not consulted, flag set only by native-e2e), other lanes skip with a message, and two guard tests pin the exposure and a nightly-shaped collection, which removes the red nightly integration-next and integration-slice exposure (chosen without a new marker, with the reasoning stated and R12 and the allowlist kept in sync)."
+  - id: TASKS-FRESH2-002
+    status: resolved
+    reason: "WP04 now exposes Wiring.failClosedFallback() and Wiring.production(), its tests target only the fallback, WP11 T084 changes production() alone, and WP11 section, overview R13 and the allowlist row all say no WP04 test is edited or goes red."
+  - id: TASKS-FRESH2-003
+    status: resolved
+    reason: "WP01 T003 step 9 pre-wires java-test-fixtures plus the test-only :adapter-to-:domain classpath, WP02 owns domain/src/testFixtures/** (wps.yaml, WP02 body, lanes.json, tasks.md) holding the mutant table, and WP11 T075 consumes it with no copy, with R3, R9 and the plan-rule delta recorded."
+  - id: TASKS-FRESH2-004
+    status: resolved
+    reason: "WP01 T003 step 4 now measures a WP01-owned standalone tools/floor-probe build that has real code and a test, runs a positive control plus the 1.01 breach that must show a coverage-verification failure, and uses the same convention script the real subprojects apply."
+  - id: TASKS-FRESH2-005
+    status: unresolved
+    remaining_severity: 2
+    reason: "The producerMainClass property handover is now fixed and recorded in WP01, WP04, R9 and the allowlist, but WP01 step 10 adds a spike entry-class test under launcher/src/test/.../spike that no WP owns (WP01 owned_files has no launcher/src/test path, WP04's deletion table covers only main spike and its metadata), so the new test is an unowned file and its removal is unrecorded."
+  - id: TASKS-FRESH2-006
+    status: resolved
+    reason: "The overview section 4 table now carries the WP11 smoke-request replacement, both fix-only metadata edits, the Wiring row, the producerMainClass edit, the CHANGELOG row and the WP10 path-filter row, matching the WP bodies."
+  - id: TASKS-FRESH2-007
+    status: resolved
+    reason: "CHANGELOG.md is added to WP07 owned_files, wps.yaml and lanes.json, T050 specifies one mission-wide Unreleased entry under the existing 4.0.0rc7 heading, the no-version-bump reconciliation with C-006 is stated, and WP06 points to it."
+  - id: TASKS-FRESH2-008
+    status: resolved
+    reason: "WP10 T083 adds path-filter globs for the e2e, helper and perf tests plus the plan 4.2 seam files, each of which exists in the checkout (the doctor file is created by WP06, which precedes WP10), and extends the workflow test to assert them with a non-empty-floor and drop-one mutation."
+  - id: TASKS-FRESH2-009
+    status: resolved
+    reason: "Overview section 10 now says R1 to R14 and names plan section 11's WP11 row as superseded by R3 with the :adapter location and the test-classpath edge."
+  - id: TASKS-FRESH2-010
+    status: resolved
+    reason: "The two explicit released-test entries are removed from the WP11 frontmatter (both lists), wps.yaml and lanes.json write_scope, leaving only the adapter/schema glob, and no schema/released entry remains in tasks.md."
