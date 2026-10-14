@@ -26,8 +26,8 @@ GRADLE_USER_HOME=$(mktemp -d) ./gradlew --write-verification-metadata sha256 bui
 
 - `./gradlew build --rerun-tasks` is the local gate; CI runs `./gradlew check` on Linux, macOS and Windows. `check` includes the JaCoCo
   floors (`tools/jacoco-floors.gradle.kts`) and the module dependency rules (`verifyModuleDependencyRules`).
-- `./gradlew :launcher:nativeCompile` builds `launcher/build/native/nativeCompile/spec-kitty-event-producer`; `producer-native.yml`
-  builds the release legs (Linux inside the pinned `manylinux_2_28` image).
+- `./gradlew :launcher:nativeCompile` builds `launcher/build/native/nativeCompile/spec-kitty-event-producer`; `event-producer.yml`
+  builds the three native legs (Linux inside the pinned `manylinux_2_28` image); its `mode` input (`pr` or `release`) is how `release.yml` reuses it.
 - `tools/expect-failure.sh` plants a defect per gate (coverage breach, tampered checksum, adapter-to-domain dependency, bad SBOM, floor
   breach) and passes only when the build goes red for the right reason. `tools/measure-start.sh` is the warm start-time protocol.
 - Gradle 8.14.5, the version `contracts/` and `acceptance-jvm/` pin, cannot run Kotlin DSL on JDK 25 and predates three advisories fixed

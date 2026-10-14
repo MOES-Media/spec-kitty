@@ -1,7 +1,16 @@
 # Event Producer: gates the native event producer (services/event-producer, Java 25) and the platform-wheel build glue.
 # Jobs: verify-pins (pins, dependency verification, negative controls), gradle-test (the full Gradle check on all three OS),
-# native (the three native-image legs, through producer-native.yml) and native-smoke (the bundled binary run by path from a stub
-# platform wheel on each OS), closed by event-producer-gate, which fails unless every job and every matrix leg succeeded.
+# native (the three native-image legs: GraalVM Community JDK 25, Linux in the pinned manylinux_2_28 container) and native-smoke
+# (the bundled binary run by path from a stub platform wheel on each OS), closed by event-producer-gate, which fails unless every
+# job and every matrix leg succeeded.
+# Triggers: pull_request and push to main (path-filtered), workflow_dispatch (by hand, on a fork too) and workflow_call (release.yml
+# calls it with mode `release` and the release ref, to build the release binaries). Input `mode`: `pr` (the default) holds the
+# warm start-time gate (median at most 100 ms, the WP01 feasibility gate); `release` builds without it. Input `ref` is the git ref
+# (tag, branch or SHA) to build; empty means the commit that triggered the run.
+# Each native leg uploads `producer-<leg>`: the binary, producer-manifest.json (binary sha256, toolchain sha256, source commit,
+# measured floor), producer-measure.json (warm start time) and producer-sbom.json. The Linux leg also uploads `producer-sbom`.
+# Tool versions and checksums come from services/event-producer/tools/pins.json; the wheel tags (and with them the glibc and macOS
+# floors the legs are held to) from scripts/release/dist-set.json.
 # No pytest runs here. The pin and glue tests (tests/contract/test_gradle_pin_check.py, test_verify_pins.py,
 # tests/architectural/test_build_glue_thin.py, tests/release/test_dist_set_platform_tags.py and the stub-wheel packaging test) run in
 # the router lanes that own them; a pytest call in this workflow would be a duplicate per-change suite execution.
@@ -15,7 +24,6 @@ on:
       - 'pyproject.toml'
       - '.github/actions/producer-smoke/**'
       - '.github/workflows/event-producer.yml'
-      - '.github/workflows/producer-native.yml'
   push:
     branches: [main]
     paths:
@@ -24,7 +32,31 @@ on:
       - 'pyproject.toml'
       - '.github/actions/producer-smoke/**'
       - '.github/workflows/event-producer.yml'
-      - '.github/workflows/producer-native.yml'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '`pr` holds the warm start-time gate; `release` builds the release binaries without it.'
+        required: false
+        default: pr
+        type: choice
+        options: [pr, release]
+      ref:
+        description: 'Git ref (tag, branch or SHA) to build; empty builds the selected ref.'
+        required: false
+        default: ''
+        type: string
+  workflow_call:
+    inputs:
+      mode:
+        description: '`pr` holds the warm start-time gate; `release` builds the release binaries without it.'
+        required: false
+        default: pr
+        type: string
+      ref:
+        description: 'Git ref (tag, branch or SHA) to build; empty builds the calling commit.'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -43,19 +75,19 @@ jobs:
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
+          ref: ${{ inputs.ref }}
           persist-credentials: false
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           python-version: '3.12'
       - name: Install the locked Python environment
         run: uv sync --frozen --no-install-project
-      # The manifest, every uses: pin and the install form of both producer workflows. The pinned archives are checksum-verified at use
+      # The manifest, every uses: pin and the install form of the producer workflow. The pinned archives are checksum-verified at use
       # (install-graalvm.sh before unpacking; the Gradle wrapper's distributionSha256Sum), so no multi-hundred-megabyte download is repeated here.
-      - name: Verify the pins of both producer workflows
+      - name: Verify the pins of the producer workflow
         run: >-
           uv run --frozen --no-sync python contracts/tools/verify_pins.py
           --pins services/event-producer/tools/pins.json
-          --workflow .github/workflows/producer-native.yml
           --workflow .github/workflows/event-producer.yml
           --pins-only
       # The Gradle version the wrapper declares must equal the pin that installs and names it; a mismatch is GRADLE_PIN_MISMATCH.
@@ -94,6 +126,7 @@ jobs:
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
+          ref: ${{ inputs.ref }}
           persist-credentials: false
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
@@ -115,12 +148,107 @@ jobs:
         run: cd services/event-producer && ./gradlew --no-daemon check
 
   native:
-    name: native
+    name: native (${{ matrix.leg }})
+    # A root job: it carries the canonical fork guard as the first conjunct.
     if: (github.repository == 'spec-kitty/spec-kitty' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
-    uses: ./.github/workflows/producer-native.yml
-    with:
-      ref: ${{ github.sha }}
-      enforce_start_gate: true
+    runs-on: ${{ matrix.runs-on }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - leg: linux-x86_64
+            runs-on: ubuntu-24.04
+            graalvm: graalvm-jdk-linux-x64
+          - leg: macos-arm64
+            runs-on: macos-14
+            graalvm: graalvm-jdk-macos-aarch64
+          - leg: windows-x86_64
+            runs-on: windows-2022
+            graalvm: graalvm-jdk-windows-x64
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      # The pinned GraalVM Community JDK: downloaded from pins.json, sha256 checked BEFORE it is unpacked, and native-image --version must
+      # report the pinned release. Exports JAVA_HOME and GRAALVM_TOOLCHAIN_SHA256 to the later steps.
+      - name: Install the pinned GraalVM (checksum verified before it is unpacked)
+        run: bash services/event-producer/tools/install-graalvm.sh "${{ matrix.graalvm }}" "$RUNNER_TEMP/graalvm"
+
+      # Windows: native-image needs the MSVC environment (vcvars64). The action is pinned by SHA (v1.13.0).
+      - name: Set up the MSVC environment (Windows)
+        if: matrix.leg == 'windows-x86_64'
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        with:
+          arch: x64
+
+      # Linux: linked against glibc 2.28 inside the pinned manylinux_2_28 image, so the binary runs wherever a manylinux_2_28 wheel does.
+      # The GraalVM installed above is mounted read-only; the build runs as the runner's user. checkout, upload and the measurements stay
+      # on the host.
+      - name: Build the native image (Linux, manylinux_2_28 container)
+        if: matrix.leg == 'linux-x86_64'
+        run: |
+          image=$(jq -r '[.tools[] | select(.kind == "container-image")][0].image' services/event-producer/tools/pins.json)
+          echo "building in $image"
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "$PWD/services/event-producer:/work" -v "$JAVA_HOME:/graalvm:ro" \
+            -e JAVA_HOME=/graalvm -e GRADLE_USER_HOME=/work/.gradle-home -e HOME=/work/.home \
+            -w /work "$image" ./gradlew --no-daemon :launcher:nativeCompile cyclonedxBom
+
+      # macOS: deployment target 11.0 (the minos floor of the macosx_11_0_arm64 tag). The binary is never stripped (ad-hoc signature).
+      - name: Build the native image (macOS)
+        if: matrix.leg == 'macos-arm64'
+        env:
+          MACOSX_DEPLOYMENT_TARGET: '11.0'
+        run: cd services/event-producer && ./gradlew --no-daemon :launcher:nativeCompile cyclonedxBom
+
+      - name: Build the native image (Windows)
+        if: matrix.leg == 'windows-x86_64'
+        run: cd services/event-producer && ./gradlew --no-daemon :launcher:nativeCompile cyclonedxBom
+
+      # Measures the floor against the leg's wheel tag (fails when it exceeds it), checks the signature (macOS), writes the manifest,
+      # runs the SBOM content check (AC-040) and records the warm start time.
+      - name: Package the leg (floor, manifest, SBOM check, start time)
+        env:
+          ENFORCE: ${{ inputs.mode != 'release' && '--enforce-start-gate' || '' }}
+        run: bash services/event-producer/tools/package-leg.sh "${{ matrix.leg }}" "$RUNNER_TEMP/producer-out" $ENFORCE
+
+      # Planted: the same packaging with a tighter floor than the binary must be refused.
+      - name: A binary above the pinned floor must be refused (planted)
+        env:
+          LEG: ${{ matrix.leg }}
+        run: bash services/event-producer/tools/expect-failure.sh floorgate
+
+      - name: Job summary
+        run: |
+          {
+            echo "### Producer ${{ matrix.leg }}"
+            echo '```json'
+            cat "$RUNNER_TEMP/producer-out/producer-manifest.json"
+            cat "$RUNNER_TEMP/producer-out/producer-measure.json"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: producer-${{ matrix.leg }}
+          path: ${{ runner.temp }}/producer-out
+          if-no-files-found: error
+          overwrite: true
+
+      # One SBOM name for the release (WP09 consumes `producer-sbom`); the Java dependency set is the same on every leg.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: matrix.leg == 'linux-x86_64'
+        with:
+          name: producer-sbom
+          path: ${{ runner.temp }}/producer-out/producer-sbom.json
+          if-no-files-found: error
+          overwrite: true
 
   native-smoke:
     name: native-smoke (${{ matrix.leg }})
@@ -143,6 +271,7 @@ jobs:
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
+          ref: ${{ inputs.ref }}
           persist-credentials: false
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:

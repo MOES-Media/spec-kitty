@@ -92,7 +92,7 @@ sbom() {
 
 floorgate() {
   # The measured-floor gate of package-leg.sh must go red when the pinned floor is tighter than the binary. Needs a built binary and
-  # the toolchain checksum (producer-native.yml runs it after the leg is built). Windows has no floor: nothing to plant.
+  # the toolchain checksum (event-producer.yml runs it after the leg is built). Windows has no floor: nothing to plant.
   local leg="${LEG:?set LEG to the leg built on this runner}"
   case "$leg" in
     windows-*) pass "floor gate: windows has no pinned floor, nothing to plant"; return ;;

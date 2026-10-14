@@ -89,7 +89,7 @@ tasks.named("check") {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
-// SBOM (AC-040): `cyclonedxBom` lists the Java dependencies; producer-native.yml uploads it beside the binary as `producer-sbom`.
+// SBOM (AC-040): `cyclonedxBom` lists the Java dependencies; event-producer.yml uploads it beside the binary as `producer-sbom`.
 // ---------------------------------------------------------------------------------------------------------------------------
 tasks.cyclonedxBom {
     projectType = org.cyclonedx.model.Component.Type.APPLICATION

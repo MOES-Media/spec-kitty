@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Install the pinned GraalVM Community JDK for one pins.json entry into a directory, verifying the sha256 BEFORE anything is unpacked,
-# and export JAVA_HOME (and PATH) to later workflow steps. Single definition used by producer-native.yml and event-producer.yml.
+# and export JAVA_HOME (and PATH) to later workflow steps. Single definition used by every job of event-producer.yml that needs the toolchain.
 #
 #   install-graalvm.sh <pins-tool-name> <destination-dir> [pins.json]
 #
