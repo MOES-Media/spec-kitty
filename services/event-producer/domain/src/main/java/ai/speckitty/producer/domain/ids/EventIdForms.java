@@ -33,7 +33,7 @@ public final class EventIdForms {
     }
 
     /** True for 26 Crockford base32 characters of either case. */
-    static boolean isUlid(String text) {
+    public static boolean isUlid(String text) {
         if (text.length() != ULID_LENGTH) {
             return false;
         }
@@ -47,7 +47,7 @@ public final class EventIdForms {
     }
 
     /** True for the 36-character hyphenated UUID form, either case. */
-    static boolean isHyphenatedUuid(String text) {
+    public static boolean isHyphenatedUuid(String text) {
         if (text.length() != UUID_HYPHENATED_LENGTH) {
             return false;
         }
@@ -61,7 +61,7 @@ public final class EventIdForms {
     }
 
     /** True for the 32-character hex UUID form, either case. */
-    static boolean isBareUuid(String text) {
+    public static boolean isBareUuid(String text) {
         if (text.length() != UUID_BARE_LENGTH) {
             return false;
         }

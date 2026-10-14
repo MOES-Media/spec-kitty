@@ -8,6 +8,15 @@ public final class AttributeName {
     private AttributeName() {}
 
     public static boolean isValid(String name) {
-        throw new UnsupportedOperationException("red stub");
+        if (name == null || name.isEmpty() || name.length() > MAX_LENGTH) {
+            return false;
+        }
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9'))) {
+                return false;
+            }
+        }
+        return true;
     }
 }
