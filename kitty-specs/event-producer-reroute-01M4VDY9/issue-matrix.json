@@ -84,6 +84,18 @@
       "verdict": "unknown",
       "wp": null
     },
+    "#6185": {
+      "evidence_ref": "the mission's own issue; WP01-WP11 deliver it",
+      "fr": null,
+      "nfr": null,
+      "repo": null,
+      "sc": null,
+      "scope": null,
+      "source_file": null,
+      "title": null,
+      "verdict": "in-mission",
+      "wp": "WP01"
+    },
     "#6192": {
       "evidence_ref": "<link or commit>",
       "fr": null,
