@@ -23,3 +23,12 @@ Seeded at plan time (Standing Order 3); append during implementation, assess at 
 - The requirement parser reads only `C-001` from the spec's inline constraint paragraph; `C-002` to `C-008` fail as `unknown_spec_id`. Acceptance criteria and gate ids are not requirement ids either, so the AC and G coverage tables are in `tasks-overview.md`.
 - `INVALID_WP_OWNED_FILES_KITTY_SPECS`: a code WP cannot own mission research files; literal new files need `create_intent` in the WP frontmatter.
 - Lane computation merges WPs whose `owned_files` globs overlap; combined with a dependency chain between them this yields `LANE_DEPENDENCY_CYCLE` (twice: `domain/src/**` vs a later `domain` test file; `gradle/**` vs `gradle/events-pin.properties`). Error text names lanes, not the overlapping paths.
+
+## Seen while fixing the tasks review (round 1)
+
+- `finalize-tasks --validate-only` reports every greenfield `owned_files` glob as "matches zero files" (warnings only); `create_intent` is the place for literal new files, and globs there are accepted.
+- Splitting a WP (WP07 into WP07 and WP12) is cheap in `wps.yaml` but the prompt file slug of the original keeps its old name, because `prompt_file` is recorded in the `WPCreated` event; renaming would desynchronise the event log.
+- `workflow_dispatch` workflows can only be dispatched once the file is on the default branch, so a new workflow has no pre-merge dispatch path; only a `pull_request` trigger (and a pushed branch) gives pre-merge evidence.
+- `contracts/tools/verify_pins.py --workflow` is red on `release.yml` and `ci-nightly.yml` on the base commit (tag-pinned actions, non-prelude installs); it cannot gate WP09 as a whole-file check.
+- `tests/architectural/test_no_duplicate_suite_execution.py` treats a plain branch `push` trigger as change-triggered, so a feasibility-only `push` trigger on `producer-native.yml` would need a fleet-verdict registration.
+- `kernel.clock` is the single wall-clock door (`test_clock_import_ban.py`, `test_clock_call_ban.py` scan `src`, `tests` and `scripts`); a client-side `_now_utc` must call it.

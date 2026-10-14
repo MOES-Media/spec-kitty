@@ -6,73 +6,117 @@
 
 Plan section 11 fixes **one draft PR to `main`**, compact history, `spk-land-pr` pass before it sits ready. Reason given by the plan: the Java tree, the wheel machinery, the client and the release workflow are only useful together, and each WP leaves its lane green on its own gates.
 
-**Is one PR reviewable in a sitting? Honest answer: no, not as a raw diff.** Estimate: Java tree (four subprojects plus tests) roughly 6 to 9 thousand lines, Python (client, faults, doctor, call sites, gates, tests) roughly 2 to 3 thousand, workflows, release scripts and docs roughly 1.5 thousand, plus a generated `verification-metadata.xml` that nobody should read. It is reviewable **by WP**: each WP is a contiguous, independently green run of commits with its own gates, and the reviewer reads WP by WP in dependency order (WP01 feasibility record first). Recommendation: keep the plan's one PR, but (a) review it as eleven contiguous WP ranges, (b) exclude generated files from the reading, and (c) keep the option of two stacked, self-contained slices open: **A** = WP01 to WP05, WP08, WP11 (Java producer, packaging machinery, schema consumer) and **B** = WP06, WP07, WP09, WP10 (client, seam, lanes, release, integration). The split would change what the closing squad gates over. **The decision belongs to the operator**; this document does not take it. WP06 is the largest single WP and has a stated internal cut if it is split.
+**Is one PR reviewable in a sitting? Honest answer: no, not as a raw diff.** Estimate: Java tree (four subprojects plus tests) roughly 6 to 9 thousand lines, Python (client, faults, doctor, call sites, gates, tests) roughly 2 to 3 thousand, workflows, release scripts and docs roughly 1.5 thousand, plus a generated `verification-metadata.xml` that nobody should read. It is reviewable **by WP**: each WP is a contiguous, independently green run of commits with its own gates, and the reviewer reads WP by WP in dependency order (WP01 feasibility record first). Recommendation: keep the plan's one PR, but (a) review it as twelve contiguous WP ranges, (b) exclude generated files from the reading, and (c) keep the option of two stacked, self-contained slices open: **A** = WP01 to WP05, WP08, WP11 (Java producer, packaging machinery, schema consumer) and **B** = WP06, WP07, WP09, WP10, WP12 (client, seam, lanes, release, integration, markers). The split would change what the closing squad gates over. **The decision belongs to the operator**; this document does not take it. WP06 is the largest single WP and has a stated internal cut if it is split.
 
 ## 2 External dependency: the spec-kitty-events PR
 
 **EXTERNAL, not a WP of this mission.** Plan section 6: the events repo carries the per-kind `data` schemas, the registry file, `dataschema` URIs, conformance fixtures, the comparator specification and nine fixtures, `Lane` alignment, optionally the minimal envelope subset. FR-040: it is released first; this mission only consumes the released wheel (pin + sha256, nothing committed).
 
-**Recommendation: a prerequisite Op that the orchestrator runs in the events repository; WP numbering unchanged.** Reasons: (1) different repository, its own review, its own charter (an amendment is needed there, plan 13.4) and its own release train, so it cannot be a lane or a worktree of this mission; (2) the outcome this mission needs is a released version `V_E`, which no WP here can produce or approve; (3) it overlaps spec-kitty-events#92 and the schema set must have one writer, so the events maintainers must be able to reshape it; (4) putting it in the mission would block the mission's own merge on a foreign release anyway. The mission instead has a visible **gate**: WP07, WP09, WP10 and WP11 each start with a "precondition: events release" task (T071 in WP11, T044, T058, T064), and none of them is approved, nor the mission PR marked ready, before `events-pin.properties` and the `spec-kitty-events` floor in `pyproject.toml` name the released wheel (WP11 is the consumer and the only WP that reads released artifacts; WP07, WP09 and WP10 follow it). WP01 to WP06 and WP08 read no schema and proceed now.
+**Recommendation: a prerequisite Op that the orchestrator runs in the events repository; WP numbering unchanged.** Reasons: (1) different repository, its own review, its own charter (an amendment is needed there, plan 13.4) and its own release train, so it cannot be a lane or a worktree of this mission; (2) the outcome this mission needs is a released version `V_E`, which no WP here can produce or approve; (3) it overlaps spec-kitty-events#92 and the schema set must have one writer, so the events maintainers must be able to reshape it; (4) putting it in the mission would block the mission's own merge on a foreign release anyway.
+
+**One gate definition, used by every gated WP (R6).** The precondition **blocks approval, and the subtasks that read a released artifact; it does not block authoring.** A gated WP may be written and tested against a locally installed pinned release, but it is not approved, and the mission PR is not marked ready, until **WP11 is approved and `services/event-producer/gradle/events-pin.properties` plus the `spec-kitty-events` floor in `pyproject.toml` name the released wheel `V_E`**. "WP11 complete" means exactly that: WP11 approved with the pin naming the released wheel. Each gated WP carries a "Precondition gate" section (not a subtask: a check with no deliverable is a section, not a numbered task) and records `V_E` and the pin sha256 in its notes for the reviewer.
+
+Which WPs are gated, and how: **WP11** (consumer; approval), **WP12** (markers and persisted-line validation; reads the released schemas; depends on WP11 because it needs the installed package), **WP10** (final measurements against the real released wheel; depends on WP11 and WP12), **WP09** (release workflow; reads nothing released, so it depends on WP08 only and its **approval** waits for the pin, because the release must publish a CLI whose floor names `V_E`). **WP07 is not gated** (lane consolidation, journal stamping, readers test, glossary and ADRs read no schema). WP01 to WP08 proceed now.
 
 ## 3 Work packages
 
 | WP | Title | Depends on | Profile | Notes |
 |---|---|---|---|---|
-| WP01 | Feasibility gate, build skeleton, CI registration, hatch hook | none | java-jenny | **Feasibility gate (HALT on failure)**; baseline capture T001; opens chokepoints |
+| WP01 | Feasibility gate, build skeleton, CI registration, shared smoke action, hatch hook | none | java-jenny | **Feasibility gate (HALT on failure)**; baseline capture T001; opens chokepoints; evidence needs the orchestrator's scratch pull request |
 | WP02 | Java `:domain` core | WP01 | java-jenny | no schema read |
-| WP03 | Java `:adapter` file-system side | WP02 | java-jenny | |
-| WP04 | Java `Produce`, ports, launcher protocol | WP03 | java-jenny | |
-| WP05 | Java retention | WP03, WP04 | java-jenny | **refinement R1** |
-| WP06 | Thin Python client, seam, gates, doctor | WP04, WP05 | python-pedro | largest WP; sole owner of `status/adapters.py` |
-| WP07 | Journal stamping, lanes, markers, ADRs | WP06, WP11 | python-pedro | **events-release gated** |
+| WP03 | Java ports and `:adapter` file-system side | WP02 | java-jenny | **R4**: owns the port interfaces |
+| WP04 | Java `Produce`, launcher protocol and wiring | WP03 | java-jenny | fail-closed default validator (R13) |
+| WP05 | Java retention | WP04 | java-jenny | **R1**, `ServiceLoader` registration (R5) |
+| WP06 | Thin Python client, seam, gates, doctor | WP05 | python-pedro | largest WP; sole owner of `status/adapters.py`; WP04 is a transitive dependency through WP05 and WP06 reads WP04's protocol fixtures |
+| WP07 | Journal stamping, lane lists, glossary, ADRs | WP06 | python-pedro | **not gated** (R6) |
 | WP08 | Packaging remainder | WP01 | python-pedro | not gated by the events release |
-| WP09 | Release workflow | WP08, WP11 | implementer-ivan | **events-release gated**; sole owner of `release.yml` |
-| WP10 | Integration and final gate | all | python-pedro | **events-release gated** |
+| WP09 | Release workflow | WP08 | implementer-ivan | **approval gated**; sole owner of `release.yml` |
+| WP10 | Integration and final gate | WP09, WP11, WP12 | python-pedro | **events-release gated**; the other WPs are transitive |
 | WP11 | Events-release consumer | WP04 | java-jenny | **events-release gated** (approval) |
+| WP12 | Marker clearing and persisted-line validation | WP07, WP11 | python-pedro | **events-release gated** (approval); split out of the old WP07 (R6) |
 
-Graph (acyclic): WP01; WP02<-WP01; WP03<-WP02; WP04<-WP03; WP05<-WP03,WP04; WP06<-WP04,WP05; WP08<-WP01; WP11<-WP04; WP07<-WP06,WP11; WP09<-WP08,WP11; WP10<-all. Genuinely parallel after WP01: WP08 beside the Java chain; after WP04: WP05 and WP11 beside each other (WP11 only touches `:adapter/schema`, one `:domain` test file and `pyproject.toml`); WP06 beside WP11. The CLI's computed lane assignment is recorded in the final report.
+Graph (acyclic, direct edges only): WP01; WP02<-WP01; WP03<-WP02; WP04<-WP03; WP05<-WP04; WP06<-WP05; WP07<-WP06; WP08<-WP01; WP09<-WP08; WP11<-WP04; WP12<-WP07,WP11; WP10<-WP09,WP11,WP12. Genuinely parallel after WP01: WP08 and WP09 beside the Java chain; after WP04: WP05 and WP11 beside each other; WP06 and WP07 beside WP11. The CLI computes twelve lanes with no merge and no cycle (`finalize-tasks --validate-only`).
 
 ### Refinements to the plan (real defect only)
 
-- **R1: WP05 also depends on WP04.** The plan has WP05 after WP03 only, but `retain` is a launcher operation: WP04 builds the launcher entry and its dispatch point, WP05 registers into it. As planned, two WPs would write the launcher concurrently. Cost: WP04 and WP05 are no longer parallel; nothing else changes.
-- **R2: ownership notes.** `kitty-specs/` paths are not allowed in a `code_change` WP's `owned_files` (CLI rule `INVALID_WP_OWNED_FILES_KITTY_SPECS`), so WP01's `research/baseline-red.txt`, `research/wp01-feasibility.md` and WP10's `research/wp10-measurements.md` are committed with `safe-commit` as mission artifacts and not listed as owned. WP07 and WP10 also make small recorded out-of-map edits (marker comment removal in files WP06 wires; ledger rows), allowed by the packages template because WP06 precedes them.
-- **R3: ownership shaped by the lane computer.** Overlapping write scopes merge WPs into one lane and the plan's graph then forms a lane cycle (seen twice during validation). So: WP02 owns `:domain` main plus its own test packages, and WP11's two `:domain` test files live in a separate test package `released` (the plan said "one `:domain` test file"); WP01 owns `gradle/verification-metadata.xml` and `gradle/wrapper/**`, not `gradle/**`, so WP11 can own `gradle/events-pin.properties`; WP11's `pyproject.toml` floor edit (and WP01's) cannot be listed in both WPs, so `pyproject.toml` is owned by WP01 and WP11 makes a recorded out-of-map edit as last editor.
+- **R1: WP05 depends on WP04 (compile-time).** The plan has WP05 after WP03 only, but `retain` is a launcher operation: WP05 needs WP04's `OperationHandler` interface and the ports at compile time. The mechanism is explicit (R5): WP05 writes only its own files, including one `META-INF/services` provider file. Reworded: the edge is the compile-time interface, not "concurrent writes". WP03 is dropped from WP05's list (implied through WP04). Cost: WP04 and WP05 are not parallel.
+- **R2: ownership notes.** `kitty-specs/` paths are not allowed in a `code_change` WP's `owned_files` (CLI rule `INVALID_WP_OWNED_FILES_KITTY_SPECS`), so `research/baseline-red.txt`, `research/wp01-feasibility.md`, `research/wp09-deferred-verification.md` and `research/wp10-measurements.md` are committed with `safe-commit` as mission artifacts and not listed as owned. Every other edit outside a WP's `owned_files` is a **recorded out-of-map edit** in the consolidated table of section 4 and in the editing WP's body ("Recorded out-of-map edits"): a reviewer's allowlist, each justified by dependency order.
+- **R3: ownership shaped by the lane computer.** Overlapping write scopes merge WPs into one lane and the graph then forms a lane cycle (seen twice during validation). So WP02 owns `:domain` main plus its own test packages, WP11's two `:domain` test files live in the separate package `released`; WP01 owns `gradle/verification-metadata.xml` and `gradle/wrapper/**`, not `gradle/**`, so WP11 can own `gradle/events-pin.properties` and `gradle/events-fetch.gradle.kts`; `pyproject.toml` is owned by WP01 and WP11 makes a recorded out-of-map edit as last editor.
+- **R4: the port interfaces are authored in WP03, not WP04.** `:adapter` depends on `:application` and implements its ports, so the interface-only package `application/port/**` must land before the adapters. WP03 owns it (first subtask T079); WP04 keeps `Produce`, the launcher and the `:application` ArchUnit test. A signature change after WP03 is a recorded second-editor edit by WP04, never a second interface. (Plan sections 1 and 11 show WP04 owning the ports.)
+- **R5: native-image metadata has one directory per WP, and registration is `ServiceLoader`.** `native-image` merges every `META-INF/native-image/` directory on the classpath, so WP01 owns only `.../ai.speckitty/producer-spike/`, WP03 `producer-adapter-fs`, WP04 `producer-launcher`, WP05 `producer-retain` and `producer-ledger`, WP11 `producer-schema`. The `native-smoke` job builds the real launcher on every path-matching pull request, so a WP that adds a reflected class without its metadata turns the gate red in that WP. WP04's deletion of WP01's `spike/**` and its metadata directory is a recorded out-of-map deletion. WP04's dispatcher discovers extra operations with `ServiceLoader`; WP05 owns the single provider file, so no launcher file of WP04 is edited by WP05.
+- **R6: the old WP07 is split, and the gate has one definition.** WP07 mixed lane consolidation, journal stamping, marker clearing and docs, and gated all of it behind a foreign release although only marker clearing reads a released schema. WP07 keeps lanes, stamping (with gate rule (b)), the reader-immutability test, glossary and ADRs and is **ungated** (depends on WP06). New **WP12** holds T047 (marker clearing, persisted-line mode, AC-019) and the gate. WP09 no longer depends on WP11 (approval gate only), WP10 lists only WP09, WP11 and WP12, WP06 lists only WP05 (transitive edges removed). The precondition checks T044, T058, T064, T071 are removed as subtasks and become "Precondition gate" sections (no deliverable); T071's URL and sha256 confirmation is the first step of T072. Gate definition: section 2.
+- **R7: the build-glue pin has its own test home.** Plan 4.2 puts the pin in `test_producer_client_thinness.py`, which does not exist until WP06, while WP01 and WP08 ship the glue earlier and WP08 is unordered against WP06. The pin is `tests/architectural/test_build_glue_thin.py`, created by WP01 (closed import allowlist and forbidden names for wholly owned glue, base-plus-allowed diff for edited files, filesystem walk, floor, mutations), with an explicit "not yet landed" list that WP08 empties; WP06's thinness gate asserts that file exists and names each plan 13.2 file. One enumerator, no ordering dependency between WP06 and WP08.
+- **R8: no `producer_smoke.py`.** WP09 owned a new Python script outside the F1 allowance (plan 13.2, operator decision 10). The smoke is one shared composite action `.github/actions/producer-smoke` (YAML and shell, WP01), used by `native-smoke` (binary mode) and `smoke-wheels` (cli mode), and a test pins that both use it. Checksum continuity and set checks are modes of `check_dist_set.py` (already on the F1 list), with executable tests and mutations in WP08.
+- **R9: build configuration is settled once, in WP01.** JaCoCo floors are wired to `check` (the gate command is `gradle check`, not `test`, everywhere) with a floor-breach test; the SBOM task and its artifact are WP01's; `scripts/release/dist-set.json` is written complete by WP01 (WP08 adds tests and the checker); `adapter/build.gradle.kts` applies the optional script plugin `gradle/events-fetch.gradle.kts`, which WP11 owns, so WP02, WP09 and WP11 edit no WP01 build file.
+- **R10: `producer_faults.py` reads the clock through `kernel.clock`, and there is no constants module.** The repository bans raw `datetime.now` and `time.time` outside `kernel/clock.py` (`test_clock_import_ban.py`, `test_clock_call_ban.py` scan `src`, `tests` and `scripts`), so `_now_utc` returns `kernel.clock.now_utc()`; this is the one added import of that module, and the thinness rule (a) clock vocabulary treats a `kernel.clock` call as the wall-clock read, allowed only in `_now_utc`. Path literals are not extracted into a module (rules (a) and (c) would reject it): the fault-log path stays a string inside `record_fault`/`_read_fault_rows`, the three paths are declared once as `StateSurface` entries in `state/contract.py` using the existing roots (no new `StateRoot` member), and the AC-030 gate keys on the publish-log entry.
+- **R11: `repo_root` forwarding is an explicit hunk.** Plan 4.2 lists `fire_lifecycle_saas_fanout` and `fire_resolved_binding_fanout` in the `adapters.py` row, but none of hunks A to D forwards `repo_root`; both functions take it as a keyword and drop it (only `fire_saas_fanout` re-joins it into `kwargs`), so the client's `start_path` would be `None` for lifecycle rows. WP06 adds hunk B2 (red-first test, then `kwargs["repo_root"] = repo_root` in both). No symbol is added.
+- **R12: CI shape.** (a) `gradle-test` is a three-leg matrix (ubuntu-24.04, macos-14, windows-2022) running `check`, because the lock, torn-line, golden-byte and node-id semantics differ per OS; the terminal gate fails on any absent or skipped leg. (b) A new job `native-e2e` (WP10, recorded edit of `event-producer.yml`) runs the real-binary tests by named file per OS with `REQUIRE_NATIVE_PRODUCER=1`, under which a missing binary fails and never skips; it also reproduces the AC-036 numbers. (c) `verify-pins` runs `gradle_pin_check.py`, because `contracts.yml` does not trigger on `services/event-producer/**`. (d) The feasibility run has no pre-merge dispatch path (a `workflow_dispatch` workflow must be on the default branch), so the path is `event-producer.yml`'s `pull_request` trigger through a scratch draft pull request pushed by the orchestrator with operator authorisation (WP01 "Evidence path"); T010 must cite the run ids. WP01's task order is kept (the hook and registration precede the measurements) because the pull-request trigger needs the registration; on HALT nothing of the lane merges and the registration is its own commit. (e) `ci-nightly.yml`'s producer job is non-gating and informational, outside `nightly-summary.needs`.
+- **R13: composition root and fail-closed default.** Nothing owned the launcher wiring that binds the real `RowSchemaValidator`. WP04 owns `Wiring` and its default binding is a validator that **fails closed**, never accept-all; WP11 T084 binds the released schema adapter (recorded edit) with a launcher test that an invalid row replies `rejected`.
+- **R14: campsite (1) edits `AGENTS.md` only.** `scripts/release/README.md` carries no stale "PyPI Release" or "release.yml absent" text (verified: the only stale line is `AGENTS.md`'s "`release.yml` is not present"), so plan 11's README line is dropped and WP01 does not edit a WP08 file.
 
-## 4 Chokepoints (serialised by dependency order)
+## 4 Chokepoints, recorded out-of-map edits, known overlaps
+
+### Chokepoints (serialised by dependency order)
 
 | Chokepoint | Edited by, in order |
 |---|---|
 | `pyproject.toml` | WP01 (hook table only), WP11 (events floor, last editor); WP08 does none |
 | `uv.lock` | WP11 |
 | `status/adapters.py`, `state/contract.py`, `tests/status/conftest.py` | WP06 only |
-| `runtime/next/_internal_runtime/engine.py` | WP06 (denial call), then WP07 (stamping, marker 8) |
-| `status/lifecycle_events.py`, `decisions/emit.py`, `events/decision_log.py` | WP06 (wiring), then WP07 (marker comments) |
+| `runtime/next/_internal_runtime/engine.py` | WP06 (denial call), then WP07 (stamping), then WP12 (marker 8 comment) |
+| `status/lifecycle_events.py`, `decisions/emit.py`, `events/decision_log.py` | WP06 (wiring), then WP12 (marker comments) |
 | `tests/architectural/test_producer_client_thinness.py` | WP06 (rules a, c, d, e), then WP07 (rule b) |
+| `tests/architectural/test_build_glue_thin.py` | WP01, then WP08 (empties "not yet landed") |
 | `.github/workflows/release.yml` | WP09 only |
+| `.github/workflows/event-producer.yml`, `tests/ci/test_event_producer_workflow.py` | WP01, then WP06 (one path glob), then WP10 (`native-e2e`) |
 | `scripts/ci/fleet_verdict.py`, `ci-fleet-verdict.yml`, `tests/ci/test_fleet_verdict.py` (shared fleet-verdict gate) | WP01 only (registers both new workflows) |
-| `scripts/release/dist-set.json` | WP01 (three platform entries), WP08 (additive: sdist, pure wheel) |
-| `scripts/release/README.md` | WP01 (campsite line), WP08 |
+| `scripts/release/dist-set.json` | WP01 only (written complete) |
+| `scripts/release/README.md` | WP08 only |
 | Event contract (envelope, type table, schemas) | external events PR, consumed by WP11; never edited here |
-| Gradle build files, `verification-metadata.xml` | WP01 settles the whole dependency set; WP02, WP03, WP11, WP09 add only plugin/config lines serially |
+| Gradle build files, `verification-metadata.xml` | WP01 only (whole dependency set, floors, SBOM); WP11 adds its own `events-fetch.gradle.kts`, applied by a hook WP01 pre-wires |
+| `services/event-producer/launcher/.../Wiring.java` | WP04, then WP11 (binding) |
 | `contracts/tools/gradle_pin_check.py` | WP01 only |
 
-Open PRs touching these files must be re-checked by the orchestrator before each lane starts (about 19 open PRs is normal here).
+### Recorded out-of-map edits (the reviewer's allowlist; also in each WP body)
+
+| File (owner) | Editor | Edit | Order |
+|---|---|---|---|
+| `launcher/.../spike/**`, `META-INF/native-image/ai.speckitty/producer-spike/**` (WP01) | WP04 | delete | WP04 first commit |
+| `application/.../port/**` (WP03) | WP04 | signature change only if needed, with the reason | after WP03 |
+| `.github/workflows/event-producer.yml` (WP01) | WP06 | add path glob `src/specify_cli/status/producer_*.py` | after WP01 |
+| `.github/workflows/event-producer.yml`, `tests/ci/test_event_producer_workflow.py` (WP01) | WP10 | add job `native-e2e` and its gate edge | after WP01 |
+| `tests/architectural/test_build_glue_thin.py` (WP01) | WP08 | empty the "not yet landed" list | after WP01 |
+| `src/runtime/next/_internal_runtime/engine.py`, `tests/architectural/test_producer_client_thinness.py` (WP06) | WP07 | `_append_event` stamping; rule (b) | after WP06 |
+| `decisions/emit.py`, `status/lifecycle_events.py`, `engine.py`, `events/decision_log.py` (WP06) | WP12 | marker comment removal | after WP06, WP07 |
+| `launcher/.../Wiring.java` (WP04) | WP11 | bind the schema-backed validator | after WP04 |
+| `pyproject.toml` (WP01) | WP11 | `spec-kitty-events` floor | after WP01 |
+
+### Known open-PR overlaps (checked read-only against the live list; re-check at dispatch, the count changes)
+
+| Open PR | File | WP | Action |
+|---|---|---|---|
+| #6205 (adopts a `spec-kitty-events` floor) | `pyproject.toml`, `uv.lock`, `.kittify/release/shared-package-compatibility.json` | WP11 (and WP01 for `pyproject.toml`) | rebase before the WP11 lane starts; WP11's "floor bump is the only `pyproject.toml` change" is relative to that base |
+| #6205 | `docs/adr/4.x/2026-10-13-2-the-event-ledger-is-the-publication-seam-default-on-with-local-retention.md` | WP07 (T050) | rebase before T050, re-apply D-1, D-2, D-3 |
+| #6148 | `.github/workflows/ci-fleet-verdict.yml` | WP01 | rebase before the lane starts, or take theirs |
+| #5540 | `docs/api/cli-commands.md` | WP06 | regenerate after rebasing, do not hand-merge |
+
+WP01, WP06, WP07 and WP11 each carry a first step "check open PRs on the owned files before the first commit".
 
 ## 5 Gates (all WPs; plan section 9)
 
-Java: `gradle -p services/event-producer test` (unit, ArchUnit with floor and self-mutation, dependency verification with tamper test, JaCoCo `:domain` 95%/90%, `:application` 90%, `:adapter` 80%). Python shim and build glue: `make lint`, `ruff check`, `ruff format --check --force-exclude`, mypy on the client modules, targeted pytest (named files only, never whole directories), the **producer-client thinness gate** (rules a to e plus the build-glue pin), `uv lock --check`. Packaging and release: dist-set equality with mutation, `smoke-wheels`, SBOM, checksum continuity, `twine check`, `verify_pins.py`, `gradle_pin_check`. Existing gates re-run per R-7 against `research/baseline-red.txt`.
+Java: `gradle -p services/event-producer check` (unit, ArchUnit with floor and self-mutation, dependency verification with tamper test, JaCoCo `:domain` 95%/90%, `:application` 90%, `:adapter` 80%; the floors hang off `check`, which `test` alone does not run, and a floor-breach test proves the wiring), run on ubuntu, macOS and Windows legs. Python shim and build glue: `make lint`, `ruff check`, `ruff format --check --force-exclude`, mypy on the client modules, targeted pytest (named files only, never whole directories), the **producer-client thinness gate** (rules a to e) and the **build-glue gate** `test_build_glue_thin.py` (R7), `test_clock_import_ban.py`, `test_clock_call_ban.py`, `test_fast_tier_marker_completeness.py`, `test_module_shard_registry.py`, `uv lock --check`. Every WP lists its new test files with marker and job. Packaging and release: dist-set equality with mutation, `smoke-wheels` and `native-smoke` through one shared action, SBOM, checksum continuity (`check_dist_set.py --verify-manifests`, executable), `twine check`, `verify_pins.py` on the two WP01 workflows only (the pre-existing unpinned lines of `release.yml` are baseline red, not re-pinned; WP09 pins every new `uses:` by a test), `gradle_pin_check` (also in `event-producer.yml`). Existing gates re-run per R-7 against `research/baseline-red.txt`.
 
 **Red-first and revert-check, per behaviour:** the test is its own commit before the implementation, verified red on the WP's base and green on its tip, and revert-checked (revert the implementation hunk; the test must fail). Floor and self-mutation cases on every census gate. Golden files come from the real serializer.
 
-**Python allowance:** only the thin runtime shim (`producer_client.py`, `producer_faults.py`, the doctor sibling, call-site edits of plan 4.2, the journal stamping) and bounded build glue (`hatch_build_producer.py`, `check_dist_set.py`, the `check_exact_install.py --wheel-tag` edit, the `gradle_pin_check.py` third-`Subproject` entry). Everything else is Java.
+**Python allowance:** only the thin runtime shim (`producer_client.py`, `producer_faults.py`, the doctor sibling, call-site edits of plan 4.2, the journal stamping) and bounded build glue (`hatch_build_producer.py`, `check_dist_set.py` with its `--verify-binaries` and `--verify-manifests` modes, the `check_exact_install.py --wheel-tag` edit, the `gradle_pin_check.py` third-`Subproject` entry). The smoke is a composite action (YAML and shell), not Python. Tests and gates are not runtime Python. Everything else is Java.
 
 ## 6 Baseline capture
 
-WP01 T001, before any change: detached scratch worktree of the base commit, one invocation per gate file of research R-7 and the owning fast tiers, written to `research/baseline-red.txt` (base sha, command, counts, failing node ids). #3283 shaped failures are re-synced and rerun once; #3284 red is recorded "known red, tracked"; any other distinct pre-existing red stops the mission until the operator opens an issue.
+WP01 T001, before any change: detached scratch worktree of the base commit, one invocation per gate file of research R-7 and the owning fast tiers (including the explicit `tests/status/` files WP06 runs, the clock-ban and marker-completeness gates, and `verify_pins.py --workflow` on `release.yml` and `ci-nightly.yml`), written to `research/baseline-red.txt` (base sha, command, counts, failing node ids) and committed after the campsite, which stays the WP's first commit. #3283 shaped failures are re-synced and rerun once; #3284 red is recorded "known red, tracked"; any other distinct pre-existing red stops the mission until the operator opens an issue.
 
 ## 7 WP01 feasibility gate
 
-PASS = on linux x86_64, macOS arm64, Windows x86_64: trivial producer builds natively, starts under 100 ms warm, stub wheel built with WP01's hook installs and runs by path, measured floors within pinned floors. FAIL path: fallbacks inside WP01 (musl static; hand-written reachability metadata); if a leg still fails, **HALT back to the orchestrator; WP02 is not started**.
+PASS = on linux x86_64, macOS arm64, Windows x86_64: trivial producer builds natively (Windows from a `vcvars64` environment, macOS with `MACOSX_DEPLOYMENT_TARGET=11.0`), starts under 100 ms warm (**median of the last 20 of 25 consecutive spawns**, p95 recorded, scripted in `tools/measure-start.sh`), stub wheel built with WP01's hook installs and runs by path, measured floors within pinned floors, FFM configuration files listed per OS. FAIL path: fallbacks inside WP01 (musl static; hand-written reachability metadata; for a macOS `minos` miss, raising the floor if the operator accepts); if a leg still fails, **HALT back to the orchestrator; WP02 is not started; nothing of the lane merges**. The verdict must cite the run ids of the scratch pull request run (R12 d); no PASS without them.
 
 ## 8 Coverage
 
@@ -84,7 +128,7 @@ PASS = on linux x86_64, macOS arm64, Windows x86_64: trivial producer builds nat
 | FR-001 | WP04, WP06 |
 | FR-002 | WP06 |
 | FR-003 | WP06 |
-| FR-004 | WP06 |
+| FR-004 | WP03, WP06 |
 | FR-005 | WP04, WP11 |
 | FR-006 | WP04, WP11 |
 | FR-007 | WP02, WP04 |
@@ -112,8 +156,8 @@ PASS = on linux x86_64, macOS arm64, Windows x86_64: trivial producer builds nat
 | FR-029 | WP02, WP05 |
 | FR-030 | WP05, WP06 |
 | FR-031 | WP05 |
-| FR-032 | WP07 |
-| FR-033 | WP07 |
+| FR-032 | WP12 |
+| FR-033 | WP12 |
 | FR-034 | WP07 |
 | FR-035 | WP07 |
 | FR-036 | WP07 |
@@ -122,7 +166,7 @@ PASS = on linux x86_64, macOS arm64, Windows x86_64: trivial producer builds nat
 | FR-039 | WP01 |
 | FR-040 | WP09, WP11 |
 | FR-041 | WP01, WP08, WP09 |
-| FR-042 | WP01, WP09 |
+| FR-042 | WP01, WP08, WP09 |
 | FR-043 | WP08, WP09, WP10 |
 | FR-044 | WP08 |
 | FR-045 | WP07 |
@@ -141,24 +185,24 @@ PASS = on linux x86_64, macOS arm64, Windows x86_64: trivial producer builds nat
 |---|---|---|---|
 | AC-001 | WP06, WP04, WP10 | AC-021 | WP04 |
 | AC-002 | WP04, WP11, WP10 | AC-022 | WP07 |
-| AC-003 | WP06 | AC-023 | WP06, WP03 |
+| AC-003 | WP06 (T036, T080) | AC-023 | WP06, WP03 |
 | AC-004 | WP06 | AC-024 | WP08, WP09 |
-| AC-005 | WP06, WP04, WP10 | AC-025 | WP10, WP08 |
-| AC-006 | WP06 | AC-026 | WP03 |
+| AC-005 | WP06, WP04, WP03 (root), WP10 | AC-025 | WP10, WP08 |
+| AC-006 | WP06 (T081 Windows) | AC-026 | WP03, WP06 (client), WP10 (end to end) |
 | AC-007 | WP06 | AC-027 | WP11 |
 | AC-008 | WP02 (test-local), WP11 (released) | AC-028 | WP01, every WP gate, WP10 final |
 | AC-009 | WP02 | AC-029 | WP11 |
 | AC-010 | WP03 | AC-030 | WP06 |
 | AC-011 | WP04, WP03 | AC-031 | WP02, WP05 |
-| AC-012 | WP06 | AC-032 | WP09, WP01 |
+| AC-012 | WP06 | AC-032 | WP08 (T082, executable), WP09, WP01 |
 | AC-013 | WP05, WP06 | AC-033 | WP07 (ADR, glossary), WP08 (packs) |
 | AC-014 | WP05 | AC-034 | WP03, WP10 |
 | AC-015 | WP07, WP10 | AC-035 | WP04, WP10 |
-| AC-016 | WP04, WP10 | AC-036 | WP01 (baseline), WP10 (limits), WP09 (nightly) |
+| AC-016 | WP04, WP10 | AC-036 | WP01 (baseline), WP10 (limits, `native-e2e`), WP09 (nightly, informational) |
 | AC-017 | WP04, WP10 | AC-037 | WP08 |
 | AC-018 | WP06, WP10 | AC-038 | WP01, WP08, WP10 |
-| AC-019 | WP07 | AC-039 | WP03, WP01 |
-| AC-020 | WP07 | AC-040 | WP09, WP01 |
+| AC-019 | WP12 | AC-039 | WP03, WP01 (CI step) |
+| AC-020 | WP04 (producer, test-local registry), WP11 (released), WP07 (census) | AC-040 | WP09, WP01 (SBOM task) |
 
 No AC is uncovered.
 
@@ -178,10 +222,10 @@ No AC is uncovered.
 
 | Gate | WPs | Gate | WPs |
 |---|---|---|---|
-| G-1 | WP01 (stub), WP08, WP09 | G-8 | WP09, WP01 |
+| G-1 | WP01 (stub), WP08, WP09 | G-8 | WP09, WP08, WP01 |
 | G-2 | WP01, WP08 | G-9 | WP09 |
 | G-3 | WP01 (PR native-smoke), WP09 | G-10 | WP08 |
-| G-4 | WP09 | G-11 | WP06, WP07, WP11, WP10 (final) |
+| G-4 | WP09 | G-11 | WP06, WP07, WP11, WP12, WP10 (final) |
 | G-5 | WP09 | G-12 | WP08 |
 | G-6 | WP09 | G-13 | WP01, WP09 |
 | G-7 | WP08, WP09, WP10 | | |
@@ -192,3 +236,12 @@ No AC is uncovered.
 - `tasks.md` is regenerated from `wps.yaml`, so narrative cannot live in it; this file holds it.
 - The requirement parser recognises only `C-001` from the spec's one-line constraint paragraph; `C-002` to `C-008` are rejected as `unknown_spec_id`.
 - `INVALID_WP_OWNED_FILES_KITTY_SPECS` bars mission research files from `owned_files`.
+- `workflow_dispatch` workflows must exist on the default branch to be dispatched, so no new workflow can be exercised from a branch by dispatch; a `pull_request` trigger is the pre-merge path (R12 d).
+- `verify_pins.py --workflow` is red on `release.yml` and `ci-nightly.yml` on base (tag-pinned `actions/checkout@v6`, non-prelude installs), so it is scoped to the two WP01 workflows.
+
+## 10 Residuals stated honestly
+
+- **Release stages unexecuted until a tag.** `release.yml` runs on a tag push or a dispatch of the default-branch copy; the full path (real platform wheels, attestation, OIDC publish, `nightly-gate` interplay, multi-wheel index) is first executed at the first 4.0 release candidate, which publishes to the real PyPI and has no Test-PyPI rehearsal. Pre-merge evidence is the executable checker tests, the shared smoke on three OS and the static graph tests; WP09 T063 writes the table `research/wp09-deferred-verification.md`, and the mission pull request body says these items are unproven pre-merge.
+- **Windows shipped-wheel behaviour.** The Windows termination subset of the client (`windows_ci`, WP06 T081) runs under the existing `windows_ci` job with a stub; the shipped wheel's smoke proves one valid row, not timeout or orphan behaviour.
+- **Per-OS legs run only in CI.** macOS and Windows native results are untested locally until the pull request runs.
+- **Plan refinements R4 to R14** change plan sections 1, 4.2, 9, 11 and 13.2 as described; the plan file itself is not edited here.
