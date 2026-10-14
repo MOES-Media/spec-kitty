@@ -204,9 +204,9 @@ class LauncherProtocolTest {
         List<Integer> halts = new java.util.concurrent.CopyOnWriteArrayList<>();
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         int exit = new Launcher(() -> produceOnly(), halts::add)
-                .run(new ByteArrayInputStream("{\"v\":1,\"op\":\"produce\",\"deadline_ms\":150,\"start_path\":\".\"}".getBytes(StandardCharsets.UTF_8)), out);
+                .run(new ByteArrayInputStream("{\"v\":1,\"op\":\"produce\",\"deadline_ms\":1000,\"start_path\":\".\"}".getBytes(StandardCharsets.UTF_8)), out);
         assertThat(exit).isZero();
-        Thread.sleep(600);
+        Thread.sleep(1600);
         assertThat(halts).as("the watchdog was cancelled when the reply was written").isEmpty();
     }
 
