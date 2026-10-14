@@ -44,7 +44,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * A delete racing a stamp is safe (R-23, AC-013): {@code retain} takes the clock lock that {@code produce} holds from its duplicate
+ * A delete that contends with a stamp is safe (R-23, AC-013): {@code retain} takes the clock lock that {@code produce} holds from its duplicate
  * check to its durable append, so no row that was reported produced is appended into a file that is then unlinked.
  */
 class RetainRaceTest {
@@ -173,7 +173,7 @@ class RetainRaceTest {
     }
 
     @Test
-    void twoProcessesRacingProduceAgainstRetainApplyLoseNoReportedRow(@TempDir Path dir) throws Exception {
+    void twoProcessesContendingProduceAndRetainApplyLoseNoReportedRow(@TempDir Path dir) throws Exception {
         Path root = populate(dir);
         Path go = dir.resolve("go");
         int rows = 60;
