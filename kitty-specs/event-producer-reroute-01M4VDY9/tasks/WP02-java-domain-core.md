@@ -37,6 +37,7 @@ create_intent:
 - services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/fault/**
 - services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/protocol/**
 - services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/arch/**
+- services/event-producer/domain/src/testFixtures/**
 execution_mode: code_change
 model: ''
 owned_files:
@@ -49,6 +50,7 @@ owned_files:
 - services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/fault/**
 - services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/protocol/**
 - services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/arch/**
+- services/event-producer/domain/src/testFixtures/**
 role: implementer
 tags: []
 tracker_refs: []
@@ -89,7 +91,7 @@ WP01 verdict PASS (read `research/wp01-feasibility.md`). If it is HALT, stop.
 ## Subtask T013: `order` (comparator, dedupe, error rows)
 
 **Steps**: red tests from the nine data-model section 4 fixtures as test-local inputs (floor: all nine; example 4 is the naive counter-example). Comparator: Lamport, then `time`, then `id`, `(time, id)` fallback for clockless rows, the `source` tie-break as the spec states. Dedupe-then-order on `(source, id)`; error rows (unparseable `time`, non-normalising or missing `id`, clock out of range) listed with line position, absent from the ordered list; ordered + errors + collapsed = rows read (AC-009). Permutation test (AC-008 against a test-local reference).
-**Mutants (each asserted red, so the tests cannot pass against a comparator that ignores the rule):** (1) the naive comparator (example 4); (2) a comparator without the `source` tie-break (example 7); (3) dedupe on the raw `id` instead of `(source, id)` (example 8); (4) an invalid duplicate survivor, or no conflict reported (example 9); (5) a comparator that **drops an error row** (AC-009). The "all nine" floor is asserted, and error rows are compared as a **multiset** (position, reason), so a dropped or duplicated error row fails. The same mutant table is reused by WP11 T075 for the released run.
+**Mutants (each asserted red, so the tests cannot pass against a comparator that ignores the rule):** (1) the naive comparator (example 4); (2) a comparator without the `source` tie-break (example 7); (3) dedupe on the raw `id` instead of `(source, id)` (example 8); (4) an invalid duplicate survivor, or no conflict reported (example 9); (5) a comparator that **drops an error row** (AC-009). The "all nine" floor is asserted, and error rows are compared as a **multiset** (position, reason), so a dropped or duplicated error row fails. **One mutant table, shared by construction:** the five mutant comparators, the nine test-local fixtures' loader and the permutation reference live in `domain/src/testFixtures/java/ai/speckitty/producer/domain/order/**` (WP02-owned; the `java-test-fixtures` plugin and the `:adapter` `testFixtures(project(":domain"))` dependency are pre-wired by WP01 T003 step 9, so this WP edits no build file). WP02's own tests consume them as `testFixtures` of `:domain`; WP11 T075 consumes the same classes from the `:adapter` test classpath and holds no copy. Test-fixture code is `java.base` plus JUnit only, so `:domain` main stays `java.base`-only.
 **Non-integer `lamportclock` (spec touch-up 4):** error rows with the named reason, never clockless, for each of `null`, `"5"`, `true`, `1.5` and `-1`; the member **absent** is clockless (ordered by `(time, id)`); `2^31` stays the out-of-range case of fixture 9. A reader that coerces `"5"` or `true` to an integer, or treats `null` as absent, fails these cases.
 **Covers** FR-013 (Java comparator), FR-016 (dedupe key), AC-008, AC-009.
 

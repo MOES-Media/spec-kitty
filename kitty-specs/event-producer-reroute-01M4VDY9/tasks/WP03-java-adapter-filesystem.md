@@ -114,7 +114,7 @@ for host, user in (('host-a', 'user-a'), ('host-b', 'user-b')):
         rows.append({'hostname': host, 'username': user, 'nodeid': generate_node_id()})
 print(json.dumps(rows))"
 ```
-Add a third case with `USER` unset and `user.name` set (Java's chain differs from `getpass`'s password-database fallback, so this case documents the intended Java behaviour with a synthetic name). **Live comparison on every OS:** the Java test compares `NodeIdentity` with the environment value `PRODUCER_LIVE_PY_NODE_ID` that each leg of the `gradle-test` matrix exports (WP01 T007, a step already in `event-producer.yml`; this WP edits no workflow). Under `CI` a missing `PRODUCER_LIVE_PY_NODE_ID` **fails** the test; it is skipped only outside CI. **Covers** FR-011, AC-039.
+Add a third case with `USER` unset and `user.name` set (Java's chain differs from `getpass`'s password-database fallback, so this case documents the intended Java behaviour with a synthetic name). **Live comparison on every OS:** the Java test compares `NodeIdentity` with the environment value `PRODUCER_LIVE_PY_NODE_ID` that each leg of the `gradle-test` matrix exports (WP01 T007, a step already in `event-producer.yml`; this WP edits no workflow). A missing `PRODUCER_LIVE_PY_NODE_ID` **fails** the test only when `REQUIRE_LIVE_NODE_ID=1`, which only the `gradle-test` legs export (WP01 T007) next to the node id; in any other run (a local `gradle check`, or any CI lane that is not `gradle-test`) it skips with a message. `CI` is not consulted, so no other lane can go red for lack of a Python-side value. **Covers** FR-011, AC-039.
 
 ## Subtask T022: Concurrency and byte tests
 

@@ -65,7 +65,8 @@
         "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/ids/**",
         "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/order/**",
         "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/protocol/**",
-        "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/retention/**"
+        "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/retention/**",
+        "services/event-producer/domain/src/testFixtures/**"
       ],
       "predicted_surfaces": [
         "api"
@@ -217,8 +218,6 @@
         "services/event-producer/adapter/src/main/java/ai/speckitty/producer/adapter/schema/**",
         "services/event-producer/adapter/src/main/resources/META-INF/native-image/ai.speckitty/producer-schema/**",
         "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/schema/**",
-        "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/schema/released/RegistryDataSubsetTest.java",
-        "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/schema/released/ReleasedComparatorFixturesTest.java",
         "services/event-producer/adapter/src/test/resources/schema/**",
         "services/event-producer/gradle/events-fetch.gradle.kts",
         "services/event-producer/gradle/events-pin.properties",
@@ -307,6 +306,7 @@
       ],
       "write_scope": [
         ".kittify/traceability/contextive-map.yaml",
+        "CHANGELOG.md",
         "docs/adr/4.x/2026-10-13-2-*.md",
         "docs/adr/4.x/2026-10-14-1-event-producer-java-native-binary-behind-thin-python-client.md",
         "docs/adr/4.x/index.md",
@@ -371,7 +371,8 @@
       ],
       "predicted_surfaces": [
         "api",
-        "artifact-rendering"
+        "artifact-rendering",
+        "tests"
       ],
       "depends_on_lanes": [
         "lane-i",
@@ -381,8 +382,8 @@
       "parallel_group": 8
     }
   ],
-  "computed_at": "2026-10-14T08:04:53.331968+00:00",
+  "computed_at": "2026-10-14T08:16:11.450496+00:00",
   "computed_from": "dependency_graph+ownership",
   "planning_artifact_wps": [],
-  "planning_commit_sha": "5f72fa341a13baa045c11cbbbee6c11b8957fd1d"
+  "planning_commit_sha": "e107dba5d246f307387ea9978eee26b023125e41"
 }

@@ -50,6 +50,7 @@ work_packages:
       - "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/fault/**"
       - "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/protocol/**"
       - "services/event-producer/domain/src/test/java/ai/speckitty/producer/domain/arch/**"
+      - "services/event-producer/domain/src/testFixtures/**"
     requirement_refs: [FR-007, FR-008, FR-009, FR-010, FR-012, FR-013, FR-016, FR-029, NFR-003, NFR-005]
     subtasks: [T011, T012, T013, T014, T015, T016]
     prompt_file: "tasks/WP02-java-domain-core.md"
@@ -182,6 +183,7 @@ work_packages:
       - "docs/adr/4.x/2026-10-14-1-event-producer-java-native-binary-behind-thin-python-client.md"
       - "docs/adr/4.x/index.md"
       - "docs/adr/4.x/2026-10-13-2-*.md"
+      - "CHANGELOG.md"
     requirement_refs: [FR-034, FR-035, FR-036, FR-037, FR-045, FR-046]
     subtasks: [T045, T046, T048, T049, T050, T051]
     prompt_file: "tasks/WP07-journal-stamping-lanes-markers-docs.md"
@@ -242,8 +244,6 @@ work_packages:
       - "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/schema/**"
       - "services/event-producer/adapter/src/test/resources/schema/**"
       - "services/event-producer/launcher/src/test/java/ai/speckitty/producer/launcher/binding/**"
-      - "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/schema/released/RegistryDataSubsetTest.java"
-      - "services/event-producer/adapter/src/test/java/ai/speckitty/producer/adapter/schema/released/ReleasedComparatorFixturesTest.java"
       - "tests/contract/spec_kitty_events_consumer/**"
       - "tests/architectural/test_no_committed_events_schema.py"
       - ".kittify/release/shared-package-compatibility.json"

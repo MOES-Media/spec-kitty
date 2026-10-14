@@ -122,6 +122,8 @@ Plan sections 4.1, 4.2 (the allowed-surface table is the complete list of Python
 
 **Chokepoints:** sole owner of `status/adapters.py`, `state/contract.py`, `tests/status/conftest.py`; first editor of `engine.py` (WP07 is second, WP12 clears marker 8). `status/lifecycle_events.py`, `decisions/emit.py`, `events/decision_log.py` take the wiring edit here and the marker comment removal in WP12 (sequential). **Check open PRs** on the owned files before the first commit: PR #5540 touches `docs/api/cli-commands.md` (regenerate after rebasing, never hand-merge a generated file).
 
+**`CHANGELOG.md`:** this WP edits `status/__init__.py`; the single mission-wide CHANGELOG entry (and the reconciliation of the AGENTS.md `__init__.py` rule with spec C-006, no version bump) is owned by WP07 T050, so this WP adds none.
+
 **No new module, no constants module, no new top-level symbol beyond plan 4.1/4.2.** Rule (a) pins the exact symbol set of the three new modules and rule (c) the module census, so path literals are not extracted. The fault-log path is a string inside `record_fault` and `_read_fault_rows`; the publish-log, fault-log and clock-state paths are declared once as the three `StateSurface` entries of `state/contract.py` (T042), and the AC-030 gate keys on the publish-log `StateSurface` entry. `producer_faults.py` imports `kernel.clock` (the repository's single wall-clock door; tasks-overview R10): `_now_utc` returns `kernel.clock.now_utc()`; raw `datetime.now` or `time.time` is banned by `tests/architectural/test_clock_import_ban.py` and `test_clock_call_ban.py`, which scan `src`, `tests` and `scripts`.
 
 ## Commit order (plan 11/12)
