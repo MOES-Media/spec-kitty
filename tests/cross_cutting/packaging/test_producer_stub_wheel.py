@@ -34,7 +34,7 @@ NATIVE_DIR = "specify_cli/_native"
 BINARY_NAME = "spec-kitty-event-producer"
 BINARY_BYTES = b"\x7fELF-stub-producer-binary\n" * 64
 
-COPIED_FILES = ("pyproject.toml", "README.md", "LICENSE", "CHANGELOG.md", ".gitignore")
+COPIED_FILES = ("pyproject.toml", "README.md", "LICENSE", "CHANGELOG.md")
 COPIED_TREES = ("src", "packs/built-in")
 
 
@@ -45,12 +45,19 @@ def _tag_for(leg: str) -> str:
 
 def _copy_inputs(destination: Path) -> Path:
     """Copy the files a wheel/sdist build reads. Not a git checkout: hatch reads .gitignore directly."""
+    destination.mkdir(parents=True, exist_ok=True)
     for name in COPIED_FILES:
         shutil.copy2(ROOT / name, destination / name)
     for tree in COPIED_TREES:
         target = destination / tree
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(ROOT / tree, target, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    # hatchling drops EVERY VCS exclusion when the project root path itself matches a .gitignore pattern, and this repository ignores
+    # ``tmp/**`` and ``build/``, so a copy under the test temp directory would silently disable the entry this test pins. The copy keeps
+    # only the repository's own lines about the native directory; ``test_the_native_directory_is_gitignored_in_the_repository`` pins the
+    # real file, and ``_assert_vcs_exclusion_live`` proves the copy's exclusion is in force.
+    real_ignore = (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+    (destination / ".gitignore").write_text("\n".join(line for line in real_ignore if "_native" in line) + "\n", encoding="utf-8")
     hook_dir = destination / "scripts" / "release"
     hook_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(HOOK, hook_dir / HOOK.name)
@@ -87,10 +94,25 @@ def _only(directory: Path, pattern: str) -> Path:
 
 
 @pytest.fixture(scope="module")
-def hook_off_with_stub(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
+def build_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    return tmp_path_factory.mktemp("stub-wheel-builds")
+
+
+def _assert_vcs_exclusion_live(project: Path) -> None:
+    from hatchling.builders.wheel import WheelBuilder
+
+    patterns = WheelBuilder(str(project)).config.load_vcs_exclusion_patterns()
+    assert any("_native" in pattern for pattern in patterns), (
+        f"hatchling dropped the .gitignore patterns (root path {project} matches one): the ignore pin would be vacuous"
+    )
+
+
+@pytest.fixture(scope="module")
+def hook_off_with_stub(build_root: Path) -> dict[str, Any]:
     """A hook-off build from a copy that has a stub binary planted, untracked, in src/specify_cli/_native/."""
-    work = tmp_path_factory.mktemp("stub-off")
+    work = build_root / "stub-off"
     project = _copy_inputs(work / "project")
+    _assert_vcs_exclusion_live(project)
     native = project / "src" / "specify_cli" / "_native"
     native.mkdir()
     (native / BINARY_NAME).write_bytes(BINARY_BYTES)
@@ -102,9 +124,22 @@ def hook_off_with_stub(tmp_path_factory: pytest.TempPathFactory) -> dict[str, An
 
 
 @pytest.fixture(scope="module")
-def hook_on_linux(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
-    work = tmp_path_factory.mktemp("stub-on")
+def hook_off_baseline(build_root: Path) -> dict[str, Path]:
+    """The same copy, hook off, nothing planted: what the build produces today."""
+    work = build_root / "baseline"
     project = _copy_inputs(work / "project")
+    _assert_vcs_exclusion_live(project)
+    out = work / "dist"
+    result = _build(project, out, "--wheel", "--sdist")
+    assert result.returncode == 0, result.stderr[-2000:]
+    return {"wheel": _only(out, "*.whl"), "sdist": _only(out, "*.tar.gz")}
+
+
+@pytest.fixture(scope="module")
+def hook_on_linux(build_root: Path) -> dict[str, Any]:
+    work = build_root / "stub-on"
+    project = _copy_inputs(work / "project")
+    _assert_vcs_exclusion_live(project)
     binary = work / "inputs" / BINARY_NAME
     binary.parent.mkdir()
     binary.write_bytes(BINARY_BYTES)
@@ -153,12 +188,14 @@ def test_hook_off_wheel_and_sdist_are_binary_free_with_a_stub_planted(hook_off_w
     assert hook_off_with_stub["wheel"].name.endswith("-py3-none-any.whl")
 
 
-def test_hook_off_wheel_equals_the_shared_build_of_the_repository(hook_off_with_stub: dict[str, Any], build_artifacts: dict[str, Path]) -> None:
-    assert _wheel_members(hook_off_with_stub["wheel"]) == _wheel_members(build_artifacts["wheel"])
-    assert _sdist_members(hook_off_with_stub["sdist"]) == _sdist_members(build_artifacts["sdist"])
+def test_hook_off_wheel_and_sdist_equal_the_build_without_the_stub(hook_off_with_stub: dict[str, Any], hook_off_baseline: dict[str, Path]) -> None:
+    assert len(_wheel_members(hook_off_baseline["wheel"])) > 1000, "floor: the baseline wheel must be the real package"
+    assert _wheel_members(hook_off_with_stub["wheel"]) == _wheel_members(hook_off_baseline["wheel"])
+    assert _sdist_members(hook_off_with_stub["sdist"]) == _sdist_members(hook_off_baseline["sdist"])
+    assert hook_off_with_stub["wheel"].name == hook_off_baseline["wheel"].name
 
 
-def test_without_the_gitignore_entry_the_stub_would_ship(hook_off_with_stub: dict[str, Any], tmp_path: Path) -> None:
+def test_without_the_gitignore_entry_the_stub_would_ship(hook_off_with_stub: dict[str, Any], build_root: Path) -> None:
     """Mutation of the ignore pin: drop the entry from the copy and the planted stub reaches the wheel, so the entry is load-bearing."""
     project = hook_off_with_stub["project"]
     ignore = project / ".gitignore"
@@ -166,9 +203,11 @@ def test_without_the_gitignore_entry_the_stub_would_ship(hook_off_with_stub: dic
     assert "src/specify_cli/_native/" in original
     ignore.write_text(original.replace("src/specify_cli/_native/", ""), encoding="utf-8")
     try:
-        result = _build(project, tmp_path / "dist", "--wheel")
+        result = _build(project, build_root / "dist-no-ignore", "--wheel")
         assert result.returncode == 0, result.stderr[-2000:]
-        assert [m for m in _wheel_members(_only(tmp_path / "dist", "*.whl")) if m.startswith(NATIVE_DIR)], "the stub did not ship: the ignore pin proves nothing"
+        assert [m for m in _wheel_members(_only(build_root / "dist-no-ignore", "*.whl")) if m.startswith(NATIVE_DIR)], (
+            "the stub did not ship: the ignore pin proves nothing"
+        )
     finally:
         ignore.write_text(original, encoding="utf-8")
 
@@ -195,9 +234,9 @@ def test_hook_on_wheel_carries_the_binary_its_checksum_and_the_exec_bit(hook_on_
     assert not stat.S_ISDIR(mode)
 
 
-def test_hook_on_adds_nothing_else_to_the_wheel(hook_on_linux: dict[str, Any], build_artifacts: dict[str, Path]) -> None:
+def test_hook_on_adds_nothing_else_to_the_wheel(hook_on_linux: dict[str, Any], hook_off_baseline: dict[str, Path]) -> None:
     on = {m for m in _wheel_members(hook_on_linux["wheel"]) if not m.endswith((".dist-info/WHEEL", ".dist-info/RECORD"))}
-    base = {m for m in _wheel_members(build_artifacts["wheel"]) if not m.endswith((".dist-info/WHEEL", ".dist-info/RECORD"))}
+    base = {m for m in _wheel_members(hook_off_baseline["wheel"]) if not m.endswith((".dist-info/WHEEL", ".dist-info/RECORD"))}
     assert sorted(on - base) == [f"{NATIVE_DIR}/PRODUCER.sha256", f"{NATIVE_DIR}/{BINARY_NAME}"]
     assert base - on == set()
 

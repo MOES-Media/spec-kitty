@@ -236,3 +236,6 @@ pytest-of-*/
 # Allure results and generated reports from the acceptance-jvm runner
 acceptance-jvm/allure-results/
 acceptance-jvm/allure-report/
+
+# Native event producer binary copied in by a developer or by the release build; it ships only through the platform wheel hook.
+src/specify_cli/_native/
