@@ -11,7 +11,7 @@ class FailClosedValidatorTest {
     @Test
     void itRefusesEveryDocumentWithTheNamedViolation() {
         FailClosedValidator validator = new FailClosedValidator();
-        for (Map<String, Object> document : new Map[] {obj(), obj("specversion", "1.0", "data", obj()), obj("anything", "at all")}) {
+        for (Map<String, Object> document : java.util.List.of(obj(), obj("specversion", "1.0", "data", obj()), obj("anything", "at all"))) {
             assertThat(validator.violation(document)).contains(Produce.VALIDATOR_UNAVAILABLE_VIOLATION);
         }
     }
