@@ -190,6 +190,10 @@ NON_CHANGE_TRIGGERED_WORKFLOWS: dict[str, str] = {
     "contracts-release.yml": (
         "contract-tag push + workflow_dispatch (a dry run) only: publishes a contract release, never runs the test suite and is not a change-triggered workflow."
     ),
+    "producer-native.yml": (
+        "workflow_call + workflow_dispatch only: the reusable native-image build of the event producer (mission event-producer-reroute). "
+        "event-producer.yml and release.yml call it; it has no pull_request or push trigger of its own and runs no pytest."
+    ),
     "module-tests.yml": (
         "workflow_call only: a reusable workflow with no triggers of its own, spliced "
         "into ci-modules.yml's caller job. Counting it standalone would double-count THE matrix."
