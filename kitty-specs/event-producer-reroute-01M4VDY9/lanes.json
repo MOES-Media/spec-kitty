@@ -32,6 +32,7 @@
         "services/event-producer/launcher/build.gradle.kts",
         "services/event-producer/launcher/src/main/java/ai/speckitty/producer/launcher/spike/**",
         "services/event-producer/launcher/src/main/resources/META-INF/native-image/ai.speckitty/producer-spike/**",
+        "services/event-producer/launcher/src/test/java/ai/speckitty/producer/launcher/spike/**",
         "services/event-producer/settings.gradle.kts",
         "services/event-producer/tools/**",
         "tests/architectural/test_build_glue_thin.py",
@@ -382,8 +383,8 @@
       "parallel_group": 8
     }
   ],
-  "computed_at": "2026-10-14T08:16:11.450496+00:00",
+  "computed_at": "2026-10-14T08:25:47.346804+00:00",
   "computed_from": "dependency_graph+ownership",
   "planning_artifact_wps": [],
-  "planning_commit_sha": "e107dba5d246f307387ea9978eee26b023125e41"
+  "planning_commit_sha": "b3b3500ec102857dbc4ec501d509ced8b67e2490"
 }

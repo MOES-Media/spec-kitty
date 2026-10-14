@@ -11,6 +11,7 @@ work_packages:
       - "services/event-producer/launcher/build.gradle.kts"
       - "services/event-producer/launcher/src/main/java/ai/speckitty/producer/launcher/spike/**"
       - "services/event-producer/launcher/src/main/resources/META-INF/native-image/ai.speckitty/producer-spike/**"
+      - "services/event-producer/launcher/src/test/java/ai/speckitty/producer/launcher/spike/**"
       - "services/event-producer/gradle/verification-metadata.xml"
       - "services/event-producer/gradle/wrapper/**"
       - "services/event-producer/tools/**"
