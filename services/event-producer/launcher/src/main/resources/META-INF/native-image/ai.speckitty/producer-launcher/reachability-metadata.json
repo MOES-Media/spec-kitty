@@ -1,0 +1,5 @@
+{
+  "resources": [
+    { "glob": "META-INF/services/ai.speckitty.producer.launcher.OperationHandler" }
+  ]
+}
