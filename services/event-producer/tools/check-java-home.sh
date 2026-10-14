@@ -16,6 +16,8 @@ is_jdk_root() {
 
 invalid() { echo "check-java-home: JAVA_HOME_INVALID: $1" >&2; exit 1; }
 
+for t in find awk dirname; do command -v "$t" >/dev/null 2>&1 || { echo "check-java-home: MISSING_TOOL $t" >&2; exit 2; }; done
+
 if [ "${1-}" = "--find" ]; then
   tree="${2-}"
   [ -n "$tree" ] && [ -d "$tree" ] || invalid "no tree to search: '$tree'"

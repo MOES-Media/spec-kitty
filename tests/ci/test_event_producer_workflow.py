@@ -11,6 +11,7 @@ from __future__ import annotations
 import copy
 import json
 import re
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -404,6 +405,46 @@ def test_install_script_uses_the_checked_root_and_hashes_from_stdin() -> None:
     assert "-name native-image" not in text, "the root is not derived from the first native-image found (that was lib/svm)"
     # sha256sum given a path with a backslash (a Windows RUNNER_TEMP) prints a leading backslash, which read as a checksum mismatch.
     assert 'sha256sum <"$archive"' in text and 'sha256sum "$archive"' not in text
+
+
+_INSTALL_TOOLS = ("jq", "curl", "sha256sum", "cut", "head", "dirname", "mkdir", "rm", "find", "awk", "tar", "uname")
+
+
+def _install_without(tmp_path: Path, *absent: str) -> subprocess.CompletedProcess[str]:
+    """Run install-graalvm.sh against a zip pin with a PATH holding only symlinks to the tools it needs, minus `absent`.
+
+    The Windows runner failed with a bare 127 because 7z was not on the Git Bash PATH. With the tool missing the script must stop
+    before any download and say which tool it is.
+    """
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    for tool in _INSTALL_TOOLS:
+        found = shutil.which(tool)
+        if found and tool not in absent:
+            (bindir / tool).symlink_to(found)
+    pins = tmp_path / "pins.json"
+    pins.write_text(
+        json.dumps({"tools": [{"name": "t", "kind": "jdk-archive", "version": "jdk-1", "url": "https://example.invalid/x.zip", "sha256": "0" * 64}]}),
+        encoding="utf-8",
+    )
+    bash = shutil.which("bash")
+    assert bash
+    env = {"PATH": str(bindir), "HOME": str(tmp_path)}
+    return subprocess.run([bash, str(TOOLS / "install-graalvm.sh"), "t", str(tmp_path / "dest"), str(pins)], capture_output=True, text=True, check=False, env=env)
+
+
+@pytest.mark.parametrize("tool", ["jq", "curl"])
+def test_install_script_names_a_missing_tool_instead_of_a_bare_127(tmp_path: Path, tool: str) -> None:
+    result = _install_without(tmp_path, tool)
+    assert result.returncode == 2, (result.returncode, result.stderr)
+    assert f"install-graalvm: MISSING_TOOL {tool}" in result.stderr
+
+
+def test_install_script_without_any_zip_extractor_fails_by_name_before_downloading(tmp_path: Path) -> None:
+    result = _install_without(tmp_path, "7z", "unzip", "tar")
+    assert result.returncode == 2, (result.returncode, result.stderr)
+    assert "install-graalvm: MISSING_TOOL 7z" in result.stderr
+    assert not (tmp_path / "dest" / "graalvm-archive").exists(), "nothing was downloaded"
 
 
 def test_the_container_build_checks_java_home_on_host_and_inside(event_producer: dict[str, Any]) -> None:

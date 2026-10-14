@@ -12,13 +12,35 @@ name="${1:?pins tool name}"
 dest="${2:?destination directory}"
 pins="${3:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/pins.json}"
 
-command -v jq >/dev/null 2>&1 || { echo "install-graalvm: jq is required" >&2; exit 2; }
+# Every external command is checked by name before use: a missing one must never surface as a bare exit 127 (the Windows runner did).
+need() { command -v "$1" >/dev/null 2>&1 || { echo "install-graalvm: MISSING_TOOL $1" >&2; exit 2; }; }
+for t in jq curl cut head dirname mkdir rm find awk; do need "$t"; done
 entry=$(jq -c --arg n "$name" '[.tools[] | select(.name == $n and .kind == "jdk-archive")][0] // empty' "$pins")
 [ -n "$entry" ] || { echo "install-graalvm: no jdk-archive entry named '$name' in $pins" >&2; exit 2; }
 url=$(jq -r .url <<<"$entry")
 want=$(jq -r .sha256 <<<"$entry")
 version=$(jq -r .version <<<"$entry")
 case "$url" in https://*) ;; *) echo "install-graalvm: refusing a non-https url: $url" >&2; exit 2 ;; esac
+if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1; then echo "install-graalvm: MISSING_TOOL sha256sum" >&2; exit 2; fi
+
+# Resolve the extractor BEFORE downloading. 7-Zip is installed on the Windows runner but is not always on the Git Bash PATH, so its
+# documented install directory is tried by explicit path; the Windows system tar (bsdtar) also reads zip. Git Bash's own tar does not.
+extract=()
+case "$url" in
+  *.zip)
+    if command -v 7z >/dev/null 2>&1; then extract=(7z x -y)
+    elif command -v 7za >/dev/null 2>&1; then extract=(7za x -y)
+    else
+      for cand in "${ProgramW6432:-}/7-Zip/7z.exe" "${PROGRAMFILES:-}/7-Zip/7z.exe" "/c/Program Files/7-Zip/7z.exe"; do
+        if [ -f "$cand" ]; then extract=("$cand" x -y); break; fi
+      done
+      if [ "${#extract[@]}" -eq 0 ] && command -v unzip >/dev/null 2>&1; then extract=(unzip -q -o); fi
+    fi
+    [ "${#extract[@]}" -gt 0 ] || { echo "install-graalvm: MISSING_TOOL 7z (a zip extractor: 7z, 7za, 7-Zip under Program Files, or unzip)" >&2; exit 2; }
+    ;;
+  *.tar.gz) need tar ;;
+  *) echo "install-graalvm: unsupported archive format: $url" >&2; exit 2 ;;
+esac
 
 mkdir -p "$dest"
 archive="$dest/graalvm-archive"
@@ -36,9 +58,12 @@ if [ "$got" != "$want" ]; then
 fi
 
 case "$url" in
-  *.zip) 7z x -y "-o$dest/unpacked" "$archive" >/dev/null ;;
-  *.tar.gz) mkdir -p "$dest/unpacked" && tar -xzf "$archive" -C "$dest/unpacked" ;;
-  *) echo "install-graalvm: unsupported archive format: $url" >&2; exit 2 ;;
+  *.zip)
+    case "${extract[0]}" in
+      unzip) "${extract[@]}" "$archive" -d "$dest/unpacked" >/dev/null ;;
+      *) "${extract[@]}" "-o$dest/unpacked" "$archive" >/dev/null ;;
+    esac ;;
+  *) mkdir -p "$dest/unpacked" && tar -xzf "$archive" -C "$dest/unpacked" ;;
 esac
 rm -f "$archive"
 
