@@ -50,6 +50,14 @@ def parse_args() -> argparse.Namespace:
             "--version when --console-script is set."
         ),
     )
+    parser.add_argument(
+        "--wheel-tag",
+        help=(
+            "Select the wheel whose tag is exactly this (for example "
+            "py3-none-win_amd64) when the distribution directory holds one wheel "
+            "per platform. Without it, exactly one wheel must be present."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -57,15 +65,19 @@ def package_prefix(package_name: str) -> str:
     return package_name.replace("-", "_")
 
 
-def locate_wheel(dist_dir: Path, package_name: str) -> Path:
+def locate_wheel(
+    dist_dir: Path, package_name: str, *, wheel_tag: str | None = None
+) -> Path:
     wheels = sorted(
         wheel
         for wheel in dist_dir.glob("*.whl")
         if wheel.name.startswith(package_prefix(package_name))
+        and (wheel_tag is None or "-".join(wheel.stem.split("-")[-3:]) == wheel_tag)
     )
     if not wheels:
+        qualifier = f" with tag {wheel_tag!r}" if wheel_tag else ""
         raise SystemExit(
-            f"No wheel found for {package_name!r} in distribution directory {dist_dir}"
+            f"No wheel found for {package_name!r}{qualifier} in distribution directory {dist_dir}"
         )
     if len(wheels) > 1:
         raise SystemExit(
@@ -131,7 +143,9 @@ def main() -> int:
         if not dist_dir.exists():
             raise SystemExit(f"Distribution directory not found: {dist_dir}")
 
-        wheel_path = locate_wheel(dist_dir, args.package)
+        wheel_path = locate_wheel(
+            dist_dir, args.package, wheel_tag=args.wheel_tag
+        )
         metadata = read_wheel_metadata(wheel_path)
         expected_version = metadata.get("Version")
         requires_dist = metadata.get_all("Requires-Dist", [])
