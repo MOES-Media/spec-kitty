@@ -344,6 +344,7 @@ def _locked_append(
     feature_dir: Path,
     build_event: Callable[[int], _RetroEventT],
     *,
+    repo_root: Path,
     lock_timeout: float | None = None,
 ) -> _RetroEventT:
     """Read the next Lamport value, build the event, and append -- under ONE lock.
@@ -360,7 +361,7 @@ def _locked_append(
     # never able to affect the append (FR-003, FR-004): the seam is non-raising.
     from specify_cli.status import fire_lifecycle_fanout  # noqa: PLC0415 -- the status facade's fan-out entry
 
-    fire_lifecycle_fanout(row=event.to_dict(), log_path=feature_dir / _EVENTS_FILENAME)
+    fire_lifecycle_fanout(row=event.to_dict(), log_path=feature_dir / _EVENTS_FILENAME, repo_root=repo_root)
     return event
 
 
@@ -485,7 +486,7 @@ def emit_captured(
             evidence_ref_count=len(record.evidence_refs),
         )
 
-    event = _locked_append(log_dir, _build, lock_timeout=lock_timeout)
+    event = _locked_append(log_dir, _build, repo_root=repo_root, lock_timeout=lock_timeout)
     _fanout_live_work_retrospective(
         "captured",
         repo_root=repo_root,
@@ -569,7 +570,7 @@ def emit_capture_failed(
             missing_artifacts=missing_artifacts,
         )
 
-    event = _locked_append(feature_dir, _build, lock_timeout=lock_timeout)
+    event = _locked_append(feature_dir, _build, repo_root=repo_root, lock_timeout=lock_timeout)
     _fanout_live_work_retrospective(
         "failed",
         repo_root=repo_root,
@@ -652,7 +653,7 @@ def emit_skipped(
             would_have_attempted=would_have_attempted,
         )
 
-    event = _locked_append(feature_dir, _build, lock_timeout=lock_timeout)
+    event = _locked_append(feature_dir, _build, repo_root=repo_root, lock_timeout=lock_timeout)
     _fanout_live_work_retrospective(
         "skipped",
         repo_root=repo_root,

@@ -107,7 +107,12 @@ class ProducerClient:
 
     @classmethod
     def handle(cls, slot: str, kwargs: Mapping[str, Any]) -> None:
-        """Hand the seam call's row to the process-wide client; never raise."""
+        """Hand the seam call's row to the process-wide client; never raise.
+
+        A call with no ``row`` mapping is not handed over and records nothing: the fault
+        vocabulary is closed (no class describes a caller's omission), and the seam census
+        (``tests/architectural/test_seam_census.py``) fails any writer whose fire carries no row.
+        """
         try:
             row = kwargs.get("row")
             if not isinstance(row, Mapping):

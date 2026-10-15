@@ -182,6 +182,9 @@ def test_a_slow_hosted_handler_records_no_producer_fault(monkeypatch: pytest.Mon
 # AC-003 sub-observables (T080)
 # ---------------------------------------------------------------------------
 
+# ac003_c (a run-journal row through RuntimeMomentProducer reaches the producer with its row) is
+# pinned in tests/architectural/test_seam_census.py; dropping row= from the journal fire turns it red.
+
 
 def _client_keys() -> list[str]:
     return [h.__qualname__ for h in adapters._status_handlers if h.__module__.endswith("producer_client")]
