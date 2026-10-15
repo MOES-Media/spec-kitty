@@ -400,6 +400,12 @@ def _client_with(extra: str, *, head: str = "") -> str:
         ),
         (_CLIENT, _client_with("class _Stamp:\n    def stamp(self):\n        return now_utc()"), "wall-clock read"),
         (_CLIENT, _client_with("class _Stamp:\n    def stamp(self):\n        return datetime.now()"), "wall-clock read"),
+        (
+            _CLIENT,
+            _CLIENT_SOURCE.replace("    record_notice,\n)", "    record_notice,\n    _now_utc,\n)", 1) + "\n\ndef _stamp() -> str:\n    return _now_utc().isoformat()\n",
+            "producer_faults:_now_utc",
+        ),
+        (_CLIENT, _client_with("class _Stamp:\n    def stamp(self):\n        return _now_utc()"), "wall-clock read"),
         (_CLIENT, _client_with("class _Decode:\n    def decode(self, text):\n        return json.loads(text)"), "json.loads outside the decode site"),
         (
             _FAULTS,
