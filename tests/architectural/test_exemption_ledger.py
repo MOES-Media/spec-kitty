@@ -229,8 +229,7 @@ def test_the_row_a_writer_persisted_belongs_to_the_type_the_ledger_claims(lint: 
     for name, entries in _cleared_rows(tmp_path, monkeypatch).items():
         for type_name, line in entries:
             row = json.loads(line)
-            if "decisions/emit.py" in name or "lifecycle_events.py" in name or "engine.py" in name:
-                assert _name_of(lint, row) == type_name, f"{name}: a {row['event_type']} row was filed under {type_name}"
+            assert _name_of(lint, row) == type_name, f"{name}: a {row['event_type']} row was filed under {type_name}"
 
 
 def test_the_run_journal_kinds_the_engine_writes_validate_too(lint: ModuleType, tmp_path: Path) -> None:
@@ -333,16 +332,34 @@ def test_publish_log_lines_validate_at_least_one_per_in_scope_type(lint: ModuleT
 # --- the gate proves itself ------------------------------------------------------------------------------------------------------------
 
 
-def test_mutation_a_schema_invalid_persisted_line_fails_the_gate(lint: ModuleType) -> None:
-    valid = json.dumps(_fixture_for("decision.opened.v1")["legacy_row"])
-    assert lint.lint_persisted_lines([("probe", "decision.opened.v1", valid)], "legacy") == []
-    broken = json.loads(valid)
-    broken["unexpected_member"] = 1
-    findings = lint.lint_persisted_lines([("probe", "decision.opened.v1", json.dumps(broken))], "legacy")
-    assert [f.code for f in findings] == ["CP950"]
-    stripped = json.loads(valid)
-    del stripped["event_id"]
-    assert [f.code for f in lint.lint_persisted_lines([("probe", "decision.opened.v1", json.dumps(stripped))], "legacy")] == ["CP950"]
+def _mutation_cases() -> list[Any]:
+    """One (form, type name) pair per type in the released registry, for both forms."""
+    cases = []
+    for form, key in (("legacy", "legacy_row"), ("publish", "input")):
+        for name in sorted(_valid_fixtures()):
+            cases.append(pytest.param(form, key, name, id=f"{form}-{name.removesuffix('.json')}"))
+    return cases
+
+
+@pytest.mark.parametrize(("form", "key", "fixture_name"), _mutation_cases())
+def test_mutation_a_schema_invalid_persisted_line_fails_the_gate(lint: ModuleType, form: str, key: str, fixture_name: str) -> None:
+    document = _valid_fixtures()[fixture_name]
+    type_name = document["type"].removeprefix(lint.released_registry()["type_prefix"] + ".")
+    schemas = lint.released_schemas(form)
+    assert type_name in schemas, f"floor: no {form} schema resolved for {type_name}"
+    valid = json.dumps(document[key], sort_keys=True)
+    assert lint.lint_persisted_lines([("probe", type_name, valid)], form) == []
+    extra = dict(document[key])
+    extra["unexpected_member"] = 1
+    codes = [f.code for f in lint.lint_persisted_lines([("probe", type_name, json.dumps(extra))], form)]
+    assert codes == ["CP950"], f"{form} {type_name}: an unknown member was accepted"
+    required = schemas[type_name].get("required", [])
+    assert required, f"floor: {form} {type_name} schema names no required member"
+    for member in required:
+        stripped = {k: v for k, v in document[key].items() if k != member}
+        assert [f.code for f in lint.lint_persisted_lines([("probe", type_name, json.dumps(stripped))], form)] == ["CP950"], (
+            f"{form} {type_name}: a row without required member {member!r} was accepted"
+        )
 
 
 def test_mutation_a_line_that_is_not_json_fails_the_gate(lint: ModuleType) -> None:
