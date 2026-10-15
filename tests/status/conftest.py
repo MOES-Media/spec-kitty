@@ -307,6 +307,8 @@ def _disable_saas_fanout_for_local_status_tests(
     """
     if Path(str(request.node.fspath)).name in (
         "test_emit_fanout_after_adapter.py",
+        # The seam-wiring tests drive the real emit -> adapters seam into a stub producer.
+        "test_producer_seam_wiring.py",
         # The Zeitgeist handler tests drive the real emit -> adapters fan-out;
         # only the network is faked there.
         "test_zeitgeist_moment_handler.py",
