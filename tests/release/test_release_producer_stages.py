@@ -559,3 +559,9 @@ def test_the_model_refuses_a_multi_job_delegate_that_runs_pytest(tmp_path: Path)
     caller = _caller_and_delegate(tmp_path, "python -m pytest tests/x")
     with pytest.raises(AssertionError, match="must not run the suite"):
         gate_coverage.load_spliced_workflow(caller)
+
+
+def test_event_producer_concurrency_group_names_the_caller() -> None:
+    """Under workflow_call, github.workflow is the CALLER's name: without it the nightly call and a release dispatch share a group and cancel each other."""
+    group = str(load(EVENT_PRODUCER)["concurrency"]["group"])
+    assert "github.workflow" in group
