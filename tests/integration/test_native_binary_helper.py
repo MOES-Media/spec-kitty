@@ -63,38 +63,46 @@ def a_binary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return binary
 
 
+def outcome() -> tuple[str, object]:
+    """What ``require_native_binary()`` ended in: a returned path, a failure or a skip (a skip is NOT a failure: assert the kind)."""
+    try:
+        return ("returned", require_native_binary())
+    except pytest.fail.Exception as raised:
+        return ("failed", str(raised))
+    except pytest.skip.Exception as raised:
+        return ("skipped", str(raised))
+
+
 def test_the_flag_and_the_override_have_their_documented_names() -> None:
     assert (FLAG, OVERRIDE) == ("REQUIRE_NATIVE_PRODUCER", "NATIVE_PRODUCER_BINARY")
 
 
 def test_with_the_flag_set_a_missing_binary_is_a_failure_not_a_skip(no_binary: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(FLAG, "1")
-    with pytest.raises(pytest.fail.Exception) as raised:
-        require_native_binary()
-    assert FLAG in str(raised.value)
+    kind, message = outcome()
+    assert kind == "failed"
+    assert FLAG in str(message)
 
 
 def test_with_the_flag_unset_a_missing_binary_skips_and_the_message_names_the_flag(no_binary: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv(FLAG, raising=False)
-    with pytest.raises(pytest.skip.Exception) as raised:
-        require_native_binary()
-    assert FLAG in str(raised.value)
+    kind, message = outcome()
+    assert kind == "skipped"
+    assert FLAG in str(message)
 
 
 @pytest.mark.parametrize("value", ["", "0", "true", "yes", "2"])
 def test_only_the_literal_one_turns_a_missing_binary_into_a_failure(no_binary: Path, monkeypatch: pytest.MonkeyPatch, value: str) -> None:
     monkeypatch.setenv(FLAG, value)
-    with pytest.raises(pytest.skip.Exception):
-        require_native_binary()
+    assert outcome()[0] == "skipped"
 
 
 def test_ci_is_not_consulted(no_binary: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv(FLAG, raising=False)
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
     for ci in ("true", "1", "false", ""):
         monkeypatch.setenv("CI", ci)
-        monkeypatch.setenv("GITHUB_ACTIONS", "true")
-        with pytest.raises(pytest.skip.Exception):
-            require_native_binary()
+        assert outcome()[0] == "skipped", ci
 
 
 @pytest.mark.parametrize("flag", [None, "1"])
@@ -103,18 +111,16 @@ def test_a_present_binary_is_returned_whatever_the_flag(a_binary: Path, monkeypa
         monkeypatch.delenv(FLAG, raising=False)
     else:
         monkeypatch.setenv(FLAG, flag)
-    assert require_native_binary() == a_binary
+    assert outcome() == ("returned", a_binary)
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="the exec bit is a POSIX notion; a Windows binary is runnable by its suffix")
 def test_an_unrunnable_binary_is_a_failure_under_the_flag_and_a_skip_without_it(a_binary: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     a_binary.chmod(0o644)
     monkeypatch.setenv(FLAG, "1")
-    with pytest.raises(pytest.fail.Exception):
-        require_native_binary()
+    assert outcome()[0] == "failed"
     monkeypatch.delenv(FLAG, raising=False)
-    with pytest.raises(pytest.skip.Exception):
-        require_native_binary()
+    assert outcome()[0] == "skipped"
 
 
 def test_the_override_is_authoritative_a_missing_path_does_not_fall_back_to_another_binary(no_binary: Path) -> None:
