@@ -95,7 +95,19 @@ _WALL_CLOCK_CALLS = {
     "utcnow",
     "time",
     "today",
+    "time_ns",
+    "gmtime",
+    "localtime",
+    "ctime",
+    "fromtimestamp",
+    "utcfromtimestamp",
+    "monotonic",
+    "monotonic_ns",
+    "perf_counter",
+    "perf_counter_ns",
 }
+# Dynamic-lookup spellings that reach a clock without naming it: banned outright in the three new modules.
+_DYNAMIC_LOOKUP_NAMES = {"__import__", "__globals__", "importlib", "import_module", "modules", "getattr", "globals", "vars", "eval", "exec"}
 _DECODE_SITES = {_CLIENT: {"_read_reply"}, _FAULTS: {"_read_fault_rows"}, _DOCTOR: set()}
 
 
@@ -171,6 +183,8 @@ def new_module_violations(label: str, source: str) -> list[str]:
             ident = node.id if isinstance(node, ast.Name) else node.attr
             if ident in _BRIDGE_ENVELOPE_NAMES:
                 problems.append(f"{label}: names the bridge envelope code {ident}")
+            if ident in _DYNAMIC_LOOKUP_NAMES:
+                problems.append(f"{label}: dynamic lookup via {ident} can reach the wall clock unseen")
         if not isinstance(node, ast.Call):
             continue
         func = node.func
