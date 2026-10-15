@@ -4,7 +4,7 @@ The producer is Java; Python is allowed only as bounded packaging and release gl
 glue must hold no runtime logic: no ids, clocks, envelopes, schemas or timestamps. This gate enumerates the glue by a filesystem walk of
 ``scripts/release/`` (a Python file that is neither classified here nor in the pre-existing baseline fails), then judges each file:
 
-* wholly owned glue (``hatch_build_producer.py``, later ``check_dist_set.py``): a closed import allowlist, ``hashlib`` used for
+* wholly owned glue (``hatch_build_producer.py``, ``check_dist_set.py``): a closed import allowlist, ``hashlib`` used for
   ``sha256`` only, and no identifier built from a forbidden token;
 * edited pre-existing glue (``check_exact_install.py``, ``contracts/tools/gradle_pin_check.py``): the base inventory of top-level names
   and imports plus an explicit, reviewed allowance, and no identifier built from a forbidden token.
@@ -28,9 +28,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 RELEASE_DIR = REPO_ROOT / "scripts" / "release"
 
 #: Glue this mission owns outright (the whole file is bounded glue).
-WHOLLY_OWNED = ("scripts/release/hatch_build_producer.py",)
-#: Glue a later work package creates (WP08). Absent today; its work package moves it into ``WHOLLY_OWNED``.
-NOT_YET_LANDED = ("scripts/release/check_dist_set.py",)
+WHOLLY_OWNED = ("scripts/release/hatch_build_producer.py", "scripts/release/check_dist_set.py")
+#: Glue a later work package creates. Empty since WP08 landed ``check_dist_set.py``; a future glue file is listed here until its owner moves it
+#: into ``WHOLLY_OWNED`` (the floor and classification tests below keep working with an empty list).
+NOT_YET_LANDED: tuple[str, ...] = ()
 #: Python files under scripts/release/ that existed before the mission and are not producer glue.
 BASELINE_RELEASE_SCRIPTS = frozenset({"check_exact_install.py", "check_shared_package_drift.py", "extract_changelog.py", "validate_release.py"})
 
@@ -241,13 +242,12 @@ def test_the_glue_floor_counts_the_files_this_gate_judges() -> None:
     edited_present = [p for p in EDITED_EXISTING if (REPO_ROOT / p).is_file()]
     assert owned_present == list(WHOLLY_OWNED), "a wholly owned glue file is missing"
     assert len(edited_present) == len(EDITED_EXISTING), "an edited glue file is missing"
-    assert len(owned_present) + len(edited_present) >= 3
-    assert NOT_YET_LANDED, "the not-yet-landed list is empty: if WP08 landed, delete this assertion with the list"
+    assert len(owned_present) + len(edited_present) >= 4
 
 
-@pytest.mark.parametrize("relative", NOT_YET_LANDED)
-def test_a_not_yet_landed_file_that_now_exists_must_be_moved_into_the_owned_set(relative: str) -> None:
-    assert not (REPO_ROOT / relative).exists(), f"{relative} landed: move it from NOT_YET_LANDED to WHOLLY_OWNED so it is judged"
+def test_a_not_yet_landed_file_that_now_exists_must_be_moved_into_the_owned_set() -> None:
+    landed = [relative for relative in NOT_YET_LANDED if (REPO_ROOT / relative).exists()]
+    assert landed == [], f"{landed} landed: move them from NOT_YET_LANDED to WHOLLY_OWNED so they are judged"
 
 
 @pytest.mark.parametrize("relative", WHOLLY_OWNED)
@@ -278,6 +278,21 @@ def test_mutation_check_dist_set_shaped_glue_with_datetime_now_is_red() -> None:
 def test_mutation_glue_that_reads_a_clock_through_an_innocent_import_is_red() -> None:
     mutated = _read(WHOLLY_OWNED[0]) + "\n\ndef later() -> float:\n    return os.times().elapsed\n\n\ndef lamport_clock() -> int:\n    return 0\n"
     assert any("lamport" in v or "clock" in v for v in wholly_owned_violations(mutated))
+
+
+MUTATIONS_FOR_EVERY_OWNED_FILE = {
+    "uuid import": ("\nimport uuid\n", "uuid"),
+    "subprocess import": ("\nimport subprocess\n", "subprocess"),
+    "hashlib beyond sha256": ("\n_DIGEST = hashlib.blake2b\n", "hashlib.blake2b"),
+    "wall-clock name": ("\n\ndef stamp_now() -> str:\n    return os.environ['X']\n\n\nCLOCK_SKEW = 1\n", "CLOCK_SKEW"),
+}
+
+
+@pytest.mark.parametrize("case", sorted(MUTATIONS_FOR_EVERY_OWNED_FILE))
+@pytest.mark.parametrize("relative", WHOLLY_OWNED)
+def test_mutation_every_wholly_owned_file_goes_red_on_each_defect(relative: str, case: str) -> None:
+    suffix, expected = MUTATIONS_FOR_EVERY_OWNED_FILE[case]
+    assert any(expected in v for v in wholly_owned_violations(_read(relative) + suffix)), (relative, case)
 
 
 def test_mutation_hashlib_beyond_sha256_is_red() -> None:

@@ -423,9 +423,7 @@ def test_main_exits_zero_on_a_good_set_and_names_the_problem_otherwise(
     assert "sdist" in capsys.readouterr().err
 
 
-def test_main_verify_manifests_needs_manifests_and_commit(
-    module: ModuleType, dist: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_main_verify_manifests_needs_manifests_and_commit(module: ModuleType, dist: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     manifests = write_manifests(tmp_path / "manifests")
     assert run_main(module, monkeypatch, "--dist-dir", str(dist), "--verify-manifests", "--manifests", str(manifests), "--commit", COMMIT) == 0
     assert run_main(module, monkeypatch, "--dist-dir", str(dist), "--verify-manifests", "--manifests", str(manifests), "--commit", "d" * 40) == 1
