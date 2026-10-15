@@ -80,7 +80,10 @@ _IMPORTS = {
 _FORBIDDEN_ROOTS = {"uuid", "ulid", "hashlib", "jsonschema", "spec_kitty_events", "secrets", "random", "datetime", "time"}
 _BRIDGE_ENVELOPE_NAMES = {"_broadcast_status_transition", "_broadcast_lifecycle_envelope", "_envelope_bookkeeping"}
 _PUBLISH_MARKER = ".kittify/events/publish"
-_WALL_CLOCK_CALLS = {"now_utc", "now_utc_iso", "now_utc_stamp", "now_utc_compact_stamp", "now_utc_seconds", "now_epoch", "now", "utcnow", "time", "today"}
+# The client may import only these names from producer_faults: borrowing its clock helper would stamp time.
+_CLIENT_FAULT_NAMES = {"FaultClass", "record_fault", "record_notice"}
+_FAULTS_MODULE = "specify_cli.status.producer_faults"
+_WALL_CLOCK_CALLS = {"_now_utc", "now_utc", "now_utc_iso", "now_utc_stamp", "now_utc_compact_stamp", "now_utc_seconds", "now_epoch", "now", "utcnow", "time", "today"}
 _DECODE_SITES = {_CLIENT: {"_read_reply"}, _FAULTS: {"_read_fault_rows"}, _DOCTOR: set()}
 
 
@@ -145,6 +148,8 @@ def new_module_violations(label: str, source: str) -> list[str]:
             problems.append(f"{label}: import {module}:{name} is outside the closed allowlist")
         if name in _BRIDGE_ENVELOPE_NAMES:
             problems.append(f"{label}: imports the bridge envelope code {name}")
+        if label == _CLIENT and module == _FAULTS_MODULE and name not in _CLIENT_FAULT_NAMES:
+            problems.append(f"{label}: imports producer_faults:{name}, outside {sorted(_CLIENT_FAULT_NAMES)}")
     symbols = _top_level_symbols(tree)
     if symbols != _SYMBOLS[label]:
         problems.append(f"{label}: top-level symbols differ: extra={sorted(symbols - _SYMBOLS[label])} missing={sorted(_SYMBOLS[label] - symbols)}")
@@ -161,6 +166,9 @@ def new_module_violations(label: str, source: str) -> list[str]:
         where = owner.get(id(node), "")
         if callee == "loads" and where not in _DECODE_SITES[label]:
             problems.append(f"{label}: json.loads outside the decode site ({where or 'module level'})")
+        # producer_faults owns the one clock read (_now_utc) and may call it; no other module may.
+        if label == _FAULTS and callee == "_now_utc":
+            continue
         if callee in _WALL_CLOCK_CALLS and not (label == _FAULTS and where == "_now_utc"):
             problems.append(f"{label}: wall-clock read {callee}() outside _now_utc ({where or 'module level'})")
     if _mentions_publish_log(tree) and any(isinstance(n, ast.Call) and _is_write_open(n) for n in ast.walk(tree)):
