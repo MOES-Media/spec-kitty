@@ -1,0 +1,5 @@
+{
+  "resources": [
+    { "glob": "ai/speckitty/producer/contract/**" }
+  ]
+}
