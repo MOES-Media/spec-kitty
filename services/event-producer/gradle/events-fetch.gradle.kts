@@ -6,6 +6,8 @@
 //                         build/events/contract/, and refuses an output a validator could not be built from (no registry, no
 //                         types, a type without its row schema). Nothing of the events repository is committed.
 //   -PeventsWheel=<path>  development only: take a local wheel instead of the pinned one. Refused when CI is set.
+//   -PeventsDownloadUrl=<url>  test seam: download from this URL (a file: URL in the tests) instead of the pinned one. The sha256 of
+//                         the pin still applies. Refused when CI is set.
 //
 // With the java plugin present, the registry and the composed row schemas are embedded as classpath resources under
 // ai/speckitty/producer/contract/ (native-image resource config: META-INF/native-image/ai.speckitty/producer-schema/), and every
@@ -27,6 +29,10 @@ abstract class FetchEventsContract : DefaultTask() {
     @get:Input
     @get:Optional
     abstract val developmentWheel: Property<String>
+
+    @get:Input
+    @get:Optional
+    abstract val downloadUrlOverride: Property<String>
 
     /** Where a downloaded wheel is kept between runs. Not an output: a re-run checks it again and keeps it. */
     @get:Internal
@@ -75,27 +81,34 @@ abstract class FetchEventsContract : DefaultTask() {
         if (!url.startsWith("https://") || !url.endsWith("/$name")) {
             throw GradleException("events-pin.properties: url must be an https URL of $name")
         }
+        val override = downloadUrlOverride.orNull
+        if (override != null && !System.getenv("CI").isNullOrEmpty()) {
+            throw GradleException("-PeventsDownloadUrl is for tests only and is refused when CI is set")
+        }
+        val source = override ?: url
         val cached = wheelCache.get().asFile.resolve(name)
         if (cached.isFile) {
-            val actual = digest(cached)
-            if (actual != sha256) {
-                throw GradleException("the cached wheel's sha256 does not match events-pin.properties (pinned $sha256, got $actual); nothing was unzipped. Delete ${cached.parentFile} to fetch it again")
-            }
+            requireDigest(cached, sha256, "cached", "Delete ${cached.parentFile} to fetch it again")
             return cached
         }
         cached.parentFile.mkdirs()
         val partial = File(cached.parentFile, "$name.part")
-        val connection = URI(url).toURL().openConnection()
+        val connection = URI(source).toURL().openConnection()
         connection.connectTimeout = 30_000
         connection.readTimeout = 60_000
         connection.getInputStream().use { Files.copy(it, partial.toPath(), StandardCopyOption.REPLACE_EXISTING) }
-        val actual = digest(partial)
-        if (actual != sha256) {
-            partial.delete()
-            throw GradleException("the downloaded wheel's sha256 does not match events-pin.properties (pinned $sha256, got $actual); nothing was unzipped")
-        }
+        requireDigest(partial, sha256, "downloaded", null)
         Files.move(partial.toPath(), cached.toPath(), StandardCopyOption.REPLACE_EXISTING)
         return cached
+    }
+
+    /** The one check every wheel passes before it is cached or opened: a mismatch deletes a partial download and unzips nothing. */
+    private fun requireDigest(file: File, sha256: String, what: String, hint: String?) {
+        val actual = digest(file)
+        if (actual != sha256) {
+            if (file.name.endsWith(".part")) file.delete()
+            throw GradleException("the $what wheel's sha256 does not match events-pin.properties (pinned $sha256, got $actual); nothing was unzipped" + (if (hint != null) ". $hint" else ""))
+        }
     }
 
     private fun digest(file: File): String {
@@ -162,6 +175,7 @@ val fetchEventsContract = tasks.register<FetchEventsContract>("fetchEventsContra
     description = "Fetches the pinned spec-kitty-events wheel, verifies its sha256, and extracts the producer contract into build/."
     pinFile = rootProject.layout.projectDirectory.file("gradle/events-pin.properties")
     developmentWheel = providers.gradleProperty("eventsWheel")
+    downloadUrlOverride = providers.gradleProperty("eventsDownloadUrl")
     wheelCache = layout.buildDirectory.dir("events/wheel")
     contractDir = layout.buildDirectory.dir("events/contract")
 }
