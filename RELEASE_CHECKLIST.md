@@ -226,7 +226,7 @@ package first, verify it is installable from PyPI, and only then tag the CLI.
   - publishes to PyPI
   - verifies exact installability from PyPI with no local wheel
 - [ ] Read the producer stages as **unproven until this tag**. `release.yml`
-  runs on a tag push or a dispatch of the default-branch copy only, so
+  runs on a tag push or a dispatch only (a pull request never starts it), so
   `build-producer`, the platform-wheel builds, the manifest and binary checks,
   `smoke-wheels`, the attestation and the multi-wheel `verify-pypi-installability`
   have not executed anywhere before the first 4.0 release candidate. What ran
@@ -241,8 +241,11 @@ package first, verify it is installable from PyPI, and only then tag the CLI.
   signed by the linker and must not be stripped. Architectures beyond Linux
   x86_64, macOS arm64 and Windows x86_64 are out of scope: other platforms get
   the pure wheel, which reports `binary-missing`.
-- [ ] The `producer-nightly` job in `ci-nightly.yml` is informational and is
-  not in `nightly-summary`; the nightly gate of this workflow does not read it.
+- [ ] The scheduled native-producer nightly is its own workflow,
+  `event-producer-nightly.yml`, and is informational. It is deliberately not a
+  job of `ci-nightly.yml`: the nightly gate of this workflow reads the whole
+  conclusion of the `ci-nightly.yml` run for the release SHA, so any failed job
+  inside that file would block the release. The producer nightly cannot.
 - [ ] Confirm release-candidate hygiene was already recorded before the tag:
   live canary and cross-repo end-to-end suites are required pre-release
   operator evidence, not tag-time publish workflow jobs.

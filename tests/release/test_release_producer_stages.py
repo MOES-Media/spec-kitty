@@ -1,13 +1,13 @@
-"""Stage rules of ``release.yml`` and the nightly producer job (mission event-producer-reroute, WP09).
+"""Stage rules of ``release.yml`` and the nightly producer workflow (mission event-producer-reroute, WP09).
 
 Every rule is a function over a parsed workflow document, so each is proved twice: the real file passes it, and a deep copy with one
 mutation fails it for that rule. A rule that found nothing to judge fails (no vacuous pass).
 
 What this file can and cannot show. These are static tests of the workflow graph. ``release.yml`` runs on a tag push or a
-``workflow_dispatch`` of the default-branch copy only, and a ``workflow_run`` or ``workflow_call`` follower runs the default-branch
-copy as well, so none of the stages below executes on a pull request. The checks they call are executable and tested elsewhere
-(``tests/release/test_check_dist_set.py``, ``test_check_exact_install.py``, the shared smoke action in ``native-smoke``); the first real
-execution of the stages is the first 4.0 release candidate. Nothing here claims otherwise.
+``workflow_dispatch`` of the selected ref, so a pull request never starts it. (A ``workflow_call`` callee runs at the caller's ref; only
+``schedule`` and ``workflow_run`` use the default-branch copy.) None of the stages below executes on a pull request. The checks they
+call are executable and tested elsewhere (``tests/release/test_check_dist_set.py``, ``test_check_exact_install.py``, the shared smoke
+action in ``native-smoke``); the first real execution of the stages is the first 4.0 release candidate. Nothing here claims otherwise.
 """
 
 from __future__ import annotations
@@ -498,6 +498,7 @@ def test_docs_state_the_unproven_stages_and_the_unsigned_binaries() -> None:
     checklist = RELEASE_CHECKLIST.read_text(encoding="utf-8")
     for needle in ("build-producer", "smoke-wheels", "Gatekeeper", "SmartScreen", "Test-PyPI", "unproven"):
         assert needle in checklist, f"RELEASE_CHECKLIST.md does not mention {needle}"
+    assert "event-producer-nightly.yml" in checklist and "`producer-nightly` job in `ci-nightly.yml`" not in checklist
     contributing = CONTRIBUTING.read_text(encoding="utf-8")
     for needle in ("Gatekeeper", "SmartScreen", "platform wheels"):
         assert needle in contributing, f"CONTRIBUTING.md does not mention {needle}"
@@ -646,7 +647,7 @@ def test_mutation_producer_nightly_with_continue_on_error_is_caught(producer_nig
 
 def test_mutation_producer_nightly_removed_is_caught(producer_nightly: dict[Any, Any]) -> None:
     mutated = mutate(producer_nightly)
-    del jobs(mutated)[NIGHTLY_JOB]
+    mutated["jobs"] = {"renamed": jobs(mutated)[NIGHTLY_JOB]}
     assert nightly_violations(mutated) == [f"no {NIGHTLY_JOB} job"]
 
 

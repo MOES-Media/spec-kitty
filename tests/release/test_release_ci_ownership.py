@@ -620,7 +620,7 @@ def test_release_workflow_classifies_hotfix_channel(tmp_path: Path, job_name: st
 def test_release_graph_adds_build_producer_and_smoke_wheels_as_needs_edges() -> None:
     """WP09: every new release stage is a ``needs`` edge, so ``publish-pypi`` cannot start unless each one succeeded.
 
-    This is a static graph test. ``release.yml`` runs on a tag push or a dispatch of the default-branch copy only, so none of these
+    This is a static graph test. ``release.yml`` runs on a tag push or a dispatch only (a pull request never starts it), so none of these
     stages executes on a pull request; the first execution is the first 4.0 release candidate.
     """
     jobs = load_workflow("release.yml")["jobs"]
