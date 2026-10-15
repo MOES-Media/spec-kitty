@@ -147,12 +147,16 @@ def test_reporter_trigger_covers_every_registered_workflow_and_reruns() -> None:
     # display_title binds it to exactly one source CI Modules run, hence one PR head),
     # so a group never mixes subjects and a cancel/replace is always same-subject, where
     # the survivor re-reads live evidence and loses no verdict (NFR-002).
+    # A scheduled completion (Event Producer nightly) carries the main tip as head_sha but has no
+    # verdict subject; it gets its own singleton group so it can never cancel a main verdict (C2-F3).
     # Exact equality — a substring pin passes for a broken expression that drops the
     # workflow_run path and collapses all tips into one cancel:true group.
     assert reporter["concurrency"] == {
         "group": (
             "ci-fleet-verdict-${{ github.event.workflow_run.path == '.github/workflows/ci-aggregate.yml' "
             "&& format('aggregate-{0}', github.event.workflow_run.id) "
+            "|| github.event.workflow_run.event == 'schedule' "
+            "&& format('schedule-{0}', github.event.workflow_run.id) "
             "|| github.event.workflow_run.head_sha }}"
         ),
         "cancel-in-progress": True,
