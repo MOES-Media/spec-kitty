@@ -30,6 +30,7 @@ scopes:
     description: "Work-package status model and lane transitions"
     contexts:
       - orchestration
+      - system-events
 
   - path: "src/specify_cli/consolidation"
     description: "Mission consolidation workflow and preflight validation"

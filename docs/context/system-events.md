@@ -182,3 +182,107 @@ Terms describing Spec Kitty's append-only event model, replay behavior, and syst
 | **Applicable to** | `3.x` |
 | **Distinct from** | [Event Envelope](#event-envelope) -- the canonical Event Envelope term names a differently-shaped wrapper (`event_id`/`event_type`/`aggregate_id`/`lamport_clock`/`payload`); a Tail envelope here is always either a raw `StatusEvent` JSON line or one of `events tail`'s own signal shapes, never that canonical schema. |
 | **Related terms** | [Tail cursor](#tail-cursor), [resume token](#resume-token), [`log_truncated`](#log_truncated) |
+
+---
+
+### Producer
+
+| | |
+|---|---|
+| **Definition** | The component that turns one persisted ledger row into one CloudEvents 1.0 row in the local publish log. It is a native binary written in Java; the CLI holds only a thin client in front of it, which builds no envelope and holds no id, clock or schema logic. Each event type has exactly one producer. |
+| **Context** | System Events |
+| **Status** | candidate |
+| **Applicable to** | `4.x` |
+| **Distinct from** | [Event Envelope](#event-envelope) -- the producer writes CloudEvents 1.0 structured JSON, not the 3.0.0 envelope, and a producer is a component while an envelope is a row shape. |
+| **Related terms** | [Publish seam](#publish-seam), [Publish log](#publish-log), [Fault log](#fault-log) |
+
+---
+
+### Publish seam
+
+| | |
+|---|---|
+| **Definition** | The post-persistence fan-out seam (`status/adapters.py`) used as the local publication point: after a writer has persisted a ledger row, the seam hands that row to the registered handlers, including the thin producer client. It fires whether or not a hosted drain is configured. |
+| **Context** | System Events |
+| **Status** | candidate |
+| **Applicable to** | `4.x` |
+| **Distinct from** | [Fan-out](#fan-out) -- fan-out is the in-process call mechanism; the publish seam is the one place where that call publishes a ledger row locally. |
+| **Related terms** | [Fan-out](#fan-out), [Producer](#producer), [Ledger](#ledger) |
+
+---
+
+### Publish log
+
+| | |
+|---|---|
+| **Definition** | The gitignored, append-only local log of rows the [Producer](#producer) has produced, one CloudEvents 1.0 row per persisted ledger row. It is a local-tier file subject to retention and is never committed. |
+| **Context** | System Events |
+| **Status** | candidate |
+| **Applicable to** | `4.x` |
+| **Distinct from** | [Ledger](#ledger) -- the ledger is the committed authority for Mission state; the publish log is a derived, local copy shaped as CloudEvents and can be pruned. |
+| **Related terms** | [Producer](#producer), [Ledger](#ledger), [Fault log](#fault-log) |
+
+---
+
+### Ledger
+
+| | |
+|---|---|
+| **Definition** | The committed event logs (for example a Mission's `status.events.jsonl`) that are the authority for Mission state. Python writers keep writing them; the producer only reads a persisted row from them through the seam and never writes them. |
+| **Context** | System Events |
+| **Status** | candidate |
+| **Applicable to** | `4.x` |
+| **Distinct from** | [Publish log](#publish-log) -- the publish log is local and derived; the ledger is committed and authoritative. |
+| **Related terms** | [Publish log](#publish-log), [Publish seam](#publish-seam), [Event Envelope](#event-envelope) |
+
+---
+
+### Fan-out
+
+| | |
+|---|---|
+| **Definition** | The in-process call from an event writer to the handlers registered for it, after the row is persisted. The names are transport-neutral (`fire_status_fanout`, `fire_lifecycle_fanout`); it is not called "sync", because nothing here implies a hosted service. |
+| **Context** | System Events |
+| **Status** | candidate |
+| **Applicable to** | `4.x` |
+| **Distinct from** | [Publish seam](#publish-seam) -- fan-out names the mechanism; the seam names the local publication role it plays. |
+| **Related terms** | [Publish seam](#publish-seam), [Producer](#producer) |
+
+---
+
+### Clockless row
+
+| | |
+|---|---|
+| **Definition** | A published row with no `lamportclock` member at all (rows written before the clock existed, or by writers that do not stamp one). It is ordered by `(time, id)`; a present `lamportclock` that is not an integer in range is an error row, not a clockless row. |
+| **Context** | System Events |
+| **Status** | candidate |
+| **Applicable to** | `4.x` |
+| **Distinct from** | [Clocked row](#clocked-row) -- a clocked row carries a valid `lamportclock` and `nodeid`; [Lamport Clock](#lamport-clock) is the counter itself. |
+| **Related terms** | [Clocked row](#clocked-row), [Lamport Clock](#lamport-clock) |
+
+---
+
+### Clocked row
+
+| | |
+|---|---|
+| **Definition** | A published row that carries a valid `lamportclock` (an integer in 0..2^31-1) and a `nodeid` extension attribute. Clocked and clockless rows share one defined total order, so a log mixing both sorts deterministically. |
+| **Context** | System Events |
+| **Status** | candidate |
+| **Applicable to** | `4.x` |
+| **Distinct from** | [Clockless row](#clockless-row) -- no clock member; [Lamport Clock](#lamport-clock) -- the logical counter, not the row. |
+| **Related terms** | [Clockless row](#clockless-row), [Lamport Clock](#lamport-clock) |
+
+---
+
+### Fault log
+
+| | |
+|---|---|
+| **Definition** | The gitignored, append-only local log in which the thin producer client records every fault (a missing binary, crash, timeout or malformed reply) so a produce failure is never silent and never fails the lifecycle command. `doctor` derives the fault count and the last fault class from it. Only the client writes it. |
+| **Context** | System Events |
+| **Status** | candidate |
+| **Applicable to** | `4.x` |
+| **Distinct from** | [Publish log](#publish-log) -- the publish log holds produced rows; the fault log holds the record that a row was not produced. |
+| **Related terms** | [Producer](#producer), [Publish log](#publish-log) |
