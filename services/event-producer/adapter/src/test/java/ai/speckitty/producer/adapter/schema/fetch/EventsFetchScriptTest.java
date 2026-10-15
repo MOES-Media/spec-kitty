@@ -104,6 +104,15 @@ class EventsFetchScriptTest {
         return project.resolve("build/events/contract");
     }
 
+    /** Gradle creates the declared output directory before the task runs, so "nothing unzipped" is: no file in it. */
+    private void assertNothingExtracted() throws IOException {
+        if (Files.exists(extracted())) {
+            try (java.util.stream.Stream<Path> walk = Files.walk(extracted())) {
+                assertThat(walk.filter(Files::isRegularFile)).as("files extracted from the wheel").isEmpty();
+            }
+        }
+    }
+
     // ----- the positive control -------------------------------------------------------------------------------------------
 
     @Test
@@ -131,7 +140,7 @@ class EventsFetchScriptTest {
         BuildResult result = runner(Map.of(), "fetchEventsContract").buildAndFail();
 
         assertThat(result.getOutput()).contains("sha256").contains("does not match");
-        assertThat(extracted()).as("nothing was unzipped").doesNotExist();
+        assertNothingExtracted();
     }
 
     @Test
@@ -192,7 +201,7 @@ class EventsFetchScriptTest {
         BuildResult result = runner(Map.of(), "fetchEventsContract").buildAndFail();
 
         assertThat(result.getOutput()).contains("escapes");
-        assertThat(project.getParent().resolve("escaped.json")).doesNotExist();
+        assertThat(project.resolve("escaped.json")).as("outside the output directory").doesNotExist();
     }
 
     // ----- the development wheel ------------------------------------------------------------------------------------------
@@ -207,7 +216,7 @@ class EventsFetchScriptTest {
         BuildResult result = runner(Map.of("CI", "true"), "fetchEventsContract", "-PeventsWheel=" + dev).buildAndFail();
 
         assertThat(result.getOutput()).contains("eventsWheel").contains("CI");
-        assertThat(extracted()).doesNotExist();
+        assertNothingExtracted();
     }
 
     @Test
