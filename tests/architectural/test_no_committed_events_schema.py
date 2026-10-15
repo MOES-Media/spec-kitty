@@ -201,3 +201,25 @@ def test_the_pin_is_the_floor_of_pyproject_and_the_locked_version() -> None:
 
     assert lower_bounds == [Version(pin["version"])], "the CLI floor names the released wheel the Java build consumes"
     assert locked == pin["version"], "uv.lock resolves the same release"
+
+
+def test_the_pin_checksum_and_url_are_the_locked_wheel_of_spec_kitty_events() -> None:
+    pin = _pin((_REPO_ROOT / _PIN).read_text(encoding="utf-8"))
+    lock = tomllib.loads((_REPO_ROOT / "uv.lock").read_text(encoding="utf-8"))
+    package = next(p for p in lock["package"] if p["name"] == "spec-kitty-events")
+    wheels = {w["url"]: w["hash"] for w in package["wheels"]}
+
+    assert pin["url"] in wheels, "the pin names a wheel that uv.lock also locks"
+    assert wheels[pin["url"]] == f"sha256:{pin['sha256']}", "the pin checksum is the locked checksum of that wheel"
+
+
+def test_the_java_lane_alias_table_equals_the_cli_lane_aliases() -> None:
+    """DataAliases.java is an input-boundary copy of LANE_ALIASES (FR-018); a drift between them is a build failure here."""
+    from specify_cli.status_lanes import LANE_ALIASES
+
+    source = (_REPO_ROOT / _PRODUCER / "adapter/src/main/java/ai/speckitty/producer/adapter/schema/DataAliases.java").read_text(encoding="utf-8")
+    members = re.findall(r'"(from_lane|to_lane)",\s*Map\.of\(((?:\s*"[^"]+",\s*"[^"]+",?)+)\)', source)
+    assert {m for m, _ in members} == {"from_lane", "to_lane"}, "both lane members carry the alias table"
+    for _, body in members:
+        pairs = dict(re.findall(r'"([^"]+)",\s*"([^"]+)"', body))
+        assert pairs == LANE_ALIASES
