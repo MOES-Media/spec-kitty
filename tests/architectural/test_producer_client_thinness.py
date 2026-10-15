@@ -83,7 +83,19 @@ _PUBLISH_MARKER = ".kittify/events/publish"
 # The client may import only these names from producer_faults: borrowing its clock helper would stamp time.
 _CLIENT_FAULT_NAMES = {"FaultClass", "record_fault", "record_notice"}
 _FAULTS_MODULE = "specify_cli.status.producer_faults"
-_WALL_CLOCK_CALLS = {"_now_utc", "now_utc", "now_utc_iso", "now_utc_stamp", "now_utc_compact_stamp", "now_utc_seconds", "now_epoch", "now", "utcnow", "time", "today"}
+_WALL_CLOCK_CALLS = {
+    "_now_utc",
+    "now_utc",
+    "now_utc_iso",
+    "now_utc_stamp",
+    "now_utc_compact_stamp",
+    "now_utc_seconds",
+    "now_epoch",
+    "now",
+    "utcnow",
+    "time",
+    "today",
+}
 _DECODE_SITES = {_CLIENT: {"_read_reply"}, _FAULTS: {"_read_fault_rows"}, _DOCTOR: set()}
 
 
@@ -410,7 +422,8 @@ def _client_with(extra: str, *, head: str = "") -> str:
         (_CLIENT, _client_with("class _Stamp:\n    def stamp(self):\n        return datetime.now()"), "wall-clock read"),
         (
             _CLIENT,
-            _CLIENT_SOURCE.replace("    record_notice,\n)", "    record_notice,\n    _now_utc,\n)", 1) + "\n\ndef _stamp() -> str:\n    return _now_utc().isoformat()\n",
+            _CLIENT_SOURCE.replace("    record_notice,\n)", "    record_notice,\n    _now_utc,\n)", 1)
+            + "\n\ndef _stamp() -> str:\n    return _now_utc().isoformat()\n",
             "producer_faults:_now_utc",
         ),
         (_CLIENT, _client_with("class _Stamp:\n    def stamp(self):\n        return _now_utc()"), "wall-clock read"),

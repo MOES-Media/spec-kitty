@@ -367,7 +367,9 @@ def test_the_process_wide_client_is_created_once_when_none_was_installed() -> No
     assert ProducerClient.current() is first
 
 
-def test_the_outer_catch_of_handle_swallows_a_failure_before_the_client_runs(monkeypatch: pytest.MonkeyPatch, repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_the_outer_catch_of_handle_swallows_a_failure_before_the_client_runs(
+    monkeypatch: pytest.MonkeyPatch, repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     def _boom(*_a: object, **_k: object) -> ProducerClient:
         raise RuntimeError("no client")
 
@@ -403,9 +405,7 @@ class _BrokenPipeChild:
         return -9
 
 
-def test_an_os_error_while_talking_to_the_child_kills_and_reaps_it_and_is_a_crash(
-    monkeypatch: pytest.MonkeyPatch, producer_stub: ProducerStub, repo: Path
-) -> None:
+def test_an_os_error_while_talking_to_the_child_kills_and_reaps_it_and_is_a_crash(monkeypatch: pytest.MonkeyPatch, producer_stub: ProducerStub, repo: Path) -> None:
     child = _BrokenPipeChild()
     monkeypatch.setattr(producer_client.subprocess, "Popen", lambda *_a, **_k: child)
     _produce(repo)

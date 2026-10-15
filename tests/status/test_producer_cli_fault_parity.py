@@ -45,7 +45,10 @@ def _run(root: Path, extra: list[str]) -> tuple[int, str, str, str]:
     """Run the emit command on a fresh repository; return exit code, normalised stdout, stderr, event id."""
     repo = _make_repo_with_mission(root, _SLUG)
     args = [a for a in _emit_args(_SLUG) if a != "--json"] if "--human" in extra else _emit_args(_SLUG)
-    with patch("specify_cli.cli.commands.agent.status.locate_project_root", return_value=repo), patch("specify_cli.cli.commands.agent.status._find_mission_slug", return_value=_SLUG):
+    with (
+        patch("specify_cli.cli.commands.agent.status.locate_project_root", return_value=repo),
+        patch("specify_cli.cli.commands.agent.status._find_mission_slug", return_value=_SLUG),
+    ):
         result = CliRunner().invoke(app, args)
     ledger = (repo / "kitty-specs" / _SLUG / "status.events.jsonl").read_text(encoding="utf-8").splitlines()
     row = json.loads(ledger[-1])
