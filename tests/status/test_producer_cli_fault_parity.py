@@ -71,6 +71,14 @@ def _run(root: Path, extra: list[str]) -> tuple[int, str, str, str]:
     return result.exit_code, stdout, result.stderr, event_id
 
 
+def _settle_orphaned_handlers(capsys: pytest.CaptureFixture[str]) -> None:
+    """Join the worker the seam abandoned and drop its late warning, so nothing outlives the test."""
+    for worker in _orphaned_handlers():
+        worker.join(5.0)
+    assert _orphaned_handlers() == []
+    capsys.readouterr()
+
+
 def _arm(stub: ProducerStub, monkeypatch: pytest.MonkeyPatch, fault: str | None) -> None:
     if fault is None:
         stub.replay("produce-valid")
@@ -86,6 +94,9 @@ def _arm(stub: ProducerStub, monkeypatch: pytest.MonkeyPatch, fault: str | None)
         else:
             stub.script(reply="", exit_code=0, hang=5.0)
             monkeypatch.setenv("SPEC_KITTY_FANOUT_TIMEOUT", "0.3")
+            # The client's own timeout just past the seam bound: the seam abandons the worker at 0.3 s and
+            # the worker then ends itself at 0.5 s, so it can be settled inside the test.
+            monkeypatch.setattr(producer_client, "_DEFAULT_TIMEOUT_S", 0.5)
     elif "golden" in behaviour:
         stub.replay(str(behaviour["golden"]))
     else:
@@ -95,7 +106,12 @@ def _arm(stub: ProducerStub, monkeypatch: pytest.MonkeyPatch, fault: str | None)
 @pytest.mark.parametrize("mode", ["json", "human"])
 @pytest.mark.parametrize("fault", sorted(_FAULTS))
 def test_a_producer_fault_leaves_stdout_and_the_exit_code_unchanged(
-    fault: str, mode: str, producer_stub: ProducerStub, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    fault: str,
+    mode: str,
+    producer_stub: ProducerStub,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     extra = ["--human"] if mode == "human" else []
     _arm(producer_stub, monkeypatch, None)
@@ -106,6 +122,7 @@ def test_a_producer_fault_leaves_stdout_and_the_exit_code_unchanged(
     _arm(producer_stub, monkeypatch, fault)
     code, out, err, _ = _run(tmp_path / "faulted", extra)
     if fault == "seam-timeout":
+        _settle_orphaned_handlers(capsys)
         _LAST_TIMEOUT_RUN.update(root=str(tmp_path / "faulted"), rows=_fault_row_count(tmp_path / "faulted"))
 
     assert code == healthy_code
