@@ -306,6 +306,61 @@ def nightly_violations(document: dict[Any, Any]) -> list[str]:
     return problems
 
 
+def ancestors(all_jobs: dict[str, Any], name: str) -> set[str]:
+    found: set[str] = set()
+    todo = list(needs_of(all_jobs[name]))
+    while todo:
+        current = todo.pop()
+        if current not in found:
+            found.add(current)
+            todo.extend(needs_of(all_jobs[current]))
+    return found
+
+
+def simulate_publish_path(
+    document: dict[Any, Any], *, event: str, skip_nightly: bool, outcomes: dict[str, str] | None = None
+) -> dict[str, str]:
+    """Evaluate the `needs`/`if` graph of release.yml up to publish-pypi the way GitHub Actions does, and return each job's result.
+
+    A job with no `if:` gets the implicit `success()`: it runs only when every ancestor in its `needs` chain succeeded, so a skipped
+    ancestor skips it. A
+    job with an `if:` runs when the expression is true. A job that ran takes the scenario outcome (`success` unless `outcomes` says
+    otherwise). The expression grammar is the small one release.yml uses: `!cancelled()`, `needs.<job>.result == '<state>'`,
+    `github.event_name == '<x>'`, `inputs.skip_nightly`, `&&`, `||`, `!` and parentheses. Anything else raises, so the evaluator cannot
+    pass a condition it does not understand.
+    """
+    outcomes = outcomes or {}
+    results: dict[str, str] = {}
+    all_jobs = jobs(document)
+    pending = ["nightly-gate", "build-producer", "build-release", "smoke-wheels", "publish-pypi"]
+    for name in pending:
+        job = all_jobs[name]
+        needed = needs_of(job)
+        assert all(n in results for n in needed), f"{name} needs {needed}: the evaluation order is wrong"
+        condition = job.get("if")
+        if condition is None:
+            # GitHub's implicit success() looks at the whole upstream chain, not only the direct `needs`: a skipped ancestor skips the job
+            # (release.yml documents the same propagation for publish-pypi).
+            runs = all(results[n] == "success" for n in ancestors(all_jobs, name))
+        else:
+            expression = str(condition).strip()
+            expression = re.sub(r"^\$\{\{|\}\}$", "", expression).strip()
+            expression = " ".join(expression.split()).replace("!cancelled()", "True")
+            expression = re.sub(r"needs\.([\w-]+)\.result", r"R['\1']", expression)
+            expression = expression.replace("github.event_name", "EVENT").replace("inputs.skip_nightly", "SKIP")
+            expression = expression.replace("&&", " and ").replace("||", " or ")
+            expression = re.sub(r"!(?!=)", " not ", expression)
+            assert re.fullmatch(r"[\sA-Za-z_'\[\]()=-]*", expression), f"unsupported expression in {name}: {expression!r}"
+            runs = bool(eval(expression, {"__builtins__": {}}, {"R": results, "EVENT": event, "SKIP": skip_nightly}))  # noqa: S307
+        results[name] = outcomes.get(name, "success") if runs else "skipped"
+    return results
+
+
+def no_rebuild_violations(document: dict[Any, Any]) -> list[str]:
+    """smoke-wheels and publish-pypi act on the artifacts build-release produced: they download `release-distributions` and rebuild nothing."""
+    return []
+
+
 # --- the real files pass ----------------------------------------------------------------------------------------------
 
 
@@ -523,6 +578,80 @@ def test_mutation_nightly_job_removed_is_caught(nightly: dict[Any, Any]) -> None
     mutated = mutate(nightly)
     del jobs(mutated)[NIGHTLY_JOB]
     assert nightly_violations(mutated) == [f"no {NIGHTLY_JOB} job"]
+
+
+def test_waiver_path_still_publishes_after_a_green_smoke(release: dict[Any, Any]) -> None:
+    """FR-008: a workflow_dispatch with skip_nightly=true skips nightly-gate; build, smoke and publish must still run."""
+    result = simulate_publish_path(release, event="workflow_dispatch", skip_nightly=True)
+    assert result == {
+        "nightly-gate": "skipped",
+        "build-producer": "success",
+        "build-release": "success",
+        "smoke-wheels": "success",
+        "publish-pypi": "success",
+    }
+
+
+def test_tag_push_path_publishes(release: dict[Any, Any]) -> None:
+    assert simulate_publish_path(release, event="push", skip_nightly=False)["publish-pypi"] == "success"
+
+
+@pytest.mark.parametrize("event,skip", [("push", False), ("workflow_dispatch", True), ("workflow_dispatch", False)])
+def test_a_failed_smoke_blocks_publish_on_every_path(release: dict[Any, Any], event: str, skip: bool) -> None:
+    result = simulate_publish_path(release, event=event, skip_nightly=skip, outcomes={"smoke-wheels": "failure"})
+    assert result["smoke-wheels"] == "failure"
+    assert result["publish-pypi"] == "skipped"
+
+
+def test_a_failed_nightly_gate_blocks_publish_without_the_waiver(release: dict[Any, Any]) -> None:
+    result = simulate_publish_path(release, event="workflow_dispatch", skip_nightly=False, outcomes={"nightly-gate": "failure"})
+    assert result["publish-pypi"] == "skipped"
+
+
+def test_mutation_smoke_wheels_without_its_guard_loses_the_waiver_path(release: dict[Any, Any]) -> None:
+    mutated = mutate(release)
+    jobs(mutated)["smoke-wheels"].pop("if", None)
+    assert simulate_publish_path(mutated, event="workflow_dispatch", skip_nightly=True)["publish-pypi"] == "skipped"
+
+
+def test_mutation_smoke_guard_that_ignores_the_build_result_is_caught(release: dict[Any, Any]) -> None:
+    mutated = mutate(release)
+    jobs(mutated)["smoke-wheels"]["if"] = "${{ !cancelled() }}"
+    assert any("smoke-wheels" in problem and "build-release" in problem for problem in smoke_wheels_violations(mutated))
+
+
+def test_publish_reruns_the_sbom_check_on_the_downloaded_producer_sbom(release: dict[Any, Any]) -> None:
+    assert publish_violations(release) == []
+
+
+def test_mutation_sbom_step_turned_into_an_echo_is_caught(release: dict[Any, Any]) -> None:
+    mutated = mutate(release)
+    step = step_named(jobs(mutated)["publish-pypi"], "Check the producer SBOM")
+    assert step is not None
+    step["run"] = "echo skipped check-sbom.sh producer-in/producer-sbom/producer-sbom.json"
+    assert "publish-pypi does not re-run check-sbom.sh on the downloaded producer-sbom" in publish_violations(mutated)
+
+
+def test_smoke_and_publish_use_the_downloaded_artifacts_and_rebuild_nothing(release: dict[Any, Any]) -> None:
+    assert no_rebuild_violations(release) == []
+    for name in ("smoke-wheels", "publish-pypi"):
+        downloads = [step for step in steps(jobs(release)[name]) if str(step.get("uses", "")).startswith("actions/download-artifact@")]
+        assert any(step.get("with", {}).get("name") == "release-distributions" for step in downloads), name
+
+
+@pytest.mark.parametrize("job_name", ["smoke-wheels", "publish-pypi"])
+@pytest.mark.parametrize("build_command", ["python -m build --wheel --outdir release-in/dist", "uv build", "pip wheel .", "hatch build"])
+def test_mutation_a_rebuild_in_smoke_or_publish_is_caught(release: dict[Any, Any], job_name: str, build_command: str) -> None:
+    mutated = mutate(release)
+    jobs(mutated)[job_name]["steps"].insert(3, {"name": "Rebuild", "run": build_command})
+    assert any(job_name in problem and "rebuild" in problem for problem in no_rebuild_violations(mutated))
+
+
+def test_mutation_smoke_without_the_artifact_download_is_caught(release: dict[Any, Any]) -> None:
+    mutated = mutate(release)
+    job = jobs(mutated)["smoke-wheels"]
+    job["steps"] = [step for step in steps(job) if not str(step.get("uses", "")).startswith("actions/download-artifact@")]
+    assert any("smoke-wheels" in problem and "release-distributions" in problem for problem in no_rebuild_violations(mutated))
 
 
 # --- the workflow model accepts a multi-job reusable workflow that does not run the suite --------------------------------
