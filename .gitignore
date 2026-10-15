@@ -53,6 +53,8 @@ env/
 # docs/development/local-overrides.md). Never committed.
 pyproject.local.toml
 *.lock
+# The producer's lock-record fixtures are real kernel.locks sidecars: tracked (mission event-producer-reroute).
+!services/event-producer/adapter/src/test/resources/ledger/locks/*.lock
 # uv.lock is the canonical lockfile for spec-kitty-cli (NFR-005 of mission
 # shared-package-boundary-cutover-01KQ22DS); track it explicitly.
 !uv.lock
