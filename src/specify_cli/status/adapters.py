@@ -179,7 +179,13 @@ def _dispatch_handlers(
     if isinstance(row, Mapping):
         # The persisted row as written to the ledger: the same sanitisation the
         # ledger writers apply, so the row a handler sees equals the ledger line (FR-004).
-        kwargs["row"] = sanitize_event_for_log(dict(row))
+        # A Mapping that cannot be snapshotted is a producer fault, never an escape.
+        try:
+            kwargs["row"] = sanitize_event_for_log(dict(row))
+        except Exception:
+            logger.warning(failed[0], *failed[1], exc_info=True)
+            record_fault(FaultClass.CRASH, row=None, start_path=ProducerClient.start_path_for(kwargs))
+            return
     for handler in handlers:
         is_client = _handler_key(handler) in client_keys
         try:
