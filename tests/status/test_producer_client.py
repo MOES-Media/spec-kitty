@@ -356,3 +356,58 @@ def test_locate_binary_finds_nothing_in_a_source_checkout_and_the_name_is_packag
     located = locate_binary()
     assert located is None or located.parent.name == "_native"
     assert producer_faults.FaultClass.BINARY_MISSING.value == "binary-missing"
+
+
+# --- the remaining defensive branches ------------------------------------------------------
+
+
+def test_the_process_wide_client_is_created_once_when_none_was_installed() -> None:
+    ProducerClient._current = None
+    first = ProducerClient.current()
+    assert ProducerClient.current() is first
+
+
+def test_the_outer_catch_of_handle_swallows_a_failure_before_the_client_runs(monkeypatch: pytest.MonkeyPatch, repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    def _boom(*_a: object, **_k: object) -> ProducerClient:
+        raise RuntimeError("no client")
+
+    monkeypatch.setattr(ProducerClient, "current", _boom)
+    _produce(repo)  # must not raise
+    assert _fault_rows(repo) == [] and capsys.readouterr().err == ""
+
+
+def test_retain_reports_an_error_reply_when_the_spawn_path_itself_raises(monkeypatch: pytest.MonkeyPatch, repo: Path) -> None:
+    def _boom(self: ProducerClient, *_a: object, **_k: object) -> None:
+        raise RuntimeError("spawn bug")
+
+    monkeypatch.setattr(ProducerClient, "_run", _boom)
+    result = ProducerClient.current().retain(start_path=repo, dry_run=True, policy={})
+    assert result == {"outcome": "error", "reason": "crash"}
+    assert _fault_rows(repo) == [], "a retain failure is an error to render, never a fault row"
+
+
+class _BrokenPipeChild:
+    """A child whose pipe breaks during communicate: the client must kill and reap it."""
+
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def communicate(self, *_a: object, **_k: object) -> tuple[bytes, bytes]:
+        raise BrokenPipeError("pipe closed")
+
+    def kill(self) -> None:
+        self.calls.append("kill")
+
+    def wait(self) -> int:
+        self.calls.append("wait")
+        return -9
+
+
+def test_an_os_error_while_talking_to_the_child_kills_and_reaps_it_and_is_a_crash(
+    monkeypatch: pytest.MonkeyPatch, producer_stub: ProducerStub, repo: Path
+) -> None:
+    child = _BrokenPipeChild()
+    monkeypatch.setattr(producer_client.subprocess, "Popen", lambda *_a, **_k: child)
+    _produce(repo)
+    assert child.calls == ["kill", "wait"]
+    assert [row["class"] for row in _fault_rows(repo)] == ["crash"]

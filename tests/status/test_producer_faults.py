@@ -217,3 +217,36 @@ def test_a_non_object_row_is_unreadable(repo: Path, at: Callable[[str], None]) -
     path.parent.mkdir(parents=True)
     path.write_text("[1]\n", encoding="utf-8")
     assert fault_summary(repo)["status"] == "unreadable"
+
+
+# --- the remaining defensive branches ------------------------------------------------------
+
+
+class _BrokenStream:
+    def write(self, _text: str) -> int:
+        raise OSError("closed")
+
+    def flush(self) -> None:
+        raise OSError("closed")
+
+
+def test_a_broken_stderr_is_ignored(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(producer_faults.sys, "stderr", _BrokenStream())
+    producer_faults.write_stderr_warning("x")  # must not raise
+
+
+def test_blank_lines_in_a_day_file_are_skipped(repo: Path, at: Callable[[str], None]) -> None:
+    path = _day_file(repo, "2026-10-15")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"kind": "fault", "class": "crash"}) + "\n\n   \n" + json.dumps({"kind": "fault", "class": "busy"}) + "\n", encoding="utf-8")
+    summary = fault_summary(repo)
+    assert (summary["status"], summary["faults"], summary["last_class"]) == ("counts", 2, "busy")
+
+
+def test_files_that_are_not_day_files_are_ignored(repo: Path, at: Callable[[str], None]) -> None:
+    _write_rows(repo, "2026-10-15", [{"kind": "fault", "class": "crash"}])
+    directory = _day_file(repo, "2026-10-15").parent
+    (directory / "notes.txt").write_text("not a log", encoding="utf-8")
+    (directory / "not-a-date.jsonl").write_text(json.dumps({"kind": "fault", "class": "busy"}) + "\n", encoding="utf-8")
+    summary = fault_summary(repo)
+    assert (summary["status"], summary["faults"], summary["last_class"]) == ("counts", 1, "crash")
