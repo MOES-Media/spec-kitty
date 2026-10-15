@@ -207,6 +207,7 @@ from .progress import (
     generate_progress_json,
 )
 from .adapters import (
+    ensure_producer_client,
     ensure_runtime_moment_producer,
     fire_lifecycle_fanout,
     fire_resolved_binding_fanout,
@@ -215,6 +216,14 @@ from .adapters import (
     register_resolved_binding_fanout_handler,
     register_status_fanout_handler,
 )
+from .producer_client import (
+    ProducerClient,
+    effective_client_timeout,
+    locate_binary,
+    produce_lifecycle_handler,
+    produce_status_handler,
+)
+from .producer_faults import FaultClass, fault_summary, record_fault
 from .bootstrap import (
     BootstrapResult,
     bootstrap_canonical_state,
@@ -651,6 +660,15 @@ __all__ = [
     "register_lifecycle_fanout_handler",
     "register_resolved_binding_fanout_handler",
     "register_status_fanout_handler",
+    "ensure_producer_client",
+    "ProducerClient",
+    "FaultClass",
+    "effective_client_timeout",
+    "fault_summary",
+    "locate_binary",
+    "produce_lifecycle_handler",
+    "produce_status_handler",
+    "record_fault",
     "summarize",
     "uninitialized_status_error",
     # WP03 (fsm-write-path-integrity-01M1TZV6, FR-010): the raw append

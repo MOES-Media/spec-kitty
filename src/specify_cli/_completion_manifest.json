@@ -682,6 +682,16 @@
      "hidden": false,
      "deprecated": false
     },
+    "events": {
+     "help": "Report the event producer's health: binary presence and the recorded fault count.\n\nRead-only. A fault log that cannot be read is shown as unreadable, never as zero.\n\nExamples:\n    spec-kitty doctor events\n    spec-kitty doctor events --json",
+     "hidden": false,
+     "deprecated": false
+    },
+    "events-retention": {
+     "help": "List, or with --apply delete, the local event files outside the retention policy.\n\nDry run by default. The policy is ``ledger.retention.keep_runs`` and\n``max_age_days`` in .kittify/config.yaml, applied by the producer.\n\nExamples:\n    spec-kitty doctor events-retention\n    spec-kitty doctor events-retention --apply",
+     "hidden": false,
+     "deprecated": false
+    },
     "provenance": {
      "help": "Flag committed absolute built-in-pack leaks and ambiguous template sources (C-PRV-5).\n\nScans .kittify/charter/charter.yaml's catalog and\n.kittify/agent_profiles_manifest.json for source_path values that\nshould be portable pack tokens. Read-only -- never mutates state;\nambiguous former-checkout paths are reported without a heal hint.\n\nExamples:\n    spec-kitty doctor provenance\n    spec-kitty doctor provenance --json",
      "hidden": false,

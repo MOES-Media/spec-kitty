@@ -2221,6 +2221,50 @@ _Project health diagnostics_
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
+## spec-kitty doctor events
+
+```
+ Usage: spec-kitty doctor events [OPTIONS]
+
+ Report the event producer's health: binary presence and the recorded fault
+ count.
+
+ Read-only. A fault log that cannot be read is shown as unreadable, never as
+ zero.
+
+ Examples:
+     spec-kitty doctor events
+     spec-kitty doctor events --json
+
+╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --json            Machine-readable JSON output                               │
+│ --help  -h        Show this message and exit.                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+```
+
+## spec-kitty doctor events-retention
+
+```
+ Usage: spec-kitty doctor events-retention [OPTIONS]
+
+ List, or with --apply delete, the local event files outside the retention
+ policy.
+
+ Dry run by default. The policy is ``ledger.retention.keep_runs`` and
+ ``max_age_days`` in .kittify/config.yaml, applied by the producer.
+
+ Examples:
+     spec-kitty doctor events-retention
+     spec-kitty doctor events-retention --apply
+
+╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --apply            Delete the eligible files (default: dry run, nothing is   │
+│                    deleted)                                                  │
+│ --json             Machine-readable JSON output                              │
+│ --help   -h        Show this message and exit.                               │
+╰──────────────────────────────────────────────────────────────────────────────╯
+```
+
 ## spec-kitty doctor identity
 
 ```

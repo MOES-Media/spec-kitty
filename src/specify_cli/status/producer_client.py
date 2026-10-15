@@ -40,6 +40,7 @@ _BINARY_NAME = "spec-kitty-event-producer"
 _PROTOCOL_VERSION = 1
 _MAX_REPLY_BYTES = 1024 * 1024
 _DEFAULT_TIMEOUT_S = 3.0
+_RETAIN_TIMEOUT_S = 20.0
 _EXIT_DEADLINE = 75
 _ROOT_UNRESOLVABLE = "root-unresolvable"
 _PRODUCE_OUTCOMES = frozenset({"produced", "skipped_duplicate", "refused"})
@@ -168,7 +169,7 @@ class ProducerClient:
         A failure here is an error to render, never an event fault: it writes
         no fault-log row (FR-023).
         """
-        timeout = self._timeout()
+        timeout = _RETAIN_TIMEOUT_S
         request = {
             "v": _PROTOCOL_VERSION,
             "op": "retain",

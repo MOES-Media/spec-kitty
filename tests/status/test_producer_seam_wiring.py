@@ -206,3 +206,65 @@ def test_the_hosted_modules_do_not_import_the_client_and_the_client_names_no_env
     source = Path(producer_client.__file__).read_text(encoding="utf-8")
     for forbidden in ("_broadcast_status_transition", "_broadcast_lifecycle_envelope", "_envelope_bookkeeping"):
         assert forbidden not in source
+
+
+# ---------------------------------------------------------------------------
+# Seam contract (decision 16b): a handler registered on the seam is fired by the real emitters
+# ---------------------------------------------------------------------------
+
+
+class TestSeamContract:
+    """Any transport owner can register on the slots, and the real emit paths fire it.
+
+    The seam is the single in-CLI publish surface (ADR 2026-10-14-1); the producer client is
+    one registrant, not a special case. A stub registrant stands for the next one.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _only_the_stub(self) -> None:
+        adapters.reset_handlers()
+        yield
+        adapters.reset_handlers()
+
+    def test_a_status_slot_registrant_is_fired_once_per_lane_transition_with_the_persisted_row(self, repo: Path, feature_dir: Path) -> None:
+        calls: list[dict[str, Any]] = []
+        adapters.register_status_fanout_handler(lambda **kwargs: calls.append(kwargs))
+        _seed_planned(feature_dir, "WP01")
+
+        event = emit_status_transition(
+            TransitionRequest(feature_dir=feature_dir, mission_slug="test-feature", wp_id="WP01", to_lane="claimed", actor="a", repo_root=repo)
+        )
+
+        assert len(calls) == 1
+        assert calls[0]["row"]["event_id"] == event.event_id and calls[0]["repo_root"] == repo
+
+    def test_a_lifecycle_slot_registrant_is_fired_once_per_lifecycle_row(self, repo: Path, feature_dir: Path) -> None:
+        from specify_cli.status.lifecycle_events import WP_CREATED, append_lifecycle_event, mission_event_log_path
+
+        calls: list[dict[str, Any]] = []
+        adapters.register_lifecycle_fanout_handler(lambda **kwargs: calls.append(kwargs))
+
+        envelope = append_lifecycle_event(
+            mission_event_log_path(feature_dir),
+            WP_CREATED,
+            {"mission_slug": "test-feature", "wp_id": "WP01"},
+            aggregate_id="WP01",
+            aggregate_type="WorkPackage",
+            mission_slug="test-feature",
+        )
+
+        assert envelope is not None and len(calls) == 1
+        assert calls[0]["row"]["event_id"] == envelope["event_id"]
+
+    def test_a_raising_registrant_never_reaches_the_emitter(self, repo: Path, feature_dir: Path) -> None:
+        def boom(**_kwargs: object) -> None:
+            raise RuntimeError("transport down")
+
+        adapters.register_status_fanout_handler(boom)
+        _seed_planned(feature_dir, "WP01")
+
+        event = emit_status_transition(
+            TransitionRequest(feature_dir=feature_dir, mission_slug="test-feature", wp_id="WP01", to_lane="claimed", actor="a", repo_root=repo)
+        )
+
+        assert event.to_lane == "claimed"

@@ -341,6 +341,52 @@ STATE_SURFACES: tuple[StateSurface, ...] = (
         ),
     ),
     StateSurface(
+        name="event_producer_publish_log",
+        path_pattern=".kittify/events/publish/missions/<mission_id>.jsonl",
+        root=StateRoot.PROJECT,
+        format=StateFormat.JSONL,
+        authority=AuthorityClass.LOCAL_RUNTIME,
+        git_class=GitClass.IGNORED,
+        owner_module="event producer (services/event-producer, Java)",
+        creation_trigger="a persisted ledger row handed to the producer through the fan-out seam",
+        notes=(
+            "The producer is the single writer (FR-020); no Python code opens it for write "
+            "(tests/architectural/test_publish_log_single_writer.py keys on this entry). A "
+            "Mission without a resolvable mission_id publishes to "
+            ".kittify/events/publish/project-<project_uuid>.jsonl beside it. Retention "
+            "(`doctor events-retention`) deletes whole files only."
+        ),
+    ),
+    StateSurface(
+        name="event_producer_fault_log",
+        path_pattern=".kittify/events/faults/<UTC date>.jsonl",
+        root=StateRoot.PROJECT,
+        format=StateFormat.JSONL,
+        authority=AuthorityClass.LOCAL_RUNTIME,
+        git_class=GitClass.IGNORED,
+        owner_module="status/producer_faults",
+        creation_trigger="a producer fault or notice (FR-023)",
+        notes=(
+            "Append-only, one day file per UTC date; the Python client is the single writer. "
+            "`doctor events` counts its fault rows (notice rows apart) inside the retention window."
+        ),
+    ),
+    StateSurface(
+        name="event_producer_clock_state",
+        path_pattern=".git/spec-kitty/event-producer/clock.json",
+        root=StateRoot.GIT_INTERNAL,
+        format=StateFormat.JSON,
+        authority=AuthorityClass.GIT_INTERNAL,
+        git_class=GitClass.GIT_INTERNAL,
+        owner_module="event producer (services/event-producer, Java)",
+        creation_trigger="the first event the producer stamps (FR-012)",
+        notes=(
+            "Producer-owned Lamport state, with clock.lock beside it. For a linked worktree the "
+            "root is the git COMMON directory (the primary checkout's .git/spec-kitty/), which "
+            "the producer resolves; Python only declares the surface."
+        ),
+    ),
+    StateSurface(
         name="glossary_fallback_events",
         path_pattern=".kittify/events/glossary/<mission_id>.events.jsonl",
         root=StateRoot.PROJECT,

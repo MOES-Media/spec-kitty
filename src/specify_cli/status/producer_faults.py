@@ -26,7 +26,7 @@ from typing import Any
 from kernel.clock import date, datetime, now_utc, timedelta
 from specify_cli.core.paths import WorkspaceRootNotFound, resolve_canonical_root
 
-__all__ = ["FaultClass", "fault_summary", "record_fault", "record_notice", "write_stderr_warning"]
+__all__ = ["FaultClass", "fault_summary", "record_fault", "record_notice"]
 
 
 class FaultClass(StrEnum):
@@ -62,50 +62,8 @@ def write_stderr_warning(message: str) -> None:
         pass
 
 
-def _opaque(row: Mapping[str, Any] | None, key: str) -> str | None:
-    """Copy one member of the row as the seam handed it, or ``None`` when it has none."""
-    if row is None:
-        return None
-    value = row.get(key)
-    return value if isinstance(value, str) and value else None
-
-
-def _fault_dir(start_path: Path | str | None) -> tuple[Path, Path] | None:
-    """``(repo root, fault-log directory)`` for a start path, or ``None`` when no spec-kitty root resolves.
-
-    A git root without a ``.kittify`` directory is not a spec-kitty project, so the log never
-    creates one there (an ambient ``.git`` such as a shared temp directory must not grow state).
-    """
-    try:
-        root = resolve_canonical_root(Path(start_path) if start_path is not None else None)
-    except (WorkspaceRootNotFound, OSError, ValueError):
-        return None
-    if not (root / ".kittify").is_dir():
-        return None
-    return root, root / ".kittify" / "events" / "faults"
-
-
-def _append_row(start_path: Path | str | None, row: dict[str, Any], now: datetime) -> None:
-    """Append one fault-log row to today's day file; any failure leaves stderr as the only carrier."""
-    located = _fault_dir(start_path)
-    if located is None:
-        return
-    _root, directory = located
-    try:
-        directory.mkdir(parents=True, exist_ok=True)
-        with (directory / f"{now.date().isoformat()}.jsonl").open("a", encoding="utf-8", newline="\n") as handle:
-            handle.write(json.dumps(row, sort_keys=True) + "\n")
-    except OSError:
-        return
-
-
-def _describe(event_type: str | None, event_id: str | None) -> str:
-    parts = [f"{name}={value}" for name, value in (("event_type", event_type), ("event_id", event_id)) if value]
-    return f" ({', '.join(parts)})" if parts else ""
-
-
 def record_fault(
-    fault_class: FaultClass,
+    fault_class: FaultClass | None,
     *,
     row: Mapping[str, Any] | None = None,
     reply_event_type: str | None = None,
@@ -113,40 +71,52 @@ def record_fault(
     detail: str | None = None,
     start_path: Path | str | None = None,
     log: bool = True,
+    notice: Mapping[str, Any] | None = None,
 ) -> None:
-    """Record one producer fault: a stderr line always, a fault-log row when ``log`` and a root resolve.
+    """Record one producer fault, or with ``notice`` one ``torn-line`` notice, never raising.
 
-    The identifiers are the reply's when one was read, else the row's own
-    members copied verbatim. Never raises: a fault that cannot be recorded is
-    still on stderr.
+    A stderr line is always written; the fault-log row is appended when ``log`` is set and
+    the starting path resolves to a spec-kitty project root. A git root without a
+    ``.kittify`` directory is not a spec-kitty project, so no log is created there (an
+    ambient ``.git`` such as a shared temp directory must not grow state). For a fault the
+    identifiers are the reply's when one was read, else the row's own members copied
+    verbatim (opaque, FR-026); a notice is not a fault (FR-024). Any failure to record
+    leaves stderr as the only carrier.
     """
     try:
-        event_type = reply_event_type or _opaque(row, "event_type")
-        event_id = reply_event_id or _opaque(row, "event_id")
-        outcome = "event may not have been produced" if fault_class in _MAY_NOT_HAVE_BEEN else "event was NOT produced"
-        write_stderr_warning(f"spec-kitty: {outcome}{_describe(event_type, event_id)}: producer fault {fault_class.value}")
+        now = _now_utc()
+        entry: dict[str, Any] = {"at": now.isoformat(), "root": "."}
+        if notice is not None:
+            write_stderr_warning(f"spec-kitty: publish log has a torn line at {notice['path']}:{notice['line']}; it was left in place")
+            entry.update(kind="notice", notice="torn-line", path=notice["path"], line=notice["line"])
+        elif fault_class is not None:
+            copied = {key: row.get(key) for key in ("event_type", "event_id")} if row is not None else {}
+            event_type = reply_event_type or (copied.get("event_type") if isinstance(copied.get("event_type"), str) else None)
+            event_id = reply_event_id or (copied.get("event_id") if isinstance(copied.get("event_id"), str) else None)
+            who = ", ".join(f"{name}={value}" for name, value in (("event_type", event_type), ("event_id", event_id)) if value)
+            outcome = "event may not have been produced" if fault_class in _MAY_NOT_HAVE_BEEN else "event was NOT produced"
+            write_stderr_warning(f"spec-kitty: {outcome}{f' ({who})' if who else ''}: producer fault {fault_class.value}")
+            entry.update(kind="fault", **{"class": fault_class.value})
+            entry.update({key: value for key, value in (("event_type", event_type), ("event_id", event_id), ("message", detail)) if value})
         if not log:
             return
-        entry: dict[str, Any] = {"kind": "fault", "class": fault_class.value, "at": _now_utc().isoformat(), "root": "."}
-        if event_type:
-            entry["event_type"] = event_type
-        if event_id:
-            entry["event_id"] = event_id
-        if detail:
-            entry["message"] = detail
-        _append_row(start_path, entry, _now_utc())
+        try:
+            root = resolve_canonical_root(Path(start_path) if start_path is not None else None)
+        except (WorkspaceRootNotFound, OSError, ValueError):
+            return
+        if not (root / ".kittify").is_dir():
+            return
+        directory = root / ".kittify" / "events" / "faults"
+        directory.mkdir(parents=True, exist_ok=True)
+        with (directory / f"{now.date().isoformat()}.jsonl").open("a", encoding="utf-8", newline="\n") as handle:
+            handle.write(json.dumps(entry, sort_keys=True) + "\n")
     except Exception:  # noqa: BLE001 - the outermost catch: a fault recorder never fails the command
         return
 
 
 def record_notice(*, path: str, line: int, start_path: Path | str | None = None) -> None:
     """Record a producer ``torn-line`` notice: one stderr line and one notice row, never a fault (FR-024)."""
-    try:
-        write_stderr_warning(f"spec-kitty: publish log has a torn line at {path}:{line}; it was left in place")
-        entry = {"kind": "notice", "notice": "torn-line", "path": path, "line": line, "at": _now_utc().isoformat(), "root": "."}
-        _append_row(start_path, entry, _now_utc())
-    except Exception:  # noqa: BLE001 - see record_fault
-        return
+    record_fault(None, notice={"path": path, "line": line}, start_path=start_path)
 
 
 def _read_fault_rows(path: Path) -> list[dict[str, Any]]:
@@ -163,37 +133,34 @@ def _read_fault_rows(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def _window_days(max_age_days: Any) -> int | None:
-    """The raw ``max_age_days`` as a whole number of days, or ``None`` (every file) when absent or non-numeric."""
-    if isinstance(max_age_days, bool):
-        return None
-    if isinstance(max_age_days, int):
-        return max_age_days if max_age_days >= 0 else None
-    if isinstance(max_age_days, str):
-        text = max_age_days.strip()
-        return int(text) if text.isascii() and text.isdigit() else None
-    return None
-
-
 def fault_summary(start_path: Path | str | None = None, *, max_age_days: Any = None) -> dict[str, Any]:
     """Count the fault-log rows inside the retention window, for ``doctor``.
 
     The window is the day files whose name date lies within ``max_age_days``
     of today (a file exactly that old is inside); an absent or non-numeric
-    value means every file present. Fault rows and notice rows are counted
-    apart, and a later success never resets the count. The ``status`` is
-    explicit: ``none_recorded`` (no log), ``counts`` or ``unreadable``;
-    an unreadable log is never reported as zero.
+    value (a bool, a negative number, text that is not digits) means every file
+    present. Fault rows and notice rows are counted apart, and a later success
+    never resets the count. The ``status`` is explicit: ``none_recorded`` (no
+    log), ``counts`` or ``unreadable``; an unreadable log is never reported as zero.
     """
-    located = _fault_dir(start_path)
-    if located is None or not located[1].exists():
-        return {"status": "none_recorded", "faults": 0, "notices": 0, "last_class": None}
-    days = _window_days(max_age_days)
+    none_recorded = {"status": "none_recorded", "faults": 0, "notices": 0, "last_class": None}
+    try:
+        root = resolve_canonical_root(Path(start_path) if start_path is not None else None)
+    except (WorkspaceRootNotFound, OSError, ValueError):
+        return none_recorded
+    directory = root / ".kittify" / "events" / "faults"
+    if not (root / ".kittify").is_dir() or not directory.exists():
+        return none_recorded
+    days: int | None = None
+    if isinstance(max_age_days, int) and not isinstance(max_age_days, bool) and max_age_days >= 0:
+        days = max_age_days
+    elif isinstance(max_age_days, str) and max_age_days.strip().isascii() and max_age_days.strip().isdigit():
+        days = int(max_age_days.strip())
     today = _now_utc().date()
     faults = notices = 0
     last_class: str | None = None
     try:
-        for path in sorted(located[1].iterdir()):
+        for path in sorted(directory.iterdir()):
             if path.suffix != ".jsonl":
                 continue
             try:

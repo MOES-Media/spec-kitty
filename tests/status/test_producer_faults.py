@@ -6,7 +6,7 @@ import json
 import os
 import stat
 from collections.abc import Callable
-from datetime import UTC, datetime
+from kernel.clock import UTC, datetime
 from pathlib import Path
 
 import pytest
