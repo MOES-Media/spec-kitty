@@ -214,11 +214,35 @@ package first, verify it is installable from PyPI, and only then tag the CLI.
   - validates release metadata
   - checks shared-package drift
   - proves exact wheel installability with plain `pip`
-  - builds distributions
+  - builds the native event producer on three OS (`build-producer`)
+  - builds distributions: the pure wheel and sdist, then one platform wheel per
+    entry of `scripts/release/dist-set.json`
+  - checks the distribution set, the checksum continuity from the producer
+    manifests to the wheels and the binary inside each platform wheel
+  - installs each wheel by path on its own OS and runs the producer smoke
+    (`smoke-wheels`)
   - publishes after tag-time release checks pass
   - creates the GitHub release
   - publishes to PyPI
   - verifies exact installability from PyPI with no local wheel
+- [ ] Read the producer stages as **unproven until this tag**. `release.yml`
+  runs on a tag push or a dispatch of the default-branch copy only, so
+  `build-producer`, the platform-wheel builds, the manifest and binary checks,
+  `smoke-wheels`, the attestation and the multi-wheel `verify-pypi-installability`
+  have not executed anywhere before the first 4.0 release candidate. What ran
+  before merge: the executable tests of `check_dist_set.py`, the shared smoke
+  action in the PR-time `native-smoke` job on three OS, and the static graph
+  tests of the workflow. **A release-candidate tag publishes to the real PyPI;
+  there is no Test-PyPI rehearsal**, so this tag is not a harmless trial run.
+  The table of items, owners and pass criteria is
+  `kitty-specs/event-producer-reroute-01M4VDY9/research/wp09-deferred-verification.md`.
+- [ ] Binaries are unsigned. macOS Gatekeeper and Windows SmartScreen may warn
+  when the bundled event producer is first run; the macOS binary is ad-hoc
+  signed by the linker and must not be stripped. Architectures beyond Linux
+  x86_64, macOS arm64 and Windows x86_64 are out of scope: other platforms get
+  the pure wheel, which reports `binary-missing`.
+- [ ] The `producer-nightly` job in `ci-nightly.yml` is informational and is
+  not in `nightly-summary`; the nightly gate of this workflow does not read it.
 - [ ] Confirm release-candidate hygiene was already recorded before the tag:
   live canary and cross-repo end-to-end suites are required pre-release
   operator evidence, not tag-time publish workflow jobs.

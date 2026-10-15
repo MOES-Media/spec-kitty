@@ -73,16 +73,51 @@ jobs:
         run: |
           python3 scripts/ci/release_nightly_gate.py --tag "${RELEASE_TAG}" --dispatch
 
-  build-release:
+  # ---------------------------------------------------------------------------
+  # build-producer: builds the native event producer (services/event-producer) for
+  # the three pinned platform legs by calling the reusable workflow
+  # event-producer.yml in `release` mode (no warm start-time gate) on the release
+  # ref, and uploads `producer-<leg>` (binary + producer-manifest.json) and
+  # `producer-sbom`. build-release consumes them. `env` is not available in a
+  # job-level `with:`, so the RELEASE_REF expression is repeated verbatim here;
+  # tests/release/test_release_producer_stages.py pins the two texts equal.
+  # Same nightly-gate waiver condition as build-release: a FAILED gate blocks the
+  # native build too.
+  # ---------------------------------------------------------------------------
+  build-producer:
+    name: Build the native event producer (release ref)
     needs: [nightly-gate]
+    if: >-
+      ${{
+        !cancelled()
+        && (
+          needs.nightly-gate.result == 'success'
+          || (
+            needs.nightly-gate.result == 'skipped'
+            && github.event_name == 'workflow_dispatch'
+            && inputs.skip_nightly
+          )
+        )
+      }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/event-producer.yml
+    with:
+      mode: release
+      ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+  build-release:
+    needs: [nightly-gate, build-producer]
     # Run when the nightly gate PASSED, or when it was deliberately SKIPPED by the
-    # workflow_dispatch maintainer waiver (skip_nightly=true). A FAILED or CANCELLED
-    # gate still blocks the build -- and therefore publication. `!cancelled()` (not
+    # workflow_dispatch maintainer waiver (skip_nightly=true), AND the native
+    # producer build succeeded. A FAILED or CANCELLED gate (or producer build) still
+    # blocks the build -- and therefore publication. `!cancelled()` (not
     # `always()`) re-enables this job after a skipped dependency without letting it
     # run on cancellation.
     if: >-
       ${{
         !cancelled()
+        && needs.build-producer.result == 'success'
         && (
           needs.nightly-gate.result == 'success'
           || (
@@ -185,14 +220,55 @@ jobs:
       - name: Build distributions
         run: python -m build
 
+      # The three producer legs built by build-producer. The pattern excludes `producer-sbom`
+      # (check_dist_set.py refuses an unpinned `producer-*` directory); the SBOM is consumed by publish-pypi.
+      - name: Download the producer legs (build-producer artifacts)
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          pattern: producer-*-*
+          path: producer-in
+
+      # Platform wheels are built from THIS checkout, not from the sdist: the sdist include list is not widened, so the
+      # hook file and the ignored `_native/` directory are not in it. One wheel per `platform_wheels` entry of dist-set.json,
+      # each with a clean build directory; the hook is off by default and acts only under HATCH_BUILD_HOOK_ENABLE_CUSTOM=true.
+      - name: Build the platform wheels (one per dist-set.json entry)
+        run: |
+          set -euo pipefail
+          [ "$(jq '.platform_wheels | length' scripts/release/dist-set.json)" -ge 1 ] || { echo "::error::dist-set.json pins no platform wheel"; exit 1; }
+          while read -r leg tag; do
+            binary=$(find "producer-in/producer-${leg}" -maxdepth 1 -type f \( -name 'spec-kitty-event-producer' -o -name 'spec-kitty-event-producer.exe' \) | head -n 1)
+            [ -n "$binary" ] || { echo "::error::no producer binary for ${leg} under producer-in"; exit 1; }
+            rm -rf build
+            HATCH_BUILD_HOOK_ENABLE_CUSTOM=true SPEC_KITTY_PRODUCER_BINARY="$PWD/$binary" SPEC_KITTY_PRODUCER_PLATFORM_TAG="$tag" python -m build --wheel --outdir dist
+          done < <(jq -r '.platform_wheels[] | "\(.leg) \(.tag)"' scripts/release/dist-set.json)
+          ls -l dist
+
+      # Checksum continuity (AC-032): every manifest names this checkout's commit and the pinned tag, and the recomputed sha256 of the
+      # downloaded binary equals the manifest and the wheel member. Needs the built wheels, so it follows the platform-wheel build.
+      - name: Verify checksum continuity from the producer manifests to the wheels
+        run: python scripts/release/check_dist_set.py --verify-manifests --manifests producer-in --commit "$(git rev-parse HEAD)"
+
+      - name: Verify the platform-wheel binaries (set, sha256, exec bit)
+        run: python scripts/release/check_dist_set.py --verify-binaries
+
       - name: Validate shared package drift
         run: python scripts/release/check_shared_package_drift.py --check-installed
 
-      - name: Verify exact installability from built wheel
-        run: python scripts/release/check_exact_install.py --package spec-kitty-cli --console-script spec-kitty --console-arg=--version
+      # pip installs only wheels whose tag fits the host, so this Linux runner installs the Linux platform wheel and the pure wheel;
+      # the macOS and Windows wheels are installed by path on their own OS in smoke-wheels.
+      - name: Verify exact installability from built wheels (Linux platform wheel and pure wheel)
+        run: |
+          set -euo pipefail
+          for tag in $(jq -r '[(.platform_wheels[] | select(.leg | startswith("linux")) | .tag)] + .pure_wheels | .[]' scripts/release/dist-set.json); do
+            python scripts/release/check_exact_install.py --package spec-kitty-cli --wheel-tag "$tag" --console-script spec-kitty --console-arg=--version
+          done
 
       - name: Verify wheel contents
         run: |
+          set -euo pipefail
+          # Every wheel of the set (pure and platform) carries the same payload: the checks run once per wheel, each with a clean extraction directory.
+          for WHEEL_FILE in dist/*.whl; do
+          echo "Wheel: $WHEEL_FILE"
           echo "::group::Verifying migration files in wheel"
 
           # Count tracked migration files in source. The test suite may generate
@@ -202,7 +278,6 @@ jobs:
           echo "Source migrations count: $SOURCE_COUNT"
 
           # Extract wheel to temp directory
-          WHEEL_FILE=$(ls dist/*.whl)
           rm -rf /tmp/wheel_check
           unzip -q "$WHEEL_FILE" -d /tmp/wheel_check
 
@@ -269,6 +344,7 @@ jobs:
 
           echo "✅ Wheel contains all $SOURCE_DOCTRINE_COUNT doctrine files and $SOURCE_SKILL_COUNT bundled skills"
           echo "::endgroup::"
+          done
 
       - name: Generate CycloneDX SBOM
         # Snapshot the resolved environment at build time so every release ships
@@ -284,6 +360,9 @@ jobs:
 
       - name: Check distributions
         run: twine check dist/*
+
+      - name: Verify the lock file is current
+        run: uv lock --check
 
       - name: Record artifact checksums
         run: |
@@ -309,20 +388,105 @@ jobs:
             sbom.cdx.json
           retention-days: 30
 
+  # ---------------------------------------------------------------------------
+  # smoke-wheels: installs each built wheel BY PATH into a fresh virtual environment on its own OS and runs the shared composite action
+  # (the same definition event-producer.yml's native-smoke uses) in `cli` mode: a platform wheel must produce one valid row, the pure
+  # wheel must report `binary-missing`. publish-pypi needs it. The `command` is the cheapest lifecycle command that persists an in-scope
+  # row in a scratch repository (a mission scaffold); it is a first guess that the first release candidate confirms, because it needs the
+  # Python client and the schema-backed binding in the built wheel, which are not in the lane that wrote this job.
+  # ---------------------------------------------------------------------------
+  smoke-wheels:
+    name: smoke-wheels (${{ matrix.leg }})
+    needs: build-release
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      GIT_AUTHOR_NAME: smoke
+      GIT_AUTHOR_EMAIL: smoke@example.invalid
+      GIT_COMMITTER_NAME: smoke
+      GIT_COMMITTER_EMAIL: smoke@example.invalid
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - leg: linux-x86_64
+            os: ubuntu-24.04
+            expect: produced
+          - leg: macos-arm64
+            os: macos-14
+            expect: produced
+          - leg: windows-x86_64
+            os: windows-2022
+            expect: produced
+          - leg: pure
+            os: ubuntu-24.04
+            expect: binary-missing
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          ref: ${{ env.RELEASE_REF }}
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+        with:
+          python-version: '3.12'
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: release-distributions
+          path: release-in
+
+      - name: Select the wheel of this leg
+        env:
+          LEG: ${{ matrix.leg }}
+        run: |
+          set -euo pipefail
+          if [ "$LEG" = "pure" ]; then
+            tag=$(jq -r '.pure_wheels[0]' scripts/release/dist-set.json)
+          else
+            tag=$(jq -r --arg leg "$LEG" '.platform_wheels[] | select(.leg == $leg) | .tag' scripts/release/dist-set.json)
+          fi
+          [ -n "$tag" ] && [ "$tag" != "null" ] || { echo "::error::no wheel tag pinned for ${LEG}"; exit 1; }
+          wheel=$(find release-in/dist -maxdepth 1 -type f -name "*-${tag}.whl")
+          [ "$(printf '%s\n' "$wheel" | grep -c .)" = "1" ] || { echo "::error::expected exactly one ${tag} wheel, found: ${wheel}"; exit 1; }
+          if command -v cygpath >/dev/null 2>&1; then wheel=$(cygpath -m "$PWD/$wheel"); else wheel="$PWD/$wheel"; fi
+          echo "SMOKE_WHEEL=$wheel" >> "$GITHUB_ENV"
+
+      - name: Install the wheel by path and run the smoke
+        uses: ./.github/actions/producer-smoke
+        with:
+          wheel: ${{ env.SMOKE_WHEEL }}
+          mode: cli
+          expect: ${{ matrix.expect }}
+          command: >-
+            git commit -q --allow-empty -m init
+            && "$SMOKE_PY" -m specify_cli init . --ai claude --non-interactive
+            && "$SMOKE_PY" -m specify_cli agent mission create smoke-probe --json
+
   publish-pypi:
     name: Publish to PyPI
-    needs: build-release
+    needs: [build-release, smoke-wheels]
     # A waiver-skipped nightly-gate (workflow_dispatch skip_nightly=true) propagates
     # its "skipped" state through the default success() condition, which would skip
     # this job -- and with it BOTH the GitHub release and the PyPI upload it owns --
     # even though build-release succeeded. Override explicitly: publish whenever
     # build-release succeeded and nothing was cancelled. On a normal tag-push the
     # gate runs and succeeds, so this is equivalent to the former implicit success().
-    if: ${{ !cancelled() && needs.build-release.result == 'success' }}
+    # publish-pypi is unreachable unless the build AND the per-OS wheel smoke succeeded.
+    if: ${{ !cancelled() && needs.build-release.result == 'success' && needs.smoke-wheels.result == 'success' }}
     runs-on: ubuntu-24.04
     permissions:
       contents: write
       id-token: write
+      attestations: write
     environment:
       name: pypi
       url: https://pypi.org/project/spec-kitty-cli/
@@ -343,6 +507,25 @@ jobs:
         with:
           name: release-distributions
           path: .
+
+      # The set, the binaries and the SBOM are checked again on the artifact that is about to be published, not only where it was built.
+      - name: Re-check the distribution set and the wheel binaries on the downloaded artifact
+        run: python scripts/release/check_dist_set.py --verify-binaries
+
+      - name: Download the producer SBOM and the Linux leg manifest
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          pattern: producer-*
+          path: producer-in
+
+      - name: Check the producer SBOM (names a pinned dependency; the manifest lists the embedded toolchain)
+        run: bash services/event-producer/tools/check-sbom.sh producer-in/producer-sbom/producer-sbom.json producer-in/producer-linux-x86_64/producer-manifest.json
+
+      # Build provenance for every distribution. No reproducibility claim is made.
+      - name: Attest build provenance of the distributions
+        uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
+        with:
+          subject-path: dist/*
 
       - name: Extract changelog for release
         id: changelog
@@ -373,6 +556,7 @@ jobs:
             dist/*.tar.gz
             SHA256SUMS.txt
             sbom.cdx.json
+            producer-in/producer-sbom/producer-sbom.json
           draft: false
           prerelease: ${{ steps.release_channel.outputs.is_prerelease }}
 

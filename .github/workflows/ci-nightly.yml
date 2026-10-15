@@ -1607,6 +1607,28 @@ jobs:
           python3 scripts/ci/nightly_escalation.py --suite-key mission-state-audit --conclusion "$conclusion" --ref "$GITHUB_REF" --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
   # ---------------------------------------------------------------------------
+  # producer-nightly (mission event-producer-reroute, WP09; AC-036): builds the native
+  # event producer on all three OS through the reusable workflow event-producer.yml and
+  # runs the shared producer-smoke action on each leg; the per-leg job summaries record
+  # the AC-036 numbers (start time, binary size, floors). It is informational and
+  # non-gating, like sonar.yml: it is DELIBERATELY NOT in nightly-summary.needs. The
+  # fail-closed nightly-gate of release.yml reads the nightly's conclusion, so a macOS or
+  # Windows hosted-runner flake or a GraalVM download outage here must not be able to
+  # block a release; the release gate relies on smoke-wheels in release.yml itself.
+  # (A workflow_call follower runs the default-branch copy, so this job cannot be
+  # exercised from a pull request; tests/release/test_release_producer_stages.py checks
+  # the graph only.)
+  # ---------------------------------------------------------------------------
+  producer-nightly:
+    if: (github.repository == 'spec-kitty/spec-kitty' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
+    name: Event producer native build, smoke and start-time numbers (nightly, informational)
+    permissions:
+      contents: read
+    uses: ./.github/workflows/event-producer.yml
+    with:
+      mode: pr
+
+  # ---------------------------------------------------------------------------
   # nightly-summary: terminal `if: always()` aggregator so a scheduled/dispatch
   # run's complete failure set is visible in one place, never short-circuited.
   # ---------------------------------------------------------------------------
