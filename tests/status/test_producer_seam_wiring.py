@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 import threading
+from collections.abc import Iterator, Mapping
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
@@ -121,6 +122,28 @@ def test_the_seam_sanitises_any_mapping_row_not_only_a_dict(drain_off: None, pro
     (request,) = producer_stub.requests
     assert request["row"] == sanitize_event_for_log(raw)
     assert "pii-machine-9f3a" not in json.dumps(request["row"])
+
+
+class _RaisingRow(Mapping[str, Any]):
+    """A Mapping whose iteration raises: snapshotting it must record a fault, never escape the seam."""
+
+    def __getitem__(self, key: str) -> Any:
+        raise KeyError(key)
+
+    def __iter__(self) -> Iterator[str]:
+        raise RuntimeError("iteration blew up")
+
+    def __len__(self) -> int:
+        return 1
+
+
+def test_a_mapping_row_that_raises_on_snapshot_records_a_fault_and_never_escapes(
+    drain_off: None, producer_stub: ProducerStub, repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    producer_stub.replay("produce-valid")
+    adapters.fire_lifecycle_fanout(row=_RaisingRow(), envelope={}, log_path=repo / "x" / "log.jsonl", repo_root=repo)
+    assert _fault_classes(repo) == ["crash"]
+    assert "producer fault crash" in capsys.readouterr().err
 
 
 def test_a_fault_on_a_pii_row_carries_no_pii_in_the_fault_log_or_stderr(
