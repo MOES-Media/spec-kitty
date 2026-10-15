@@ -20,11 +20,12 @@ from specify_cli.status.models import TransitionRequest
 from tests.status.conftest import ProducerStub
 from tests.status.conftest import seed_wp_to_planned as _seed_planned
 
-pytestmark = pytest.mark.fast
+pytestmark = [pytest.mark.fast, pytest.mark.real_event_producer]
 
 
 @pytest.fixture
 def repo(tmp_path: Path) -> Path:
+    (tmp_path / ".kittify").mkdir(exist_ok=True)
     return tmp_path
 
 

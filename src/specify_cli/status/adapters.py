@@ -39,6 +39,8 @@ from specify_cli.core.env import moment_handlers_disabled_reason
 # an import side effect hidden in another package's init. The producer client
 # is the default occupant of the status and lifecycle slots; the E3 Zeitgeist
 # moment handler (#8) is the hosted one.
+from specify_cli.events import sanitize_event_for_log
+
 from .producer_client import ProducerClient, produce_lifecycle_handler, produce_status_handler
 from .producer_faults import FaultClass, record_fault
 from .zeitgeist_bridge import (
@@ -172,6 +174,11 @@ def _dispatch_handlers(
     for it.
     """
     client_keys = {_handler_key(produce_status_handler), _handler_key(produce_lifecycle_handler)}
+    row = kwargs.get("row")
+    if isinstance(row, dict):
+        # The persisted row as written to the ledger: the same sanitisation the
+        # ledger writers apply, so the row a handler sees equals the ledger line (FR-004).
+        kwargs["row"] = sanitize_event_for_log(row)
     for handler in handlers:
         is_client = _handler_key(handler) in client_keys
         try:

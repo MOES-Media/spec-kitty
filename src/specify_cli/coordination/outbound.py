@@ -110,6 +110,8 @@ def _send_to_saas(
         metadata=WPStatusChangeMetadata.from_status_event(
             event, policy_metadata=event.policy_metadata
         ),
+        # The persisted row for the event producer (FR-004).
+        row=event.to_dict(),
         # The emitting checkout root, so the Zeitgeist bridge resolves relay
         # credentials from it instead of the process cwd (#125).
         repo_root=repo_root,

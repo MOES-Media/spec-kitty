@@ -764,29 +764,28 @@ def _authorize_audit_answer(
     actor: ActorIdentity,
     raci_source: str | None,
     raci_override_reason: str | None,
+    emitter: RuntimeEventEmitter,
 ) -> str:
     """T014: audit owner checks, then answer validation. Returns the authority role.
 
-    A denial appends ``DecisionAuthorityDenied`` (``rationale_linkage`` null)
-    and raises; nothing else is written."""
+    A denial appends ``DecisionAuthorityDenied`` (``rationale_linkage`` null),
+    hands the same payload to the emitter and raises; nothing else is written."""
     authority_role = "mission_owner"
     deny_reason = _audit_denial_reason(actor, snapshot.inputs)
     if deny_reason is not None:
-        _append_event(
-            run_dir,
-            "DecisionAuthorityDenied",
-            {
-                "run_id": snapshot.run_id,
-                "decision_id": decision_id,
-                "actor_type": actor.actor_type,
-                "actor_id": actor.actor_id,
-                "authority_role": authority_role,
-                "rationale_linkage": None,
-                "reason": deny_reason,
-                "raci_source": raci_source,
-                "override_reason": raci_override_reason,
-            },
-        )
+        denied = {
+            "run_id": snapshot.run_id,
+            "decision_id": decision_id,
+            "actor_type": actor.actor_type,
+            "actor_id": actor.actor_id,
+            "authority_role": authority_role,
+            "rationale_linkage": None,
+            "reason": deny_reason,
+            "raci_source": raci_source,
+            "override_reason": raci_override_reason,
+        }
+        _append_event(run_dir, "DecisionAuthorityDenied", denied)
+        emitter.emit_decision_authority_denied(denied)
         raise MissionRuntimeError(deny_reason)
     _validate_audit_answer(_significance_band(snapshot.decisions, decision_id), answer)
     return authority_role
@@ -915,7 +914,7 @@ def _apply_decision_answer(
 
     is_audit = decision_id.startswith(_AUDIT_PREFIX)
     if is_audit:
-        authority_role = _authorize_audit_answer(run_dir, snapshot, decision_id, answer, actor, raci_source, raci_override_reason)
+        authority_role = _authorize_audit_answer(run_dir, snapshot, decision_id, answer, actor, raci_source, raci_override_reason, emitter)
     elif actor.actor_type == "llm":
         authority_role, rationale_linkage = _authorize_llm_answer(inputs, decision_id, actor)
 

@@ -1321,6 +1321,17 @@ def _resolved_binding_fan_out(event: InnerStateChanged, mission_slug: str, repo_
     ``repo_root`` (#5181): threaded through to :func:`fire_resolved_binding_fanout`
     so its drain gate reads the emitting repo's own posture, never the process CWD.
     """
+    # Every persisted annotation row, plain or resolved-binding, reaches the event
+    # producer once, through the status slot (FR-003): this is the single funnel of
+    # the standalone, bundled and coordination announce paths. The version gate
+    # below belongs to the hosted WPResolvedBindingChanged bridge only.
+    fire_status_fanout(
+        wp_id=event.wp_id,
+        mission_slug=mission_slug,
+        actor=event.actor,
+        row=event.to_dict(),
+        repo_root=repo_root,
+    )
     delta = event.delta
     binding = {name: getattr(delta, name) for name in _RESOLVED_BINDING_DELTA_FIELDS}
     if all(value is None for value in binding.values()):
@@ -1564,6 +1575,9 @@ def _saas_fan_out(
         # time so SaaS persists Event.occurred_at = StatusEvent.at, not the
         # sync-emission clock (Rule R-T-01 in spec-kitty-events).
         metadata=WPStatusChangeMetadata.from_status_event(event, policy_metadata=policy_metadata),
+        # The persisted row, handed to the event producer as one opaque mapping
+        # (FR-004); the seam sanitises it exactly as the ledger writer did.
+        row=event.to_dict(),
         # The emitting checkout root, so the Zeitgeist bridge resolves relay
         # credentials from it instead of the process cwd (#125).
         repo_root=repo_root,

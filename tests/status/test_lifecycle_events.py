@@ -819,7 +819,7 @@ def test_persist_local_then_explicit_hosted_fanout_uses_same_envelope(
 
         fanout_lifecycle_event_hosted(envelope, log_path=log_path)
 
-        assert captured == [{"envelope": envelope, "log_path": log_path}]
+        assert captured == [{"row": envelope, "envelope": envelope, "log_path": log_path, "repo_root": log_path.parent}]
         assert captured[0]["envelope"] is envelope
         assert read_lifecycle_events(log_path) == [envelope]
     finally:
@@ -847,7 +847,7 @@ def test_append_lifecycle_event_composes_local_write_and_hosted_fanout(
 
         assert envelope is not None
         assert read_lifecycle_events(log_path) == [envelope]
-        assert captured == [{"envelope": envelope, "log_path": log_path}]
+        assert captured == [{"row": envelope, "envelope": envelope, "log_path": log_path, "repo_root": log_path.parent}]
     finally:
         adapters.reset_handlers()
 

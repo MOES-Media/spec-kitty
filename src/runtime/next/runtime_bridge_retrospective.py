@@ -116,6 +116,9 @@ class _BufferingRuntimeEmitter:
     def emit_decision_timeout_expired(self, payload: Any) -> None:
         self._record("emit_decision_timeout_expired", payload)
 
+    def emit_decision_authority_denied(self, payload: Any) -> None:
+        self._record("emit_decision_authority_denied", payload)
+
     def seed_from_snapshot(self, snapshot: Any) -> None:
         # Pass-through for SyncRuntimeEventEmitter compatibility; not buffered
         # because seed is idempotent and side-effect-free.

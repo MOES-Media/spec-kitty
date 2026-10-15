@@ -107,6 +107,7 @@ class TestCanonicalFanOut:
                 evidence=None,
                 occurred_at=event.at,
             ),
+            "row": event.to_dict(),
             "repo_root": None,
         }
 

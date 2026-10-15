@@ -20,7 +20,7 @@ from specify_cli.status.producer_client import (
 from specify_cli.status.producer_faults import fault_summary
 from tests.status.conftest import GOLDEN_DIR, ProducerStub, golden
 
-pytestmark = pytest.mark.fast
+pytestmark = [pytest.mark.fast, pytest.mark.real_event_producer]
 
 _ROW: dict[str, Any] = {"event_id": "01J0000000000000000000F001", "wp_id": "WP01", "from_lane": "planned", "to_lane": "claimed"}
 
@@ -29,6 +29,7 @@ _ROW: dict[str, Any] = {"event_id": "01J0000000000000000000F001", "wp_id": "WP01
 def repo(tmp_path: Path) -> Path:
     root = tmp_path / "repo"
     (root / ".git").mkdir(parents=True)
+    (root / ".kittify").mkdir()
     return root
 
 

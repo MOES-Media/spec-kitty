@@ -71,10 +71,16 @@ def _opaque(row: Mapping[str, Any] | None, key: str) -> str | None:
 
 
 def _fault_dir(start_path: Path | str | None) -> tuple[Path, Path] | None:
-    """``(repo root, fault-log directory)`` for a start path, or ``None`` when no root resolves."""
+    """``(repo root, fault-log directory)`` for a start path, or ``None`` when no spec-kitty root resolves.
+
+    A git root without a ``.kittify`` directory is not a spec-kitty project, so the log never
+    creates one there (an ambient ``.git`` such as a shared temp directory must not grow state).
+    """
     try:
         root = resolve_canonical_root(Path(start_path) if start_path is not None else None)
     except (WorkspaceRootNotFound, OSError, ValueError):
+        return None
+    if not (root / ".kittify").is_dir():
         return None
     return root, root / ".kittify" / "events" / "faults"
 

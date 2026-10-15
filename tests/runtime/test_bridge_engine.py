@@ -287,6 +287,9 @@ class _FakeSyncEmitter:
         self.order.append("NextStepIssued")
         self.step_issued.append(payload)
 
+    def emit_decision_authority_denied(self, payload: Any) -> None:
+        self.order.append("DecisionAuthorityDenied")
+
     def emit_decision_input_requested(self, payload: Any) -> None:
         self.order.append("DecisionInputRequested")
         self.decision_requested.append(payload)

@@ -407,7 +407,7 @@ def test_coord_fallback_commit_failure_announces_nothing(
     ("emit", "expected"),
     [
         pytest.param(_emit_single, ["commit", "fan_out"], id="single"),
-        pytest.param(_emit_batch, ["commit", "fan_out", "fan_out"], id="batch"),
+        pytest.param(_emit_batch, ["commit", "fan_out", "fan_out", "fan_out"], id="batch"),
     ],
 )
 def test_coord_fallback_fans_out_only_after_commit(
@@ -424,7 +424,9 @@ def test_coord_fallback_fans_out_only_after_commit(
     The batch member carrying an ``annotation_delta`` proves the committed
     resolved-binding annotation also survives the deferral: it is read back
     from the committed tail and handed to the resolved-binding fan-out (which
-    is a no-op for a plain note, but is invoked after the commit only).
+    is a no-op for a plain note, but is invoked after the commit only). Since #6185 every
+    persisted annotation row also reaches the status slot once (the event producer's seam
+    call), so the batch announces three times: two transitions and one annotation.
     """
     _seed_planned_on_coord(repo)
     _force_fallback_path(monkeypatch)
@@ -447,7 +449,7 @@ def test_coord_fallback_fans_out_only_after_commit(
     ("emit", "expected"),
     [
         pytest.param(_emit_single, ["commit", "fan_out"], id="single"),
-        pytest.param(_emit_batch, ["commit", "fan_out", "fan_out"], id="batch"),
+        pytest.param(_emit_batch, ["commit", "fan_out", "fan_out", "fan_out"], id="batch"),
     ],
 )
 def test_transactional_door_fans_out_only_after_commit(

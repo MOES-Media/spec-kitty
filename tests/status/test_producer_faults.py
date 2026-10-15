@@ -29,6 +29,7 @@ _NOW = datetime(2026, 10, 15, 12, 0, tzinfo=UTC)
 def repo(tmp_path: Path) -> Path:
     root = tmp_path / "repo"
     (root / ".git").mkdir(parents=True)
+    (root / ".kittify").mkdir()
     return root
 
 
@@ -122,6 +123,17 @@ def test_with_no_root_the_warning_is_stderr_only(monkeypatch: pytest.MonkeyPatch
     assert "event was NOT produced" in capsys.readouterr().err
     assert not (tmp_path / ".kittify").exists()
     assert fault_summary(tmp_path)["status"] == "none_recorded"
+
+
+def test_a_git_root_that_is_not_a_spec_kitty_project_gets_no_fault_log(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    bare = tmp_path / "ambient"
+    (bare / ".git").mkdir(parents=True)
+
+    record_fault(FaultClass.BINARY_MISSING, row={}, start_path=bare)
+
+    assert "event was NOT produced" in capsys.readouterr().err
+    assert not (bare / ".kittify").exists()
+    assert fault_summary(bare)["status"] == "none_recorded"
 
 
 def test_a_notice_is_one_stderr_line_and_one_notice_row_and_not_a_fault(repo: Path, at: Callable[[str], None], capsys: pytest.CaptureFixture[str]) -> None:

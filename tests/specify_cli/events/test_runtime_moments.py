@@ -120,7 +120,10 @@ def test_real_bridge_walk_publishes_all_six_runtime_moments_with_journal_identit
 
     run_dir = Path(get_or_start_run(SLUG, repo_root, MISSION_TYPE).run_dir)
     journal = _journal(run_dir)
-    envelopes = [call["envelope"] for call in published]
+    # The terminus also persists retrospective rows, which the producer now receives through the
+    # same lifecycle fan-out; this test is about the run journal's rows.
+    journal_calls = [call for call in published if call["log_path"] == run_dir / "run.events.jsonl"]
+    envelopes = [call["envelope"] for call in journal_calls]
 
     assert {envelope["event_type"] for envelope in envelopes} == RUNTIME_MOMENT_KINDS, (
         "every runtime moment the walk journalled must reach the lifecycle fan-out: "
@@ -130,7 +133,7 @@ def test_real_bridge_walk_publishes_all_six_runtime_moments_with_journal_identit
     event_ids = [envelope["event_id"] for envelope in envelopes]
     assert len(event_ids) == len(set(event_ids)), "each journalled transition publishes under its own event_id"
 
-    for call in published:
+    for call in journal_calls:
         envelope = call["envelope"]
         assert envelope["payload"]["mission_slug"] == SLUG, "the producer stamps mission identity (S11)"
         matches = [

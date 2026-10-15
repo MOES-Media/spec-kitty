@@ -187,7 +187,7 @@ def _queue_decision_fanout(
         "payload": event_dict["payload"],
     }
     try:
-        fire_lifecycle_fanout(envelope=envelope, log_path=events_path, repo_root=repo_root)
+        fire_lifecycle_fanout(row=event_dict, envelope=envelope, log_path=events_path, repo_root=repo_root)
     except Exception:
         logger.warning(
             "Zeitgeist fan-out failed for %s; canonical decision log unaffected",

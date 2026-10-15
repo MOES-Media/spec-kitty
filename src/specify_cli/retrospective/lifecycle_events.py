@@ -356,6 +356,11 @@ def _locked_append(
     with retro_status_lock(feature_dir, lock_timeout=lock_timeout):
         event = build_event(_next_lamport(feature_dir))
         _append_retro_lifecycle_event(feature_dir, event.to_dict(), lock_timeout=lock_timeout)
+    # The persisted row reaches the event producer once, after the lock is released and
+    # never able to affect the append (FR-003, FR-004): the seam is non-raising.
+    from specify_cli.status import fire_lifecycle_fanout  # noqa: PLC0415 -- the status facade's fan-out entry
+
+    fire_lifecycle_fanout(row=event.to_dict(), log_path=feature_dir / _EVENTS_FILENAME)
     return event
 
 

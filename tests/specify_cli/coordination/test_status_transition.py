@@ -684,7 +684,9 @@ def test_inner_state_annotation_degrades_when_coordination_branch_missing(
     )
 
     assert isinstance(annotation, InnerStateChanged)
-    assert mock_saas_sink.call_count == 0
+    # The persisted annotation row reaches the status slot once for the event producer (FR-003); the
+    # hosted resolved-binding bridge stays version-gated and a plain note never bridges.
+    assert mock_saas_sink.call_count == 1
     # Degraded to the PRIMARY, uncommitted write: the annotation lands on
     # the primary checkout's event log rather than a coord ref that could
     # never be committed to (the coord branch no longer exists).

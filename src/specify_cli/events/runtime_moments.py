@@ -47,7 +47,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -90,6 +90,8 @@ class JournalRecord:
 
     line: int
     timestamp: str
+    #: The raw parsed journal line: the persisted row the event producer reads (FR-004).
+    row: dict[str, Any] = field(default_factory=dict, compare=False)
 
 
 def find_run_journal(feature_dir: Path, run_id: str) -> Path | None:
@@ -134,7 +136,7 @@ def latest_matching_record(journal: Path, event_type: str, payload: dict[str, An
             if record is None:
                 continue
             if record.get("event_type") == event_type and record.get("payload") == payload:
-                match = JournalRecord(line=line_number, timestamp=str(record.get("timestamp") or ""))
+                match = JournalRecord(line=line_number, timestamp=str(record.get("timestamp") or ""), row=record)
     return match
 
 
@@ -201,14 +203,16 @@ class RuntimeMomentProducer:
         self._publish(MISSION_RUN_COMPLETED, payload)
 
     def emit_significance_evaluated(self, payload: SignificanceEvaluatedPayload) -> None:
-        """Not a runtime moment: significance stays in the local run journal."""
-        del payload
+        self._publish("SignificanceEvaluated", payload)
+
+    def emit_decision_authority_denied(self, payload: dict[str, Any]) -> None:
+        self._publish("DecisionAuthorityDenied", payload)
 
     def emit_decision_timeout_expired(self, payload: TimeoutExpiredPayload) -> None:
         """Not a runtime moment: timeout expiry stays in the local run journal."""
         del payload
 
-    def _publish(self, event_type: str, payload: BaseModel) -> None:
+    def _publish(self, event_type: str, payload: BaseModel | dict[str, Any]) -> None:
         # The producer fires whatever the hosted drain posture is (FR-002): the
         # drain gate lives in the Zeitgeist handler behind the fan-out seam, so
         # no posture is read here. Only a genuine failure below
@@ -222,8 +226,8 @@ class RuntimeMomentProducer:
                 exc_info=True,
             )
 
-    def _publish_journalled(self, event_type: str, payload: BaseModel, *, repo_root: Path | None) -> None:
-        payload_dict = payload.model_dump(mode="json")
+    def _publish_journalled(self, event_type: str, payload: BaseModel | dict[str, Any], *, repo_root: Path | None) -> None:
+        payload_dict = payload if isinstance(payload, dict) else payload.model_dump(mode="json")
         run_id = str(payload_dict.get("run_id") or "")
         journal = find_run_journal(self._feature_dir, run_id)
         if journal is None:
@@ -243,7 +247,8 @@ class RuntimeMomentProducer:
             "timestamp": record.timestamp,
             "payload": self._with_mission_identity(payload_dict),
         }
-        fire_lifecycle_fanout(envelope=envelope, log_path=journal, repo_root=repo_root)
+        # ``row`` is the raw journal line the producer reads; ``envelope`` (the UUID5 moment id) stays for the hosted handler only.
+        fire_lifecycle_fanout(row=record.row, envelope=envelope, log_path=journal, repo_root=repo_root)
 
     def _with_mission_identity(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Stamp the mission's slug and ULID into the published payload where the engine left them empty."""
