@@ -16,6 +16,7 @@ import pytest
 from typer.testing import CliRunner
 
 from specify_cli.cli.commands.agent.status import app
+from specify_cli.status import adapters, producer_client
 from specify_cli.status.producer_client import ProducerClient
 from tests.status.conftest import ProducerStub
 from tests.status.test_agent_status_emit_aggregate_wiring import _emit_args, _make_repo_with_mission
@@ -24,6 +25,7 @@ pytestmark = [pytest.mark.fast, pytest.mark.real_event_producer]
 
 _SLUG = "017-test-feature"
 _BUSY_REPLY = json.dumps({"v": 1, "op": "produce", "outcome": "refused", "reason_class": "busy"})
+_OVERFLOW_REPLY = json.dumps({"v": 1, "op": "produce", "outcome": "refused", "reason_class": "clock-overflow"})
 
 #: fault name -> how the stub misbehaves (None: the binary is missing).
 _FAULTS: dict[str, dict[str, object] | None] = {
@@ -33,12 +35,22 @@ _FAULTS: dict[str, dict[str, object] | None] = {
     "malformed-reply": {"reply": "not json", "exit_code": 0},
     "rejected": {"golden": "produce-refused-no-time"},
     "busy": {"reply": _BUSY_REPLY, "exit_code": 0},
+    "clock-overflow": {"reply": _OVERFLOW_REPLY, "exit_code": 0},
+    # The seam's own bounds, not the producer's replies: a handler still in flight is skipped
+    # (busy), and one outliving the fan-out bound is abandoned (timeout).
+    "seam-busy": {"seam": "busy"},
+    "seam-timeout": {"seam": "timeout"},
 }
+#: fault name -> the class token the one warning line must carry (default: the name itself).
+_EXPECTED_CLASS = {"rejected": "rejected", "seam-busy": "busy", "seam-timeout": "timeout"}
 
 
 @pytest.fixture(autouse=True)
-def _fresh_client() -> None:
+def _fresh_client(monkeypatch: pytest.MonkeyPatch) -> None:
     ProducerClient.install()
+    # An abandoned (timed-out) handler keeps its in-flight key until it ends; a private set per test
+    # keeps that from reading as "busy" in the next one.
+    monkeypatch.setattr(adapters, "_inflight_fanout_handlers", set())
 
 
 def _run(root: Path, extra: list[str]) -> tuple[int, str, str, str]:
@@ -65,6 +77,14 @@ def _arm(stub: ProducerStub, monkeypatch: pytest.MonkeyPatch, fault: str | None)
     behaviour = _FAULTS[fault]
     if behaviour is None:
         monkeypatch.setattr("specify_cli.status.producer_client.locate_binary", lambda: None)
+    elif "seam" in behaviour:
+        if behaviour["seam"] == "busy":
+            stub.replay("produce-valid")
+            key = adapters._handler_key(producer_client.produce_status_handler)
+            adapters._inflight_fanout_handlers.add(key)
+        else:
+            stub.script(reply="", exit_code=0, hang=5.0)
+            monkeypatch.setenv("SPEC_KITTY_FANOUT_TIMEOUT", "0.3")
     elif "golden" in behaviour:
         stub.replay(str(behaviour["golden"]))
     else:
@@ -90,5 +110,6 @@ def test_a_producer_fault_leaves_stdout_and_the_exit_code_unchanged(
     warning_lines = [line for line in err.splitlines() if line.strip()]
     assert len(warning_lines) == 1, warning_lines
     assert "produced" in warning_lines[0], warning_lines[0]
+    assert f"producer fault {_EXPECTED_CLASS.get(fault, fault)}" in warning_lines[0], warning_lines[0]
     if mode == "json":
         json.loads(out)  # still one valid JSON document
