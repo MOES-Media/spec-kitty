@@ -1,4 +1,4 @@
-"""Stage rules of ``release.yml`` and the nightly producer workflow (mission event-producer-reroute, WP09).
+"""Stage rules of ``release.yml`` and the scheduled producer nightly (mission event-producer-reroute, WP09).
 
 Every rule is a function over a parsed workflow document, so each is proved twice: the real file passes it, and a deep copy with one
 mutation fails it for that rule. A rule that found nothing to judge fails (no vacuous pass).
@@ -27,7 +27,6 @@ ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = ROOT / ".github" / "workflows"
 RELEASE = WORKFLOWS / "release.yml"
 NIGHTLY = WORKFLOWS / "ci-nightly.yml"
-PRODUCER_NIGHTLY = WORKFLOWS / "event-producer-nightly.yml"
 EVENT_PRODUCER = WORKFLOWS / "event-producer.yml"
 RELEASE_CHECKLIST = ROOT / "RELEASE_CHECKLIST.md"
 CONTRIBUTING = ROOT / "CONTRIBUTING.md"
@@ -305,26 +304,25 @@ def publish_violations(document: dict[Any, Any]) -> list[str]:
 
 
 def nightly_violations(document: dict[Any, Any]) -> list[str]:
-    """The producer nightly lives in its own scheduled workflow, never in the run that release_nightly_gate.py reads."""
-    job = jobs(document).get(NIGHTLY_JOB)
-    if job is None:
-        return [f"no {NIGHTLY_JOB} job"]
+    """event-producer.yml carries the nightly itself (a `schedule` trigger): the workflow-count ceiling (20) forbids a new file.
+
+    It stays out of the run release_nightly_gate.py reads because it is a different workflow file; masking it with
+    continue-on-error is not how it is non-gating (Standing Order 9).
+    """
     problems: list[str] = []
-    if job.get("uses") != PRODUCER_WORKFLOW:
-        problems.append(f"{NIGHTLY_JOB} calls {job.get('uses')!r}, not {PRODUCER_WORKFLOW}")
-    if job.get("continue-on-error"):
-        problems.append(f"{NIGHTLY_JOB} uses continue-on-error (it is non-gating by living in its own workflow, not by masking)")
-    if str(job.get("if", "")).strip() != FORK_GUARD:
-        problems.append(f"{NIGHTLY_JOB} lacks the canonical fork guard")
-    if job.get("permissions") != {"contents": "read"}:
-        problems.append(f"{NIGHTLY_JOB} permissions are not exactly contents: read")
+    on = document.get("on", document.get(True, {}))
+    schedule = on.get("schedule") if isinstance(on, dict) else None
+    if not schedule or not all(isinstance(entry, dict) and entry.get("cron") for entry in schedule):
+        problems.append("event-producer.yml has no `schedule` trigger with a cron: the nightly would not run")
+    problems.extend(f"event-producer.yml masks a failure with continue-on-error: {found}" for found in continue_on_error_violations(document))
+    group = str(document.get("concurrency", {}).get("group", ""))
+    if "github.workflow" not in group:
+        problems.append("the concurrency group does not name the calling workflow, so the nightly and a release dispatch could cancel each other")
     if document.get("permissions") != {"contents": "read"}:
         problems.append("the workflow-level permissions are not exactly contents: read")
-    group = str(document.get("concurrency", {}).get("group", ""))
-    if "github.workflow" not in group and not group.startswith("event-producer-nightly"):
-        problems.append("the concurrency group is not distinct from event-producer.yml's")
-    if group.startswith("event-producer-${{ github.workflow }}"):
-        problems.append("the concurrency group collides with event-producer.yml's own")
+    for name, job in jobs(document).items():
+        if "github.repository == 'spec-kitty/spec-kitty'" not in str(job.get("if", "")):
+            problems.append(f"job {name} lacks the canonical fork guard, so a fork's schedule would run it")
     return problems
 
 
@@ -419,9 +417,9 @@ def nightly_fixture() -> dict[Any, Any]:
     return load(NIGHTLY)
 
 
-@pytest.fixture(name="producer_nightly")
-def producer_nightly_fixture() -> dict[Any, Any]:
-    return load(PRODUCER_NIGHTLY)
+@pytest.fixture(name="event_producer")
+def event_producer_fixture() -> dict[Any, Any]:
+    return load(EVENT_PRODUCER)
 
 
 def test_every_new_action_of_release_and_nightly_is_sha_pinned(release: dict[Any, Any], nightly: dict[Any, Any]) -> None:
@@ -435,13 +433,9 @@ def test_no_stage_masks_a_failure(release: dict[Any, Any]) -> None:
     assert continue_on_error_violations(release) == []
 
 
-def test_release_and_nightlies_stay_non_change_triggered(
-    release: dict[Any, Any], nightly: dict[Any, Any], producer_nightly: dict[Any, Any]
-) -> None:
+def test_release_and_nightly_stay_non_change_triggered(release: dict[Any, Any], nightly: dict[Any, Any]) -> None:
     assert trigger_violations(release, {"push", "workflow_dispatch"}) == []
     assert trigger_violations(nightly, {"schedule", "workflow_dispatch"}) == []
-    assert trigger_violations(producer_nightly, {"schedule", "workflow_dispatch"}) == []
-    assert "schedule" in triggers(producer_nightly), "floor: the producer nightly is scheduled"
 
 
 def test_build_producer_calls_the_producer_workflow_on_the_release_ref(release: dict[Any, Any]) -> None:
@@ -471,11 +465,11 @@ def test_native_smoke_and_smoke_wheels_share_one_action(release: dict[Any, Any])
     assert any(step.get("uses") == SMOKE_ACTION for step in steps(jobs(release)["smoke-wheels"]))
 
 
-def test_producer_nightly_is_its_own_scheduled_workflow(producer_nightly: dict[Any, Any]) -> None:
-    assert nightly_violations(producer_nightly) == []
-    assert unpinned_uses_violations(producer_nightly, Counter()) == []
-    text = PRODUCER_NIGHTLY.read_text(encoding="utf-8")
-    assert "release_nightly_gate" in text and "ci-nightly.yml" in text, "the file must say why it is not part of ci-nightly.yml"
+def test_event_producer_workflow_carries_the_scheduled_nightly(event_producer: dict[Any, Any]) -> None:
+    assert nightly_violations(event_producer) == []
+    assert triggers(event_producer) == {"pull_request", "push", "workflow_dispatch", "workflow_call", "schedule"}
+    text = EVENT_PRODUCER.read_text(encoding="utf-8")
+    assert "release_nightly_gate" in text and "ci-nightly.yml" in text, "the file must say why the nightly is not part of ci-nightly.yml"
 
 
 def test_the_release_gate_input_workflow_does_not_contain_the_producer_job(nightly: dict[Any, Any]) -> None:
@@ -498,7 +492,7 @@ def test_docs_state_the_unproven_stages_and_the_unsigned_binaries() -> None:
     checklist = RELEASE_CHECKLIST.read_text(encoding="utf-8")
     for needle in ("build-producer", "smoke-wheels", "Gatekeeper", "SmartScreen", "Test-PyPI", "unproven"):
         assert needle in checklist, f"RELEASE_CHECKLIST.md does not mention {needle}"
-    assert "event-producer-nightly.yml" in checklist and "`producer-nightly` job in `ci-nightly.yml`" not in checklist
+    assert "`schedule` trigger of `event-producer.yml`" in checklist and "`producer-nightly` job in `ci-nightly.yml`" not in checklist
     contributing = CONTRIBUTING.read_text(encoding="utf-8")
     for needle in ("Gatekeeper", "SmartScreen", "platform wheels"):
         assert needle in contributing, f"CONTRIBUTING.md does not mention {needle}"
@@ -639,30 +633,28 @@ def test_mutation_publish_without_the_set_recheck_is_caught(release: dict[Any, A
     assert "publish-pypi does not re-run check_dist_set.py --verify-binaries on the downloaded artifact" in publish_violations(mutated)
 
 
-def test_mutation_producer_nightly_with_continue_on_error_is_caught(producer_nightly: dict[Any, Any]) -> None:
-    mutated = mutate(producer_nightly)
-    jobs(mutated)[NIGHTLY_JOB]["continue-on-error"] = True
+def test_mutation_event_producer_without_a_schedule_is_caught(event_producer: dict[Any, Any]) -> None:
+    mutated = mutate(event_producer)
+    del mutated[True if True in mutated else "on"]["schedule"]
+    assert any("no `schedule` trigger" in problem for problem in nightly_violations(mutated))
+
+
+def test_mutation_event_producer_with_continue_on_error_is_caught(event_producer: dict[Any, Any]) -> None:
+    mutated = mutate(event_producer)
+    jobs(mutated)["native"]["continue-on-error"] = True
     assert any("continue-on-error" in problem for problem in nightly_violations(mutated))
 
 
-def test_mutation_producer_nightly_removed_is_caught(producer_nightly: dict[Any, Any]) -> None:
-    mutated = mutate(producer_nightly)
-    mutated["jobs"] = {"renamed": jobs(mutated)[NIGHTLY_JOB]}
-    assert nightly_violations(mutated) == [f"no {NIGHTLY_JOB} job"]
+def test_mutation_event_producer_group_without_the_caller_name_is_caught(event_producer: dict[Any, Any]) -> None:
+    mutated = mutate(event_producer)
+    mutated["concurrency"] = {"group": "event-producer-${{ github.ref }}"}
+    assert any("concurrency group" in problem for problem in nightly_violations(mutated))
 
 
-def test_mutation_producer_nightly_without_fork_guard_or_with_wide_permissions_is_caught(producer_nightly: dict[Any, Any]) -> None:
-    mutated = mutate(producer_nightly)
-    del jobs(mutated)[NIGHTLY_JOB]["if"]
-    jobs(mutated)[NIGHTLY_JOB]["permissions"] = {"contents": "write"}
-    problems = nightly_violations(mutated)
-    assert any("fork guard" in problem for problem in problems) and any("permissions" in problem for problem in problems)
-
-
-def test_mutation_producer_nightly_sharing_the_producer_concurrency_group_is_caught(producer_nightly: dict[Any, Any]) -> None:
-    mutated = mutate(producer_nightly)
-    mutated["concurrency"] = {"group": "event-producer-${{ github.workflow }}-${{ github.ref }}"}
-    assert any("collides" in problem for problem in nightly_violations(mutated))
+def test_mutation_event_producer_job_without_fork_guard_is_caught(event_producer: dict[Any, Any]) -> None:
+    mutated = mutate(event_producer)
+    jobs(mutated)["native"]["if"] = "true"
+    assert any("fork guard" in problem for problem in nightly_violations(mutated))
 
 
 def test_waiver_path_still_publishes_after_a_green_smoke(release: dict[Any, Any]) -> None:
@@ -862,7 +854,7 @@ def test_the_model_still_leaves_a_delegate_without_pytest_opaque(tmp_path: Path,
 def test_the_real_producer_workflows_load_through_the_model() -> None:
     from tests.architectural import _gate_coverage as gate_coverage
 
-    for name in ("release.yml", "event-producer-nightly.yml", "event-producer.yml"):
+    for name in ("release.yml", "ci-nightly.yml", "event-producer.yml"):
         assert gate_coverage.load_spliced_workflow(WORKFLOWS / name)["jobs"]
 
 
