@@ -26,14 +26,15 @@ from specify_cli.core.git_ops import run_command
 from specify_cli.consolidation._constants import _STATUS_EVENTS_FILENAME, logger
 from specify_cli.consolidation.git_probes import path_is_under_worktrees
 from specify_cli.consolidation.state import ConsolidationState, save_state
+from specify_cli.status import Lane
 from specify_cli.status_lanes import has_operator_provenance, is_acceptable_ending
 from mission_runtime import MissionArtifactKind, placement_seam, resolve_placement_only
 
 if TYPE_CHECKING:
-    from specify_cli.status import DoneEvidence, EventStream, Lane
+    from specify_cli.status import DoneEvidence, EventStream
 
 # Lanes treated as "pre-approved" for the approved-replay emission.
-_PRE_APPROVED_LANE_VALUES = frozenset({"planned", "claimed", "in_progress", "for_review"})
+_PRE_APPROVED_LANE_VALUES = frozenset({Lane.PLANNED.value, Lane.CLAIMED.value, Lane.IN_PROGRESS.value, Lane.FOR_REVIEW.value})
 
 _CANCELED_LANE_VALUE = "canceled"
 
