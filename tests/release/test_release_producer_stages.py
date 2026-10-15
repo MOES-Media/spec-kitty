@@ -352,13 +352,42 @@ def ancestors(all_jobs: dict[str, Any], name: str) -> set[str]:
     return found
 
 
+STATUS_FUNCTION = re.compile(r"\b(success|failure|cancelled|always)\(\)")
+
+
+def job_runs(condition: Any, *, results: dict[str, str], upstream: set[str], event: str, skip_nightly: bool) -> bool:
+    """Decide whether a job runs, the way GitHub Actions does.
+
+    No `if:` means the implicit `success()`. An `if:` with no status-check function (success(), failure(), cancelled(), always())
+    is evaluated as `success() && (<expr>)`. Both look at the whole `upstream` chain, not only the direct `needs`: a skipped or failed
+    ancestor makes success() false. An `if:` that names a status function is evaluated as written. Cancellation is not modelled:
+    cancelled() is false and `!cancelled()` true.
+    """
+    upstream_ok = all(results[n] == "success" for n in upstream)
+    if condition is None:
+        return upstream_ok
+    expression = re.sub(r"^\$\{\{|\}\}$", "", str(condition).strip()).strip()
+    expression = " ".join(expression.split())
+    implicit = STATUS_FUNCTION.search(expression) is None
+    failed = any(results[n] == "failure" for n in upstream)
+    for token, value in (("success()", upstream_ok), ("failure()", failed), ("cancelled()", False), ("always()", True)):
+        expression = expression.replace(token, repr(value))
+    expression = re.sub(r"needs\.([\w-]+)\.result", r"R['\1']", expression)
+    expression = expression.replace("github.event_name", "EVENT").replace("inputs.skip_nightly", "SKIP")
+    expression = expression.replace("&&", " and ").replace("||", " or ")
+    expression = re.sub(r"!(?!=)", " not ", expression)
+    assert re.fullmatch(r"[\sA-Za-z_'\[\]()=-]*", expression), f"unsupported expression: {expression!r}"
+    value = bool(eval(expression, {"__builtins__": {}}, {"R": results, "EVENT": event, "SKIP": skip_nightly}))  # noqa: S307
+    return (upstream_ok and value) if implicit else value
+
+
 def simulate_publish_path(document: dict[Any, Any], *, event: str, skip_nightly: bool, outcomes: dict[str, str] | None = None) -> dict[str, str]:
     """Evaluate the `needs`/`if` graph of release.yml up to publish-pypi the way GitHub Actions does, and return each job's result.
 
     A job with no `if:` gets the implicit `success()`: it runs only when every ancestor in its `needs` chain succeeded, so a skipped
     ancestor skips it. A
     job with an `if:` runs when the expression is true. A job that ran takes the scenario outcome (`success` unless `outcomes` says
-    otherwise). The expression grammar is the small one release.yml uses: `!cancelled()`, `needs.<job>.result == '<state>'`,
+    otherwise). The expression grammar is the small one release.yml uses: `success()`, `failure()`, `cancelled()`, `always()`, `needs.<job>.result == '<state>'`,
     `github.event_name == '<x>'`, `inputs.skip_nightly`, `&&`, `||`, `!` and parentheses. Anything else raises, so the evaluator cannot
     pass a condition it does not understand.
     """
@@ -370,21 +399,7 @@ def simulate_publish_path(document: dict[Any, Any], *, event: str, skip_nightly:
         job = all_jobs[name]
         needed = needs_of(job)
         assert all(n in results for n in needed), f"{name} needs {needed}: the evaluation order is wrong"
-        condition = job.get("if")
-        if condition is None:
-            # GitHub's implicit success() looks at the whole upstream chain, not only the direct `needs`: a skipped ancestor skips the job
-            # (release.yml documents the same propagation for publish-pypi).
-            runs = all(results[n] == "success" for n in ancestors(all_jobs, name))
-        else:
-            expression = str(condition).strip()
-            expression = re.sub(r"^\$\{\{|\}\}$", "", expression).strip()
-            expression = " ".join(expression.split()).replace("!cancelled()", "True")
-            expression = re.sub(r"needs\.([\w-]+)\.result", r"R['\1']", expression)
-            expression = expression.replace("github.event_name", "EVENT").replace("inputs.skip_nightly", "SKIP")
-            expression = expression.replace("&&", " and ").replace("||", " or ")
-            expression = re.sub(r"!(?!=)", " not ", expression)
-            assert re.fullmatch(r"[\sA-Za-z_'\[\]()=-]*", expression), f"unsupported expression in {name}: {expression!r}"
-            runs = bool(eval(expression, {"__builtins__": {}}, {"R": results, "EVENT": event, "SKIP": skip_nightly}))  # noqa: S307
+        runs = job_runs(job.get("if"), results=results, upstream=ancestors(all_jobs, name), event=event, skip_nightly=skip_nightly)
         results[name] = outcomes.get(name, "success") if runs else "skipped"
     return results
 
@@ -689,6 +704,30 @@ def test_mutation_smoke_wheels_without_its_guard_loses_the_waiver_path(release: 
     mutated = mutate(release)
     jobs(mutated)["smoke-wheels"].pop("if", None)
     assert simulate_publish_path(mutated, event="workflow_dispatch", skip_nightly=True)["publish-pypi"] == "skipped"
+
+
+@pytest.mark.parametrize(
+    "condition,results,upstream,expected",
+    [
+        (None, {"a": "success"}, {"a"}, True),
+        (None, {"a": "skipped"}, {"a"}, False),
+        ("${{ needs.a.result == 'skipped' }}", {"a": "skipped"}, {"a"}, False),  # no status function: implicit success() wins
+        ("${{ needs.a.result == 'success' }}", {"a": "success"}, {"a"}, True),
+        ("${{ needs.a.result == 'success' }}", {"a": "success", "b": "skipped"}, {"a", "b"}, False),  # skipped grand-ancestor
+        ("${{ !cancelled() && needs.a.result == 'skipped' }}", {"a": "skipped"}, {"a"}, True),
+        ("${{ cancelled() }}", {"a": "success"}, {"a"}, False),
+        ("${{ always() }}", {"a": "failure"}, {"a"}, True),
+        ("${{ !always() }}", {"a": "success"}, {"a"}, False),
+        ("${{ failure() }}", {"a": "failure"}, {"a"}, True),
+        ("${{ failure() }}", {"a": "success"}, {"a"}, False),
+        ("${{ !failure() }}", {"a": "skipped"}, {"a"}, True),
+        ("${{ success() }}", {"a": "skipped"}, {"a"}, False),
+        ("${{ !success() }}", {"a": "skipped"}, {"a"}, True),
+        ("${{ success() && needs.a.result == 'success' }}", {"a": "success"}, {"a"}, True),
+    ],
+)
+def test_job_runs_models_the_implicit_success_for_each_status_function_form(condition: Any, results: dict[str, str], upstream: set[str], expected: bool) -> None:
+    assert job_runs(condition, results=results, upstream=upstream, event="push", skip_nightly=False) is expected
 
 
 def test_mutation_publish_without_cancelled_loses_the_waiver_path(release: dict[Any, Any]) -> None:
