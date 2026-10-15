@@ -391,13 +391,17 @@ jobs:
   # ---------------------------------------------------------------------------
   # smoke-wheels: installs each built wheel BY PATH into a fresh virtual environment on its own OS and runs the shared composite action
   # (the same definition event-producer.yml's native-smoke uses) in `cli` mode: a platform wheel must produce one valid row, the pure
-  # wheel must report `binary-missing`. publish-pypi needs it. The `command` is the cheapest lifecycle command that persists an in-scope
-  # row in a scratch repository (a mission scaffold); it is a first guess that the first release candidate confirms, because it needs the
-  # Python client and the schema-backed binding in the built wheel, which are not in the lane that wrote this job.
+  # wheel must report `binary-missing`. publish-pypi needs it. The `command` is `init` alone: it hands exactly ONE row (ProjectInitialized) to the
+  # producer, which the shared action's check (one publish log holding one line) requires. `agent mission create` would add MissionCreated and
+  # SpecifyStarted and a second log. Confirmed against a built wheel only up to the producer hand-off; the first release candidate runs the binary.
   # ---------------------------------------------------------------------------
   smoke-wheels:
     name: smoke-wheels (${{ matrix.leg }})
     needs: build-release
+    # On the maintainer waiver path (workflow_dispatch skip_nightly=true) nightly-gate is skipped, and the default success() would
+    # propagate that skip down the chain to this job and to publish-pypi. Override explicitly: run whenever build-release succeeded
+    # and nothing was cancelled. A failed build-release still skips this job.
+    if: ${{ !cancelled() && needs.build-release.result == 'success' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     permissions:
@@ -469,7 +473,6 @@ jobs:
           command: >-
             git commit -q --allow-empty -m init
             && "$SMOKE_PY" -m specify_cli init . --ai claude --non-interactive
-            && "$SMOKE_PY" -m specify_cli agent mission create smoke-probe --json
 
   publish-pypi:
     name: Publish to PyPI

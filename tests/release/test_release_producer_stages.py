@@ -34,6 +34,8 @@ CONTRIBUTING = ROOT / "CONTRIBUTING.md"
 SMOKE_ACTION = "./.github/actions/producer-smoke"
 PRODUCER_WORKFLOW = "./.github/workflows/event-producer.yml"
 RELEASE_REF = "${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
+SBOM_INVOCATION = re.compile(r"^\s*(?:bash\s+)?\S*tools/check-sbom\.sh\s+producer-in/producer-sbom/\S+", re.MULTILINE)
+REBUILD = re.compile(r"python3?\s+-m\s+build\b|\buv\s+build\b|\bpip\s+wheel\b|\bhatch\s+build\b|\bpython3?\s+-m\s+hatchling\b")
 PINNED = re.compile(r"^[\w.-]+/[\w.-]+(?:/[\w./-]+)?@[0-9a-f]{40}$")
 
 # The tag-pinned `uses:` lines that existed on the base commit of this mission, with their counts. They are held, not re-pinned (out of
@@ -240,6 +242,9 @@ def smoke_wheels_violations(document: dict[Any, Any]) -> list[str]:
     problems: list[str] = []
     if "build-release" not in needs_of(job):
         problems.append("smoke-wheels does not need build-release")
+    condition = str(job.get("if", ""))
+    if "!cancelled()" not in condition or "needs.build-release.result == 'success'" not in condition:
+        problems.append("smoke-wheels if: must be !cancelled() and needs.build-release.result == 'success' (the waiver path skips nightly-gate)")
     include = job.get("strategy", {}).get("matrix", {}).get("include", [])
     systems = {str(entry.get("os")) for entry in include}
     if systems != THREE_OS:
@@ -257,6 +262,11 @@ def smoke_wheels_violations(document: dict[Any, Any]) -> list[str]:
         with_ = action.get("with", {})
         if with_.get("mode") != "cli" or "matrix.expect" not in str(with_.get("expect", "")) or not with_.get("command"):
             problems.append("smoke-wheels must run the shared action in cli mode with matrix.expect and a command")
+        command = str(with_.get("command", ""))
+        # The shared action asserts exactly one publish log holding exactly one line, so the command must hand exactly one row to the
+        # producer: `init` does (ProjectInitialized); `agent mission create` adds MissionCreated and SpecifyStarted and a second log.
+        if " init " not in command or "mission" in command or command.count("specify_cli") != 1:
+            problems.append("smoke-wheels command must run `specify_cli init` alone (exactly one producer row), with no mission command")
     return problems
 
 
@@ -272,7 +282,7 @@ def publish_violations(document: dict[Any, Any]) -> list[str]:
     if set_check is None or not all(token in str(set_check.get("run", "")) for token in ("check_dist_set.py", "--verify-binaries")):
         problems.append("publish-pypi does not re-run check_dist_set.py --verify-binaries on the downloaded artifact")
     sbom = step_named(job, "Check the producer SBOM")
-    if sbom is None or "check-sbom.sh" not in str(sbom.get("run", "")):
+    if sbom is None or not SBOM_INVOCATION.search(str(sbom.get("run", ""))):
         problems.append("publish-pypi does not re-run check-sbom.sh on the downloaded producer-sbom")
     attest = step_named(job, "Attest")
     if attest is None or not str(attest.get("uses", "")).startswith("actions/attest-build-provenance@") or not PINNED.match(str(attest.get("uses", ""))):
@@ -358,7 +368,17 @@ def simulate_publish_path(
 
 def no_rebuild_violations(document: dict[Any, Any]) -> list[str]:
     """smoke-wheels and publish-pypi act on the artifacts build-release produced: they download `release-distributions` and rebuild nothing."""
-    return []
+    problems: list[str] = []
+    for name in ("smoke-wheels", "publish-pypi"):
+        job = jobs(document).get(name)
+        if job is None:
+            problems.append(f"no {name} job")
+            continue
+        problems.extend(f"{name} would rebuild a distribution: {step.get('name')}" for step in steps(job) if REBUILD.search(str(step.get("run", ""))))
+        downloads = [step for step in steps(job) if str(step.get("uses", "")).startswith("actions/download-artifact@")]
+        if not any(step.get("with", {}).get("name") == "release-distributions" for step in downloads):
+            problems.append(f"{name} does not download the release-distributions artifact")
+    return problems
 
 
 # --- the real files pass ----------------------------------------------------------------------------------------------
@@ -694,3 +714,11 @@ def test_event_producer_concurrency_group_names_the_caller() -> None:
     """Under workflow_call, github.workflow is the CALLER's name: without it the nightly call and a release dispatch share a group and cancel each other."""
     group = str(load(EVENT_PRODUCER)["concurrency"]["group"])
     assert "github.workflow" in group
+
+
+def test_mutation_a_mission_command_in_the_smoke_is_caught(release: dict[Any, Any]) -> None:
+    """`init` hands one row to the producer; adding `agent mission create` hands three and breaks the action's one-log, one-line check."""
+    mutated = mutate(release)
+    action = next(step for step in steps(jobs(mutated)["smoke-wheels"]) if step.get("uses") == SMOKE_ACTION)
+    action["with"]["command"] = str(action["with"]["command"]) + ' && "$SMOKE_PY" -m specify_cli agent mission create smoke-probe --json'
+    assert any("exactly one producer row" in problem for problem in smoke_wheels_violations(mutated))
