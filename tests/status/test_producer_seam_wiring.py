@@ -13,6 +13,7 @@ from typing import Any
 import pytest
 
 from specify_cli.core.env import MOMENT_HANDLER_DISABLE_ENV_VARS
+from specify_cli.events import sanitize_event_for_log
 from specify_cli.status import adapters, producer_client, producer_faults, zeitgeist_bridge
 from specify_cli.status.producer_client import ProducerClient
 from specify_cli.status.emit import emit_status_transition
@@ -63,6 +64,42 @@ def test_the_lifecycle_fire_forwards_its_repo_root(drain_off: None, producer_stu
     assert len(producer_stub.requests) == 1, "the lifecycle fire must reach the producer"
     (request,) = producer_stub.requests
     assert request["slot"] == "lifecycle" and request["start_path"] == str(repo)
+
+
+def _pii_row() -> dict[str, Any]:
+    return {
+        "event_id": "01J0000000000000000000P001",
+        "event_type": "MissionCreated",
+        "machine_name": "pii-machine-9f3a",
+        "hostname": "pii-host-9f3a",
+        "workspace_path": "/pii/workspace-9f3a",
+        "payload": {"developer_name": "pii-developer-9f3a", "kept": "visible"},
+        "session_started_at": "2026-01-01T00:00:00+00:00",
+        "session_ended_at": "2026-01-01T00:01:00+00:00",
+    }
+
+
+def test_the_seam_hands_the_producer_the_sanitised_row_not_the_raw_one(drain_off: None, producer_stub: ProducerStub, repo: Path) -> None:
+    """FR-004: the producer's row is the ledger line, after sanitisation; PII members never reach it."""
+    producer_stub.replay("produce-valid")
+    raw = _pii_row()
+    adapters.fire_lifecycle_fanout(row=raw, envelope={}, log_path=repo / "x" / "log.jsonl", repo_root=repo)
+    (request,) = producer_stub.requests
+    assert request["row"] == sanitize_event_for_log(raw)
+    sent = json.dumps(request["row"])
+    for leaked in ("pii-machine-9f3a", "pii-host-9f3a", "/pii/workspace-9f3a", "pii-developer-9f3a", "session_started_at", "session_ended_at"):
+        assert leaked not in sent, leaked
+    assert request["row"]["session_duration_s"] == 60 and request["row"]["payload"]["kept"] == "visible"
+
+
+def test_a_fault_on_a_pii_row_carries_no_pii_in_the_fault_log_or_stderr(
+    drain_off: None, producer_stub: ProducerStub, repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    producer_stub.script(reply="", exit_code=1)
+    adapters.fire_lifecycle_fanout(row=_pii_row(), envelope={}, log_path=repo / "x" / "log.jsonl", repo_root=repo)
+    assert _fault_classes(repo) == ["crash"]
+    logged = "".join(path.read_text(encoding="utf-8") for path in (repo / ".kittify" / "events" / "faults").glob("*.jsonl"))
+    assert "pii-" not in logged + capsys.readouterr().err
 
 
 # ---------------------------------------------------------------------------
