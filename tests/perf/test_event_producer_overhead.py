@@ -19,13 +19,16 @@ from __future__ import annotations
 import os
 import statistics
 import time
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from specify_cli.status import adapters, producer_client
 from specify_cli.status.emit import emit_status_transition_batch
 from specify_cli.status.models import TransitionRequest
+from specify_cli.status.producer_faults import FaultClass
 from specify_cli.status.producer_client import ProducerClient
 from tests._perf_helpers import (
     PRODUCER_COLD_RATIO_LIMIT,
@@ -85,10 +88,11 @@ class _Seam:
         self.spawns = 0
         real_run = ProducerClient._run
 
-        def counting_run(client: ProducerClient, request, timeout):  # noqa: ANN001, ANN202 - mirrors the patched method
+        def counting_run(client: ProducerClient, request: Mapping[str, Any], timeout: float) -> tuple[FaultClass | None, dict[str, Any] | None]:
             self.spawns += 1
             self.before_spawn()
-            return real_run(client, request, timeout)
+            outcome: tuple[FaultClass | None, dict[str, Any] | None] = real_run(client, request, timeout)
+            return outcome
 
         self.delay = 0.0
         monkeypatch.setattr(ProducerClient, "_run", counting_run)

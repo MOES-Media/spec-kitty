@@ -285,7 +285,7 @@ def test_a_mission_without_a_mission_id_publishes_project_scoped_and_changes_not
     assert with_producer.returncode == without.returncode == 0
 
     def body(result: subprocess.CompletedProcess[str], project: Project) -> dict[str, Any]:
-        parsed = json.loads(result.stdout)
+        parsed: dict[str, Any] = json.loads(result.stdout)
         parsed.pop("event_id")
         parsed["status_events_path"] = parsed["status_events_path"].replace(str(project.root), "<root>")
         return parsed
