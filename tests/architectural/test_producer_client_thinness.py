@@ -413,6 +413,14 @@ def _client_with(extra: str, *, head: str = "") -> str:
     return head + _CLIENT_SOURCE + "\n" + extra + "\n"
 
 
+def _faults_aliased_today() -> str:
+    """The cycle-3 P1 mutation: ``fault_summary`` reads today through an aliased kernel.clock import."""
+    imported = "from kernel.clock import date, datetime, now_utc, timedelta"
+    used = "    today = _now_utc().date()"
+    assert imported in _FAULTS_SOURCE and used in _FAULTS_SOURCE
+    return _FAULTS_SOURCE.replace(imported, imported + "\nfrom kernel.clock import now_utc as _utc_now", 1).replace(used, "    today = _utc_now().date()", 1)
+
+
 @pytest.mark.parametrize(
     ("label", "mutated", "needle"),
     [
@@ -485,11 +493,47 @@ def _client_with(extra: str, *, head: str = "") -> str:
             _FAULTS_SOURCE.replace("def write_stderr_warning", "def _sneak(text):\n    return json.loads(text)\n\n\ndef write_stderr_warning", 1),
             "json.loads outside the decode site",
         ),
+        # An aliased clock import is still a clock read (cycle-3 P1): the gate resolves the names an import binds.
+        (_FAULTS, _faults_aliased_today(), "wall-clock read"),
+        (
+            _FAULTS,
+            _FAULTS_SOURCE.replace("def write_stderr_warning", "def _sneak() -> object:\n    return kc.current_instant()\n\n\ndef write_stderr_warning", 1).replace(
+                "from __future__ import annotations\n", "from __future__ import annotations\n\nimport kernel.clock as kc\n", 1
+            ),
+            "wall-clock read",
+        ),
+        (
+            _CLIENT,
+            _client_with("class _Stamp:\n    def stamp(self):\n        return _utc_now()", head="from kernel.clock import now_utc as _utc_now\n"),
+            "wall-clock read",
+        ),
+        (
+            _CLIENT,
+            _client_with("class _Stamp:\n    def stamp(self):\n        return kc.current_instant()", head="import kernel.clock as kc\n"),
+            "wall-clock read",
+        ),
+        (
+            _DOCTOR,
+            "from kernel.clock import now_utc as _utc_now\n" + _DOCTOR_SOURCE + "\n\nclass _Stamp:\n    def stamp(self):\n        return _utc_now()\n",
+            "wall-clock read",
+        ),
+        (
+            _DOCTOR,
+            "import kernel.clock as kc\n" + _DOCTOR_SOURCE + "\n\nclass _Stamp:\n    def stamp(self):\n        return kc.current_instant()\n",
+            "wall-clock read",
+        ),
     ],
 )
 def test_a_self_mutation_of_a_new_module_fails_the_gate(label: str, mutated: str, needle: str) -> None:
     problems = new_module_violations(label, mutated)
     assert any(needle in problem for problem in problems), problems
+
+
+def test_a_local_variable_named_modules_is_not_a_dynamic_lookup() -> None:
+    """Only ``sys.modules`` reaches a clock; a local ``modules`` name is ordinary (cycle-3 P4)."""
+    mutated = _client_with("def _count(items):\n    modules = tuple(items)\n    return len(modules)")
+    problems = new_module_violations(_CLIENT, mutated)
+    assert not any("dynamic lookup" in problem for problem in problems), problems
 
 
 @pytest.fixture
