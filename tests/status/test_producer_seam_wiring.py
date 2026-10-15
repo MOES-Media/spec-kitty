@@ -8,6 +8,7 @@ import subprocess
 import sys
 import threading
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 
 import pytest
@@ -110,6 +111,16 @@ def test_the_seam_hands_the_producer_the_sanitised_row_not_the_raw_one(drain_off
     for leaked in ("pii-machine-9f3a", "pii-host-9f3a", "/pii/workspace-9f3a", "pii-developer-9f3a", "session_started_at", "session_ended_at"):
         assert leaked not in sent, leaked
     assert request["row"]["session_duration_s"] == 60 and request["row"]["payload"]["kept"] == "visible"
+
+
+def test_the_seam_sanitises_any_mapping_row_not_only_a_dict(drain_off: None, producer_stub: ProducerStub, repo: Path) -> None:
+    """The client accepts any Mapping, so a non-dict row must not skip sanitisation."""
+    producer_stub.replay("produce-valid")
+    raw = _pii_row()
+    adapters.fire_lifecycle_fanout(row=MappingProxyType(raw), envelope={}, log_path=repo / "x" / "log.jsonl", repo_root=repo)
+    (request,) = producer_stub.requests
+    assert request["row"] == sanitize_event_for_log(raw)
+    assert "pii-machine-9f3a" not in json.dumps(request["row"])
 
 
 def test_a_fault_on_a_pii_row_carries_no_pii_in_the_fault_log_or_stderr(
