@@ -450,7 +450,8 @@ def test_b_floor_the_function_is_found() -> None:
 
 def _engine_with_stamp(replacement: str) -> str:
     source = (_SRC / _ENGINE).read_text(encoding="utf-8")
-    return source.replace("str(ulid.ULID())", replacement) if "str(ulid.ULID())" in source else source
+    assert "str(ulid.ULID())" in source, "the stamp this mutation replaces is missing"
+    return source.replace("str(ulid.ULID())", replacement)
 
 
 @pytest.mark.parametrize(

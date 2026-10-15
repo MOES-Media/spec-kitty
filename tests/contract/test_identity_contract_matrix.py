@@ -162,7 +162,7 @@ def _build_runtime_moment_envelope() -> dict[str, Any]:
         (feature_dir / "meta.json").write_text(json.dumps({"mission_id": ULID_CANONICAL}), encoding="utf-8")
         run_dir = root / ".kittify" / "runtime" / "runs" / run_id
         run_dir.mkdir(parents=True)
-        record = {"event_type": "MissionRunStarted", "timestamp": "2026-04-11T12:00:00+00:00", "payload": payload.model_dump(mode="json")}
+        record = {"event_id": "01KNRQK0R1ZDS8Z57M1TRXF0XS", "row_version": 1, "event_type": "MissionRunStarted", "timestamp": "2026-04-11T12:00:00+00:00", "payload": payload.model_dump(mode="json")}
         (run_dir / "run.events.jsonl").write_text(json.dumps(record, sort_keys=True) + "\n", encoding="utf-8")
         producer = RuntimeMomentProducer.for_mission(feature_dir=feature_dir, mission_slug=MISSION_SLUG, mission_type="software-dev")
         producer.emit_mission_run_started(payload)

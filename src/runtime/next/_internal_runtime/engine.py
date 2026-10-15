@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Literal, cast
 from uuid import uuid4
 
+import ulid
 import yaml
 from pydantic import BaseModel, ConfigDict
 
@@ -108,6 +109,8 @@ def _append_event(run_dir: Path, event_type: str, payload: dict[str, Any]) -> No
     event_file = run_dir / "run.events.jsonl"
     # canonical-producer-exempt: #1248 -- local runtime journal mirrors package-retired schema.
     event = {
+        "event_id": str(ulid.ULID()),
+        "row_version": 1,
         "event_type": event_type,
         "timestamp": now_utc_iso(),
         "payload": payload,
