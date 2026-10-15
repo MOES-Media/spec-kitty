@@ -387,7 +387,7 @@ def mutate(document: dict[Any, Any]) -> dict[Any, Any]:
 
 def test_mutation_a_tag_pinned_new_action_fails_the_pin_rule(release: dict[Any, Any]) -> None:
     mutated = mutate(release)
-    steps(jobs(mutated)["smoke-wheels"]).append({"name": "x", "uses": "some/action@v1"})
+    jobs(mutated)["smoke-wheels"]["steps"].append({"name": "x", "uses": "some/action@v1"})
     jobs(mutated)["smoke-wheels"]["steps"].append({"name": "y", "uses": "actions/checkout@v6"})  # one more than the base commit holds
     assert unpinned_uses_violations(mutated, BASE_TAG_PINNED_RELEASE) == [
         "new action not pinned to a 40-hex commit: some/action@v1",
@@ -403,7 +403,7 @@ def test_mutation_continue_on_error_is_caught(release: dict[Any, Any]) -> None:
 
 def test_mutation_a_pull_request_trigger_is_caught(release: dict[Any, Any]) -> None:
     mutated = mutate(release)
-    mutated["on"]["pull_request"] = {}
+    mutated[True if True in mutated else "on"]["pull_request"] = {}  # PyYAML reads the key `on` as True
     assert trigger_violations(mutated, {"push", "workflow_dispatch"}) == ["pull_request"]
 
 
@@ -427,7 +427,7 @@ def test_mutation_build_release_without_build_producer_edge_is_caught(release: d
 
 def test_mutation_swapping_two_build_steps_is_caught(release: dict[Any, Any]) -> None:
     mutated = mutate(release)
-    build_steps = steps(jobs(mutated)["build-release"])
+    build_steps = jobs(mutated)["build-release"]["steps"]
     a, b = step_index(jobs(mutated)["build-release"], "Build the platform wheels"), step_index(jobs(mutated)["build-release"], "Verify checksum continuity")
     build_steps[a], build_steps[b] = build_steps[b], build_steps[a]
     assert any("out of order" in problem for problem in build_release_violations(mutated))
@@ -523,3 +523,39 @@ def test_mutation_nightly_job_removed_is_caught(nightly: dict[Any, Any]) -> None
     mutated = mutate(nightly)
     del jobs(mutated)[NIGHTLY_JOB]
     assert nightly_violations(mutated) == [f"no {NIGHTLY_JOB} job"]
+
+
+# --- the workflow model accepts a multi-job reusable workflow that does not run the suite --------------------------------
+
+
+def _caller_and_delegate(tmp_path: Path, delegate_run: str) -> Path:
+    workflows = tmp_path / ".github" / "workflows"
+    workflows.mkdir(parents=True)
+    (workflows / "caller.yml").write_text("on: [schedule]\njobs:\n  call:\n    uses: ./.github/workflows/delegate.yml\n", encoding="utf-8")
+    delegate = {
+        "on": {"workflow_call": {}},
+        "jobs": {
+            "one": {"runs-on": "ubuntu-24.04", "steps": [{"run": "echo build"}]},
+            "two": {"runs-on": "ubuntu-24.04", "steps": [{"run": delegate_run}]},
+        },
+    }
+    (workflows / "delegate.yml").write_text(yaml.safe_dump(delegate), encoding="utf-8")
+    return workflows / "caller.yml"
+
+
+def test_the_model_leaves_a_multi_job_delegate_opaque_when_it_runs_no_pytest(tmp_path: Path) -> None:
+    """event-producer.yml has five jobs and is called from release.yml and ci-nightly.yml; the splicer used to refuse any multi-job delegate."""
+    from tests.architectural import _gate_coverage as gate_coverage
+
+    caller = _caller_and_delegate(tmp_path, "echo smoke")
+    spliced = gate_coverage.load_spliced_workflow(caller)
+    assert spliced["jobs"]["call"]["steps"] == []
+
+
+def test_the_model_refuses_a_multi_job_delegate_that_runs_pytest(tmp_path: Path) -> None:
+    """The mutation: a pytest step in a multi-job delegate would be invisible to every consumer of the model, so it is refused."""
+    from tests.architectural import _gate_coverage as gate_coverage
+
+    caller = _caller_and_delegate(tmp_path, "python -m pytest tests/x")
+    with pytest.raises(AssertionError, match="must not run the suite"):
+        gate_coverage.load_spliced_workflow(caller)

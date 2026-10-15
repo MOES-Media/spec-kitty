@@ -1361,12 +1361,27 @@ def _splice_local_uses(data: dict[str, Any], workflows_dir: Path) -> dict[str, A
         else:
             target = yaml.safe_load(target_path.read_text(encoding="utf-8")) or {}
             target_jobs = target.get("jobs") or {}
-            # Single-purpose assumption made load-bearing: flattening multiple
-            # delegate jobs into one caller key would conflate their markers/coverage.
-            assert len(target_jobs) == 1, (
-                f"reusable workflow {called} must define exactly one job to splice "
-                f"into caller {name!r}; found {sorted(target_jobs)}"
-            )
+            if len(target_jobs) != 1:
+                # A multi-job delegate cannot be flattened into one caller key without conflating its jobs' markers and coverage.
+                # It is therefore left opaque (the caller keeps no delegate steps), which is sound only while no job of the delegate
+                # reaches pytest: a pytest step in a multi-job delegate would be invisible to every model consumer, so it is refused.
+                runs = "\n".join(
+                    str(step.get("run") or "")
+                    for delegate_job in target_jobs.values()
+                    if isinstance(delegate_job, dict)
+                    for step in delegate_job.get("steps") or []
+                    if isinstance(step, dict)
+                )
+                assert not re.search(r"\bpytest\b", runs), (
+                    f"reusable workflow {called} defines several jobs ({sorted(target_jobs)}) and one of them runs pytest; "
+                    f"a multi-job delegate cannot be spliced into caller {name!r}, so it must not run the suite"
+                )
+                merged = dict(job)
+                merged["steps"] = _splice_step_level_actions(
+                    list(merged.get("steps") or []), actions_dir, frozenset(),
+                )
+                spliced[name] = merged
+                continue
             delegate_steps: list[Any] = []
             delegate_runs_on: Any = None
             for delegate_job in target_jobs.values():
