@@ -66,6 +66,26 @@ def test_the_lifecycle_fire_forwards_its_repo_root(drain_off: None, producer_stu
     assert request["slot"] == "lifecycle" and request["start_path"] == str(repo)
 
 
+def test_the_retrospective_lifecycle_fire_forwards_its_repo_root(drain_off: None, producer_stub: ProducerStub, repo: Path) -> None:
+    """#5181: the retrospective row reaches the producer with the acting repo as its start path, never the process CWD."""
+    from specify_cli.retrospective.lifecycle_events import Actor, emit_skipped
+
+    producer_stub.replay("produce-valid")
+    (repo / "kitty-specs" / "retro-feature").mkdir(parents=True)
+    emit_skipped(
+        "01J0000000000000000000M001",
+        "retro-feature",
+        repo,
+        skip_reason="operator bypass",
+        skip_reason_source="cli_flag",
+        policy_source={},
+        actor=Actor(kind="human", id="tester", display="Tester"),
+        event_log_dir=repo / "kitty-specs" / "retro-feature",
+    )
+    (request,) = producer_stub.requests
+    assert request["slot"] == "lifecycle" and request["start_path"] == str(repo)
+
+
 def _pii_row() -> dict[str, Any]:
     return {
         "event_id": "01J0000000000000000000P001",
