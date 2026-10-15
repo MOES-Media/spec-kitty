@@ -20,8 +20,11 @@ on:
 # aggregate run's own id instead: a per-subject singleton group (only a re-run of the
 # same aggregate run shares it, which is same-subject newer evidence). The survivor is
 # the last completion and re-reads live evidence, so coalescing loses no verdict.
+# A scheduled completion (the Event Producer nightly) is the second exception: its head_sha is
+# the main tip, but identify() emits no subject for event=schedule, so sharing the tip's group
+# would let that no-op cancel a real main verdict at the same SHA. It keys on its own run id.
 concurrency:
-  group: ci-fleet-verdict-${{ github.event.workflow_run.path == '.github/workflows/ci-aggregate.yml' && format('aggregate-{0}', github.event.workflow_run.id) || github.event.workflow_run.head_sha }}
+  group: ci-fleet-verdict-${{ github.event.workflow_run.path == '.github/workflows/ci-aggregate.yml' && format('aggregate-{0}', github.event.workflow_run.id) || github.event.workflow_run.event == 'schedule' && format('schedule-{0}', github.event.workflow_run.id) || github.event.workflow_run.head_sha }}
   cancel-in-progress: true
 
 # Fork guard: the fleet verdict (PR `[ci]` comments, main-red P0 issues) is

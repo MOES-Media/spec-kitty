@@ -444,6 +444,19 @@ before the tag.
 After the tag, open the next candidate on `main` (for example `4.0.0rc5` →
 `4.0.0rc6`) exactly as in step 9 below.
 
+### Platform wheels and the native event producer
+
+A release publishes one pure wheel (`py3-none-any`), the sdist and three
+platform wheels that bundle the native event producer (Linux x86_64 as
+`manylinux_2_28`, macOS arm64 from macOS 11, Windows x86_64). The set is pinned
+in `scripts/release/dist-set.json`; `release.yml` builds the platform wheels from
+the tagged checkout, checks the set and the binaries, installs each wheel by path
+on its own OS (`smoke-wheels`) and attests the distributions before publishing.
+The binaries are unsigned: macOS Gatekeeper and Windows SmartScreen may warn on
+first run. Other architectures are out of scope and get the pure wheel. These
+stages run only on a release tag, so they are unproven until the first release
+candidate; a candidate tag publishes to the real PyPI.
+
 ### Quick Release (Patch)
 
 For a small release whose product changes have already landed on `main`:

@@ -799,6 +799,9 @@ def real_workflows_copy(tmp_path: Path) -> Path:
     """A writable copy of the whole live ``.github/workflows/`` directory."""
     destination = tmp_path / "workflows"
     shutil.copytree(gc.WORKFLOWS_DIR, destination)
+    # The sibling composite actions go along: the model resolves them next to the workflows directory, and a multi-job reusable delegate
+    # that uses one is refused (fail closed) when the action cannot be found.
+    shutil.copytree(gc.WORKFLOWS_DIR.parent / "actions", tmp_path / "actions")
     return destination
 
 

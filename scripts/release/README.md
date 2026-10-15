@@ -87,6 +87,52 @@ python scripts/release/check_exact_install.py \
   --console-arg=--version
 ```
 
+Release builds also produce one platform wheel per producer leg (the native
+event producer bundled at `specify_cli/_native/`). When `dist/` holds several
+wheels, select one with its whole tag:
+
+```bash
+python scripts/release/check_exact_install.py \
+  --package spec-kitty-cli \
+  --wheel-tag py3-none-win_amd64 \
+  --console-script spec-kitty \
+  --console-arg=--version
+```
+
+Without `--wheel-tag`, a directory with more than one wheel is refused.
+
+### `check_dist_set.py`
+
+Build glue for the producer release set. `dist-set.json` pins the expected
+files: one platform wheel per leg (with its exact tag), one sdist and the pure
+wheel (`py3-none-any`). The script compares `dist/` with that list and reports
+every missing or unexpected file, a repeated tag and mixed versions. It never
+reads a wheel's contents in this default mode. Exit status is 1 when anything
+is wrong, with one line per problem on stderr.
+
+```bash
+# The set: exactly the pinned wheels, sdist and pure wheel.
+python scripts/release/check_dist_set.py --dist-dir dist
+
+# Each platform wheel's binary against its own PRODUCER.sha256 member; the
+# Linux and macOS binaries must be executable; the pure wheel and the sdist
+# must carry no binary.
+python scripts/release/check_dist_set.py --dist-dir dist --verify-binaries
+
+# Checksum continuity: the downloaded producer-<leg> artifacts (each holding
+# producer-manifest.json and its binary) against the wheels. Every manifest
+# must name this source commit and its pinned tag, and the recomputed sha256 of
+# the downloaded binary must equal both the manifest and the wheel member.
+python scripts/release/check_dist_set.py --dist-dir dist --verify-manifests \
+  --manifests producer-artifacts --commit "$(git rev-parse HEAD)"
+```
+
+Executable proof lives in `tests/release/test_check_dist_set.py` (stub wheels,
+one mutation per rule) and `tests/cross_cutting/packaging/test_producer_wheel_contents.py`
+(real builds with a stub binary). The script is pinned thin by
+`tests/architectural/test_build_glue_thin.py`: file names, sha256 of a file and
+archive listings only.
+
 ## Workflow Integration
 
 - PR release metadata validation: `.github/workflows/release-readiness.yml`

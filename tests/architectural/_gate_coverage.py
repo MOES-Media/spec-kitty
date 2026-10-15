@@ -1323,6 +1323,53 @@ def _splice_step_level_actions(
     return spliced
 
 
+def _delegate_suite_refusal(
+    called: str,
+    caller_job: str,
+    target_jobs: dict[str, Any],
+    workflows_dir: Path,
+) -> str | None:
+    """Why a multi-job reusable delegate must be refused, or ``None`` when no job of it reaches the suite.
+
+    A multi-job delegate is left opaque (see :func:`_splice_local_uses`), which is sound only while none of its jobs runs pytest.
+    "Runs pytest" is decided with this model's own semantics, not a text search: every job's steps are spliced with
+    :func:`_splice_step_level_actions` (local composite actions, nested ones too) and every ``run:`` line goes through
+    :func:`suite_invocations`, which resolves ``make`` targets (prerequisites and recipe-level ``make``) and in-repo scripts.
+    It fails closed: a job-level ``uses:`` inside the delegate, a local composite action that cannot be resolved, and a ``make``
+    target that the Makefile does not define are all refused, because the model cannot see what they run.
+    """
+    repo_root = workflows_dir.parent.parent
+    actions_dir = workflows_dir.parent / "actions"
+    makefile_path = repo_root / _MAKEFILE_NAME
+    makefile = makefile_path if makefile_path.is_file() else None
+    make_model = parse_makefile(makefile_path) if makefile is not None else None
+    head = (
+        f"reusable workflow {called} defines several jobs ({sorted(target_jobs)}) and one of them reaches pytest or cannot be resolved; "
+        f"a multi-job delegate cannot be spliced into caller {caller_job!r}, so it must not run the suite"
+    )
+    for job_name, delegate_job in target_jobs.items():
+        if not isinstance(delegate_job, dict):
+            continue
+        if delegate_job.get("uses"):
+            return f"{head}: job {job_name!r} calls {delegate_job['uses']!r} itself (cannot be resolved)"
+        for step in _splice_step_level_actions(list(delegate_job.get("steps") or []), actions_dir, frozenset()):
+            if not isinstance(step, dict):
+                continue
+            uses = step.get("uses")
+            if isinstance(uses, str) and uses.startswith(_LOCAL_ACTION_PREFIX):
+                return f"{head}: job {job_name!r} uses local action {uses!r} that cannot be resolved"
+            for logical in join_continuations(str(step.get("run") or "")):
+                if re.search(r"\bpytest\b", logical):
+                    return f"{head}: job {job_name!r} runs pytest directly ({logical.strip()!r})"
+                for segment in _SEGMENT_SPLIT_RE.split(logical):
+                    for target in make_targets_in_command(strip_to_command(segment).strip()):
+                        if make_model is None or (target not in make_model.recipes and target not in make_model.prerequisites):
+                            return f"{head}: job {job_name!r} runs make target {target!r} that cannot be resolved"
+                if suite_invocations(logical, makefile=makefile, repo_root=repo_root):
+                    return f"{head}: job {job_name!r} reaches the suite through {logical.strip()!r}"
+    return None
+
+
 def _splice_local_uses(data: dict[str, Any], workflows_dir: Path) -> dict[str, Any]:
     """Inline local ``uses:`` delegation — workflows AND composite actions.
 
@@ -1361,12 +1408,18 @@ def _splice_local_uses(data: dict[str, Any], workflows_dir: Path) -> dict[str, A
         else:
             target = yaml.safe_load(target_path.read_text(encoding="utf-8")) or {}
             target_jobs = target.get("jobs") or {}
-            # Single-purpose assumption made load-bearing: flattening multiple
-            # delegate jobs into one caller key would conflate their markers/coverage.
-            assert len(target_jobs) == 1, (
-                f"reusable workflow {called} must define exactly one job to splice "
-                f"into caller {name!r}; found {sorted(target_jobs)}"
-            )
+            if len(target_jobs) != 1:
+                # A multi-job delegate cannot be flattened into one caller key without conflating its jobs' markers and coverage.
+                # It is therefore left opaque (the caller keeps no delegate steps), which is sound only while no job of the delegate
+                # reaches pytest: a pytest step in a multi-job delegate would be invisible to every model consumer, so it is refused.
+                refusal = _delegate_suite_refusal(called, name, target_jobs, workflows_dir)
+                assert refusal is None, refusal
+                merged = dict(job)
+                merged["steps"] = _splice_step_level_actions(
+                    list(merged.get("steps") or []), actions_dir, frozenset(),
+                )
+                spliced[name] = merged
+                continue
             delegate_steps: list[Any] = []
             delegate_runs_on: Any = None
             for delegate_job in target_jobs.values():

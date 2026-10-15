@@ -615,3 +615,21 @@ def test_release_workflow_classifies_hotfix_channel(tmp_path: Path, job_name: st
 
     assert result.returncode == 0, result.stderr
     assert output.read_text().strip() == f"is_prerelease={str(is_prerelease).lower()}"
+
+
+def test_release_graph_adds_build_producer_and_smoke_wheels_as_needs_edges() -> None:
+    """WP09: every new release stage is a ``needs`` edge, so ``publish-pypi`` cannot start unless each one succeeded.
+
+    This is a static graph test. ``release.yml`` runs on a tag push or a dispatch only (a pull request never starts it), so none of these
+    stages executes on a pull request; the first execution is the first 4.0 release candidate.
+    """
+    jobs = load_workflow("release.yml")["jobs"]
+
+    assert jobs["build-producer"]["uses"] == "./.github/workflows/event-producer.yml"
+    assert jobs["build-producer"]["with"]["mode"] == "release"
+    assert jobs["build-producer"]["with"]["ref"] == load_workflow("release.yml")["env"]["RELEASE_REF"]
+    assert jobs["build-producer"]["needs"] == ["nightly-gate"]
+    assert set(jobs["build-release"]["needs"]) == {"nightly-gate", "build-producer"}
+    assert jobs["smoke-wheels"]["needs"] == "build-release" or jobs["smoke-wheels"]["needs"] == ["build-release"]
+    assert set(jobs["publish-pypi"]["needs"]) == {"build-release", "smoke-wheels"}
+    assert jobs["verify-pypi-installability"]["needs"] == "publish-pypi"

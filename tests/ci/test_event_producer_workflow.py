@@ -179,7 +179,8 @@ def test_no_continue_on_error_anywhere(event_producer: dict[str, Any]) -> None:
 
 def test_triggers_and_path_filters(event_producer: dict[str, Any]) -> None:
     on = triggers(event_producer)
-    assert set(on) == {"pull_request", "push", "workflow_dispatch", "workflow_call"}
+    assert set(on) == {"pull_request", "push", "workflow_dispatch", "workflow_call", "schedule"}
+    assert on["schedule"] and all(entry["cron"] for entry in on["schedule"]), "the informational nightly (WP09, AC-036)"
     assert on["pull_request"]["paths"] == on["push"]["paths"]
     assert on["push"]["branches"] == ["main"]
     paths = set(on["pull_request"]["paths"])
