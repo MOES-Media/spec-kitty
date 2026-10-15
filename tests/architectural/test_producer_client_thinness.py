@@ -198,6 +198,38 @@ def _call_root(func: ast.expr) -> str:
     return func.id if isinstance(func, ast.Name) else ""
 
 
+# Method names that read the clock off a date/time TYPE; as a bare attribute (a value) they are still a read.
+_CLOCK_METHODS = {"now", "today", "utcnow", "fromtimestamp", "utcfromtimestamp"}
+# Bare names that are clock reads in this codebase whether or not an import binds them (``now`` etc. are ordinary locals).
+_CLOCK_VALUE_NAMES = _WALL_CLOCK_CALLS - {"now", "time", "today", "ctime", "gmtime", "localtime", "monotonic", "perf_counter"} | {"_now_utc"}
+
+
+def _clock_value_problems(label: str, tree: ast.Module, owner: dict[int, str], names: tuple[set[str], set[str]]) -> list[str]:
+    """Any clock reference that is not a call's callee is a read waiting to happen (default, alias, argument, return, container).
+
+    Calls are judged by the call rule; a reference in any other position fails unless it sits inside ``_now_utc``.
+    """
+    clock_functions, clock_modules = names
+    callees = {id(node.func) for node in ast.walk(tree) if isinstance(node, ast.Call)}
+    problems: list[str] = []
+    for node in ast.walk(tree):
+        if id(node) in callees or not isinstance(getattr(node, "ctx", None), ast.Load):
+            continue
+        if label == _FAULTS and owner.get(id(node), "") == "_now_utc":
+            continue
+        if isinstance(node, ast.Name):
+            hit = node.id in clock_functions or node.id in clock_modules or node.id in _CLOCK_VALUE_NAMES
+            shown = node.id
+        elif isinstance(node, ast.Attribute):
+            hit = _call_root(node) in clock_modules or node.attr in _CLOCK_METHODS or node.attr in _CLOCK_VALUE_NAMES
+            shown = node.attr
+        else:
+            continue
+        if hit:
+            problems.append(f"{label}: clock referenced as a value ({shown}) outside _now_utc ({owner.get(id(node), '') or 'module level'})")
+    return problems
+
+
 def new_module_violations(label: str, source: str) -> list[str]:
     """Rules (a) and (d) for one of the three new modules, given its source text."""
     tree = ast.parse(source)
@@ -219,6 +251,7 @@ def new_module_violations(label: str, source: str) -> list[str]:
         problems.append(f"{label}: top-level symbols differ: extra={sorted(symbols - _SYMBOLS[label])} missing={sorted(_SYMBOLS[label] - symbols)}")
     owner = _enclosing_function_names(tree)
     clock_functions, clock_modules = _clock_bindings(tree)
+    problems.extend(_clock_value_problems(label, tree, owner, (clock_functions, clock_modules)))
     for node in ast.walk(tree):
         if isinstance(node, (ast.Name, ast.Attribute)):
             ident = node.id if isinstance(node, ast.Name) else node.attr
