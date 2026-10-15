@@ -19,6 +19,10 @@ five rules (rule (b), the journal stamping, belongs to WP07):
     base plus that file's row, so a helper such as ``_mint_id`` or an import of
     ``uuid`` added to ``emit.py`` fails.
 
+The gate's purpose is to catch honest drift, a contributor reaching for a clock or an id by habit,
+not to resist an adversary: deliberate evasions (stdlib-internal aliases, string-built keys,
+lambda defaults) are out of scope.
+
 Every rule has a floor (the thing scanned is found and counted above zero) and a
 self-mutation case that must fail. Rules (c) and (e) walk the filesystem, never a
 diff, so an untracked file is seen.
@@ -107,7 +111,12 @@ _WALL_CLOCK_CALLS = {
     "perf_counter_ns",
 }
 # Dynamic-lookup spellings that reach a clock without naming it: banned outright in the three new modules.
-_DYNAMIC_LOOKUP_NAMES = {"__import__", "__globals__", "importlib", "import_module", "modules", "getattr", "globals", "vars", "eval", "exec"}
+_DYNAMIC_LOOKUP_NAMES = {"__import__", "__globals__", "importlib", "import_module", "getattr", "globals", "vars", "eval", "exec"}
+# ``modules`` is a lookup only as ``sys.modules`` (or ``from sys import modules``); a local name is ordinary.
+# Modules that hand out a clock: any name bound from one of them is a clock name, under any alias.
+_CLOCK_SOURCES = {"kernel.clock", "time", "datetime"}
+# Types imported from a clock source are not reads; their ``now()``-style calls are caught by the vocabulary above.
+_CLOCK_TYPES = {"date", "datetime", "timedelta", "timezone", "tzinfo", "UTC"}
 _DECODE_SITES = {_CLIENT: {"_read_reply"}, _FAULTS: {"_read_fault_rows"}, _DOCTOR: set()}
 
 
@@ -159,8 +168,34 @@ def _mentions_publish_log(tree: ast.AST) -> bool:
     return any(_PUBLISH_MARKER in text for text in literals) or ("events" in literals and "publish" in literals)
 
 
-def _dynamic_lookup_problems(label: str, ident: str) -> list[str]:
-    return [f"{label}: dynamic lookup via {ident} can reach the wall clock unseen"] if ident in _DYNAMIC_LOOKUP_NAMES else []
+def _dynamic_lookup_problems(label: str, node: ast.Name | ast.Attribute) -> list[str]:
+    ident = node.id if isinstance(node, ast.Name) else node.attr
+    hit = ident in _DYNAMIC_LOOKUP_NAMES or (isinstance(node, ast.Attribute) and ident == "modules" and getattr(node.value, "id", "") == "sys")
+    return [f"{label}: dynamic lookup via {ident} can reach the wall clock unseen"] if hit else []
+
+
+def _dynamic_lookup_import_problems(label: str, module: str, name: str) -> list[str]:
+    return [f"{label}: dynamic lookup via modules can reach the wall clock unseen"] if (module, name) == ("sys", "modules") else []
+
+
+def _clock_bindings(tree: ast.AST) -> tuple[set[str], set[str]]:
+    """The local names an import binds to a clock source: (functions, modules), whatever the alias."""
+    functions: set[str] = set()
+    modules: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module in _CLOCK_SOURCES:
+            functions.update(alias.asname or alias.name for alias in node.names if alias.name not in _CLOCK_TYPES)
+        elif isinstance(node, ast.Import):
+            modules.update(
+                alias.asname or alias.name.split(".")[0] for alias in node.names if alias.name in _CLOCK_SOURCES or alias.name.split(".")[0] in _CLOCK_SOURCES
+            )
+    return functions, modules
+
+
+def _call_root(func: ast.expr) -> str:
+    while isinstance(func, ast.Attribute):
+        func = func.value
+    return func.id if isinstance(func, ast.Name) else ""
 
 
 def new_module_violations(label: str, source: str) -> list[str]:
@@ -174,6 +209,7 @@ def new_module_violations(label: str, source: str) -> list[str]:
             problems.append(f"{label}: forbidden import {module}:{name}")
         elif module not in allowed and not any(module == prefix or module.startswith(prefix + ".") for prefix in allowed if prefix != "."):
             problems.append(f"{label}: import {module}:{name} is outside the closed allowlist")
+        problems.extend(_dynamic_lookup_import_problems(label, module, name))
         if name in _BRIDGE_ENVELOPE_NAMES:
             problems.append(f"{label}: imports the bridge envelope code {name}")
         if label == _CLIENT and module == _FAULTS_MODULE and name not in _CLIENT_FAULT_NAMES:
@@ -182,12 +218,13 @@ def new_module_violations(label: str, source: str) -> list[str]:
     if symbols != _SYMBOLS[label]:
         problems.append(f"{label}: top-level symbols differ: extra={sorted(symbols - _SYMBOLS[label])} missing={sorted(_SYMBOLS[label] - symbols)}")
     owner = _enclosing_function_names(tree)
+    clock_functions, clock_modules = _clock_bindings(tree)
     for node in ast.walk(tree):
         if isinstance(node, (ast.Name, ast.Attribute)):
             ident = node.id if isinstance(node, ast.Name) else node.attr
             if ident in _BRIDGE_ENVELOPE_NAMES:
                 problems.append(f"{label}: names the bridge envelope code {ident}")
-            problems.extend(_dynamic_lookup_problems(label, ident))
+            problems.extend(_dynamic_lookup_problems(label, node))
         if not isinstance(node, ast.Call):
             continue
         func = node.func
@@ -198,7 +235,9 @@ def new_module_violations(label: str, source: str) -> list[str]:
         # producer_faults owns the one clock read (_now_utc) and may call it; no other module may.
         if label == _FAULTS and callee == "_now_utc":
             continue
-        if callee in _WALL_CLOCK_CALLS and not (label == _FAULTS and where == "_now_utc"):
+        sanctioned = label == _FAULTS and where == "_now_utc"
+        resolved = (isinstance(func, ast.Name) and func.id in clock_functions) or _call_root(func) in clock_modules
+        if (callee in _WALL_CLOCK_CALLS or resolved) and not sanctioned:
             problems.append(f"{label}: wall-clock read {callee}() outside _now_utc ({where or 'module level'})")
     if _mentions_publish_log(tree) and any(isinstance(n, ast.Call) and _is_write_open(n) for n in ast.walk(tree)):
         problems.append(f"{label}: opens the publish-log path for write")
