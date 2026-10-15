@@ -41,7 +41,7 @@ class RegistryValidatorTest {
         Map<String, Object> extra = document("a");
         @SuppressWarnings("unchecked")
         Map<String, Object> data = (Map<String, Object>) extra.get("data");
-        data.put("bogus", 1);
+        data.put("bogus", new JsonNumber("1"));
         Map<String, Object> missing = document("a");
         ((Map<?, ?>) missing.get("data")).clear();
 
@@ -95,7 +95,7 @@ class RegistryValidatorTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> data = (Map<String, Object>) bad.get("data");
         for (int i = 0; i < 40; i++) {
-            data.put("extra" + "x".repeat(20) + i, i);
+            data.put("extra" + "x".repeat(20) + i, new JsonNumber(Integer.toString(i)));
         }
 
         String violation = validator.violation(bad).orElseThrow();
