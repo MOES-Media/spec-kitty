@@ -30,7 +30,7 @@ import logging
 import math
 import os
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -176,10 +176,10 @@ def _dispatch_handlers(
     """
     client_keys = {_handler_key(produce_status_handler), _handler_key(produce_lifecycle_handler)}
     row = kwargs.get("row")
-    if isinstance(row, dict):
+    if isinstance(row, Mapping):
         # The persisted row as written to the ledger: the same sanitisation the
         # ledger writers apply, so the row a handler sees equals the ledger line (FR-004).
-        kwargs["row"] = sanitize_event_for_log(row)
+        kwargs["row"] = sanitize_event_for_log(dict(row))
     for handler in handlers:
         is_client = _handler_key(handler) in client_keys
         try:
