@@ -3,6 +3,7 @@ package ai.speckitty.producer.launcher.binding;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import ai.speckitty.producer.adapter.json.Json;
+import ai.speckitty.producer.domain.value.JsonNumber;
 import ai.speckitty.producer.launcher.Main;
 import java.io.IOException;
 import java.io.InputStream;
@@ -26,6 +27,8 @@ class ProductionEntryTest {
             assertThat(in).as("protocol/smoke-request.json").isNotNull();
             Map<String, Object> request = Repos.parse(new String(in.readAllBytes(), StandardCharsets.UTF_8));
             request.put("start_path", scratch.toString());
+            // This test's subject is the write path and the schema, not the deadline: a loaded host must not trip the 3 s watchdog.
+            request.put("deadline_ms", new JsonNumber("60000"));
             return Json.render(request).getBytes(StandardCharsets.UTF_8);
         }
     }
