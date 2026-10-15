@@ -251,7 +251,6 @@ def emit_decision_opened(
         recorded_at=now,
     )
 
-    # canonical-producer-exempt: #1198 -- canonical local-only decisions JSONL envelope.
     event_dict = {
         "event_id": _generate_ulid(),
         "at": now.isoformat(),
@@ -334,7 +333,6 @@ def emit_decision_resolved(
             recorded_at=now,
         )
 
-    # canonical-producer-exempt: #1198 -- canonical local-only decisions JSONL envelope.
     event_dict = {
         "event_id": _generate_ulid(),
         "at": now.isoformat(),

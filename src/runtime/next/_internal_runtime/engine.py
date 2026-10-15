@@ -107,7 +107,6 @@ def _runtime_runs_dir(run_store: Path | None = None) -> Path:
 
 def _append_event(run_dir: Path, event_type: str, payload: dict[str, Any]) -> None:
     event_file = run_dir / "run.events.jsonl"
-    # canonical-producer-exempt: #1248 -- local runtime journal mirrors package-retired schema.
     event = {
         "event_id": str(ulid.ULID()),
         "row_version": 1,

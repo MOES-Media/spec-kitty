@@ -305,7 +305,6 @@ def _lifecycle_write_lock(repo_root: Path | None, mission_dir: Path | None) -> A
     return lock
 
 
-# canonical-producer-exempt: #1198 -- local lifecycle JSONL envelope.
 def _build_envelope(
     event_type: str,
     payload: Mapping[str, Any],
@@ -316,7 +315,7 @@ def _build_envelope(
     project_slug: str | None = None,
     schema_version: str = "5.0.0",
 ) -> dict[str, Any]:
-    return {  # canonical-producer-exempt: #1198 — see function-level comment above
+    return {
         "event_id": _generate_event_id(),
         "event_type": event_type,
         "aggregate_id": aggregate_id,
