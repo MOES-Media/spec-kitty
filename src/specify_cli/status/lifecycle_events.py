@@ -495,10 +495,10 @@ def fanout_lifecycle_event_hosted(
     handing it the raw path and letting IT canonicalise (and fail closed) is
     correct and simpler.
     """
-    from specify_cli.status.adapters import fire_lifecycle_saas_fanout
+    from specify_cli.status.adapters import fire_lifecycle_fanout
 
     repo_root = log_path.parent if log_path is not None else None
-    fire_lifecycle_saas_fanout(envelope=envelope, log_path=log_path, repo_root=repo_root)
+    fire_lifecycle_fanout(row=envelope, envelope=envelope, log_path=log_path, repo_root=repo_root)
 
 
 def _match_lifecycle_event(

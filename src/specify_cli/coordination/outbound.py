@@ -11,8 +11,8 @@ sites stay one line:
 
 Rather than:
 
-    from specify_cli.status import fire_saas_fanout
-    txn.defer_outbound(lambda: fire_saas_fanout(...))
+    from specify_cli.status import fire_status_fanout
+    txn.defer_outbound(lambda: fire_status_fanout(...))
 
 Rationale: FR-022 requires that no outbound side-effect fires if the
 local commit rolls back.  Routing every SaaS emission through
@@ -24,7 +24,7 @@ NFR-009 / SC-09 (no spurious outbound on rollback) is verified in
 ``tests/specify_cli/coordination/test_outbound.py``.
 
 This module deliberately does **not** migrate existing direct callers of
-``fire_saas_fanout``.  Migrating those call sites is out of scope for
+``fire_status_fanout``.  Migrating those call sites is out of scope for
 WP09 (would expand the touched-files set well beyond hardening tests);
 this module is the opt-in surface that future work can route through.
 """
@@ -89,18 +89,18 @@ def _send_to_saas(
     """Forward ``event`` to the canonical SaaS fanout adapter.
 
     The actual sink boundary lives in :mod:`specify_cli.status.adapters`
-    as ``fire_saas_fanout``.  We import lazily so tests can monkeypatch
+    as ``fire_status_fanout``.  We import lazily so tests can monkeypatch
     the adapter without forcing this module to carry the dependency at
     import time.
 
-    The default ``fire_saas_fanout`` signature accepts ``**kwargs`` and
+    The default ``fire_status_fanout`` signature accepts ``**kwargs`` and
     routes through the SaaS sync wiring.  Callers that already have a
     structured ``StatusEvent`` need only pass it through.
     """
-    from specify_cli.status import fire_saas_fanout  # noqa: PLC0415
+    from specify_cli.status import fire_status_fanout  # noqa: PLC0415
     from specify_cli.status import WPStatusChangeMetadata  # noqa: PLC0415
 
-    fire_saas_fanout(
+    fire_status_fanout(
         wp_id=event.wp_id,
         from_lane=str(event.from_lane),
         to_lane=str(event.to_lane),
@@ -110,6 +110,8 @@ def _send_to_saas(
         metadata=WPStatusChangeMetadata.from_status_event(
             event, policy_metadata=event.policy_metadata
         ),
+        # The persisted row for the event producer (FR-004).
+        row=event.to_dict(),
         # The emitting checkout root, so the Zeitgeist bridge resolves relay
         # credentials from it instead of the process cwd (#125).
         repo_root=repo_root,

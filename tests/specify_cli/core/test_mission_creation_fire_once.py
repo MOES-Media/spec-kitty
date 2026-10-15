@@ -10,11 +10,11 @@ preserve:
 
 * the canonical ``MissionCreated`` event is written **exactly once** (no drop,
   no double-write), and
-* the daemon/SaaS lifecycle fan-out (``fire_lifecycle_saas_fanout``) fires
+* the daemon/SaaS lifecycle fan-out (``fire_lifecycle_fanout``) fires
   **exactly once** for that event.
 
 It drives the *real* adapter registry — registering a spy observer through the
-public ``register_lifecycle_saas_fanout_handler`` API rather than patching the
+public ``register_lifecycle_fanout_handler`` API rather than patching the
 fire function — so a double-fire or drop introduced by the rewired lifecycle
 path would fail here.
 """
@@ -121,7 +121,7 @@ def _isolated_adapter_registry() -> Iterator[_RegistryFixture]:
     def _lifecycle_spy(*, envelope: Any = None, **_kw: Any) -> None:
         lifecycle_events.append(dict(envelope or {}))
 
-    status_adapters.register_lifecycle_saas_fanout_handler(_lifecycle_spy)
+    status_adapters.register_lifecycle_fanout_handler(_lifecycle_spy)
     try:
         yield lifecycle_events
     finally:

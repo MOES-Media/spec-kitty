@@ -9,7 +9,7 @@ backward emission appeared to be silently dropped/replaced.
 
 These tests pin the contract at the layer this repo owns:
 
-1. ``emit_status_transition`` fires ``fire_saas_fanout`` exactly once per
+1. ``emit_status_transition`` fires ``fire_status_fanout`` exactly once per
    forward transition AND exactly once for a forced backward review-rejection
    transition (``in_review → planned``, ``force=True``).
 2. The backward fan-out invocation carries the correct ``from_lane`` /
@@ -18,7 +18,7 @@ These tests pin the contract at the layer this repo owns:
    fan-out invocations and the last one is the backward rollback.
 
 If the canary failure recurs and these tests still pass, the regression is
-downstream of ``fire_saas_fanout`` (in ``emit_wp_status_changed`` →
+downstream of ``fire_status_fanout`` (in ``emit_wp_status_changed`` →
 ``OfflineQueue.queue_event``) — the breadcrumb log added in
 ``src/specify_cli/status/adapters.py`` will then surface it in operator
 logs. See ``kitty-specs/investigate-canary-followups-1142-1141-01KS02TV/
@@ -63,7 +63,7 @@ def _enable_saas_fanout_for_this_module(
     this directory except a single whitelisted filename. Without this
     override our registered handler would never fire and the assertions
     would pass vacuously. We restore the original ``_saas_fan_out`` (the
-    one that calls ``fire_saas_fanout``) for the duration of every test in
+    one that calls ``fire_status_fanout``) for the duration of every test in
     this file.
     """
     monkeypatch.setattr(_emit_module, "_saas_fan_out", _REAL_SAAS_FAN_OUT)
@@ -176,7 +176,7 @@ class TestBackwardTransitionFanOut:
         def fake_saas(**kwargs: Any) -> None:
             captured.append(dict(kwargs))
 
-        adapters.register_saas_fanout_handler(fake_saas)
+        adapters.register_status_fanout_handler(fake_saas)
 
         try:
             _drive_forward_chain(
@@ -250,7 +250,7 @@ class TestBackwardTransitionFanOut:
         def fake_saas(**kwargs: Any) -> None:
             captured.append(dict(kwargs))
 
-        adapters.register_saas_fanout_handler(fake_saas)
+        adapters.register_status_fanout_handler(fake_saas)
 
         try:
             _drive_forward_chain(
@@ -307,7 +307,7 @@ class TestBackwardTransitionFanOut:
         def fake_saas(**kwargs: Any) -> None:
             captured.append(dict(kwargs))
 
-        adapters.register_saas_fanout_handler(fake_saas)
+        adapters.register_status_fanout_handler(fake_saas)
 
         try:
             _drive_forward_chain(

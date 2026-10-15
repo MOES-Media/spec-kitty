@@ -229,3 +229,47 @@ def test_stale_plan_raises_and_writes_nothing(tmp_path: Path) -> None:
     assert called == []
     assert emitter.calls == []
     assert {path.name: path.read_bytes() for path in run_dir.iterdir() if path.is_file()} == files_before
+
+
+def test_an_authority_denial_is_emitted_with_the_payload_the_journal_recorded(tmp_path: Path) -> None:
+    """#6185: ``DecisionAuthorityDenied`` reaches the emitter seam (the engine never calls the producer itself)."""
+    from runtime.next._internal_runtime import provide_decision_answer
+    from runtime.next._internal_runtime.schema import ActorIdentity, MissionRuntimeError
+    from tests.next.test_provide_decision_answer_characterisation import _audit_run, _events
+
+    class _Denials(NullEmitter):
+        def __init__(self) -> None:
+            super().__init__()
+            self.denied: list[dict[str, Any]] = []
+
+        def emit_decision_authority_denied(self, payload: dict[str, Any]) -> None:
+            self.denied.append(payload)
+
+    run_ref = _audit_run(tmp_path, significance=None)
+    emitter = _Denials()
+    intruder = ActorIdentity(actor_id="intruder", actor_type="human", provider=None, model=None, tool=None)
+
+    with pytest.raises(MissionRuntimeError):
+        provide_decision_answer(run_ref, "audit:review_gate", "approve", intruder, emitter=emitter)
+
+    journalled = [e for e in _events(run_ref) if e["event_type"] == "DecisionAuthorityDenied"]
+    assert len(journalled) == 1
+    assert emitter.denied == [journalled[0]["payload"]]
+
+
+def test_an_accepted_answer_emits_no_denial(tmp_path: Path) -> None:
+    from runtime.next._internal_runtime import provide_decision_answer
+    from runtime.next._internal_runtime.schema import ActorIdentity
+    from tests.next.test_provide_decision_answer_characterisation import _audit_run
+
+    class _Denials(NullEmitter):
+        denied: list[Any] = []
+
+        def emit_decision_authority_denied(self, payload: dict[str, Any]) -> None:
+            self.denied.append(payload)
+
+    run_ref = _audit_run(tmp_path, significance=None)
+    emitter = _Denials()
+    owner = ActorIdentity(actor_id="owner-1", actor_type="human", provider=None, model=None, tool=None)
+    provide_decision_answer(run_ref, "audit:review_gate", "approve", owner, emitter=emitter)
+    assert emitter.denied == []

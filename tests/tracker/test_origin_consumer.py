@@ -4,7 +4,7 @@ Covers the remaining T015 projections (the former dossier-sync projection,
 T015.1, was removed by issue #677 along with the dead
 ``fire_dossier_sync``/``register_dossier_sync_handler`` fan-out seam it
 exercised — that registry had no production registrants):
-  1. SaaS fan-out — fire_lifecycle_saas_fanout is called via emit_mission_created_local.
+  1. SaaS fan-out — fire_lifecycle_fanout is called via emit_mission_created_local.
   2. Origin binding end-to-end — with consume_pending_origin_impl registered as the
      REAL consumer (as it is in production), a mission creation populates
      MissionCreationResult.origin_binding_* and clears the pending origin.
@@ -229,12 +229,12 @@ def test_consumer_qualified_name_is_stable() -> None:
 
 
 # ---------------------------------------------------------------------------
-# T015.2 — SaaS fan-out: fire_lifecycle_saas_fanout fires via emit_mission_created_local
+# T015.2 — SaaS fan-out: fire_lifecycle_fanout fires via emit_mission_created_local
 # ---------------------------------------------------------------------------
 
 
 def test_saas_fanout_fires_via_emit_mission_created_local(tmp_path: Path) -> None:
-    """fire_lifecycle_saas_fanout is called when emit_mission_created_local runs.
+    """fire_lifecycle_fanout is called when emit_mission_created_local runs.
 
     Verifies that the lifecycle event fan-out chain is intact after the
     WP02 removal of the direct emit_mission_created call from core/.
@@ -246,7 +246,7 @@ def test_saas_fanout_fires_via_emit_mission_created_local(tmp_path: Path) -> Non
 
     mock_fanout = MagicMock()
 
-    with patch("specify_cli.status.adapters.fire_lifecycle_saas_fanout", mock_fanout):
+    with patch("specify_cli.status.adapters.fire_lifecycle_fanout", mock_fanout):
         emit_mission_created_local(
             tmp_path,
             mission_slug="test-fanout-01TSTULID00000001",

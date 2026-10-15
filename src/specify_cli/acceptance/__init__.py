@@ -21,7 +21,7 @@ from specify_cli.decisions.models import DecisionStatus
 from specify_cli.decisions.store import load_index
 from specify_cli.mission import Mission, MissionError, get_mission_for_feature
 from specify_cli.mission_metadata import locked_update_meta, record_acceptance, resolve_mission_identity
-from specify_cli.status import CanonicalStatusNotFoundError
+from specify_cli.status import CanonicalStatusNotFoundError, Lane
 from specify_cli.status import EVENTS_FILENAME, SNAPSHOT_FILENAME, StoreError
 
 from specify_cli.task_utils import (
@@ -148,7 +148,15 @@ _DECISION_ID_MARKER = "decision_id:"
 # module constant is retired onto the single acceptable-ending authority
 # (``specify_cli.status_lanes.is_acceptable_ending``, FR-005 / directive 044).
 
-_LEGACY_NOT_DONE_LANES = ("planned", "claimed", "doing", "in_progress", "for_review")
+# ``doing`` is the legacy alias of ``in_progress`` (``LANE_ALIASES``); it is not a ``Lane`` member.
+_DOING_ALIAS = "doing"
+_LEGACY_NOT_DONE_LANES = (
+    Lane.PLANNED.value,
+    Lane.CLAIMED.value,
+    _DOING_ALIAS,
+    Lane.IN_PROGRESS.value,
+    Lane.FOR_REVIEW.value,
+)
 # The ``canceled`` hint (FR-003) names the WP and states that operator-authored
 # cancellation provenance is required — a synthetic cancellation (``--force``
 # with no operator ``--note``) cannot be used to skip work silently. The trailing

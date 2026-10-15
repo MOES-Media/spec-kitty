@@ -4,7 +4,7 @@ control offer, readable event frame)".
 
 Runs the REAL production fan-out chain this issue wires up --
 ``decisions.emit.emit_decision_opened`` -> ``_queue_decision_fanout`` ->
-``status.fire_lifecycle_saas_fanout`` ->
+``status.fire_lifecycle_fanout`` ->
 ``zeitgeist_bridge.lifecycle_moment_handler`` ->
 ``_broadcast_lifecycle_envelope`` -> ``_broadcast_moment`` -- against a REAL,
 unmodified zeitgeist relay container, not this package's own recording

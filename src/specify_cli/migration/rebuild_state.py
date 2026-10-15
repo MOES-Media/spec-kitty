@@ -51,6 +51,7 @@ from specify_cli.migration.canonicalization import (
 )
 from specify_cli.mission_metadata import load_meta_or_empty
 from specify_cli.status import feature_status_lock, mission_lock_key
+from specify_cli.status_lanes import CANONICAL_LANES
 from specify_cli.workspace.root_resolver import resolve_status_lock_root
 
 logger = logging.getLogger(__name__)
@@ -141,9 +142,8 @@ _LANE_ORDER: list[str] = [
 
 _TERMINAL_LANES: frozenset[str] = frozenset({"done", "canceled", "approved"})
 
-_VALID_LANES: frozenset[str] = frozenset(
-    {"planned", "claimed", "in_progress", "for_review", "done", "blocked", "canceled", "approved"}
-)
+# Every canonical lane except ``in_review``, which a legacy rebuild never synthesizes.
+_VALID_LANES: frozenset[str] = frozenset(CANONICAL_LANES) - {"in_review"}
 
 
 def _resolve_alias(lane: str) -> str:

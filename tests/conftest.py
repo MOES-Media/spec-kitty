@@ -313,6 +313,10 @@ def pytest_configure(config: pytest.Config) -> None:
     )
     config.addinivalue_line(
         "markers",
+        "real_event_producer: opt out of the autouse event-producer silencer; the real client runs (against a stub binary or a missing one)",
+    )
+    config.addinivalue_line(
+        "markers",
         "architectural: Architectural enforcement tests (layer rules, import-graph invariants)",
     )
     config.addinivalue_line(
@@ -2315,6 +2319,24 @@ def _drain_posture_enabled(request: pytest.FixtureRequest, monkeypatch: pytest.M
             reason="drain enabled (test fixture)",
         ),
     )
+
+
+@pytest.fixture(autouse=True)
+def _event_producer_silenced(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the native event producer out of every test that is not about it (mission event-producer-reroute).
+
+    A source checkout ships no native binary, so the registered producer client would print its
+    ``binary-missing`` warning on stderr for every lifecycle row any test persists, and a CLI test
+    that parses its mixed output would break. ``ProducerClient.produce`` becomes a no-op; a test
+    about the client, the seam wiring or a fault opts out with the ``real_event_producer`` marker
+    or by requesting the ``producer_stub`` fixture (which installs a stub binary).
+    """
+    if request.node.get_closest_marker("real_event_producer") is not None or "producer_stub" in request.fixturenames:
+        return
+
+    from specify_cli.status.producer_client import ProducerClient
+
+    monkeypatch.setattr(ProducerClient, "produce", lambda self, **_kwargs: None)
 
 
 @pytest.fixture()

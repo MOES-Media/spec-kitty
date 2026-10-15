@@ -11,7 +11,7 @@ first-class ``WPResolvedBindingChanged`` bridge:
    this test goes red).
 2. **The claim fan-out payload carries the resolved binding** — a claim transition
    whose actor is a resolved-binding dict fans out (via the existing
-   ``_saas_fan_out`` / ``fire_saas_fanout`` seam) with the ``{role, profile, tool,
+   ``_saas_fan_out`` / ``fire_status_fanout`` seam) with the ``{role, profile, tool,
    model}`` payload intact; the delivery rides ``spec_kitty_events`` 6.1.0's
    ``Union[str, Dict]`` ``actor`` — zero shared-package change.
 3. **A plain-string actor is unchanged** — the defensive feature-detection never
@@ -229,7 +229,7 @@ def test_claim_fanout_payload_carries_resolved_binding(tmp_path: Path) -> None:
     captured: list[dict[str, object]] = []
     try:
         _seed_to_planned(feature_dir, tmp_path)  # genesis -> planned (no handler yet)
-        adapters.register_saas_fanout_handler(lambda **kw: captured.append(dict(kw)))
+        adapters.register_status_fanout_handler(lambda **kw: captured.append(dict(kw)))
 
         dict_actor = _build_resolved_actor(
             role="implementer",
@@ -267,7 +267,7 @@ def test_claim_with_string_actor_fans_out_unchanged(tmp_path: Path) -> None:
     captured: list[dict[str, object]] = []
     try:
         _seed_to_planned(feature_dir, tmp_path)
-        adapters.register_saas_fanout_handler(lambda **kw: captured.append(dict(kw)))
+        adapters.register_status_fanout_handler(lambda **kw: captured.append(dict(kw)))
 
         emit_status_transition(
             feature_dir,

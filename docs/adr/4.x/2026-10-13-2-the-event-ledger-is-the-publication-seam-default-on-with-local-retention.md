@@ -162,7 +162,7 @@ The default numbers above are a proposal for the operator to confirm.
 
 ### Follow-up debt
 
-- The seam's slots and registration functions are still named after the retired SaaS fan-out (`register_saas_fanout_handler`, `register_lifecycle_saas_fanout_handler`, `fire_saas_fanout`, `fire_lifecycle_saas_fanout` in `status/adapters.py`). Local adapters would register into slots called `saas_fanout`; renaming them to transport-neutral names is recorded here as follow-up debt.
+- **Discharged (mission `event-producer-reroute`).** The seam's slots and registration functions were named after the retired SaaS fan-out. They are now transport-neutral: `fire_status_fanout`, `fire_lifecycle_fanout`, `register_status_fanout_handler` and `register_lifecycle_fanout_handler` in `status/adapters.py`, and the timeout variable is `SPEC_KITTY_FANOUT_TIMEOUT`, with `SPEC_KITTY_SAAS_FANOUT_TIMEOUT` kept as an alias because the contract pins it.
 - A tail path for `decisions.events.jsonl`, `.kittify/canonical-events.jsonl` and the run journals (D-2).
 
 ### Consequences
@@ -192,6 +192,16 @@ The default numbers above are a proposal for the operator to confirm.
 - With drain on (both scopes), the hosted handler fires as before.
 - An architectural test pins that every handler registered by `ensure_zeitgeist_moment_handlers` checks drain first.
 - The cleanup command, run against a fixture with open and closed Missions, deletes only eligible local runs and logs, removes their `feature-runs.json` entries, keeps every log of a Mission with an unfinished step, and never changes a tracked file.
+
+## Amendment 2026-10-15 (the local event producer): D-1, D-2 and D-3 extended
+
+**Why.** Mission `event-producer-reroute` (spec-kitty#6185) builds the producer this record anticipated: a native Java binary that the CLI reaches through a thin Python client on the fan-out seam (see [ADR 2026-10-15-1](2026-10-15-1-event-producer-java-native-binary-behind-thin-python-client.md)). It departs from three decisions above, for the new rows only.
+
+**D-1 departure: CloudEvents rows, not flat rows.** For the rows the producer writes, the persisted form is a CloudEvents 1.0 structured-JSON row (`ai.spec-kitty` type prefix, ULID `id`, `dataschema` and `schemaversion` taken from the `spec-kitty-events` producer registry), not the flat versioned ledger row D-1 describes. The committed ledgers keep their existing rows and are not rewritten: D-1's flat rows stay the persisted form of `status.events.jsonl` and the other committed files, and a reader keeps accepting them (legacy rows are upcast on read). The `data` schemas are the same single set `spec-kitty-events` publishes, so this is one contract, not two. The run journal gains a ULID `event_id` and a `row_version` (a field stamp on the existing writer, not a new row shape).
+
+**D-2 extension: a new read path.** The publish log (`.kittify/events/publish/`), the fault log (`.kittify/events/faults/`) and the Lamport clock state (under the git common directory, `<git-common-dir>/spec-kitty/event-producer`) are a read path beside `events tail` and the Read API: an integration may read the publish log, which is a gitignored, derived copy and never the authority. The committed ledger stays the sole authority for Mission state.
+
+**D-3 extension: new local-tier files.** The closed list of local-tier files gains the publish log, the fault log and the clock state (the clock state is outside the working tree, so retention does not touch it). Retention for them is a Java operation (the producer's `retain`), reached through the `doctor` pass-through; it is explicit and dry-run first, and it never touches the committed tier.
 
 ## Pros and Cons of the Options
 

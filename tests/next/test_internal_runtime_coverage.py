@@ -408,7 +408,7 @@ def test_null_emitter_seed_and_emits_never_raise() -> None:
     emit_methods = [
         name for name in dir(events_mod.RuntimeEventEmitter) if name.startswith("emit_")
     ]
-    assert len(emit_methods) == 8  # (R-2: the Protocol is exactly the eight emit_* methods)
+    assert len(emit_methods) == 9  # (R-2: the Protocol is exactly the nine emit_* methods; the ninth is the denial route of #6185)
 
     emitter.seed_from_snapshot(object())
     for name in emit_methods:
@@ -431,7 +431,7 @@ def test_null_emitter_bare_constructor_unchanged() -> None:
 
 
 def test_null_emitter_for_mission_not_on_protocol() -> None:
-    # R-2: the Protocol stays at the eight emit_* methods; construction/seeding are
+    # R-2: the Protocol stays at the nine emit_* methods; construction/seeding are
     # bridge-side concerns on the object the factory returns.
     protocol_names = set(vars(events_mod.RuntimeEventEmitter))
     assert "for_mission" not in protocol_names

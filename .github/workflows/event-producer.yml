@@ -21,6 +21,7 @@ on:
     paths:
       - 'services/event-producer/**'
       - 'scripts/release/**'
+      - 'src/specify_cli/status/producer_*.py'
       - 'pyproject.toml'
       - '.github/actions/producer-smoke/**'
       - '.github/workflows/event-producer.yml'
@@ -29,6 +30,7 @@ on:
     paths:
       - 'services/event-producer/**'
       - 'scripts/release/**'
+      - 'src/specify_cli/status/producer_*.py'
       - 'pyproject.toml'
       - '.github/actions/producer-smoke/**'
       - '.github/workflows/event-producer.yml'

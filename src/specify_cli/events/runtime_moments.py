@@ -6,7 +6,7 @@ obtained from ``runtime_emitter_for_mission``. This producer is what that seam
 returns in a normal CLI process: it publishes the six ``mission_next`` runtime
 moments (run started/completed, step issued/auto-completed, decision input
 requested/answered) through the existing bounded lifecycle fan-out
-(``specify_cli.status.fire_lifecycle_saas_fanout`` -> the Zeitgeist moment
+(``specify_cli.status.fire_lifecycle_fanout`` -> the Zeitgeist moment
 handler), exactly the path decision and mission-lifecycle moments already take.
 
 Identity and time come from the journal, never from this process:
@@ -47,7 +47,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -71,7 +71,6 @@ from runtime.next._internal_runtime.significance import (
     SignificanceEvaluatedPayload,
     TimeoutExpiredPayload,
 )
-from specify_cli.core import hosted_posture
 from specify_cli.core.constants import KITTIFY_DIR
 from specify_cli.core.paths import assert_safe_path_segment
 from specify_cli.mission_metadata import resolve_mission_identity
@@ -91,6 +90,8 @@ class JournalRecord:
 
     line: int
     timestamp: str
+    #: The raw parsed journal line: the persisted row the event producer reads (FR-004).
+    row: dict[str, Any] = field(default_factory=dict, compare=False)
 
 
 def find_run_journal(feature_dir: Path, run_id: str) -> Path | None:
@@ -135,7 +136,7 @@ def latest_matching_record(journal: Path, event_type: str, payload: dict[str, An
             if record is None:
                 continue
             if record.get("event_type") == event_type and record.get("payload") == payload:
-                match = JournalRecord(line=line_number, timestamp=str(record.get("timestamp") or ""))
+                match = JournalRecord(line=line_number, timestamp=str(record.get("timestamp") or ""), row=record)
     return match
 
 
@@ -202,40 +203,22 @@ class RuntimeMomentProducer:
         self._publish(MISSION_RUN_COMPLETED, payload)
 
     def emit_significance_evaluated(self, payload: SignificanceEvaluatedPayload) -> None:
-        """Not a runtime moment: significance stays in the local run journal."""
-        del payload
+        self._publish("SignificanceEvaluated", payload)
+
+    def emit_decision_authority_denied(self, payload: dict[str, Any]) -> None:
+        self._publish("DecisionAuthorityDenied", payload)
 
     def emit_decision_timeout_expired(self, payload: TimeoutExpiredPayload) -> None:
         """Not a runtime moment: timeout expiry stays in the local run journal."""
         del payload
 
-    def _repo_root(self) -> Path:
-        """The starting point a posture read should canonicalise from
-        (#5181, m2). ``self._feature_dir`` is always a real path -- never
-        pre-resolved to ``None`` here: :func:`hosted_posture.drain_posture`
-        (via ``_resolve_repo_root``) does its OWN walk-up-and-fail-closed
-        canonicalisation for an explicit, non-``None`` ``project_root`` and
-        never falls back to CWD for one. Pre-resolving here and collapsing an
-        unresolvable feature_dir to ``None`` before calling ``drain_posture``
-        was the bug (m2): ``None`` is indistinguishable there from "no root
-        was offered at all", so a target that genuinely could not resolve
-        (e.g. a hermetic test directory with no ``.git``/``.kittify`` above
-        it) was silently re-gated on the process's own CWD instead of being
-        treated as drain-off."""
-        return self._feature_dir
-
-    def _publish(self, event_type: str, payload: BaseModel) -> None:
-        # C-004: this module already lives in specify_cli, so calling
-        # specify_cli.core.hosted_posture here creates no runtime -> specify_cli
-        # edge. A deliberate drain-off skip is logged at debug, never warning
-        # -- only a genuine failure below (find_run_journal/latest_matching_record
-        # raising) is worth a warning.
-        repo_root = self._repo_root()
-        if not hosted_posture.drain_posture(project_root=repo_root).enabled:
-            logger.debug("Runtime moment %s not published: drain off", event_type)
-            return
+    def _publish(self, event_type: str, payload: BaseModel | dict[str, Any]) -> None:
+        # The producer fires whatever the hosted drain posture is (FR-002): the
+        # drain gate lives in the Zeitgeist handler behind the fan-out seam, so
+        # no posture is read here. Only a genuine failure below
+        # (find_run_journal/latest_matching_record raising) is worth a warning.
         try:
-            self._publish_journalled(event_type, payload, repo_root=repo_root)
+            self._publish_journalled(event_type, payload, repo_root=self._feature_dir)
         except Exception:
             logger.warning(
                 "Runtime moment %s not published; mission runtime state unaffected",
@@ -243,8 +226,8 @@ class RuntimeMomentProducer:
                 exc_info=True,
             )
 
-    def _publish_journalled(self, event_type: str, payload: BaseModel, *, repo_root: Path | None) -> None:
-        payload_dict = payload.model_dump(mode="json")
+    def _publish_journalled(self, event_type: str, payload: BaseModel | dict[str, Any], *, repo_root: Path | None) -> None:
+        payload_dict = payload if isinstance(payload, dict) else payload.model_dump(mode="json")
         run_id = str(payload_dict.get("run_id") or "")
         journal = find_run_journal(self._feature_dir, run_id)
         if journal is None:
@@ -255,7 +238,7 @@ class RuntimeMomentProducer:
             logger.warning("Runtime moment %s not published: not journalled in %s", event_type, journal)
             return
 
-        from specify_cli.status import fire_lifecycle_saas_fanout  # noqa: PLC0415 -- the status facade's hosted fan-out seam
+        from specify_cli.status import fire_lifecycle_fanout  # noqa: PLC0415 -- the status facade's hosted fan-out seam
 
         envelope = {
             "event_id": moment_event_id(run_id, record, event_type),
@@ -264,7 +247,8 @@ class RuntimeMomentProducer:
             "timestamp": record.timestamp,
             "payload": self._with_mission_identity(payload_dict),
         }
-        fire_lifecycle_saas_fanout(envelope=envelope, log_path=journal, repo_root=repo_root)
+        # ``row`` is the raw journal line the producer reads; ``envelope`` (the UUID5 moment id) stays for the hosted handler only.
+        fire_lifecycle_fanout(row=record.row, envelope=envelope, log_path=journal, repo_root=repo_root)
 
     def _with_mission_identity(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Stamp the mission's slug and ULID into the published payload where the engine left them empty."""

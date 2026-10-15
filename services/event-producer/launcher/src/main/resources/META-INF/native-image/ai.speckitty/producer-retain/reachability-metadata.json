@@ -1,0 +1,8 @@
+{
+  "reflection": [
+    {
+      "type": "ai.speckitty.producer.launcher.retain.RetainHandler",
+      "methods": [ { "name": "<init>", "parameterTypes": [] } ]
+    }
+  ]
+}

@@ -154,7 +154,7 @@ def _build_runtime_moment_envelope() -> dict[str, Any]:
     published: list[dict[str, Any]] = []
     with (
         tempfile.TemporaryDirectory() as tmp,
-        patch("specify_cli.status.fire_lifecycle_saas_fanout", side_effect=lambda **kwargs: published.append(kwargs)),
+        patch("specify_cli.status.fire_lifecycle_fanout", side_effect=lambda **kwargs: published.append(kwargs)),
     ):
         root = Path(tmp)
         feature_dir = root / "kitty-specs" / MISSION_SLUG
@@ -162,7 +162,13 @@ def _build_runtime_moment_envelope() -> dict[str, Any]:
         (feature_dir / "meta.json").write_text(json.dumps({"mission_id": ULID_CANONICAL}), encoding="utf-8")
         run_dir = root / ".kittify" / "runtime" / "runs" / run_id
         run_dir.mkdir(parents=True)
-        record = {"event_type": "MissionRunStarted", "timestamp": "2026-04-11T12:00:00+00:00", "payload": payload.model_dump(mode="json")}
+        record = {
+            "event_id": "01KNRQK0R1ZDS8Z57M1TRXF0XS",
+            "row_version": 1,
+            "event_type": "MissionRunStarted",
+            "timestamp": "2026-04-11T12:00:00+00:00",
+            "payload": payload.model_dump(mode="json"),
+        }
         (run_dir / "run.events.jsonl").write_text(json.dumps(record, sort_keys=True) + "\n", encoding="utf-8")
         producer = RuntimeMomentProducer.for_mission(feature_dir=feature_dir, mission_slug=MISSION_SLUG, mission_type="software-dev")
         producer.emit_mission_run_started(payload)
@@ -255,9 +261,7 @@ def test_surface_carries_identity(surface: ContractSurface) -> None:
     regression is immediately traceable.
     """
     payload = surface.builder()
-    assert isinstance(payload, dict), (
-        f"Surface {surface.name!r} produced non-dict payload: {type(payload).__name__}"
-    )
+    assert isinstance(payload, dict), f"Surface {surface.name!r} produced non-dict payload: {type(payload).__name__}"
     assert payload, f"Surface {surface.name!r} produced an empty payload"
 
     for key in surface.identity_locations:
@@ -270,10 +274,7 @@ def test_surface_carries_identity(surface: ContractSurface) -> None:
 
     for key in surface.ulid_equals:
         value = _dig(payload, key)
-        assert value == ULID_CANONICAL, (
-            f"Surface {surface.name!r} field {key!r} must equal the canonical "
-            f"ULID {ULID_CANONICAL!r}, got {value!r}"
-        )
+        assert value == ULID_CANONICAL, f"Surface {surface.name!r} field {key!r} must equal the canonical ULID {ULID_CANONICAL!r}, got {value!r}"
 
 
 def test_legacy_wp_status_event_without_mission_id_is_valid() -> None:
@@ -297,12 +298,6 @@ def test_legacy_wp_status_event_without_mission_id_is_valid() -> None:
         # No mission_id — legacy event.
     )
     payload = legacy_event.to_dict()
-    assert "mission_id" not in payload, (
-        "Legacy StatusEvent without mission_id must not synthesise a false value"
-    )
-    assert "legacy_aggregate_id" not in payload, (
-        "legacy_aggregate_id is only emitted when mission_id is present"
-    )
+    assert "mission_id" not in payload, "Legacy StatusEvent without mission_id must not synthesise a false value"
+    assert "legacy_aggregate_id" not in payload, "legacy_aggregate_id is only emitted when mission_id is present"
     assert payload["mission_slug"] == MISSION_SLUG
-
-

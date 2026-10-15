@@ -84,7 +84,7 @@ class TestCanonicalFanOut:
 
         event = self._make_event(from_lane=from_lane, to_lane=to_lane)
         captured: list[dict] = []
-        adapters.register_saas_fanout_handler(lambda **kwargs: captured.append(dict(kwargs)))
+        adapters.register_status_fanout_handler(lambda **kwargs: captured.append(dict(kwargs)))
         _saas_fan_out(event, "039-test-feature", None)
 
         assert len(captured) == 1, "fan-out handler must be invoked exactly once"
@@ -107,6 +107,7 @@ class TestCanonicalFanOut:
                 evidence=None,
                 occurred_at=event.at,
             ),
+            "row": event.to_dict(),
             "repo_root": None,
         }
 
@@ -114,7 +115,7 @@ class TestCanonicalFanOut:
         """planned->claimed is no longer a no-op (was collapsed to planned->planned)."""
         event = self._make_event(from_lane=Lane.PLANNED, to_lane=Lane.CLAIMED)
         captured: list[dict] = []
-        adapters.register_saas_fanout_handler(lambda **kwargs: captured.append(dict(kwargs)))
+        adapters.register_status_fanout_handler(lambda **kwargs: captured.append(dict(kwargs)))
         _saas_fan_out(event, "039-test-feature", None)
         assert len(captured) == 1
 

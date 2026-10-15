@@ -1,7 +1,7 @@
 """A hanging SaaS/lifecycle fan-out handler must never block canonical persistence.
 
 Regression for the move-task sync-daemon hang: the status fan-out
-(``fire_saas_fanout``) caught per-handler *exceptions* but nothing bounded a
+(``fire_status_fanout``) caught per-handler *exceptions* but nothing bounded a
 handler that *hangs* (e.g. the sync daemon polling a stopped daemon with a large
 offline-queue backlog). ``emit_status_transition`` documents "SaaS failures never
 block canonical persistence" — that guarantee must cover hangs, not just raises.
@@ -42,10 +42,10 @@ def test_hanging_saas_handler_does_not_block_canonical_persistence(monkeypatch: 
         # Simulate the daemon poll that never returns within the bound.
         release.wait(timeout=10)
 
-    adapters.register_saas_fanout_handler(hanging_handler)
+    adapters.register_status_fanout_handler(hanging_handler)
 
     with caplog.at_level(logging.WARNING):
-        adapters.fire_saas_fanout(wp_id="WP01", from_lane="in_progress", to_lane="for_review", force=False)
+        adapters.fire_status_fanout(wp_id="WP01", from_lane="in_progress", to_lane="for_review", force=False)
 
     assert entered.is_set(), "handler was expected to start"
     assert any("timed out" in record.getMessage().lower() for record in caplog.records), "a timeout warning should be logged"
@@ -63,11 +63,11 @@ def test_hanging_saas_handler_returns_within_three_seconds(monkeypatch: pytest.M
     def hanging_handler(**_kwargs: object) -> None:
         release.wait(timeout=10)
 
-    adapters.register_saas_fanout_handler(hanging_handler)
+    adapters.register_status_fanout_handler(hanging_handler)
 
     start = time.monotonic()
     with caplog.at_level(logging.WARNING):
-        adapters.fire_saas_fanout(wp_id="WP01", from_lane="in_progress", to_lane="for_review", force=False)
+        adapters.fire_status_fanout(wp_id="WP01", from_lane="in_progress", to_lane="for_review", force=False)
     elapsed = time.monotonic() - start
 
     assert_timing_budget(elapsed, 3.0, name="hanging_saas_handler_fanout")
@@ -84,8 +84,8 @@ def test_normal_saas_handler_still_runs_to_completion(
     def ok_handler(**kwargs: object) -> None:
         calls.append(kwargs.get("wp_id"))  # type: ignore[arg-type]
 
-    adapters.register_saas_fanout_handler(ok_handler)
-    adapters.fire_saas_fanout(wp_id="WP02", from_lane="planned", to_lane="claimed", force=False)
+    adapters.register_status_fanout_handler(ok_handler)
+    adapters.fire_status_fanout(wp_id="WP02", from_lane="planned", to_lane="claimed", force=False)
     assert calls == ["WP02"], "a well-behaved handler must run to completion synchronously"
 
 
@@ -95,9 +95,9 @@ def test_raising_saas_handler_is_still_caught(monkeypatch: pytest.MonkeyPatch) -
     def boom(**_kwargs: object) -> None:
         raise RuntimeError("handler blew up")
 
-    adapters.register_saas_fanout_handler(boom)
+    adapters.register_status_fanout_handler(boom)
     # Must not propagate — exceptions remain caught even with the bound in place.
-    adapters.fire_saas_fanout(wp_id="WP03", from_lane="planned", to_lane="claimed", force=False)
+    adapters.fire_status_fanout(wp_id="WP03", from_lane="planned", to_lane="claimed", force=False)
 
 
 @pytest.mark.parametrize("bad", ["nan", "inf", "-inf", "Infinity"])
@@ -106,10 +106,10 @@ def test_nonfinite_timeout_falls_back_to_default_not_disabled(monkeypatch: pytes
     # inf overflows) — that would silently disable the bound. It falls back to
     # the default, so a well-behaved handler still runs to completion.
     monkeypatch.setenv("SPEC_KITTY_SAAS_FANOUT_TIMEOUT", bad)
-    assert adapters._saas_fanout_timeout_s() == adapters._DEFAULT_SAAS_FANOUT_TIMEOUT_S
+    assert adapters._fanout_timeout_s() == adapters._DEFAULT_FANOUT_TIMEOUT_S
     calls: list[object] = []
-    adapters.register_saas_fanout_handler(lambda **k: calls.append(k.get("wp_id")))
-    adapters.fire_saas_fanout(wp_id="WP09", from_lane="planned", to_lane="claimed")
+    adapters.register_status_fanout_handler(lambda **k: calls.append(k.get("wp_id")))
+    adapters.fire_status_fanout(wp_id="WP09", from_lane="planned", to_lane="claimed")
     assert calls == ["WP09"]
 
 
@@ -124,14 +124,14 @@ def test_orphaned_handler_suppresses_an_overlapping_invocation(monkeypatch: pyte
             entry_count.append(1)
         release.wait(timeout=10)
 
-    adapters.register_saas_fanout_handler(hanging_handler)
+    adapters.register_status_fanout_handler(hanging_handler)
 
     # First call: spawns a worker that hangs past the 0.3s bound (orphaned).
-    adapters.fire_saas_fanout(wp_id="WP10", from_lane="planned", to_lane="claimed")
+    adapters.fire_status_fanout(wp_id="WP10", from_lane="planned", to_lane="claimed")
     # Second call while the orphan is still running: must be skipped, NOT spawn
     # a second concurrent invocation of the same handler.
     with caplog.at_level(logging.WARNING):
-        adapters.fire_saas_fanout(wp_id="WP11", from_lane="claimed", to_lane="in_progress")
+        adapters.fire_status_fanout(wp_id="WP11", from_lane="claimed", to_lane="in_progress")
 
     assert sum(entry_count) == 1, "the handler must not run a second, overlapping time"
     assert any("still in flight" in r.getMessage().lower() for r in caplog.records)
@@ -149,9 +149,67 @@ def test_hanging_lifecycle_handler_does_not_block(
     def hanging_handler(**_kwargs: object) -> None:
         release.wait(timeout=10)
 
-    adapters.register_lifecycle_saas_fanout_handler(hanging_handler)
+    adapters.register_lifecycle_fanout_handler(hanging_handler)
     start = time.monotonic()
-    adapters.fire_lifecycle_saas_fanout(wp_id="WP04")
+    adapters.fire_lifecycle_fanout(wp_id="WP04")
     elapsed = time.monotonic() - start
     assert elapsed < 3.0, f"lifecycle fan-out blocked for {elapsed:.1f}s"
     release.set()
+
+
+def test_neutral_timeout_env_is_read(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("SPEC_KITTY_SAAS_FANOUT_TIMEOUT", raising=False)
+    monkeypatch.setenv("SPEC_KITTY_FANOUT_TIMEOUT", "1.5")
+    assert adapters._fanout_timeout_s() == 1.5
+
+
+def test_legacy_timeout_env_stays_an_alias(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("SPEC_KITTY_FANOUT_TIMEOUT", raising=False)
+    monkeypatch.setenv("SPEC_KITTY_SAAS_FANOUT_TIMEOUT", "2.5")
+    assert adapters._fanout_timeout_s() == 2.5
+
+
+def test_neutral_timeout_env_wins_over_the_legacy_alias(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SPEC_KITTY_FANOUT_TIMEOUT", "1.5")
+    monkeypatch.setenv("SPEC_KITTY_SAAS_FANOUT_TIMEOUT", "2.5")
+    assert adapters._fanout_timeout_s() == 1.5
+
+
+# --- the producer client keeps its own timeout strictly below the effective seam bound (FR-025, AC-006) ---
+
+
+def _hang_and_fire(producer_stub, tmp_path):  # noqa: ANN001, ANN202
+    import json as _json
+
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    (repo / ".kittify").mkdir()
+    producer_stub.script(reply="", hang=30)
+    adapters.reset_handlers()
+    adapters.ensure_producer_client()
+    started = time.monotonic()
+    adapters.fire_status_fanout(row={"event_id": "01J0000000000000000000T777"}, repo_root=repo, wp_id="WP01")
+    elapsed = time.monotonic() - started
+    rows = []
+    for path in (repo / ".kittify" / "events" / "faults").glob("*.jsonl"):
+        rows += [_json.loads(line)["class"] for line in path.read_text(encoding="utf-8").splitlines()]
+    return elapsed, rows
+
+
+def test_with_the_bound_lowered_the_client_still_ends_the_producer_first(monkeypatch: pytest.MonkeyPatch, producer_stub, tmp_path) -> None:  # noqa: ANN001
+    """The override lowered below the client default (3 s): the client uses the lowered value and terminates the stub itself."""
+    monkeypatch.setenv("SPEC_KITTY_FANOUT_TIMEOUT", "1.0")
+    elapsed, faults = _hang_and_fire(producer_stub, tmp_path)
+    assert elapsed < 6
+    assert faults == ["timeout"], "one client timeout, not a seam timeout plus a client timeout"
+    assert producer_stub.survivors() == []
+
+
+def test_with_the_bound_disabled_the_client_default_applies_and_terminates_the_stub(monkeypatch: pytest.MonkeyPatch, producer_stub, tmp_path) -> None:  # noqa: ANN001
+    """The legacy override at its disabling value: the seam runs handlers inline, the client's 3 s default fires first."""
+    monkeypatch.delenv("SPEC_KITTY_FANOUT_TIMEOUT", raising=False)
+    monkeypatch.setenv("SPEC_KITTY_SAAS_FANOUT_TIMEOUT", "0")
+    elapsed, faults = _hang_and_fire(producer_stub, tmp_path)
+    assert 2.5 < elapsed < 12
+    assert faults == ["timeout"]
+    assert producer_stub.survivors() == []

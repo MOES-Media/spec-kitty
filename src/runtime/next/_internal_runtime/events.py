@@ -96,6 +96,8 @@ class RuntimeEventEmitter(Protocol):
 
     def emit_decision_timeout_expired(self, payload: TimeoutExpiredPayload) -> None: ...
 
+    def emit_decision_authority_denied(self, payload: dict[str, Any]) -> None: ...
+
 
 def seed_runtime_emitter(emitter: RuntimeEventEmitter, snapshot: Any) -> None:
     """Seed optional producer state without affecting mission control flow.
@@ -177,6 +179,9 @@ class NullEmitter:
         pass
 
     def emit_decision_timeout_expired(self, payload: TimeoutExpiredPayload) -> None:
+        pass
+
+    def emit_decision_authority_denied(self, payload: dict[str, Any]) -> None:
         pass
 
 

@@ -8,7 +8,7 @@ this package's own recording double (``OfferRecorder`` in
 not that a real relay accepts the moment. This module is the operational
 half a laptop lane could not produce: the REAL production chain --
 ``create_mission_core`` -> ``fanout_lifecycle_event_hosted`` ->
-``status.fire_lifecycle_saas_fanout`` -> ``zeitgeist_bridge`` ->
+``status.fire_lifecycle_fanout`` -> ``zeitgeist_bridge`` ->
 ``ZeitgeistClient.offer("event.publish", ...)`` -- against a REAL,
 unmodified zeitgeist relay container, then read back through the REAL
 ``GET /managed/events`` pull path with the SAME two-header discipline Team

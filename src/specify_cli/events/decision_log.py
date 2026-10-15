@@ -216,6 +216,9 @@ class DecisionGitLog:
     ) -> None:
         self._inner.emit_decision_timeout_expired(payload)
 
+    def emit_decision_authority_denied(self, payload: dict[str, Any]) -> None:
+        self._inner.emit_decision_authority_denied(payload)
+
     def seed_from_snapshot(self, snapshot: Any) -> None:
         """Delegate optional seeding; producer failures cannot block mission work."""
         seed_runtime_emitter(self._inner, snapshot)

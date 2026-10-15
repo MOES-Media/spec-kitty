@@ -104,7 +104,7 @@ def _stamped(payload: BaseModel, **identity: str) -> dict[str, Any]:
 @pytest.fixture
 def published(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     captured: list[dict[str, Any]] = []
-    monkeypatch.setattr("specify_cli.status.fire_lifecycle_saas_fanout", lambda **kwargs: captured.append(kwargs))
+    monkeypatch.setattr("specify_cli.status.fire_lifecycle_fanout", lambda **kwargs: captured.append(kwargs))
     return captured
 
 
@@ -121,7 +121,7 @@ def test_producer_implements_every_emit_method_of_the_protocol(tmp_path: Path) -
     producer = _producer(tmp_path)
     protocol_methods = [name for name in RuntimeEventEmitter.__dict__ if name.startswith("emit_")]
 
-    assert len(protocol_methods) == 8
+    assert len(protocol_methods) == 9
     assert [name for name in protocol_methods if not callable(getattr(producer, name, None))] == []
 
 
@@ -135,13 +135,86 @@ def test_seeding_is_a_side_effect_free_noop(tmp_path: Path, published: list[dict
     assert not journal.exists()
 
 
-def test_significance_and_timeout_are_not_runtime_moments(tmp_path: Path, published: list[dict[str, Any]]) -> None:
+def test_timeout_expiry_is_not_a_runtime_moment(tmp_path: Path, published: list[dict[str, Any]]) -> None:
     producer = _producer(tmp_path)
 
-    producer.emit_significance_evaluated(cast(Any, object()))
     producer.emit_decision_timeout_expired(cast(Any, object()))
 
     assert published == []
+
+
+def test_significance_and_authority_denials_are_published_from_their_journal_records(tmp_path: Path, published: list[dict[str, Any]]) -> None:
+    """#6185: the two journal kinds with no hosted moment still reach the seam, as rows."""
+    feature_dir, journal = _layout(tmp_path)
+    significance = {"run_id": RUN_ID, "decision_id": "audit:gate", "band": "high"}
+    denied = {"run_id": RUN_ID, "decision_id": "audit:gate", "reason": "not the owner", "rationale_linkage": None}
+    for kind, payload in (("SignificanceEvaluated", significance), ("DecisionAuthorityDenied", denied)):
+        record = {"event_type": kind, "timestamp": STAMP, "payload": payload}
+        with journal.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, sort_keys=True) + "\n")
+    producer = _producer(feature_dir)
+
+    producer.emit_decision_authority_denied(denied)
+    producer.emit_significance_evaluated(cast(Any, type("P", (), {"model_dump": lambda self, mode: significance})()))
+
+    assert [call["row"]["event_type"] for call in published] == ["DecisionAuthorityDenied", "SignificanceEvaluated"]
+    assert [call["row"]["payload"] for call in published] == [denied, significance]
+
+
+# ---------------------------------------------------------------------------
+# The persisted journal line reaches the seam as ``row`` (#6185, FR-004)
+# ---------------------------------------------------------------------------
+
+_PERSISTED_JOURNAL_KEYS = {"event_id", "row_version", "event_type", "timestamp", "payload"}
+
+
+@pytest.mark.parametrize("kind", sorted(EMIT_METHOD_BY_KIND))
+def test_every_publish_call_carries_the_raw_journal_line_as_its_row(tmp_path: Path, published: list[dict[str, Any]], kind: str) -> None:
+    feature_dir, journal = _layout(tmp_path)
+    payload = _payload(kind)
+    _append(journal, kind, payload)
+
+    _emit(_producer(feature_dir), kind, payload)
+
+    (call,) = published
+    assert call["row"] == json.loads(journal.read_text(encoding="utf-8").splitlines()[0])
+    assert set(call["row"]) <= _PERSISTED_JOURNAL_KEYS, "an envelope passed as the row would carry aggregate_id"
+    assert "aggregate_id" not in call["row"]
+
+
+def test_a_stamped_journal_ulid_is_the_rows_id_and_differs_from_the_hosted_moment_id(tmp_path: Path, published: list[dict[str, Any]]) -> None:
+    feature_dir, journal = _layout(tmp_path)
+    payload = _payload("NextStepIssued")
+    stamped = {
+        "event_id": "01J0000000000000000000R001",
+        "row_version": 1,
+        "event_type": "NextStepIssued",
+        "timestamp": STAMP,
+        "payload": payload.model_dump(mode="json"),
+    }
+    journal.write_text(json.dumps(stamped, sort_keys=True) + "\n", encoding="utf-8")
+
+    _emit(_producer(feature_dir), "NextStepIssued", payload)
+
+    (call,) = published
+    assert call["row"]["event_id"] == "01J0000000000000000000R001"
+    assert call["row"]["event_id"] != call["envelope"]["event_id"]
+
+
+def test_a_hand_built_journal_record_has_an_empty_row_and_the_publish_neither_raises_nor_adds_an_id(
+    tmp_path: Path, published: list[dict[str, Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert JournalRecord(line=4, timestamp=STAMP).row == {}
+    assert JournalRecord(line=4, timestamp=STAMP) == JournalRecord(line=4, timestamp=STAMP, row={"x": 1}), "the row is not part of a record's identity"
+    feature_dir, journal = _layout(tmp_path)
+    payload = _payload("MissionRunStarted")
+    _append(journal, "MissionRunStarted", payload)
+    monkeypatch.setattr(rm, "latest_matching_record", lambda *_a, **_k: JournalRecord(line=1, timestamp=STAMP))
+
+    _emit(_producer(feature_dir), "MissionRunStarted", payload)
+
+    (call,) = published
+    assert call["row"] == {}
 
 
 # ---------------------------------------------------------------------------
@@ -221,6 +294,7 @@ def test_blank_torn_and_non_object_lines_are_skipped(tmp_path: Path) -> None:
     record = rm.latest_matching_record(journal, "MissionRunStarted", payload.model_dump(mode="json"))
 
     assert record == JournalRecord(line=4, timestamp=STAMP)
+    assert record is not None and record.row["event_type"] == "MissionRunStarted"
 
 
 def test_the_journal_is_found_from_a_mission_dir_nested_in_a_worktree(tmp_path: Path) -> None:
@@ -321,7 +395,7 @@ def test_a_fanout_failure_never_raises_into_the_runtime(tmp_path: Path, monkeypa
     def explode(**_kwargs: Any) -> None:
         raise RuntimeError("relay unreachable")
 
-    monkeypatch.setattr("specify_cli.status.fire_lifecycle_saas_fanout", explode)
+    monkeypatch.setattr("specify_cli.status.fire_lifecycle_fanout", explode)
 
     with caplog.at_level(logging.WARNING, logger=PRODUCER_LOGGER):
         _emit(_producer(feature_dir), "DecisionInputAnswered", payload)

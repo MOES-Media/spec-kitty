@@ -11,6 +11,7 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -64,7 +65,13 @@ class DispatcherTest {
             names.append(provider.getName()).append('\n');
         }
         Files.writeString(services.resolve(OperationHandler.class.getName()), names.toString());
-        return new URLClassLoader(new URL[] {dir.toUri().toURL()}, DispatcherTest.class.getClassLoader());
+        // The parent class loader holds the real provider file (WP05); only this directory's own file may be seen here.
+        return new URLClassLoader(new URL[] {dir.toUri().toURL()}, DispatcherTest.class.getClassLoader()) {
+            @Override
+            public Enumeration<URL> getResources(String name) throws IOException {
+                return findResources(name);
+            }
+        };
     }
 
     @Test

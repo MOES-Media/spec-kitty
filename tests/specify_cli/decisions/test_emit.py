@@ -309,10 +309,10 @@ def test_emit_decision_opened_fanout_sees_the_append_already_durable(
     entry = _make_entry("01KAAAAAAAAAAAAAAAAAAAAAAA")
     seen_lines: list[str] = []
 
-    def fake_fanout(*, envelope: dict, log_path: Path, repo_root: Path | None = None) -> None:
+    def fake_fanout(*, envelope: dict, log_path: Path, repo_root: Path | None = None, row: dict | None = None) -> None:
         seen_lines.extend(log_path.read_text().splitlines())
 
-    monkeypatch.setattr("specify_cli.status.fire_lifecycle_saas_fanout", fake_fanout)
+    monkeypatch.setattr("specify_cli.status.fire_lifecycle_fanout", fake_fanout)
 
     emit_decision_opened(
         tmp_path, MISSION_SLUG, decision_id="01KAAAAAAAAAAAAAAAAAAAAAAA", entry=entry, actor=ACTOR
@@ -330,11 +330,12 @@ def test_emit_decision_opened_fanout_envelope_matches_the_local_event(
     entry = _make_entry("01KCCCCCCCCCCCCCCCCCCCCCCC")
     captured: dict = {}
 
-    def fake_fanout(*, envelope: dict, log_path: Path, repo_root: Path | None = None) -> None:
+    def fake_fanout(*, envelope: dict, log_path: Path, repo_root: Path | None = None, row: dict | None = None) -> None:
         captured["envelope"] = envelope
         captured["log_path"] = log_path
+        captured["row"] = row
 
-    monkeypatch.setattr("specify_cli.status.fire_lifecycle_saas_fanout", fake_fanout)
+    monkeypatch.setattr("specify_cli.status.fire_lifecycle_fanout", fake_fanout)
 
     emit_decision_opened(
         tmp_path, MISSION_SLUG, decision_id="01KCCCCCCCCCCCCCCCCCCCCCCC", entry=entry, actor=ACTOR
@@ -349,6 +350,7 @@ def test_emit_decision_opened_fanout_envelope_matches_the_local_event(
     assert envelope["timestamp"] == local_event["at"]
     assert envelope["payload"] == local_event["payload"]
     assert captured["log_path"] == tmp_path / "kitty-specs" / MISSION_SLUG / "status.events.jsonl"
+    assert captured["row"] == local_event, "the producer reads the persisted row, never the derived envelope"
 
 
 def test_emit_decision_opened_survives_a_fanout_exception(
@@ -359,10 +361,10 @@ def test_emit_decision_opened_survives_a_fanout_exception(
     happened before fan-out was attempted."""
     entry = _make_entry("01KBBBBBBBBBBBBBBBBBBBBBBB")
 
-    def exploding_fanout(*, envelope: dict, log_path: Path, repo_root: Path | None = None) -> None:
+    def exploding_fanout(*, envelope: dict, log_path: Path, repo_root: Path | None = None, row: dict | None = None) -> None:
         raise RuntimeError("relay unreachable")
 
-    monkeypatch.setattr("specify_cli.status.fire_lifecycle_saas_fanout", exploding_fanout)
+    monkeypatch.setattr("specify_cli.status.fire_lifecycle_fanout", exploding_fanout)
     caplog.set_level(logging.WARNING)
 
     lamport = emit_decision_opened(
@@ -388,10 +390,11 @@ def test_emit_decision_resolved_fanout_envelope_matches_the_local_event(
     )
     captured: dict = {}
 
-    def fake_fanout(*, envelope: dict, log_path: Path, repo_root: Path | None = None) -> None:
+    def fake_fanout(*, envelope: dict, log_path: Path, repo_root: Path | None = None, row: dict | None = None) -> None:
         captured["envelope"] = envelope
+        captured["row"] = row
 
-    monkeypatch.setattr("specify_cli.status.fire_lifecycle_saas_fanout", fake_fanout)
+    monkeypatch.setattr("specify_cli.status.fire_lifecycle_fanout", fake_fanout)
 
     emit_decision_resolved(
         tmp_path, MISSION_SLUG, decision_id="01KDDDDDDDDDDDDDDDDDDDDDDD", entry=entry, actor=ACTOR
@@ -402,6 +405,7 @@ def test_emit_decision_resolved_fanout_envelope_matches_the_local_event(
     assert envelope["event_id"] == local_event["event_id"]
     assert envelope["event_type"] == DECISION_POINT_RESOLVED == local_event["event_type"]
     assert envelope["payload"] == local_event["payload"]
+    assert captured["row"] == local_event, "the producer reads the persisted row, never the derived envelope"
 
 
 def test_emit_decision_resolved_survives_a_fanout_exception(
@@ -415,10 +419,10 @@ def test_emit_decision_resolved_survives_a_fanout_exception(
         resolved_by=ACTOR,
     )
 
-    def exploding_fanout(*, envelope: dict, log_path: Path, repo_root: Path | None = None) -> None:
+    def exploding_fanout(*, envelope: dict, log_path: Path, repo_root: Path | None = None, row: dict | None = None) -> None:
         raise RuntimeError("relay unreachable")
 
-    monkeypatch.setattr("specify_cli.status.fire_lifecycle_saas_fanout", exploding_fanout)
+    monkeypatch.setattr("specify_cli.status.fire_lifecycle_fanout", exploding_fanout)
     caplog.set_level(logging.WARNING)
 
     lamport = emit_decision_resolved(

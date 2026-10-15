@@ -132,7 +132,7 @@ sequenceDiagram
 
     A->>E: move-task --to for_review
     E->>E: append event, materialize snapshot (always succeeds locally)
-    E->>Z: fire_saas_fanout (daemon thread, 10 s bound)
+    E->>Z: fire_status_fanout (daemon thread, 10 s bound)
     Z->>Z: check hosted_posture.drain_posture().enabled
     alt drain off (either scope off/absent, or narrowed by env)
         Z-->>Z: clean skip -- no credential read, no network call
@@ -166,7 +166,7 @@ explained in [Zeitgeist publisher and lease identity](../architecture/zeitgeist-
 
 | Step | Module |
 |---|---|
-| Canonical persistence, then fan-out | `src/specify_cli/status/emit.py` (`emit_status_transition` → `_saas_fan_out` → `fire_saas_fanout`) |
+| Canonical persistence, then fan-out | `src/specify_cli/status/emit.py` (`emit_status_transition` → `_saas_fan_out` → `fire_status_fanout`) |
 | Handler registry, 10 s bounded thread, in-flight de-dup | `src/specify_cli/status/adapters.py` (`ensure_zeitgeist_moment_handlers` registers the three moment handlers at import unless `SPEC_KITTY_SYNC_MINIMAL_IMPORT` is set) |
 | Payload → attrs codec, offer, liveness refresh | `src/specify_cli/status/zeitgeist_bridge.py` (codec is the pinned `spec_kitty_events` package: `to_zeitgeist_attrs`, `zeitgeist_ref_for`) |
 | Credential resolution, admission and mint gateway | `src/specify_cli/zeitgeist_client/resolution.py` ("team admission is the gate") and `credentials.py` (TOML store under the runtime state root) |
@@ -175,7 +175,7 @@ explained in [Zeitgeist publisher and lease identity](../architecture/zeitgeist-
 | Bearer for the SaaS calls | `src/specify_cli/saas_client/auth.py::load_auth_context` → env token, `.kittify/saas-auth.json`, or the `spec-kitty auth login` session via `auth/server_target.py` and the token manager |
 
 Lifecycle moments (mission created, specify/plan/tasks beats, decision points,
-op invocations) travel the same path through `fire_lifecycle_saas_fanout`. So
+op invocations) travel the same path through `fire_lifecycle_fanout`. So
 do the six runtime moments of `spec-kitty next` (run started/completed, step
 issued/auto-completed, decision input requested/answered): the runtime journals
 each transition to `run.events.jsonl`, and the producer the status seam

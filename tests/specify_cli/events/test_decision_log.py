@@ -416,6 +416,13 @@ class TestDelegation:
         log.emit_decision_timeout_expired(payload)
         inner.emit_decision_timeout_expired.assert_called_once_with(payload)
 
+    def test_decision_authority_denied_delegated(self, tmp_path: Path) -> None:
+        inner = self._make_tracking_inner()
+        log = _make_log(tmp_path, inner=inner)
+        payload = {"run_id": "r", "decision_id": "audit:gate", "reason": "denied"}
+        log.emit_decision_authority_denied(payload)
+        inner.emit_decision_authority_denied.assert_called_once_with(payload)
+
     def test_seed_from_snapshot_delegates_to_inner(self, tmp_path: Path) -> None:
         """F6 (dead-port-disposition-01M1VRA2): the composition advancement
         helper seeds whichever emitter it is handed; the wrap forwards that
