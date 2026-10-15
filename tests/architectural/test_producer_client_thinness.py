@@ -159,6 +159,10 @@ def _mentions_publish_log(tree: ast.AST) -> bool:
     return any(_PUBLISH_MARKER in text for text in literals) or ("events" in literals and "publish" in literals)
 
 
+def _dynamic_lookup_problems(label: str, ident: str) -> list[str]:
+    return [f"{label}: dynamic lookup via {ident} can reach the wall clock unseen"] if ident in _DYNAMIC_LOOKUP_NAMES else []
+
+
 def new_module_violations(label: str, source: str) -> list[str]:
     """Rules (a) and (d) for one of the three new modules, given its source text."""
     tree = ast.parse(source)
@@ -183,8 +187,7 @@ def new_module_violations(label: str, source: str) -> list[str]:
             ident = node.id if isinstance(node, ast.Name) else node.attr
             if ident in _BRIDGE_ENVELOPE_NAMES:
                 problems.append(f"{label}: names the bridge envelope code {ident}")
-            if ident in _DYNAMIC_LOOKUP_NAMES:
-                problems.append(f"{label}: dynamic lookup via {ident} can reach the wall clock unseen")
+            problems.extend(_dynamic_lookup_problems(label, ident))
         if not isinstance(node, ast.Call):
             continue
         func = node.func
@@ -223,6 +226,7 @@ _ROWS: dict[str, dict[str, set[str]]] = {
             "_fanout_timeout_s",
         },
         "imports": {
+            "collections.abc:Mapping",
             "specify_cli.events:sanitize_event_for_log",
             "specify_cli.status.producer_client:ProducerClient",
             "specify_cli.status.producer_client:produce_lifecycle_handler",
@@ -455,7 +459,11 @@ def _client_with(extra: str, *, head: str = "") -> str:
         (_CLIENT, _client_with("class _Stamp:\n    def stamp(self):\n        return clock.fromtimestamp(0)"), "wall-clock read"),
         (_CLIENT, _client_with("class _Stamp:\n    def stamp(self):\n        return clock.monotonic_ns()"), "wall-clock read"),
         (_CLIENT, _client_with("class _Stamp:\n    def stamp(self):\n        return clock.perf_counter()"), "wall-clock read"),
-        (_FAULTS, _FAULTS_SOURCE.replace("def write_stderr_warning", "def _sneak() -> object:\n    return __import__('time').time()\n\n\ndef write_stderr_warning", 1), "dynamic lookup"),
+        (
+            _FAULTS,
+            _FAULTS_SOURCE.replace("def write_stderr_warning", "def _sneak() -> object:\n    return __import__('time').time()\n\n\ndef write_stderr_warning", 1),
+            "dynamic lookup",
+        ),
         (
             _DOCTOR,
             _DOCTOR_SOURCE + "\n\ndef _sneak() -> object:\n    return sys.modules['time'].time_ns()\n",
