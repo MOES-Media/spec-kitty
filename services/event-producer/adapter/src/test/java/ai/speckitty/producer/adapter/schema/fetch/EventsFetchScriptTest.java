@@ -204,6 +204,54 @@ class EventsFetchScriptTest {
         assertThat(project.resolve("escaped.json")).as("outside the output directory").doesNotExist();
     }
 
+    // ----- the download branch --------------------------------------------------------------------------------------------
+
+    /** Lays out a project with NO cached wheel, so the fetch must take the download branch. */
+    private void layoutWithoutCache(String pinnedSha) throws IOException {
+        layout(new byte[0], pinnedSha);
+        Files.delete(project.resolve("build/events/wheel").resolve(WHEEL));
+    }
+
+    @Test
+    void aDownloadedWheelWithTheWrongChecksumFailsTheFetchBeforeAnythingIsUnzipped() throws Exception {
+        byte[] bytes = wheel(goodEntries("a.b.v1"));
+        Path source = project.resolve("served.whl");
+        Files.write(source, bytes);
+        layoutWithoutCache("0".repeat(64));
+
+        BuildResult result = runner(Map.of(), "fetchEventsContract", "-PeventsDownloadUrl=" + source.toUri()).buildAndFail();
+
+        assertThat(result.getOutput()).contains("downloaded wheel's sha256").contains("does not match");
+        assertNothingExtracted();
+        assertThat(project.resolve("build/events/wheel").resolve(WHEEL)).as("a refused download is not cached").doesNotExist();
+    }
+
+    @Test
+    void aDownloadedWheelWithTheRightChecksumIsCachedAndExtracted() throws Exception {
+        byte[] bytes = wheel(goodEntries("a.b.v1"));
+        Path source = project.resolve("served.whl");
+        Files.write(source, bytes);
+        layoutWithoutCache(sha256(bytes));
+
+        runner(Map.of(), "fetchEventsContract", "-PeventsDownloadUrl=" + source.toUri()).build();
+
+        assertThat(extracted().resolve("composed/rows/a.b.v1.row.schema.json")).exists();
+        assertThat(project.resolve("build/events/wheel").resolve(WHEEL)).exists();
+    }
+
+    @Test
+    void theDownloadOverrideIsRefusedWhenCiIsSet() throws Exception {
+        byte[] bytes = wheel(goodEntries("a.b.v1"));
+        Path source = project.resolve("served.whl");
+        Files.write(source, bytes);
+        layoutWithoutCache(sha256(bytes));
+
+        BuildResult result = runner(Map.of("CI", "true"), "fetchEventsContract", "-PeventsDownloadUrl=" + source.toUri()).buildAndFail();
+
+        assertThat(result.getOutput()).contains("eventsDownloadUrl").contains("CI");
+        assertNothingExtracted();
+    }
+
     // ----- the development wheel ------------------------------------------------------------------------------------------
 
     @Test
