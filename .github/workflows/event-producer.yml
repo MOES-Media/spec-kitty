@@ -63,7 +63,7 @@ permissions:
 
 # Per-SHA concurrency on push to main (the contracts.yml pattern); PRs coalesce per ref.
 concurrency:
-  group: event-producer-${{ github.event_name == 'push' && github.sha || github.ref }}
+  group: event-producer-${{ github.workflow }}-${{ github.event_name == 'push' && github.sha || github.ref }}
   cancel-in-progress: ${{ github.event_name != 'push' }}
 
 jobs:
