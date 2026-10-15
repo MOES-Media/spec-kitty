@@ -650,3 +650,128 @@ class TestRebuildStateIsImplementationBehindCanonicalSeam:
 
         assert hasattr(mission_state, "rebuild_mission_event_log")
         assert "rebuild_mission_event_log" in mission_state.__all__
+
+
+# ---------------------------------------------------------------------------
+# FR-036 / FR-037: the CLI readers leave pre-stamp (legacy) ledgers untouched
+# ---------------------------------------------------------------------------
+
+
+def _legacy_status_rows() -> list[dict]:
+    """Three pre-change status rows: UUID-free legacy ids, no CloudEvents members, no row version."""
+
+    def row(n: int, wp: str, src: str, dst: str, at: str) -> dict:
+        return _make_event(wp, src, dst, "001-legacy", event_id=f"01HZZZZZZZZZZZZZZZZZZZZZ0{n}") | {"at": at}
+
+    return [
+        row(1, "WP01", "planned", "claimed", "2026-01-01T10:00:00+00:00"),
+        row(2, "WP01", "claimed", "in_progress", "2026-01-01T10:05:00+00:00"),
+        row(3, "WP02", "planned", "claimed", "2026-01-01T10:06:00+00:00"),
+    ]
+
+
+def _legacy_run_journal_rows() -> list[dict]:
+    """Two pre-stamp run-journal rows: no ``event_id``, no ``row_version``."""
+    return [
+        {"event_type": "MissionRunStarted", "timestamp": "2026-01-01T09:00:00+00:00", "payload": {"run_id": "r1"}},
+        {"event_type": "NextStepIssued", "timestamp": "2026-01-01T09:01:00+00:00", "payload": {"run_id": "r1", "step_id": "s1"}},
+    ]
+
+
+def _write_jsonl(path: Path, rows: list[dict]) -> bytes:
+    data = "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows).encode("utf-8")
+    path.write_bytes(data)
+    return data
+
+
+def _run_readers(feature_dir: Path, journal: Path) -> dict:
+    """Push the legacy files through the CLI readers and the reducer; return the reduced projection."""
+    from specify_cli.events.runtime_moments import latest_matching_record
+    from specify_cli.migration.rebuild_state import _read_existing_events
+    from specify_cli.status import read_events
+    from specify_cli.status.reducer import reduce
+
+    raw = _read_existing_events(feature_dir)
+    snapshot = reduce(read_events(feature_dir))
+    record = latest_matching_record(journal, "NextStepIssued", {"run_id": "r1", "step_id": "s1"})
+    return {
+        "raw_rows_read": len(raw),
+        "event_count": snapshot.event_count,
+        "last_event_id": snapshot.last_event_id,
+        "lanes": {wp: state["lane"] for wp, state in snapshot.work_packages.items()},
+        "journal_line": None if record is None else record.line,
+    }
+
+
+_LEGACY_GOLDEN = {
+    "raw_rows_read": 3,
+    "event_count": 3,
+    "last_event_id": "01HZZZZZZZZZZZZZZZZZZZZZ03",
+    "lanes": {"WP01": "in_progress", "WP02": "claimed"},
+    "journal_line": 2,
+}
+
+
+class TestReadersLeaveLegacyLedgersUntouched:
+    """Legacy rows are read on read and never rewritten (FR-036, FR-037)."""
+
+    @staticmethod
+    def _fixture(tmp_path: Path) -> tuple[Path, Path, bytes, bytes]:
+        feature_dir = tmp_path / "kitty-specs" / "001-legacy"
+        feature_dir.mkdir(parents=True)
+        status_bytes = _write_jsonl(feature_dir / "status.events.jsonl", _legacy_status_rows())
+        journal = tmp_path / "run.events.jsonl"
+        journal_bytes = _write_jsonl(journal, _legacy_run_journal_rows())
+        return feature_dir, journal, status_bytes, journal_bytes
+
+    def test_floor_the_fixture_has_legacy_rows_to_read(self, tmp_path: Path) -> None:
+        feature_dir, journal, _, _ = self._fixture(tmp_path)
+        projection = _run_readers(feature_dir, journal)
+        assert projection["raw_rows_read"] >= 1
+        assert projection["journal_line"] is not None
+        for row in _legacy_run_journal_rows():
+            assert "event_id" not in row and "row_version" not in row
+
+    def test_the_readers_leave_both_files_byte_identical(self, tmp_path: Path) -> None:
+        feature_dir, journal, status_bytes, journal_bytes = self._fixture(tmp_path)
+
+        _run_readers(feature_dir, journal)
+
+        assert (feature_dir / "status.events.jsonl").read_bytes() == status_bytes
+        assert journal.read_bytes() == journal_bytes
+
+    def test_the_reduced_output_equals_the_pre_change_golden(self, tmp_path: Path) -> None:
+        feature_dir, journal, _, _ = self._fixture(tmp_path)
+
+        assert _run_readers(feature_dir, journal) == _LEGACY_GOLDEN
+
+    def test_no_row_is_stamped_or_rewritten(self, tmp_path: Path) -> None:
+        feature_dir, journal, _, _ = self._fixture(tmp_path)
+
+        _run_readers(feature_dir, journal)
+
+        for line in journal.read_text(encoding="utf-8").splitlines():
+            assert set(json.loads(line)) == {"event_type", "timestamp", "payload"}
+        for line in (feature_dir / "status.events.jsonl").read_text(encoding="utf-8").splitlines():
+            assert "row_version" not in json.loads(line)
+
+    def test_mutation_a_reader_that_rewrites_a_row_fails_the_byte_identity_check(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A reader variant that stamps and rewrites the first row is caught by the byte-identity assertion."""
+        import specify_cli.migration.rebuild_state as rebuild_state
+
+        original = rebuild_state._read_existing_events
+
+        def rewriting_reader(feature_dir: Path) -> list[dict]:
+            rows = original(feature_dir)
+            rows[0]["row_version"] = 1
+            _write_jsonl(feature_dir / "status.events.jsonl", rows)
+            return rows
+
+        monkeypatch.setattr(rebuild_state, "_read_existing_events", rewriting_reader)
+        feature_dir, journal, status_bytes, _ = self._fixture(tmp_path)
+
+        _run_readers(feature_dir, journal)
+
+        assert (feature_dir / "status.events.jsonl").read_bytes() != status_bytes
