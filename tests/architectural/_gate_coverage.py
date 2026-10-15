@@ -138,6 +138,9 @@ WORKFLOW_FILES: tuple[str, ...] = (
     # ``uv run --frozen pytest tests/architectural/test_module_length_agreement.py``
     # invocation on a schedule (the exact-count invariant's strict-mode home).
     "ci-shard-recapture.yml",
+    # Added by mission event-producer-reroute WP10 (T083): its ``native-e2e`` job runs the real-binary tests, one directly-anchored
+    # ``pytest`` invocation per matrix leg on three OS (a ledgered per-change suite job; see DELEGATE_SUITE_JOBS_BY_DESIGN).
+    "event-producer.yml",
 )
 
 _COLLECT_PLUGIN = "tests.architectural._gate_collect_plugin"
