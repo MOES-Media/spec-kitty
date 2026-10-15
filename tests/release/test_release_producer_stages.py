@@ -691,6 +691,14 @@ def test_mutation_smoke_wheels_without_its_guard_loses_the_waiver_path(release: 
     assert simulate_publish_path(mutated, event="workflow_dispatch", skip_nightly=True)["publish-pypi"] == "skipped"
 
 
+def test_mutation_publish_without_cancelled_loses_the_waiver_path(release: dict[Any, Any]) -> None:
+    """C2-F1: an `if:` with no status function gets an implicit success(), so dropping `!cancelled()` skips publish when nightly-gate is skipped."""
+    mutated = mutate(release)
+    jobs(mutated)["publish-pypi"]["if"] = "${{ needs.build-release.result == 'success' && needs.smoke-wheels.result == 'success' }}"
+    assert simulate_publish_path(mutated, event="workflow_dispatch", skip_nightly=True)["publish-pypi"] == "skipped"
+    assert simulate_publish_path(mutated, event="push", skip_nightly=False)["publish-pypi"] == "success"
+
+
 def test_mutation_smoke_guard_that_ignores_the_build_result_is_caught(release: dict[Any, Any]) -> None:
     mutated = mutate(release)
     jobs(mutated)["smoke-wheels"]["if"] = "${{ !cancelled() }}"
