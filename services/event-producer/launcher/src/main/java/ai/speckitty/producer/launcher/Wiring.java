@@ -32,6 +32,11 @@ public final class Wiring {
         return assemble(new FailClosedValidator(), TypeCatalog.UNAVAILABLE);
     }
 
+    /** The use case over this contract binding: the fail-closed fallback when none is embedded or it cannot be used. For tests. */
+    public static Produce from(java.util.function.Supplier<java.util.Optional<ai.speckitty.producer.adapter.schema.ProducerContract.Binding>> contract) {
+        return failClosedFallback();
+    }
+
     /** A use case over the real adapters with this validator and registry. For tests: the shipped binary never calls it. */
     public static Produce withValidator(RowSchemaValidator validator, TypeCatalog catalog) {
         return assemble(validator, catalog);
