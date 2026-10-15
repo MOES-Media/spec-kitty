@@ -148,9 +148,7 @@ def test_mutation_an_injected_full_lane_list_fails_the_scan(tmp_path: Path) -> N
         'MY_LANES = frozenset({"planned", "claimed", "in_progress", "for_review", "in_review", "approved", "done", "blocked"})\n',
         encoding="utf-8",
     )
-    assert _census_violations(tmp_path) == [
-        "specify_cli/injected.py: MY_LANES is a new full literal lane list; derive it from Lane or CANONICAL_LANES"
-    ]
+    assert _census_violations(tmp_path) == ["specify_cli/injected.py: MY_LANES is a new full literal lane list; derive it from Lane or CANONICAL_LANES"]
 
 
 def test_a_short_subset_is_not_a_full_list() -> None:
@@ -163,7 +161,7 @@ def test_a_short_subset_is_not_a_full_list() -> None:
 def test_valid_lanes_value_is_unchanged() -> None:
     from specify_cli.migration.rebuild_state import _VALID_LANES
 
-    assert _VALID_LANES == frozenset({"planned", "claimed", "in_progress", "for_review", "done", "blocked", "canceled", "approved"})
+    assert frozenset({"planned", "claimed", "in_progress", "for_review", "done", "blocked", "canceled", "approved"}) == _VALID_LANES
 
 
 def test_lane_order_value_and_order_are_unchanged() -> None:
@@ -181,14 +179,14 @@ def test_legacy_not_done_lanes_value_and_order_are_unchanged() -> None:
 def test_pre_approved_lane_values_are_unchanged() -> None:
     from specify_cli.consolidation.done_bookkeeping import _PRE_APPROVED_LANE_VALUES
 
-    assert _PRE_APPROVED_LANE_VALUES == frozenset({"planned", "claimed", "in_progress", "for_review"})
+    assert frozenset({"planned", "claimed", "in_progress", "for_review"}) == _PRE_APPROVED_LANE_VALUES
 
 
 def test_canonical_lanes_equal_the_post_genesis_members_of_lane() -> None:
     from specify_cli.status import Lane
     from specify_cli.status_lanes import CANONICAL_LANES
 
-    assert CANONICAL_LANES == tuple(m.value for m in Lane if m not in {Lane.GENESIS, Lane.UNINITIALIZED})
+    assert tuple(m.value for m in Lane if m not in {Lane.GENESIS, Lane.UNINITIALIZED}) == CANONICAL_LANES
 
 
 def test_the_persisted_lists_exclude_uninitialized() -> None:

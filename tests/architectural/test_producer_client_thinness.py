@@ -431,9 +431,7 @@ def journal_stamp_violations(source: str) -> list[str]:
     ]
     if key_sets != [_STAMPED_KEYS]:
         problems.append(f"stamp: the row keys are {key_sets}, expected exactly {sorted(_STAMPED_KEYS)}")
-    names = {node.id for node in ast.walk(body) if isinstance(node, ast.Name)} | {
-        node.attr for node in ast.walk(body) if isinstance(node, ast.Attribute)
-    }
+    names = {node.id for node in ast.walk(body) if isinstance(node, ast.Name)} | {node.attr for node in ast.walk(body) if isinstance(node, ast.Attribute)}
     problems += [f"stamp: _append_event references {name}" for name in sorted(names & _ID_SOURCES_BANNED)]
     if "ulid" not in names:
         problems.append("stamp: _append_event does not mint the event_id from ulid")
