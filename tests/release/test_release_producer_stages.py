@@ -775,6 +775,97 @@ def test_the_model_refuses_a_multi_job_delegate_that_runs_pytest(tmp_path: Path)
         gate_coverage.load_spliced_workflow(caller)
 
 
+def _plant(tmp_path: Path, job_two: dict[str, Any], files: dict[str, str] | None = None) -> Path:
+    """A per-change caller of a workflow_call-only two-job delegate whose second job is *job_two*, plus any repository files."""
+    workflows = tmp_path / ".github" / "workflows"
+    workflows.mkdir(parents=True)
+    (workflows / "caller.yml").write_text("on: [schedule]\njobs:\n  call:\n    uses: ./.github/workflows/delegate.yml\n", encoding="utf-8")
+    delegate = {
+        "on": {"workflow_call": {}},
+        "jobs": {"one": {"runs-on": "ubuntu-24.04", "steps": [{"run": "echo build"}]}, "two": {"runs-on": "ubuntu-24.04", **job_two}},
+    }
+    (workflows / "delegate.yml").write_text(yaml.safe_dump(delegate), encoding="utf-8")
+    for relative, content in (files or {}).items():
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
+    return workflows / "caller.yml"
+
+
+ACTION_RUNNING_PYTEST = "runs:\n  using: composite\n  steps:\n    - shell: bash\n      run: python -m pytest tests/x\n"
+ACTION_RUNNING_ECHO = "runs:\n  using: composite\n  steps:\n    - shell: bash\n      run: echo hello\n"
+MAKEFILE = "test-fast:\n\tpython -m pytest tests/x\n\nlint:\n\techo lint\n\nci: test-fast\n"
+
+# (job two, repository files): every route by which a delegate job reaches pytest that the old refusal did not see.
+HIDDEN_SUITE_ROUTES = {
+    "composite-action": ({"steps": [{"uses": "./.github/actions/x"}]}, {".github/actions/x/action.yml": ACTION_RUNNING_PYTEST}),
+    "nested-composite-action": (
+        {"steps": [{"uses": "./.github/actions/outer"}]},
+        {
+            ".github/actions/outer/action.yml": "runs:\n  using: composite\n  steps:\n    - uses: ./.github/actions/x\n",
+            ".github/actions/x/action.yml": ACTION_RUNNING_PYTEST,
+        },
+    ),
+    "make-target": ({"steps": [{"run": "make test-fast"}]}, {"Makefile": MAKEFILE}),
+    "make-prerequisite": ({"steps": [{"run": "make ci"}]}, {"Makefile": MAKEFILE}),
+    "make-after-and": ({"steps": [{"run": "echo go && make test-fast"}]}, {"Makefile": MAKEFILE}),
+    "direct-in-first-job-position": ({"steps": [{"run": "python -m pytest tests/x"}]}, {}),
+}
+
+
+@pytest.mark.parametrize("route", sorted(HIDDEN_SUITE_ROUTES))
+def test_the_model_refuses_a_multi_job_delegate_that_reaches_pytest_by_any_route(tmp_path: Path, route: str) -> None:
+    from tests.architectural import _gate_coverage as gate_coverage
+
+    job_two, files = HIDDEN_SUITE_ROUTES[route]
+    caller = _plant(tmp_path, job_two, files)
+    with pytest.raises(AssertionError, match="must not run the suite"):
+        gate_coverage.load_spliced_workflow(caller)
+
+
+FAIL_CLOSED_ROUTES = {
+    "unresolvable-composite-action": ({"steps": [{"uses": "./.github/actions/missing"}]}, {}),
+    "unresolvable-make-target": ({"steps": [{"run": "make no-such-target"}]}, {"Makefile": MAKEFILE}),
+    "make-without-a-makefile": ({"steps": [{"run": "make test-fast"}]}, {}),
+    "job-level-uses-inside-the-delegate": ({"uses": "./.github/workflows/other.yml"}, {}),
+}
+
+
+@pytest.mark.parametrize("route", sorted(FAIL_CLOSED_ROUTES))
+def test_the_model_fails_closed_when_a_delegate_job_cannot_be_resolved(tmp_path: Path, route: str) -> None:
+    from tests.architectural import _gate_coverage as gate_coverage
+
+    job_two, files = FAIL_CLOSED_ROUTES[route]
+    caller = _plant(tmp_path, job_two, files)
+    with pytest.raises(AssertionError, match="must not run the suite|cannot be resolved"):
+        gate_coverage.load_spliced_workflow(caller)
+
+
+BENIGN_ROUTES = {
+    "echo": ({"steps": [{"run": "echo smoke"}]}, {}),
+    "action-without-pytest": ({"steps": [{"uses": "./.github/actions/x"}]}, {".github/actions/x/action.yml": ACTION_RUNNING_ECHO}),
+    "make-target-without-pytest": ({"steps": [{"run": "make lint"}]}, {"Makefile": MAKEFILE}),
+    "external-action": ({"steps": [{"uses": "actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8"}]}, {}),
+}
+
+
+@pytest.mark.parametrize("route", sorted(BENIGN_ROUTES))
+def test_the_model_still_leaves_a_delegate_without_pytest_opaque(tmp_path: Path, route: str) -> None:
+    """event-producer.yml must keep loading: it has five jobs, uses make-free shell and an action that runs no pytest."""
+    from tests.architectural import _gate_coverage as gate_coverage
+
+    job_two, files = BENIGN_ROUTES[route]
+    spliced = gate_coverage.load_spliced_workflow(_plant(tmp_path, job_two, files))
+    assert spliced["jobs"]["call"]["steps"] == []
+
+
+def test_the_real_producer_workflows_load_through_the_model() -> None:
+    from tests.architectural import _gate_coverage as gate_coverage
+
+    for name in ("release.yml", "event-producer-nightly.yml", "event-producer.yml"):
+        assert gate_coverage.load_spliced_workflow(WORKFLOWS / name)["jobs"]
+
+
 def test_event_producer_concurrency_group_names_the_caller() -> None:
     """Under workflow_call, github.workflow is the CALLER's name: without it the nightly call and a release dispatch share a group and cancel each other."""
     group = str(load(EVENT_PRODUCER)["concurrency"]["group"])
