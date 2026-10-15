@@ -3,8 +3,15 @@
 # native (the three native-image legs: GraalVM Community JDK 25, Linux in the pinned manylinux_2_28 container) and native-smoke
 # (the bundled binary run by path from a stub platform wheel on each OS), closed by event-producer-gate, which fails unless every
 # job and every matrix leg succeeded.
-# Triggers: pull_request and push to main (path-filtered), workflow_dispatch (by hand, on a fork too) and workflow_call (release.yml
-# calls it with mode `release` and the release ref, to build the release binaries). Input `mode`: `pr` (the default) holds the
+# Triggers: pull_request and push to main (path-filtered), a nightly schedule, workflow_dispatch (by hand, on a fork too) and
+# workflow_call (release.yml calls it with mode `release` and the release ref, to build the release binaries).
+# The nightly (mission event-producer-reroute, WP09; AC-036) builds the native producer on all three OS in mode `pr` and records the
+# AC-036 numbers (start time, binary size, floors) in the per-leg job summaries. It is informational and sits in THIS file, not in
+# ci-nightly.yml, because scripts/ci/release_nightly_gate.py decides from the whole conclusion of the ci-nightly.yml run: any failed
+# job in that file, listed in nightly-summary.needs or not, blocks a release. A separate scheduled file is not possible because the
+# workflow-file ceiling (tests/architectural/test_module_shard_registry.py) is already reached. No job is masked with
+# continue-on-error (Standing Order 9). A called workflow runs at the caller's ref; only schedule and workflow_run use the default
+# branch, so the scheduled run builds the default branch. Input `mode`: `pr` (the default) holds the
 # warm start-time gate (median at most 100 ms, the WP01 feasibility gate); `release` builds without it. Input `ref` is the git ref
 # (tag, branch or SHA) to build; empty means the commit that triggered the run.
 # Each native leg uploads `producer-<leg>`: the binary, producer-manifest.json (binary sha256, toolchain sha256, source commit,
@@ -32,6 +39,9 @@ on:
       - 'pyproject.toml'
       - '.github/actions/producer-smoke/**'
       - '.github/workflows/event-producer.yml'
+  schedule:
+    # 03:47 UTC: off the round hour and after ci-nightly.yml's own slot (03:17).
+    - cron: '47 3 * * *'
   workflow_dispatch:
     inputs:
       mode:

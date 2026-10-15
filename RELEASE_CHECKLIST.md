@@ -241,9 +241,9 @@ package first, verify it is installable from PyPI, and only then tag the CLI.
   signed by the linker and must not be stripped. Architectures beyond Linux
   x86_64, macOS arm64 and Windows x86_64 are out of scope: other platforms get
   the pure wheel, which reports `binary-missing`.
-- [ ] The scheduled native-producer nightly is its own workflow,
-  `event-producer-nightly.yml`, and is informational. It is deliberately not a
-  job of `ci-nightly.yml`: the nightly gate of this workflow reads the whole
+- [ ] The scheduled native-producer nightly is the `schedule` trigger of
+  `event-producer.yml`, and it is informational. It is deliberately not a job of
+  `ci-nightly.yml`: the nightly gate of this workflow reads the whole
   conclusion of the `ci-nightly.yml` run for the release SHA, so any failed job
   inside that file would block the release. The producer nightly cannot.
 - [ ] Confirm release-candidate hygiene was already recorded before the tag:

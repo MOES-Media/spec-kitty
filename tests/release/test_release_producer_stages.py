@@ -321,6 +321,8 @@ def nightly_violations(document: dict[Any, Any]) -> list[str]:
     if document.get("permissions") != {"contents": "read"}:
         problems.append("the workflow-level permissions are not exactly contents: read")
     for name, job in jobs(document).items():
+        if needs_of(job):
+            continue  # a dependent job is skipped with its root, so only root jobs carry the guard
         if "github.repository == 'spec-kitty/spec-kitty'" not in str(job.get("if", "")):
             problems.append(f"job {name} lacks the canonical fork guard, so a fork's schedule would run it")
     return problems
@@ -329,7 +331,7 @@ def nightly_violations(document: dict[Any, Any]) -> list[str]:
 def release_gate_input_violations(ci_nightly: dict[Any, Any], gate_source: str) -> list[str]:
     """release_nightly_gate.py decides from the WHOLE ci-nightly.yml run conclusion, so no producer job may be in that file."""
     problems: list[str] = []
-    if 'ci-nightly.yml' not in gate_source:
+    if "ci-nightly.yml" not in gate_source:
         problems.append("release_nightly_gate.py no longer reads ci-nightly.yml: re-derive what the producer nightly may touch")
     for name, job in jobs(ci_nightly).items():
         if name == NIGHTLY_JOB or str(job.get("uses", "")).endswith("event-producer.yml"):
@@ -350,9 +352,7 @@ def ancestors(all_jobs: dict[str, Any], name: str) -> set[str]:
     return found
 
 
-def simulate_publish_path(
-    document: dict[Any, Any], *, event: str, skip_nightly: bool, outcomes: dict[str, str] | None = None
-) -> dict[str, str]:
+def simulate_publish_path(document: dict[Any, Any], *, event: str, skip_nightly: bool, outcomes: dict[str, str] | None = None) -> dict[str, str]:
     """Evaluate the `needs`/`if` graph of release.yml up to publish-pypi the way GitHub Actions does, and return each job's result.
 
     A job with no `if:` gets the implicit `success()`: it runs only when every ancestor in its `needs` chain succeeded, so a skipped
@@ -492,7 +492,7 @@ def test_docs_state_the_unproven_stages_and_the_unsigned_binaries() -> None:
     checklist = RELEASE_CHECKLIST.read_text(encoding="utf-8")
     for needle in ("build-producer", "smoke-wheels", "Gatekeeper", "SmartScreen", "Test-PyPI", "unproven"):
         assert needle in checklist, f"RELEASE_CHECKLIST.md does not mention {needle}"
-    assert "`schedule` trigger of `event-producer.yml`" in checklist and "`producer-nightly` job in `ci-nightly.yml`" not in checklist
+    assert "`schedule` trigger of `event-producer.yml`" in " ".join(checklist.split()) and "`producer-nightly` job in `ci-nightly.yml`" not in checklist
     contributing = CONTRIBUTING.read_text(encoding="utf-8")
     for needle in ("Gatekeeper", "SmartScreen", "platform wheels"):
         assert needle in contributing, f"CONTRIBUTING.md does not mention {needle}"
