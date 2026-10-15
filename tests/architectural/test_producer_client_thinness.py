@@ -498,6 +498,7 @@ def _faults_with(function: str, *, head: str = "") -> str:
 
 _VALUE = "clock referenced as a value"
 
+
 @pytest.mark.parametrize(
     ("label", "mutated", "needle"),
     [
