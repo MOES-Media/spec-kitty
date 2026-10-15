@@ -9,8 +9,9 @@ binary, a crash, a timeout, a malformed reply or a busy producer degrades to a
 recorded warning (see ``producer_faults``) and never changes a lifecycle
 command's exit code or ``--json`` body.
 
-This is the single in-CLI entry point to the producer (ADR 2026-10-14-1: each
-event type has one writer).
+This is the single in-CLI entry point to the producer, in the sense of the
+accepted ADR ``2026-10-14-1-event-native-core-one-canonical-event-writer``: every
+event type has one writer, and callers reach it only through the fan-out seam.
 """
 
 from __future__ import annotations

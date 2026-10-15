@@ -173,3 +173,43 @@ def test_neutral_timeout_env_wins_over_the_legacy_alias(monkeypatch: pytest.Monk
     monkeypatch.setenv("SPEC_KITTY_FANOUT_TIMEOUT", "1.5")
     monkeypatch.setenv("SPEC_KITTY_SAAS_FANOUT_TIMEOUT", "2.5")
     assert adapters._fanout_timeout_s() == 1.5
+
+
+# --- the producer client keeps its own timeout strictly below the effective seam bound (FR-025, AC-006) ---
+
+
+def _hang_and_fire(producer_stub, tmp_path):  # noqa: ANN001, ANN202
+    import json as _json
+
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    (repo / ".kittify").mkdir()
+    producer_stub.script(reply="", hang=30)
+    adapters.reset_handlers()
+    adapters.ensure_producer_client()
+    started = time.monotonic()
+    adapters.fire_status_fanout(row={"event_id": "01J0000000000000000000T777"}, repo_root=repo, wp_id="WP01")
+    elapsed = time.monotonic() - started
+    rows = []
+    for path in (repo / ".kittify" / "events" / "faults").glob("*.jsonl"):
+        rows += [_json.loads(line)["class"] for line in path.read_text(encoding="utf-8").splitlines()]
+    return elapsed, rows
+
+
+def test_with_the_bound_lowered_the_client_still_ends_the_producer_first(monkeypatch: pytest.MonkeyPatch, producer_stub, tmp_path) -> None:  # noqa: ANN001
+    """The override lowered below the client default (3 s): the client uses the lowered value and terminates the stub itself."""
+    monkeypatch.setenv("SPEC_KITTY_FANOUT_TIMEOUT", "1.0")
+    elapsed, faults = _hang_and_fire(producer_stub, tmp_path)
+    assert elapsed < 6
+    assert faults == ["timeout"], "one client timeout, not a seam timeout plus a client timeout"
+    assert producer_stub.survivors() == []
+
+
+def test_with_the_bound_disabled_the_client_default_applies_and_terminates_the_stub(monkeypatch: pytest.MonkeyPatch, producer_stub, tmp_path) -> None:  # noqa: ANN001
+    """The legacy override at its disabling value: the seam runs handlers inline, the client's 3 s default fires first."""
+    monkeypatch.delenv("SPEC_KITTY_FANOUT_TIMEOUT", raising=False)
+    monkeypatch.setenv("SPEC_KITTY_SAAS_FANOUT_TIMEOUT", "0")
+    elapsed, faults = _hang_and_fire(producer_stub, tmp_path)
+    assert 2.5 < elapsed < 12
+    assert faults == ["timeout"]
+    assert producer_stub.survivors() == []

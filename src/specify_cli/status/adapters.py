@@ -9,7 +9,8 @@ module's import tail) installs two occupants:
   and lifecycle slots, always and ahead of every other handler: producing an
   event never depends on whether a hosted drain is enabled or on a hosted kill
   switch (ADR 2026-10-13-2). It is the single in-CLI entry point to the
-  producer (ADR 2026-10-14-1: each event type has one writer);
+  producer (ADR ``2026-10-14-1-event-native-core-one-canonical-event-writer``:
+  each event type has one writer);
 * the Zeitgeist moment handler (#8), the hosted occupant; that tail honours
   the moment-handler gate
   (:func:`specify_cli.core.env.moment_handlers_disabled_reason` —
