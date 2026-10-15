@@ -28,10 +28,12 @@ interrupted run cannot poison later ones.
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -112,6 +114,125 @@ def run_scoped_shared_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
     if os.environ.get("PYTEST_XDIST_WORKER"):
         return base.parent
     return base
+
+
+_DIST_SET_PATH = _REPO_ROOT / "scripts" / "release" / "dist-set.json"
+_PLATFORM_WHEEL_DIR_PREFIX = "shared-platform-wheel-"
+_HOOK_ENABLE_ENV = "HATCH_BUILD_HOOK_ENABLE_CUSTOM"
+_HOOK_ENV_PREFIXES = ("HATCH_BUILD_HOOK_ENABLE", "SPEC_KITTY_PRODUCER_")
+_BUILD_INPUT_FILES = ("pyproject.toml", "README.md", "LICENSE", "CHANGELOG.md")
+#: ``packs`` is copied whole, internal pack included: a copy without ``packs/internal`` could not catch an include that widened.
+_BUILD_INPUT_TREES = ("src", "packs")
+PRODUCER_BINARY_NAME = "spec-kitty-event-producer"
+
+
+def platform_tag_for_leg(leg: str) -> str:
+    """The wheel tag ``dist-set.json`` pins for ``leg`` (the single authority; the hook caller reads it the same way)."""
+    entries = json.loads(_DIST_SET_PATH.read_text(encoding="utf-8"))["platform_wheels"]
+    return str(next(entry["tag"] for entry in entries if entry["leg"] == leg))
+
+
+def stub_binary_name(leg: str) -> str:
+    return PRODUCER_BINARY_NAME + (".exe" if leg.startswith("windows") else "")
+
+
+def stub_binary_bytes(leg: str) -> bytes:
+    """Deterministic stand-in for the native producer of ``leg``: the build hook only copies and hashes it."""
+    return f"stub-producer-binary-for-{leg}\n".encode() * 64
+
+
+def copy_build_inputs(destination: Path) -> Path:
+    """Copy what a wheel/sdist build reads, so a hook-on build never writes into the working tree.
+
+    Not a git checkout: hatchling reads ``.gitignore`` directly, and drops every VCS exclusion when the project root path itself
+    matches one of its patterns (this repository ignores ``tmp/**`` and ``build/``). The copy keeps only the repository's own lines
+    about the native directory, so a stub planted in ``src/specify_cli/_native/`` stays excluded exactly as in a real checkout.
+    """
+    destination.mkdir(parents=True, exist_ok=True)
+    for name in _BUILD_INPUT_FILES:
+        shutil.copy2(_REPO_ROOT / name, destination / name)
+    for tree in _BUILD_INPUT_TREES:
+        shutil.copytree(_REPO_ROOT / tree, destination / tree, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    real_ignore = (_REPO_ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+    (destination / ".gitignore").write_text("\n".join(line for line in real_ignore if "_native" in line) + "\n", encoding="utf-8")
+    hook_dir = destination / "scripts" / "release"
+    hook_dir.mkdir(parents=True, exist_ok=True)
+    for name in ("hatch_build_producer.py", "dist-set.json"):
+        shutil.copy2(_REPO_ROOT / "scripts" / "release" / name, hook_dir / name)
+    return destination
+
+
+def run_build(project: Path, outdir: Path, *targets: str, env_extra: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+    """``python -m build --no-isolation`` in ``project`` with the producer hook variables cleared, then ``env_extra`` applied."""
+    env = {key: value for key, value in os.environ.items() if not key.startswith(_HOOK_ENV_PREFIXES)}
+    env.update(env_extra or {})
+    return subprocess.run(
+        [sys.executable, "-m", "build", "--no-isolation", *targets, "--outdir", str(outdir)],
+        cwd=project,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def default_platform_wheel_builder(outdir: Path, *, leg: str) -> None:
+    """Build the platform wheel of ``leg`` into ``outdir``: hook on, a stub binary, the tag read from ``dist-set.json``.
+
+    The sibling of :func:`default_wheel_sdist_builder` (the pure wheel). The build runs in a copy of the build inputs.
+    """
+    with tempfile.TemporaryDirectory(prefix="platform-wheel-") as scratch:
+        project = copy_build_inputs(Path(scratch) / "project")
+        binary = Path(scratch) / "inputs" / stub_binary_name(leg)
+        binary.parent.mkdir()
+        binary.write_bytes(stub_binary_bytes(leg))
+        binary.chmod(0o644)  # artifact transfer drops mode bits; the hook must restore the exec bit itself
+        result = run_build(
+            project,
+            outdir,
+            "--wheel",
+            env_extra={
+                _HOOK_ENABLE_ENV: "true",
+                "SPEC_KITTY_PRODUCER_BINARY": str(binary),
+                "SPEC_KITTY_PRODUCER_PLATFORM_TAG": platform_tag_for_leg(leg),
+            },
+        )
+    if result.returncode != 0:
+        raise SharedBuildError(f"Platform wheel build for {leg} failed: {result.stderr[-2000:]}")
+
+
+def published_platform_wheel(shared_dir: Path) -> Path | None:
+    """The run's published platform wheel, or ``None`` if it is absent or empty."""
+    wheels = sorted(shared_dir.glob("spec_kitty_cli-*.whl"))
+    if len(wheels) == 1 and wheels[0].stat().st_size > 0:
+        return wheels[0]
+    return None
+
+
+def ensure_shared_platform_wheel(
+    run_root: Path,
+    leg: str,
+    build: Callable[[Path], None] | None = None,
+    *,
+    lock_timeout_s: float = _LOCK_TIMEOUT_S,
+) -> Path:
+    """Return the run's platform wheel of ``leg``, building it once under a lock like :func:`ensure_shared_build_artifacts`."""
+    if build is None:
+
+        def build(outdir: Path) -> None:
+            default_platform_wheel_builder(outdir, leg=leg)
+
+    dir_name = _PLATFORM_WHEEL_DIR_PREFIX + leg
+    return _publish_once(
+        run_root,
+        dir_name=dir_name,
+        staging_glob=dir_name + ".staging-*",
+        inspect=published_platform_wheel,
+        fill=build,
+        attempts=1,
+        retry_delay_s=0.0,
+        lock_timeout_s=lock_timeout_s,
+    )
 
 
 def published_build_artifacts(shared_dir: Path) -> dict[str, Path] | None:
