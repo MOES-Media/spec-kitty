@@ -3,13 +3,19 @@
 Python may do exactly one thing for the producer: a thin client that locates the
 binary, hands it the seam's persisted row and records faults. It holds no schema,
 id, event clock, order, dedupe or type knowledge. This gate enforces that with
-five rules (rule (b), the journal stamping, belongs to WP07):
+five rules:
 
 (a) the three new modules (``producer_client.py``, ``producer_faults.py``, the
     doctor sibling): a closed import allowlist, no write-mode open of the
     publish-log path, ``json.loads`` only in the one decode site per module, a
     wall-clock read only inside ``_now_utc`` of ``producer_faults.py``, and the
     exact top-level symbol set of plan 4.1;
+(b) the run-journal stamp in ``engine._append_event`` (FR-035, the one flagged edit of
+    existing Python): the row dict has exactly the keys ``event_id, row_version,
+    event_type, timestamp, payload``, the body references the ``ulid`` package and none
+    of ``uuid``, ``uuid4``, ``hashlib``, ``secrets`` or ``random`` (``engine.py``
+    already imports ``uuid4`` and ``hashlib``, so the import rule alone cannot see
+    them);
 (c) the emission-area module census (``status/``, ``events/``, ``retrospective/``,
     ``decisions/`` plus the three new files) equals a pinned list, so a new module
     such as ``status/_mint_id.py`` fails, whether or not git knows it;
@@ -402,6 +408,78 @@ def census_violations(src_root: Path) -> list[str]:
     problems = [f"census: unpinned module {name}" for name in sorted(found - expected)]
     problems += [f"census: pinned module {name} is gone" for name in sorted(expected - found)]
     return problems
+
+
+# --- rule (b): the run-journal stamp ------------------------------------------------------
+
+_ENGINE = "runtime/next/_internal_runtime/engine.py"
+_STAMPED_KEYS = {"event_id", "row_version", "event_type", "timestamp", "payload"}
+_ID_SOURCES_BANNED = {"uuid", "uuid4", "hashlib", "secrets", "random"}
+
+
+def journal_stamp_violations(source: str) -> list[str]:
+    """Rule (b): ``_append_event`` writes exactly the five keys and mints its id from ``ulid`` only."""
+    functions = [n for n in ast.walk(ast.parse(source)) if isinstance(n, ast.FunctionDef) and n.name == "_append_event"]
+    if len(functions) != 1:
+        return [f"stamp: expected one _append_event, found {len(functions)}"]
+    body = functions[0]
+    problems: list[str] = []
+    key_sets = [
+        {key.value for key in node.keys if isinstance(key, ast.Constant)}
+        for node in ast.walk(body)
+        if isinstance(node, ast.Dict) and any(isinstance(key, ast.Constant) and key.value == "event_type" for key in node.keys)
+    ]
+    if key_sets != [_STAMPED_KEYS]:
+        problems.append(f"stamp: the row keys are {key_sets}, expected exactly {sorted(_STAMPED_KEYS)}")
+    names = {node.id for node in ast.walk(body) if isinstance(node, ast.Name)} | {
+        node.attr for node in ast.walk(body) if isinstance(node, ast.Attribute)
+    }
+    problems += [f"stamp: _append_event references {name}" for name in sorted(names & _ID_SOURCES_BANNED)]
+    if "ulid" not in names:
+        problems.append("stamp: _append_event does not mint the event_id from ulid")
+    return problems
+
+
+def test_b_the_journal_stamp_is_exactly_the_five_keys_from_ulid() -> None:
+    assert journal_stamp_violations((_SRC / _ENGINE).read_text(encoding="utf-8")) == []
+
+
+def test_b_floor_the_function_is_found() -> None:
+    assert "def _append_event(" in (_SRC / _ENGINE).read_text(encoding="utf-8")
+
+
+def _engine_with_stamp(replacement: str) -> str:
+    source = (_SRC / _ENGINE).read_text(encoding="utf-8")
+    return source.replace("str(ulid.ULID())", replacement) if "str(ulid.ULID())" in source else source
+
+
+@pytest.mark.parametrize(
+    ("replacement", "needle"),
+    [
+        ("str(uuid4())", "uuid4"),
+        ("hashlib.sha256(b'x').hexdigest()", "hashlib"),
+        ("secrets.token_hex(13)", "secrets"),
+        ("random.random()", "random"),
+    ],
+)
+def test_b_self_mutation_an_id_from_another_source_fails(replacement: str, needle: str) -> None:
+    mutated = _engine_with_stamp(replacement)
+    problems = journal_stamp_violations(mutated)
+    assert any(needle in problem for problem in problems), problems
+
+
+def test_b_self_mutation_an_extra_key_fails() -> None:
+    source = (_SRC / _ENGINE).read_text(encoding="utf-8")
+    mutated = source.replace('"event_type": event_type,', '"event_type": event_type,\n        "hash": "x",', 1)
+    assert mutated != source
+    assert any("row keys" in problem for problem in journal_stamp_violations(mutated))
+
+
+def test_b_self_mutation_a_missing_key_fails() -> None:
+    source = (_SRC / _ENGINE).read_text(encoding="utf-8")
+    mutated = source.replace('"row_version": 1,', "", 1)
+    assert mutated != source
+    assert any("row keys" in problem for problem in journal_stamp_violations(mutated))
 
 
 # --- the real tree --------------------------------------------------------------------------
