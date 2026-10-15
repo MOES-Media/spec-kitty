@@ -30,6 +30,13 @@ CP003  `payload=` keyword argument in a call to any identifier matching
 
 CP900  Exemption comment present but tracker reference missing or malformed.
 
+Persisted-line mode (``--persisted-lines``) adds three codes:
+
+CP950  A persisted line does not validate against the released
+       ``spec_kitty_events.producer_contract`` schema of its row type.
+CP951  A persisted line is not a JSON object.
+CP952  The released schema set is empty, or the named row type is not in it.
+
 CP901  ``canonical-event-exempt`` comment present but the category is missing
        / not one of the allowed categories, or the reason is empty.
 
@@ -110,6 +117,19 @@ specific (path, code, dict-shape-fingerprint) triple. When a baselined
 violation disappears (because the site was refactored), the lint warns and
 suggests re-running --update-baseline to keep the file lean.
 
+Persisted-line mode (AC-019, FR-032) validates what a writer actually wrote
+instead of reading its source. A marker on an authoritative Python writer is
+cleared only when its persisted lines validate against the schemas released in
+the installed ``spec_kitty_events`` package (``--form legacy``: the persisted
+legacy row; ``--form publish``: a CloudEvents publish-log line):
+
+    python scripts/lint_canonical_producers.py \\
+        --persisted-lines decision.opened.v1=kitty-specs/<mission>/status.events.jsonl
+
+This mode is bounded gate glue (O-3): it loops over released schemas and
+persisted lines and holds no producer, envelope, id, clock or schema-authoring
+logic. It needs ``spec_kitty_events`` and ``jsonschema``, imported on use.
+
 Exit codes:
     0 -- no violations (or all violations covered by baseline; no stale
          baseline entries)
@@ -131,12 +151,14 @@ from __future__ import annotations
 import argparse
 import ast
 import io
+import json
 import re
 import sys
 import tokenize
 from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Iterable
+from typing import Any
 
 # --------------------------------------------------------------------------- #
 # Configuration                                                                #
@@ -672,6 +694,93 @@ def lint_paths(paths: Iterable[Path]) -> list[Finding]:
 
 
 # --------------------------------------------------------------------------- #
+# Persisted-line mode (AC-019): validate written lines against released schemas #
+# --------------------------------------------------------------------------- #
+
+_PERSISTED_FORMS = ("legacy", "publish")
+
+
+def released_registry() -> dict[str, Any]:
+    """The registry of the installed, released ``spec_kitty_events`` producer contract."""
+    from spec_kitty_events.producer_contract import load_registry
+
+    return load_registry()
+
+
+def released_schemas(form: str) -> dict[str, dict[str, Any]]:
+    """Name -> schema for every registered type, read from the installed package.
+
+    ``legacy`` is the persisted legacy row, ``publish`` the whole CloudEvents line.
+    """
+    from spec_kitty_events.producer_contract import legacy_row_form_schema, row_schema
+
+    build = {"legacy": legacy_row_form_schema, "publish": row_schema}[form]
+    return {entry["name"]: build(entry["name"]) for entry in released_registry()["types"]}
+
+
+def _persisted_findings(label: str, line_no: int, type_name: str, text: str, schemas: dict[str, dict[str, Any]]) -> list[Finding]:
+    from jsonschema import Draft202012Validator
+
+    where = Path(label)
+    schema = schemas.get(type_name)
+    if schema is None:
+        return [Finding(where, line_no, 1, "CP952", f"no released schema for row type {type_name!r}")]
+    try:
+        row = json.loads(text)
+    except ValueError as exc:
+        return [Finding(where, line_no, 1, "CP951", f"not JSON: {exc}")]
+    if not isinstance(row, dict):
+        return [Finding(where, line_no, 1, "CP951", "not a JSON object")]
+    errors = sorted(Draft202012Validator(schema).iter_errors(row), key=lambda e: [str(p) for p in e.absolute_path])
+    if not errors:
+        return []
+    first = errors[0]
+    pointer = "/" + "/".join(str(p) for p in first.absolute_path)
+    return [Finding(where, line_no, 1, "CP950", f"{type_name} violates the released schema at {pointer} ({first.validator}): {first.message}")]
+
+
+def lint_persisted_lines(
+    rows: Iterable[tuple[str, str, str]],
+    form: str = "legacy",
+    *,
+    schemas: dict[str, dict[str, Any]] | None = None,
+) -> list[Finding]:
+    """Validate ``(label, row type name, line)`` triples against the released schemas.
+
+    An empty schema set is itself a finding: a gate that resolved no schema proves nothing.
+    """
+    resolved = released_schemas(form) if schemas is None else schemas
+    if not resolved:
+        return [Finding(Path("<schemas>"), 0, 1, "CP952", "the released schema set is empty")]
+    findings: list[Finding] = []
+    for index, (label, type_name, text) in enumerate(rows, start=1):
+        findings.extend(_persisted_findings(label, index, type_name, text, resolved))
+    return findings
+
+
+def _read_persisted_lines(spec: str) -> list[tuple[str, str, str]]:
+    type_name, _, file_name = spec.partition("=")
+    lines = Path(file_name).read_text(encoding="utf-8").splitlines()
+    return [(file_name, type_name, line) for line in lines if line.strip()]
+
+
+def _run_persisted_mode(specs: list[str], form: str) -> int:
+    try:
+        rows = [row for spec in specs for row in _read_persisted_lines(spec)]
+    except OSError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    try:
+        findings = lint_persisted_lines(rows, form)
+    except ImportError as exc:
+        print(f"error: persisted-line mode needs spec_kitty_events and jsonschema: {exc}", file=sys.stderr)
+        return 2
+    for finding in findings:
+        print(finding.format())
+    return 1 if findings else 0
+
+
+# --------------------------------------------------------------------------- #
 # CLI                                                                          #
 # --------------------------------------------------------------------------- #
 
@@ -726,8 +835,24 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--paths",
         nargs="+",
-        required=True,
-        help="One or more files or directories to lint.",
+        default=None,
+        help="One or more files or directories to lint (required unless --persisted-lines).",
+    )
+    p.add_argument(
+        "--persisted-lines",
+        nargs="+",
+        default=None,
+        metavar="TYPE=FILE",
+        help=(
+            "Persisted-line mode: validate every line of FILE against the released "
+            "schema of registry row TYPE (for example decision.opened.v1=status.events.jsonl)."
+        ),
+    )
+    p.add_argument(
+        "--form",
+        choices=_PERSISTED_FORMS,
+        default="legacy",
+        help="Persisted-line mode: validate the persisted legacy row (default) or a CloudEvents publish-log line.",
     )
     p.add_argument(
         "--baseline",
@@ -759,6 +884,15 @@ def main(argv: list[str] | None = None) -> int:
     except SystemExit as exc:
         # argparse exits with 2 on usage error; preserve that.
         return int(exc.code) if exc.code is not None else 2
+
+    if args.persisted_lines is not None:
+        if args.paths is not None:
+            print("error: --persisted-lines cannot be combined with --paths", file=sys.stderr)
+            return 2
+        return _run_persisted_mode(args.persisted_lines, args.form)
+    if args.paths is None:
+        print("error: one of --paths or --persisted-lines is required", file=sys.stderr)
+        return 2
 
     roots = [Path(p) for p in args.paths]
     missing = [p for p in roots if not p.exists()]

@@ -175,7 +175,7 @@ def _name_of(lint: ModuleType, row: dict[str, Any]) -> str:
     from spec_kitty_events.producer_contract import load_registry
 
     by_discriminator = {entry["legacy"]["discriminator_value"]: entry["name"] for entry in load_registry()["types"] if "discriminator_value" in entry["legacy"]}
-    return by_discriminator[row["event_type"]]
+    return str(by_discriminator[row["event_type"]])
 
 
 def _fixture_for(type_name: str) -> dict[str, Any]:
@@ -262,43 +262,32 @@ def test_marker_3_stays_residual_while_the_decision_log_row_does_not_validate(li
 
     mission_dir = tmp_path / "kitty-specs" / "m3"
     log = DecisionGitLog(tmp_path, tmp_path, "main", "m3", mission_dir=mission_dir, inner=NullEmitter())
-    actor = RuntimeActorIdentity(actor_id="ledger", actor_type="llm")
-    log.emit_decision_input_requested(
-        DecisionInputRequestedPayload(
-            run_id="0123456789abcdef0123456789abcdef", decision_id="input:x", step_id="s", question="q?", options=("a",), input_key="x", actor=actor
-        )
+    actor = RuntimeActorIdentity.model_validate({"actor_id": "ledger", "actor_type": "llm"})
+    payload = DecisionInputRequestedPayload.model_validate(
+        {
+            "run_id": "0123456789abcdef0123456789abcdef",
+            "decision_id": "input:x",
+            "step_id": "s",
+            "question": "q?",
+            "options": ("a",),
+            "input_key": "x",
+            "actor": actor,
+        }
     )
+    log.emit_decision_input_requested(payload)
     (line,) = _ledger_lines(mission_dir / "decisions.events.jsonl")
     for type_name in ("run.decision.requested.v1", "decision.opened.v1", "decision.resolved.v1"):
         assert lint.lint_persisted_lines([("decision_log", type_name, line)], "legacy"), f"marker 3 now validates as {type_name}: clear it"
 
 
-def test_marker_7_stays_residual_while_the_saas_queue_envelope_does_not_validate(lint: ModuleType) -> None:
-    from specify_cli.status.lifecycle_events import build_saas_lifecycle_queue_event
+def test_marker_7_stays_residual_while_the_saas_queue_envelope_does_not_validate(lint: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from specify_cli.status.lifecycle_events import MISSION_CREATED, build_saas_lifecycle_queue_event
 
-    envelope = {
-        "event_id": "01KLEDGER000000000000000A1",
-        "event_type": "MissionCreated",
-        "aggregate_id": "m7",
-        "aggregate_type": "Mission",
-        "schema_version": "5.0.0",
-        "timestamp": "2026-10-15T00:00:00+00:00",
-        "payload": {
-            "mission_slug": "m7",
-            "mission_number": None,
-            "mission_type": "software-dev",
-            "target_branch": "main",
-            "wp_count": 0,
-            "created_at": "2026-10-15T00:00:00+00:00",
-            "mission_id": "01KLEDGER000000000000000M1",
-        },
-        "project_uuid": None,
-        "project_slug": None,
-    }
+    persisted = json.loads(_driven(_LIFECYCLE_WRITERS[MISSION_CREATED], tmp_path / "m7", monkeypatch))
     queued = build_saas_lifecycle_queue_event(
-        envelope, build_id="b", project_uuid="11111111-1111-4111-8111-111111111111", project_slug="p", node_id="n", lamport_clock=1
+        persisted, build_id="b", project_uuid="11111111-1111-4111-8111-111111111111", project_slug="p", node_id="n", lamport_clock=1
     )
-    assert queued is not None, "the SaaS queue builder refused the probe envelope: the probe no longer reaches the marker"
+    assert queued is not None, "the SaaS queue builder refused the persisted row: the probe no longer reaches the marker"
     assert lint.lint_persisted_lines([("saas-queue", "mission.created.v1", json.dumps(queued))], "legacy"), "marker 7 now validates: clear it"
 
 
@@ -364,6 +353,8 @@ def test_mutation_an_empty_schema_set_fails_the_gate(lint: ModuleType) -> None:
     valid = json.dumps(_fixture_for("decision.opened.v1")["legacy_row"])
     findings = lint.lint_persisted_lines([("probe", "decision.opened.v1", valid)], "legacy", schemas={})
     assert [f.code for f in findings] == ["CP952"]
+    assert "empty" in findings[0].message, "an empty schema set must be reported as such, not as an unknown row type"
+    assert [f.code for f in lint.lint_persisted_lines([], "legacy", schemas={})] == ["CP952"], "no rows and no schemas must still fail"
     assert [f.code for f in lint.lint_persisted_lines([("probe", "no.such.type.v1", valid)], "legacy")] == ["CP952"]
 
 
