@@ -453,12 +453,17 @@ def _client_with(extra: str, *, head: str = "") -> str:
 
 
 def _faults_aliased_today() -> str:
-    """The cycle-3 P1 mutation: ``fault_summary`` reads today through an aliased kernel.clock import."""
-    imported = "from kernel.clock import date, datetime, now_utc, timedelta"
-    used = "    today = _now_utc().date()"
-    assert imported in _FAULTS_SOURCE and used in _FAULTS_SOURCE
-    return _FAULTS_SOURCE.replace(imported, imported + "\nfrom kernel.clock import now_utc as _utc_now", 1).replace(used, "    today = _utc_now().date()", 1)
+    """The cycle-3 P1 mutation: a function reads today through an aliased kernel.clock import."""
+    return _faults_with("def _sneak() -> object:\n    return _utc_now().date()", head="from kernel.clock import now_utc as _utc_now\n")
 
+
+def _faults_with(function: str, *, head: str = "") -> str:
+    """The real faults module with one extra function before ``write_stderr_warning`` (and a head after the future import)."""
+    source = _FAULTS_SOURCE.replace("def write_stderr_warning", function + "\n\n\ndef write_stderr_warning", 1)
+    return source.replace("from __future__ import annotations\n", "from __future__ import annotations\n\n" + head, 1) if head else source
+
+
+_VALUE = "clock referenced as a value"
 
 @pytest.mark.parametrize(
     ("label", "mutated", "needle"),
@@ -532,6 +537,18 @@ def _faults_aliased_today() -> str:
             _FAULTS_SOURCE.replace("def write_stderr_warning", "def _sneak(text):\n    return json.loads(text)\n\n\ndef write_stderr_warning", 1),
             "json.loads outside the decode site",
         ),
+        # A clock used as a VALUE (cycle-4 Q1) is as much a read as a call: any reference outside _now_utc fails.
+        (_FAULTS, _faults_with("def _sneak(*, clock: Any = now_utc) -> object:\n    return clock().date()"), _VALUE),
+        (_FAULTS, _faults_with("def _sneak() -> object:\n    clock = now_utc\n    return clock().date()"), _VALUE),
+        (_FAULTS, _faults_with("def _sneak() -> object:\n    return field(default_factory=now_utc)", head="from dataclasses import field\n"), _VALUE),
+        (_FAULTS, _faults_with("def _sneak() -> object:\n    return sorted([], key=time.monotonic)", head="import time\n"), _VALUE),
+        (_FAULTS, _faults_with("def _sneak() -> object:\n    return now_utc"), _VALUE),
+        (_FAULTS, _faults_with("def _sneak() -> object:\n    return lambda: now_utc()"), "wall-clock read"),
+        (_FAULTS, _faults_with("def _sneak() -> object:\n    return {'t': now_utc}"), _VALUE),
+        (_FAULTS, _faults_with("def _sneak(*, clock: Any = _now_utc) -> object:\n    return clock()"), _VALUE),
+        (_FAULTS, _faults_with("def _sneak() -> object:\n    return datetime.now"), _VALUE),
+        (_CLIENT, _client_with("def _sneak(*, clock: object = sys.modules) -> object:\n    return clock"), "dynamic lookup"),
+        (_CLIENT, _client_with("", head="from sys import modules\n"), "dynamic lookup via modules"),
         # An aliased clock import is still a clock read (cycle-3 P1): the gate resolves the names an import binds.
         (_FAULTS, _faults_aliased_today(), "wall-clock read"),
         (
