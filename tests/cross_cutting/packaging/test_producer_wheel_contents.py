@@ -261,21 +261,10 @@ def test_no_wheel_contains_the_internal_pack(release_dist: Path) -> None:
         assert any(m.startswith("packs/built-in/") for m in listing), f"{wheel.name} must carry the built-in packs"
 
 
-def test_the_sdist_carries_the_built_in_packs_and_leaks_no_internal_file_beyond_the_known_readme(pure_build: dict[str, Any]) -> None:
-    """Pins today's leak exactly. The bare ``README.md`` entry of the sdist ``include`` list matches at any depth, so
-    ``packs/internal/README.md`` ships. Any further internal file is a new leak and fails here."""
+def test_the_sdist_carries_the_built_in_packs_and_no_internal_pack_file(pure_build: dict[str, Any]) -> None:
     listing = sdist_members(pure_build["sdist"])
     assert any(m.startswith("packs/built-in/") for m in listing), "floor: the sdist carries the built-in packs"
-    assert [m for m in listing if "packs/internal" in m] == ["packs/internal/README.md"]
-
-
-@pytest.mark.xfail(
-    strict=True,
-    reason="pre-existing sdist leak of packs/internal/README.md through the unanchored 'README.md' include entry; fixing it needs a "
-    "pyproject.toml edit (an 'packs/internal/**' sdist exclude), which WP08 may not make. Remove this marker with that edit.",
-)
-def test_the_sdist_contains_no_internal_pack_file(pure_build: dict[str, Any]) -> None:
-    assert [m for m in sdist_members(pure_build["sdist"]) if "packs/internal" in m] == []
+    assert [m for m in listing if "packs/internal" in m] == []
 
 
 # --- the real wheels satisfy check_dist_set.py ---------------------------------------------------------------------

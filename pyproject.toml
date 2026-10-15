@@ -233,6 +233,8 @@ exclude = [
     # distribution (cli-acceptance-bdd-nightly, FR-013 / C-004).
     "acceptance-jvm/**",
     "tests/scenarios/**",
+    # The bare "README.md" include above is gitignore-style and also matched packs/internal/README.md; the internal pack never ships.
+    "packs/internal/**",
 ]
 
 # NOTE: pytest configuration (markers, pythonpath, testpaths, addopts) lives in

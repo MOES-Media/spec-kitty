@@ -168,6 +168,16 @@ def test_sdist_contains_no_kittify_paths(build_artifacts: dict[str, Path]) -> No
 
 
 @pytest.mark.slow
+def test_sdist_contains_no_internal_pack_file(build_artifacts: dict[str, Path]) -> None:
+    """The maintainer-only ``packs/internal/`` must not ship in the sdist (a bare ``README.md`` include once matched its README)."""
+    with tarfile.open(build_artifacts["sdist"], "r:gz") as tar:
+        all_files = tar.getnames()
+
+    assert [f for f in all_files if "/packs/built-in/" in f], "positive control: the built-in packs are in the sdist"
+    leaked = [f for f in all_files if "/packs/internal" in f]
+    assert not leaked, f"Maintainer-only packs/internal/ leaked into the sdist: {leaked}"
+
+
 def test_sdist_excludes_acceptance_runner_and_scenarios(build_artifacts: dict[str, Path]) -> None:
     """The acceptance runner + scenario corpus must not ship in the sdist (FR-013 / C-004).
 
