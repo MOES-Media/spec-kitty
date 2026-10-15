@@ -1323,6 +1323,18 @@ def _splice_step_level_actions(
     return spliced
 
 
+#: Jobs of a multi-job reusable workflow that run pytest on purpose, keyed (workflow file, job). A caller's splice leaves a multi-job
+#: delegate opaque, so a pytest job in one would be invisible to the model; each row here is a job that is instead named in
+#: ``test_no_duplicate_suite_execution.AUTHORIZED_PER_CHANGE_SUITE_JOBS`` (its own workflow's run is the one counted) and whose row
+#: is pinned live by ``tests/ci/test_event_producer_workflow.py``. Mission event-producer-reroute, WP10 (``native-e2e``).
+DELEGATE_SUITE_JOBS_BY_DESIGN: dict[tuple[str, str], str] = {
+    ("event-producer.yml", "native-e2e"): (
+        "the real-binary tests need the one job that installs the platform wheel; release.yml reaches it through build-producer, "
+        "which runs them on the release binaries (a tag-only push, so no per-change run is added)"
+    ),
+}
+
+
 def _delegate_suite_refusal(
     called: str,
     caller_job: str,
@@ -1348,7 +1360,7 @@ def _delegate_suite_refusal(
         f"a multi-job delegate cannot be spliced into caller {caller_job!r}, so it must not run the suite"
     )
     for job_name, delegate_job in target_jobs.items():
-        if not isinstance(delegate_job, dict):
+        if not isinstance(delegate_job, dict) or (called, job_name) in DELEGATE_SUITE_JOBS_BY_DESIGN:
             continue
         if delegate_job.get("uses"):
             return f"{head}: job {job_name!r} calls {delegate_job['uses']!r} itself (cannot be resolved)"

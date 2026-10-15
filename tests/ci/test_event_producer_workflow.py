@@ -1,9 +1,10 @@
 """Guard tests for ``event-producer.yml`` (which also builds the native image) and the shared smoke action (mission event-producer-reroute, WP01).
 
 Every rule is a function over a parsed workflow document, so each is proved twice: the real file passes it, and a deep copy with one
-mutation fails it for that rule. A rule that found nothing to judge fails (no vacuous pass). No job of the workflow may run pytest:
-the pin and glue tests run in the router lanes that own them, and a pytest call here would be a duplicate per-change suite execution
-(``tests/architectural/test_no_duplicate_suite_execution.py``).
+mutation fails it for that rule. A rule that found nothing to judge fails (no vacuous pass). Only ``native-e2e`` (WP10) may run pytest:
+the pin and glue tests run in the router lanes that own them, and a pytest call in any other job would be a duplicate per-change suite
+execution (``tests/architectural/test_no_duplicate_suite_execution.py``). ``native-e2e`` is the one job that builds and installs the real
+binary, and the only place ``REQUIRE_NATIVE_PRODUCER=1`` is set.
 """
 
 from __future__ import annotations
@@ -36,6 +37,35 @@ DIST_SET = ROOT / "scripts" / "release" / "dist-set.json"
 THREE_OS = {"ubuntu-24.04", "macos-14", "windows-2022"}
 THREE_LEGS = {"linux-x86_64", "macos-arm64", "windows-x86_64"}
 GATE_JOB = "event-producer-gate"
+E2E_JOB = "native-e2e"
+E2E_FLAG = "REQUIRE_NATIVE_PRODUCER"
+E2E_FILES = (
+    "tests/integration/test_event_producer_e2e.py",
+    "tests/integration/test_event_producer_degraded.py",
+    "tests/perf/test_event_producer_overhead.py",
+    "tests/integration/test_native_binary_helper.py",
+)
+#: Path filters WP10 added so a later change to the seam, the call sites, the e2e tests or the perf test still runs native-e2e.
+E2E_PATH_GLOBS = (
+    "tests/integration/test_event_producer_*.py",
+    "tests/integration/_native_binary.py",
+    "tests/integration/test_native_binary_helper.py",
+    "tests/perf/test_event_producer_overhead.py",
+    "tests/_perf_helpers.py",
+    "src/specify_cli/status/adapters.py",
+    "src/specify_cli/status/emit.py",
+    "src/specify_cli/status/lifecycle_events.py",
+    "src/specify_cli/coordination/outbound.py",
+    "src/specify_cli/coordination/status_transition.py",
+    "src/specify_cli/decisions/emit.py",
+    "src/specify_cli/retrospective/lifecycle_events.py",
+    "src/specify_cli/events/runtime_moments.py",
+    "src/specify_cli/events/decision_log.py",
+    "src/runtime/next/_internal_runtime/events.py",
+    "src/runtime/next/runtime_bridge_retrospective.py",
+    "src/runtime/next/_internal_runtime/engine.py",
+    "src/specify_cli/cli/commands/_event_producer_doctor.py",
+)
 GUARD = "github.repository == 'spec-kitty/spec-kitty'"
 PINNED_USES = re.compile(r"^[\w.-]+/[\w.-]+(?:/[\w./-]+)?@[0-9a-f]{40}$")
 
@@ -73,7 +103,8 @@ def matrix_values(job: dict[str, Any], key: str) -> set[str]:
 
 
 def pytest_violations(document: dict[str, Any]) -> list[str]:
-    return [text for text in all_run_texts(document) if re.search(r"\bpytest\b", text)]
+    """Run steps that call pytest in a job other than native-e2e."""
+    return [text for name, job in jobs(document).items() if name != E2E_JOB for text in run_texts(job) if re.search(r"\bpytest\b", text)]
 
 
 def continue_on_error_violations(document: dict[str, Any]) -> list[str]:
@@ -159,9 +190,10 @@ def event_producer() -> dict[str, Any]:
     return load(EVENT_PRODUCER)
 
 
-def test_no_job_of_the_workflow_runs_pytest(event_producer: dict[str, Any]) -> None:
+def test_no_job_other_than_native_e2e_runs_pytest(event_producer: dict[str, Any]) -> None:
     assert len(all_run_texts(event_producer)) > 10, "floor: the scan must see the run steps"
     assert pytest_violations(event_producer) == []
+    assert any(re.search(r"\bpytest\b", text) for text in run_texts(jobs(event_producer)[E2E_JOB])), "floor: native-e2e is the job that does"
 
 
 def test_mutation_a_pytest_step_is_red(event_producer: dict[str, Any]) -> None:
@@ -255,8 +287,8 @@ def test_the_native_job_builds_in_this_workflow_with_no_reusable_call(event_prod
 
 def test_the_terminal_gate_needs_every_job_and_requires_success(event_producer: dict[str, Any]) -> None:
     assert gate_violations(event_producer) == []
-    assert set(jobs(event_producer)[GATE_JOB]["needs"]) == {"verify-pins", "gradle-test", "native", "native-smoke"}
-    for dropped in ("verify-pins", "gradle-test", "native", "native-smoke"):
+    assert set(jobs(event_producer)[GATE_JOB]["needs"]) == {"verify-pins", "gradle-test", "native", "native-smoke", "native-e2e"}
+    for dropped in ("verify-pins", "gradle-test", "native", "native-smoke", "native-e2e"):
         mutated = copy.deepcopy(event_producer)
         mutated["jobs"][GATE_JOB]["needs"].remove(dropped)
         assert gate_violations(mutated) != [], dropped
@@ -344,6 +376,140 @@ def test_verify_pins_goes_red_on_an_unpinned_use(tmp_path: Path, monkeypatch: py
     code = tool.main(["--root", str(ROOT), "--pins", str(TOOLS / "pins.json"), "--workflow", str(planted), "--pins-only"])
     assert code == 1
     assert "UNPINNED_USES" in capsys.readouterr().out
+
+
+# --- native-e2e (WP10 T083) ---------------------------------------------------------------------------------------
+
+
+def e2e_violations(document: dict[str, Any]) -> list[str]:
+    """Everything the native-e2e job must be: three legs, after native-smoke, the wheel installed by path, one pytest on the four named files."""
+    all_jobs = jobs(document)
+    if E2E_JOB not in all_jobs:
+        return ["no native-e2e job"]
+    job = all_jobs[E2E_JOB]
+    problems = matrix_violations(job, "leg", THREE_LEGS)
+    if matrix_values(job, "os") != THREE_OS:
+        problems.append("native-e2e does not run on the three OS")
+    if job.get("needs") != "native-smoke":
+        problems.append("native-e2e does not need native-smoke")
+    steps = job.get("steps", [])
+    downloads = [s for s in steps if "download-artifact" in str(s.get("uses", ""))]
+    if [d["with"]["name"] for d in downloads] != ["producer-${{ matrix.leg }}"]:
+        problems.append("native-e2e does not download the leg's producer artifact")
+    texts = " ".join(run_texts(job))
+    if "HATCH_BUILD_HOOK_ENABLE_CUSTOM" not in str(steps) or "uv build --wheel" not in texts:
+        problems.append("native-e2e does not build the platform wheel with the hook")
+    if '--with "$E2E_WHEEL" pytest' not in " ".join(texts.split()):
+        problems.append("native-e2e does not install the platform wheel by path (uv run --with)")
+    pytest_steps = [s for s in steps if re.search(r"\bpytest\b", str(s.get("run", "")))]
+    if len(pytest_steps) != 1:
+        problems.append(f"native-e2e has {len(pytest_steps)} pytest steps, expected exactly one")
+    else:
+        command = " ".join(str(pytest_steps[0]["run"]).split())
+        for named in E2E_FILES:
+            if named not in command:
+                problems.append(f"the pytest command does not name {named}")
+        if str(pytest_steps[0].get("env", {}).get(E2E_FLAG)) != "1":
+            problems.append(f"the pytest step does not set {E2E_FLAG}=1")
+    return problems
+
+
+def flag_setters(workflows: Path, actions: Path) -> list[str]:
+    """Every (workflow or action file, job) whose text sets the fail-on-missing flag; a file-level mention outside a job is reported by file."""
+    found = []
+    for path in sorted([*workflows.glob("*.yml"), *actions.rglob("action.yml")]):
+        document = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        for name, job in (document.get("jobs") or {}).items():
+            if E2E_FLAG in yaml.safe_dump(job):
+                found.append(f"{path.name}:{name}")
+        if E2E_FLAG in yaml.safe_dump({k: v for k, v in document.items() if k != "jobs"}):
+            found.append(f"{path.name}:<file level>")
+    return found
+
+
+def glob_violations(globs: list[str], tracked: list[str]) -> list[str]:
+    """The asserted globs: a non-empty list, each present in the trigger paths and matching at least one tracked file."""
+    if not globs:
+        return ["the glob list is empty"]
+    import fnmatch  # noqa: PLC0415
+
+    return [f"{glob} matches no tracked file" for glob in globs if not any(fnmatch.fnmatch(path, glob) for path in tracked)]
+
+
+def test_native_e2e_is_a_three_os_job_that_installs_the_wheel_and_runs_the_four_named_files_once(event_producer: dict[str, Any]) -> None:
+    assert e2e_violations(event_producer) == []
+    for mutate, expected in (
+        (lambda d: d["jobs"][E2E_JOB]["strategy"]["matrix"]["include"].pop(), "legs are"),
+        (lambda d: d["jobs"][E2E_JOB].__setitem__("needs", "native"), "does not need native-smoke"),
+        (lambda d: d["jobs"][E2E_JOB]["steps"].append({"run": "uv run pytest tests/x.py"}), "pytest steps"),
+        (
+            lambda d: d["jobs"][E2E_JOB]["steps"].__setitem__(
+                -1,
+                {
+                    "run": 'uv run --frozen --all-extras --with "$E2E_WHEEL" pytest tests/integration/test_event_producer_e2e.py',
+                    "env": {E2E_FLAG: "1"},
+                },
+            ),
+            "does not name",
+        ),
+    ):
+        mutated = copy.deepcopy(event_producer)
+        mutate(mutated)
+        assert any(expected in problem for problem in e2e_violations(mutated)), expected
+
+
+def test_the_fail_on_missing_flag_is_set_in_native_e2e_and_nowhere_else(tmp_path: Path) -> None:
+    assert flag_setters(WORKFLOWS, ROOT / ".github" / "actions") == [f"event-producer.yml:{E2E_JOB}"]
+    # Mutation: the same scan over a copy with the flag planted in another job of the file, and in another workflow.
+    copied = tmp_path / "workflows"
+    copied.mkdir()
+    for path in WORKFLOWS.glob("*.yml"):
+        shutil.copy2(path, copied / path.name)
+    text = (copied / "event-producer.yml").read_text(encoding="utf-8")
+    needle = "  native-smoke:\n    name: native-smoke (${{ matrix.leg }})\n    needs: native\n"
+    assert needle in text
+    (copied / "event-producer.yml").write_text(text.replace(needle, needle + "    env:\n      REQUIRE_NATIVE_PRODUCER: '1'\n"), encoding="utf-8")
+    other = copied / "ci-nightly.yml"
+    other.write_text(other.read_text(encoding="utf-8").replace("\njobs:\n", "\nenv:\n  REQUIRE_NATIVE_PRODUCER: '1'\njobs:\n", 1), encoding="utf-8")
+    planted = flag_setters(copied, ROOT / ".github" / "actions")
+    assert "event-producer.yml:native-smoke" in planted and "ci-nightly.yml:<file level>" in planted
+
+
+def test_the_gate_waits_for_native_e2e(event_producer: dict[str, Any]) -> None:
+    assert E2E_JOB in jobs(event_producer)[GATE_JOB]["needs"]
+    mutated = copy.deepcopy(event_producer)
+    mutated["jobs"][GATE_JOB]["needs"].remove(E2E_JOB)
+    assert gate_violations(mutated) != []
+
+
+def _tracked_files() -> list[str]:
+    listing = subprocess.run(["git", "ls-files", "--cached", "--others", "--exclude-standard"], cwd=ROOT, capture_output=True, text=True, check=True).stdout
+    return listing.splitlines()
+
+
+def test_the_path_filters_cover_the_seam_the_call_sites_and_the_tests_and_each_glob_matches_a_tracked_file(event_producer: dict[str, Any]) -> None:
+    on = triggers(event_producer)
+    for trigger in ("pull_request", "push"):
+        assert set(E2E_PATH_GLOBS) <= set(on[trigger]["paths"]), trigger
+    tracked = _tracked_files()
+    assert glob_violations(list(E2E_PATH_GLOBS), tracked) == []
+    assert glob_violations([], tracked) == ["the glob list is empty"]
+    assert glob_violations([*E2E_PATH_GLOBS, "src/specify_cli/events/no_such_module.py"], tracked) == [
+        "src/specify_cli/events/no_such_module.py matches no tracked file"
+    ]
+    mutated = copy.deepcopy(on["pull_request"]["paths"])
+    mutated.remove("src/specify_cli/status/adapters.py")
+    assert not set(E2E_PATH_GLOBS) <= set(mutated), "mutation: dropping one glob is detected"
+
+
+def test_the_duplicate_suite_ledger_and_the_delegate_exemption_name_native_e2e_and_it_still_runs_pytest(event_producer: dict[str, Any]) -> None:
+    from tests.architectural import _gate_coverage  # noqa: PLC0415
+    from tests.architectural.test_no_duplicate_suite_execution import AUTHORIZED_PER_CHANGE_SUITE_JOBS  # noqa: PLC0415
+
+    assert ("event-producer.yml", E2E_JOB) in AUTHORIZED_PER_CHANGE_SUITE_JOBS
+    assert ("event-producer.yml", E2E_JOB) in _gate_coverage.DELEGATE_SUITE_JOBS_BY_DESIGN
+    assert set(_gate_coverage.DELEGATE_SUITE_JOBS_BY_DESIGN) == {("event-producer.yml", E2E_JOB)}, "the exemption is exactly this one job"
+    assert any(re.search(r"\bpytest\b", text) for text in run_texts(jobs(event_producer)[E2E_JOB])), "a stale exemption must be deleted"
 
 
 # --- the shared smoke action and the shell tools ----------------------------------------------------------------

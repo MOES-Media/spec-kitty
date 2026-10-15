@@ -258,6 +258,12 @@ AUTHORIZED_PER_CHANGE_SUITE_JOBS: dict[JobKey, str] = {
     ("packs.yml", "built-in-pack-manifest"): "Packs lane: the pack-manifest guard.",
     ("packs.yml", "built-in-corpus-suite"): "Packs lane: corpus suite, sole owner bar the blocking node-ids; advisory (continue-on-error), FR-009.",
     ("packs.yml", "internal-packaging-safety"): "Packs lane: the wheel-contents guard.",
+    ("event-producer.yml", "native-e2e"): (
+        "The only job that builds the real GraalVM binary and installs the platform wheel, so the real-binary tests "
+        "(tests/integration/test_event_producer_e2e.py, test_event_producer_degraded.py, tests/perf/test_event_producer_overhead.py) "
+        "and their helper test run here and nowhere else: every other lane collects those files with REQUIRE_NATIVE_PRODUCER unset "
+        "and skips them, so nothing runs twice. One pytest invocation per matrix leg (mission event-producer-reroute, WP10)."
+    ),
 }
 
 # ---------------------------------------------------------------------------

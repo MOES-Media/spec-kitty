@@ -18,9 +18,9 @@
 # measured floor), producer-measure.json (warm start time) and producer-sbom.json. The Linux leg also uploads `producer-sbom`.
 # Tool versions and checksums come from services/event-producer/tools/pins.json; the wheel tags (and with them the glibc and macOS
 # floors the legs are held to) from scripts/release/dist-set.json.
-# No pytest runs here. The pin and glue tests (tests/contract/test_gradle_pin_check.py, test_verify_pins.py,
+# Only `native-e2e` runs pytest (the real-binary tests, WP10; every other lane skips them with the flag unset). The pin and glue tests (tests/contract/test_gradle_pin_check.py, test_verify_pins.py,
 # tests/architectural/test_build_glue_thin.py, tests/release/test_dist_set_platform_tags.py and the stub-wheel packaging test) run in
-# the router lanes that own them; a pytest call in this workflow would be a duplicate per-change suite execution.
+# the router lanes that own them; a pytest call in any other job of this workflow would be a duplicate per-change suite execution.
 name: Event Producer
 
 on:
@@ -31,6 +31,24 @@ on:
       - 'src/specify_cli/status/producer_*.py'
       - 'pyproject.toml'
       - '.github/actions/producer-smoke/**'
+      - 'tests/integration/test_event_producer_*.py'
+      - 'tests/integration/_native_binary.py'
+      - 'tests/integration/test_native_binary_helper.py'
+      - 'tests/perf/test_event_producer_overhead.py'
+      - 'tests/_perf_helpers.py'
+      - 'src/specify_cli/status/adapters.py'
+      - 'src/specify_cli/status/emit.py'
+      - 'src/specify_cli/status/lifecycle_events.py'
+      - 'src/specify_cli/coordination/outbound.py'
+      - 'src/specify_cli/coordination/status_transition.py'
+      - 'src/specify_cli/decisions/emit.py'
+      - 'src/specify_cli/retrospective/lifecycle_events.py'
+      - 'src/specify_cli/events/runtime_moments.py'
+      - 'src/specify_cli/events/decision_log.py'
+      - 'src/runtime/next/_internal_runtime/events.py'
+      - 'src/runtime/next/runtime_bridge_retrospective.py'
+      - 'src/runtime/next/_internal_runtime/engine.py'
+      - 'src/specify_cli/cli/commands/_event_producer_doctor.py'
       - '.github/workflows/event-producer.yml'
   push:
     branches: [main]
@@ -40,6 +58,24 @@ on:
       - 'src/specify_cli/status/producer_*.py'
       - 'pyproject.toml'
       - '.github/actions/producer-smoke/**'
+      - 'tests/integration/test_event_producer_*.py'
+      - 'tests/integration/_native_binary.py'
+      - 'tests/integration/test_native_binary_helper.py'
+      - 'tests/perf/test_event_producer_overhead.py'
+      - 'tests/_perf_helpers.py'
+      - 'src/specify_cli/status/adapters.py'
+      - 'src/specify_cli/status/emit.py'
+      - 'src/specify_cli/status/lifecycle_events.py'
+      - 'src/specify_cli/coordination/outbound.py'
+      - 'src/specify_cli/coordination/status_transition.py'
+      - 'src/specify_cli/decisions/emit.py'
+      - 'src/specify_cli/retrospective/lifecycle_events.py'
+      - 'src/specify_cli/events/runtime_moments.py'
+      - 'src/specify_cli/events/decision_log.py'
+      - 'src/runtime/next/_internal_runtime/events.py'
+      - 'src/runtime/next/runtime_bridge_retrospective.py'
+      - 'src/runtime/next/_internal_runtime/engine.py'
+      - 'src/specify_cli/cli/commands/_event_producer_doctor.py'
       - '.github/workflows/event-producer.yml'
   schedule:
     # 03:47 UTC: off the round hour and after ci-nightly.yml's own slot (03:17).
@@ -319,10 +355,84 @@ jobs:
           mode: binary
           expect: produced
 
+  # native-e2e (mission event-producer-reroute, WP10 T083): the ONLY job that runs pytest, and the only one that sets
+  # REQUIRE_NATIVE_PRODUCER=1. It runs the real-binary tests by named file against the platform wheel it builds from the leg's binary
+  # and installs by path (so the child interpreters of the tests see the bundled binary exactly as a user's default install does), on all
+  # three OS. Elsewhere those files skip (flag unset): tests/integration and tests/perf are also collected by directory in the nightly
+  # integration-next job and the integration-slice lane, which build no binary, so nothing runs them twice. The AC-036 numbers are
+  # recorded in each leg's job summary.
+  native-e2e:
+    name: native-e2e (${{ matrix.leg }})
+    needs: native-smoke
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # `shard` is the leg label tests/architectural/test_no_duplicate_suite_execution.py counts pytest invocations by.
+          - leg: linux-x86_64
+            os: ubuntu-24.04
+            shard: linux-x86_64
+          - leg: macos-arm64
+            os: macos-14
+            shard: macos-arm64
+          - leg: windows-x86_64
+            os: windows-2022
+            shard: windows-x86_64
+    defaults:
+      run:
+        shell: bash
+    env:
+      GIT_AUTHOR_NAME: e2e
+      GIT_AUTHOR_EMAIL: e2e@example.invalid
+      GIT_COMMITTER_NAME: e2e
+      GIT_COMMITTER_EMAIL: e2e@example.invalid
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: producer-${{ matrix.leg }}
+          path: ${{ runner.temp }}/producer-in
+      - name: Build the platform wheel with the build hook
+        env:
+          HATCH_BUILD_HOOK_ENABLE_CUSTOM: 'true'
+          LEG: ${{ matrix.leg }}
+        run: |
+          set -euo pipefail
+          tag=$(jq -r --arg leg "$LEG" '[.platform_wheels[] | select(.leg == $leg)][0].tag' scripts/release/dist-set.json)
+          binary=$(find "$RUNNER_TEMP/producer-in" -maxdepth 1 -type f \( -name 'spec-kitty-event-producer' -o -name 'spec-kitty-event-producer.exe' \) | head -n 1)
+          [ -n "$binary" ] || { echo "::error::no producer binary in the downloaded artifact"; exit 1; }
+          export SPEC_KITTY_PRODUCER_BINARY="$binary" SPEC_KITTY_PRODUCER_PLATFORM_TAG="$tag"
+          uv build --wheel --out-dir "$RUNNER_TEMP/e2e-wheel"
+          echo "E2E_WHEEL=$(ls "$RUNNER_TEMP"/e2e-wheel/*.whl)" >> "$GITHUB_ENV"
+      # The four named files: the three real-binary files and the helper test. REQUIRE_NATIVE_PRODUCER=1 (set here and nowhere else) turns a
+      # missing or unrunnable binary into a failure; without it the real-binary files skip. One pytest invocation per leg.
+      # `--with "$E2E_WHEEL"` installs the platform wheel BY PATH into the run's overlay environment, whose interpreter (the tests'
+      # sys.executable) imports that wheel, not the editable project underneath, and finds the bundled binary as on a user's default
+      # install, while pytest itself imports the source tree through `pythonpath = src`. `uv pip install` is not an allowed install form here
+      # (contracts/tools/verify_pins.py), so the wheel goes in through `uv run`.
+      - name: Real-binary end to end, degraded modes, AC-036 overhead and the helper guards
+        env:
+          REQUIRE_NATIVE_PRODUCER: '1'
+        run: >-
+          uv run --frozen --all-extras --with "$E2E_WHEEL" pytest
+          tests/integration/test_event_producer_e2e.py
+          tests/integration/test_event_producer_degraded.py
+          tests/perf/test_event_producer_overhead.py
+          tests/integration/test_native_binary_helper.py
+          -p no:cacheprovider -q -s
+
   # The terminal gate: it lists every job (and so every matrix leg of each) and fails unless all of them succeeded. A missing or
   # skipped leg is a failure, never a pass.
   event-producer-gate:
-    needs: [verify-pins, gradle-test, native, native-smoke]
+    needs: [verify-pins, gradle-test, native, native-smoke, native-e2e]
     # always() makes the job self-starting, so the canonical fork guard is required here too.
     if: (github.repository == 'spec-kitty/spec-kitty' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && always()
     runs-on: ubuntu-24.04
