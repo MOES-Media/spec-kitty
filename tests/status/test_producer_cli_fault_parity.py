@@ -9,6 +9,7 @@ fault and none for the healthy run; the ledger row is present in every run.
 from __future__ import annotations
 
 import json
+import threading
 from pathlib import Path
 from unittest.mock import patch
 
@@ -104,6 +105,8 @@ def test_a_producer_fault_leaves_stdout_and_the_exit_code_unchanged(
 
     _arm(producer_stub, monkeypatch, fault)
     code, out, err, _ = _run(tmp_path / "faulted", extra)
+    if fault == "seam-timeout":
+        _LAST_TIMEOUT_RUN.update(root=str(tmp_path / "faulted"), rows=_fault_row_count(tmp_path / "faulted"))
 
     assert code == healthy_code
     assert out == healthy_out, "a producer fault must not change a single byte of stdout"
@@ -113,3 +116,28 @@ def test_a_producer_fault_leaves_stdout_and_the_exit_code_unchanged(
     assert f"producer fault {_EXPECTED_CLASS.get(fault, fault)}" in warning_lines[0], warning_lines[0]
     if mode == "json":
         json.loads(out)  # still one valid JSON document
+
+
+#: The last seam-timeout run: its repository root and fault-row count when the test ended.
+_LAST_TIMEOUT_RUN: dict[str, object] = {}
+
+
+def _fault_row_count(root: Path) -> int:
+    return sum(len(path.read_text(encoding="utf-8").splitlines()) for path in root.rglob("faults/*.jsonl"))
+
+
+def _orphaned_handlers() -> list[threading.Thread]:
+    return [thread for thread in threading.enumerate() if thread.is_alive() and thread.name.endswith("-handler")]
+
+
+def test_zz_the_seam_timeout_case_leaves_nothing_behind(capfd: pytest.CaptureFixture[str]) -> None:
+    """Runs after the matrix: an abandoned worker must not write into whichever test runs next.
+
+    The seam-timeout case abandons its worker at the seam bound. If that worker outlives the case
+    it later writes a second warning line and a second fault row into a later test (cycle-3 P2).
+    """
+    if not _LAST_TIMEOUT_RUN:
+        pytest.skip("the seam-timeout case did not run in this session")
+    assert _orphaned_handlers() == [], "a worker abandoned by the seam-timeout case is still running"
+    assert capfd.readouterr().err == ""
+    assert _fault_row_count(Path(str(_LAST_TIMEOUT_RUN["root"]))) == _LAST_TIMEOUT_RUN["rows"]
