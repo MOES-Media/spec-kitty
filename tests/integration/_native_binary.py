@@ -40,6 +40,7 @@ __all__ = [
     "FLAG",
     "OVERRIDE",
     "MISSION_ID",
+    "PROJECT_UUID",
     "SLUG",
     "Project",
     "cli_argv",
@@ -57,6 +58,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _BINARY_NAME = "spec-kitty-event-producer"
 MISSION_ID = "01KE2E0000000000000000MSN1"
 SLUG = "017-e2e-producer"
+PROJECT_UUID = "3947daa2-06f7-4c84-9602-d5478e3319f7"
 
 #: The child's entry when the binary is not the installed wheel's own: it points the client's ``locate_binary`` at ``argv[1]`` (a
 #: path, or ``-`` for none) and runs the real CLI. ``stub`` (``argv[2]``, a script path or ``-``) makes the client spawn
@@ -243,7 +245,7 @@ def make_project(root: Path, *, slug: str = SLUG, mission_id: str | None = MISSI
     root.mkdir(parents=True, exist_ok=True)
     git(root, "init", "-q", "-b", "main")
     (root / ".kittify").mkdir()
-    (root / ".kittify" / "config.yaml").write_text("# e2e scratch project\n", encoding="utf-8")
+    (root / ".kittify" / "config.yaml").write_text(f"project:\n  uuid: {PROJECT_UUID}\n  slug: e2e\n", encoding="utf-8")
     (root / ".gitignore").write_text(".kittify/events/\n.kittify/derived/\n.worktrees/\n", encoding="utf-8")
     feature = root / "kitty-specs" / slug
     feature.mkdir(parents=True)

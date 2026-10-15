@@ -190,6 +190,25 @@ FIXED_WORKLOAD_MODULES: tuple[str, ...] = (
 #: Generated functions the fixed interpreter workload compiles (about 0.3 s on the calibration machine).
 FIXED_WORKLOAD_FUNCTIONS = 12000
 
+#: PROVISIONAL (mission event-producer-reroute, WP10 T068): the AC-036 limits for the native event producer. They come from local Linux
+#: numbers only (warm ratio 4.87, cold ratio 5.24, about 75 ms per produced row; the placeholders are 1.6 and 1.9 times those). They are
+#: replaced from the numbers of the three native-e2e legs, and then ``PRODUCER_LIMITS_PROVISIONAL`` goes False. While it is True the
+#: overhead test records the ratios and asserts nothing against these two limits.
+PRODUCER_LIMITS_PROVISIONAL = True
+
+#: Ratio limit for an ``emit_status_transition_batch`` of three rows with the real producer (one spawn per row) over the same batch with a
+#: no-op handler, WARM (median of the spawns after the first). PROVISIONAL placeholder.
+PRODUCER_WARM_RATIO_LIMIT = 8.0
+
+#: Ratio limit for the COLD batch (the first producer batch of the process) over the no-op median. PROVISIONAL placeholder.
+PRODUCER_COLD_RATIO_LIMIT = 10.0
+
+#: Producer batches (and no-op batches) sampled per measurement, interleaved. One more than ``SAMPLE_RUNS`` so the warm median has four.
+PRODUCER_SAMPLE_RUNS = 5
+
+#: How far past the warm limit the planted slow producer must push the ratio, as a multiple of the limit.
+PRODUCER_PLANT_FACTOR = 1.5
+
 _STDERR_TAIL_CHARS = 1500
 _FLOOR_LABEL = "floor"
 
