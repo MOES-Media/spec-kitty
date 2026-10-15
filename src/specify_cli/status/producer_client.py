@@ -95,6 +95,14 @@ class ProducerClient:
             cls._current = cls()
         return cls._current
 
+    @staticmethod
+    def start_path_for(kwargs: Mapping[str, Any]) -> Path | str:
+        """The starting path the call site gives: its ``repo_root``, else its log path's directory, else ``.``."""
+        repo_root, log_path = kwargs.get("repo_root"), kwargs.get("log_path")
+        if repo_root is not None:
+            return repo_root  # type: ignore[no-any-return]
+        return Path(log_path).parent if log_path is not None else "."
+
     @classmethod
     def handle(cls, slot: str, kwargs: Mapping[str, Any]) -> None:
         """Hand the seam call's row to the process-wide client; never raise."""
@@ -102,8 +110,7 @@ class ProducerClient:
             row = kwargs.get("row")
             if not isinstance(row, Mapping):
                 return
-            repo_root, log_path = kwargs.get("repo_root"), kwargs.get("log_path")
-            start_path: Path | str = repo_root if repo_root is not None else (Path(log_path).parent if log_path is not None else ".")
+            start_path = cls.start_path_for(kwargs)
             seam_args = {key: value for key, value in kwargs.items() if key != "row"}
             cls.current().produce(row=row, slot=slot, seam_args=seam_args, start_path=start_path)
         except Exception:  # noqa: BLE001 - the outermost catch: a handler never raises into the seam

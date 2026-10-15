@@ -69,6 +69,7 @@ from collections.abc import Mapping
 from kernel.clock import datetime, now_utc, parse_iso
 from pydantic import BaseModel, ValidationError
 
+from specify_cli.core import hosted_posture
 from spec_kitty_events.models import Event
 from spec_kitty_events.status import StatusTransitionPayload
 from spec_kitty_events.zeitgeist_attrs import (
@@ -111,8 +112,21 @@ _PRESENCE_ACTIVITY: Literal["file_edit", "command"] = "command"
 _FOCUS_REF_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._@+-]{0,63}")
 
 
+def _drain_off(kwargs: Mapping[str, Any]) -> bool:
+    """Whether the emitting repository's hosted drain is off (the gate moved here from the fan-out seam).
+
+    The seam fires the event producer whatever the posture is; only these hosted
+    handlers are silenced by it. ``repo_root`` is the emitting repository, never
+    the process working directory (#5181).
+    """
+    return not hosted_posture.drain_posture(project_root=kwargs.get("repo_root")).enabled
+
+
 def saas_moment_handler(**kwargs: Any) -> None:
     """Broadcast one WP lane transition as a ``WPStatusChanged`` moment."""
+    if _drain_off(kwargs) or kwargs.get("to_lane") is None:
+        # Drain off, or a status-slot call that carries only a persisted row (an annotation): no moment.
+        return
     try:
         _broadcast_status_transition(kwargs)
     except Exception:
@@ -124,6 +138,8 @@ def saas_moment_handler(**kwargs: Any) -> None:
 
 def lifecycle_moment_handler(**kwargs: Any) -> None:
     """Broadcast one volatile mission-lifecycle moment from the local log envelope."""
+    if _drain_off(kwargs):
+        return
     try:
         _broadcast_lifecycle_envelope(kwargs)
     except Exception:
@@ -135,6 +151,8 @@ def lifecycle_moment_handler(**kwargs: Any) -> None:
 
 def resolved_binding_moment_handler(**kwargs: Any) -> None:
     """Slot wiring for ``WPResolvedBindingChanged`` — no broadcast until a codec exists."""
+    if _drain_off(kwargs):
+        return
     logger.debug(
         "Zeitgeist: WPResolvedBindingChanged (wp_id=%s) is not a volatile-family moment; nothing broadcast",
         kwargs.get("wp_id"),

@@ -271,7 +271,7 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
 
 @pytest.fixture(autouse=True)
 def _restore_zeitgeist_moment_handlers_around_every_status_test() -> None:
-    """Re-register the Zeitgeist moment handlers around every status test.
+    """Re-register the producer client and the Zeitgeist moment handlers around every status test.
 
     Many files in this directory (``test_emit_backward_transition.py``,
     ``test_emit_fanout_after_adapter.py``, ``test_sync_lane_mapping.py``, ...)
@@ -288,8 +288,12 @@ def _restore_zeitgeist_moment_handlers_around_every_status_test() -> None:
     whose first import ran under ``SPEC_KITTY_SYNC_MINIMAL_IMPORT`` and
     therefore registered nothing at import time.
     """
+    # The producer client is restored first (and as a fresh client, so one test's
+    # open breaker cannot spill into the next), as the import tail registers it.
+    adapters.ensure_producer_client()
     adapters.ensure_zeitgeist_moment_handlers()
     yield
+    adapters.ensure_producer_client()
     adapters.ensure_zeitgeist_moment_handlers()
 
 

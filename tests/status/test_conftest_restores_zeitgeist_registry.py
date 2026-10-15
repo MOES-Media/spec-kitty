@@ -39,6 +39,6 @@ def test_conftest_fixture_restores_the_registry_after_a_test_wipes_it() -> None:
     with contextlib.suppress(StopIteration):
         next(fixture)  # teardown half: must restore before the next test runs
 
-    assert [h.__qualname__ for h in adapters._status_handlers] == ["saas_moment_handler"]
-    assert [h.__qualname__ for h in adapters._lifecycle_handlers] == ["lifecycle_moment_handler"]
+    assert [h.__qualname__ for h in adapters._status_handlers] == ["produce_status_handler", "saas_moment_handler"]
+    assert [h.__qualname__ for h in adapters._lifecycle_handlers] == ["produce_lifecycle_handler", "lifecycle_moment_handler"]
     assert [h.__qualname__ for h in adapters._resolved_binding_handlers] == ["resolved_binding_moment_handler"]

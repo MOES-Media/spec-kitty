@@ -3,12 +3,20 @@
 Provides a decoupled callback boundary so that status/emit.py does not
 need to depend on any transport. Handlers are registered into the slots
 below by whichever subsystem owns a transport. The default wiring (this
-module's import tail) installs the Zeitgeist moment handler (#8), the
-sole occupant of these registries since the sync package was deleted
-(#5/#114); that tail honours the moment-handler gate
-(:func:`specify_cli.core.env.moment_handlers_disabled_reason` —
-``SPEC_KITTY_NO_MOMENT_HANDLERS``, the ``SPEC_KITTY_SYNC_DISABLE`` kill
-switch, or the deprecated ``SPEC_KITTY_SYNC_MINIMAL_IMPORT`` alias, #3980).
+module's import tail) installs two occupants:
+
+* the event-producer client (:func:`ensure_producer_client`) into the status
+  and lifecycle slots, always and ahead of every other handler: producing an
+  event never depends on whether a hosted drain is enabled or on a hosted kill
+  switch (ADR 2026-10-13-2). It is the single in-CLI entry point to the
+  producer (ADR 2026-10-14-1: each event type has one writer);
+* the Zeitgeist moment handler (#8), the hosted occupant; that tail honours
+  the moment-handler gate
+  (:func:`specify_cli.core.env.moment_handlers_disabled_reason` —
+  ``SPEC_KITTY_NO_MOMENT_HANDLERS``, the ``SPEC_KITTY_SYNC_DISABLE`` kill
+  switch, or the deprecated ``SPEC_KITTY_SYNC_MINIMAL_IMPORT`` alias, #3980).
+  The drain gate lives inside the Zeitgeist handlers themselves, so it
+  silences only them.
 
 All fire_* functions are non-raising: exceptions from individual
 handlers are caught and logged, never re-raised to the caller. An empty
@@ -25,13 +33,14 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from specify_cli.core import hosted_posture
 from specify_cli.core.env import moment_handlers_disabled_reason
 
-# The E3 Zeitgeist moment handler (#8): the default occupant of the three
-# fan-out slots since the sync transport (which registered its own handlers)
-# was deleted. Module-level import so registration below is a plain function
-# call, never an import side effect hidden in another package's init.
+# Module-level imports so registration below is a plain function call, never
+# an import side effect hidden in another package's init. The producer client
+# is the default occupant of the status and lifecycle slots; the E3 Zeitgeist
+# moment handler (#8) is the hosted one.
+from .producer_client import ProducerClient, produce_lifecycle_handler, produce_status_handler
+from .producer_faults import FaultClass, record_fault
 from .zeitgeist_bridge import (
     lifecycle_moment_handler,
     resolved_binding_moment_handler,
@@ -156,14 +165,25 @@ def _dispatch_handlers(
     flight is skipped (``busy``), one that outlives the bound is abandoned
     (``timed_out``) and one that raises is logged (``failed``, with the
     traceback). Each outcome carries the slot's own message and arguments.
+
+    A busy-skip or a timeout of the producer client's own handler is a
+    producer fault (FR-023): it is recorded beside the log line. A slow hosted
+    handler records none, so no "event was NOT produced" warning is printed
+    for it.
     """
+    client_keys = {_handler_key(produce_status_handler), _handler_key(produce_lifecycle_handler)}
     for handler in handlers:
+        is_client = _handler_key(handler) in client_keys
         try:
             _run_fanout_handler_bounded(handler, kwargs, label=label)
         except _FanoutHandlerBusyError:
             logger.warning(busy[0], *busy[1])
+            if is_client:
+                record_fault(FaultClass.BUSY, row=kwargs.get("row"), start_path=ProducerClient.start_path_for(kwargs))
         except TimeoutError:
             logger.warning(timed_out[0], *timed_out[1])
+            if is_client:
+                record_fault(FaultClass.TIMEOUT, row=kwargs.get("row"), start_path=ProducerClient.start_path_for(kwargs))
         except Exception:
             (logger.debug if failed_quietly else logger.warning)(failed[0], *failed[1], exc_info=True)
 
@@ -256,6 +276,22 @@ def ensure_zeitgeist_moment_handlers() -> None:
     register_resolved_binding_fanout_handler(resolved_binding_moment_handler)
 
 
+def ensure_producer_client(bound_resolver: Callable[[], float] = _fanout_timeout_s) -> None:
+    """Register the event-producer client into the status and lifecycle slots.
+
+    The client is registered outside the ``moment_handlers_disabled_reason``
+    branch of the import tail and ignores the hosted kill switches: the
+    producer has no opt-out (OD-OPTOUT). ``bound_resolver`` is how the client
+    learns the effective seam bound without importing a private name from this
+    module; a fresh client (a closed breaker) is installed on each call. The
+    resolved-binding slot stays unregistered by the client (FR-003): the
+    annotation row it carries reaches the producer through the status slot.
+    """
+    ProducerClient.install(bound_resolver=bound_resolver)
+    register_status_fanout_handler(produce_status_handler)
+    register_lifecycle_fanout_handler(produce_lifecycle_handler)
+
+
 def ensure_runtime_moment_producer() -> None:
     """Register the E3 runtime-moment producer at the runtime emitter seam (#3929).
 
@@ -275,8 +311,9 @@ def ensure_runtime_moment_producer() -> None:
 def reset_handlers() -> None:
     """Clear all registered handlers (test-only utility).
 
-    Clears the Zeitgeist moment handlers too; a test that wipes the registry
-    and wants the production wiring back calls
+    Clears the producer client and the Zeitgeist moment handlers too; a test
+    that wipes the registry and wants the production wiring back calls
+    :func:`ensure_producer_client` and
     :func:`ensure_zeitgeist_moment_handlers` (the status conftest does exactly
     that around every test, so one test's wipe cannot silence another's
     fan-out).
@@ -317,21 +354,11 @@ def fire_status_fanout(*, repo_root: Path | None = None, **kwargs: Any) -> None:
 
     ``repo_root`` (#5181): the repository that OWNS this transition -- the
     checkout ``status/emit.py`` and ``coordination/outbound.py`` were given,
-    never the process's own CWD. It gates drain against that repo's own
-    ``.kittify/config.yaml`` (see below) and is re-joined into the kwargs
-    handed to handlers, since ``zeitgeist_bridge._broadcast_status_transition``
-    already reads ``kwargs["repo_root"]`` to resolve relay credentials. A
-    caller that omits it (an older call site, or a direct test call) falls
-    back to ``drain_posture()``'s own documented CWD resolution -- unchanged
-    legacy behaviour, not a new fallback this fix introduces.
+    never the process's own CWD. It is re-joined into the kwargs handed to
+    handlers: the producer client takes it as its starting path, and the
+    Zeitgeist handler reads it to resolve relay credentials and to scope its
+    own drain gate. The call fires the producer whatever the drain posture is.
     """
-    # Drain gate (WP03/T013, repo-scoped per #5181): evaluated per call,
-    # independently of the import-time moment_handlers_disabled_reason()
-    # registration gate below -- the two compose (either one silences
-    # fan-out); neither replaces the other. A future reader must not
-    # "simplify" this into one check.
-    if not hosted_posture.drain_posture(project_root=repo_root).enabled:
-        return
     kwargs["repo_root"] = repo_root
     # Diagnostic breadcrumb (issue #1141). Cheap dict.get() calls avoid
     # raising if the caller drops a key; the breadcrumb is best-effort and
@@ -375,13 +402,10 @@ def fire_resolved_binding_fanout(*, repo_root: Path | None = None, **kwargs: Any
     no-op. The status layer only reaches here once its version gate confirms the
     installed ``spec_kitty_events`` supports the event (FR-015 / IC-09).
 
-    ``repo_root`` (#5181): see :func:`fire_status_fanout` -- gates drain against
-    the emitting repo, never the process CWD.
+    ``repo_root`` (#5181): see :func:`fire_status_fanout`; it is absorbed here
+    and not forwarded (FR-004 names the status and lifecycle fires only).
     """
-    # Drain gate (WP03/T013, repo-scoped per #5181): composes with, does not
-    # replace, the import-time moment_handlers_disabled_reason() gate below.
-    if not hosted_posture.drain_posture(project_root=repo_root).enabled:
-        return
+    del repo_root  # not forwarded to handlers (FR-004 names the status and lifecycle fires only)
     logger.info(
         "fire_resolved_binding_fanout: wp_id=%s mission_slug=%s handlers=%d",
         kwargs.get("wp_id"),
@@ -402,16 +426,14 @@ def fire_resolved_binding_fanout(*, repo_root: Path | None = None, **kwargs: Any
 def fire_lifecycle_fanout(*, repo_root: Path | None = None, **kwargs: Any) -> None:
     """Call all registered lifecycle fan-out handlers with **kwargs.
 
-    ``repo_root`` (#5181): see :func:`fire_status_fanout` -- gates drain against
-    the emitting repo, never the process CWD. Callers resolve it themselves
-    (e.g. ``lifecycle_events.repo_root_for_lifecycle_log(log_path)``) since
-    this module must not reach back into ``lifecycle_events``/``decisions``
+    ``repo_root`` (#5181): see :func:`fire_status_fanout`; it is forwarded to
+    handlers as the status fire forwards it (FR-004), so the producer client
+    starts its root resolution from the emitting repository. Callers resolve it
+    themselves (e.g. ``lifecycle_events.repo_root_for_lifecycle_log(log_path)``)
+    since this module must not reach back into ``lifecycle_events``/``decisions``
     at import time.
     """
-    # Drain gate (WP03/T013, repo-scoped per #5181): composes with, does not
-    # replace, the import-time moment_handlers_disabled_reason() gate below.
-    if not hosted_posture.drain_posture(project_root=repo_root).enabled:
-        return
+    kwargs["repo_root"] = repo_root
     _dispatch_handlers(
         _lifecycle_handlers,
         kwargs,
@@ -423,14 +445,16 @@ def fire_lifecycle_fanout(*, repo_root: Path | None = None, **kwargs: Any) -> No
     )
 
 
-# Default wiring: every process that imports this seam carries the Zeitgeist
-# moment handler (#3980 launch names). The gate has its own name —
-# SPEC_KITTY_NO_MOMENT_HANDLERS means "register no transport at import time"
-# — the kill switch SPEC_KITTY_SYNC_DISABLE folds in (a disarmed process
-# registers no transport), and the former SPEC_KITTY_SYNC_MINIMAL_IMPORT name
-# survives as a deprecated alias that warns once when honored. This is the
-# only default registration into these slots. A caller needing an empty
-# registry (tests) calls reset_handlers() and restores with
+# Default wiring. The producer client is registered first and unconditionally:
+# the hosted kill switches below gate the hosted handler only, never the
+# producer (FR-002, OD-OPTOUT). The Zeitgeist moment handler follows under its
+# own gate: SPEC_KITTY_NO_MOMENT_HANDLERS means "register no hosted transport
+# at import time" -- the kill switch SPEC_KITTY_SYNC_DISABLE folds in (a
+# disarmed process registers no hosted transport), and the former
+# SPEC_KITTY_SYNC_MINIMAL_IMPORT name survives as a deprecated alias that warns
+# once when honored. A caller needing an empty registry (tests) calls
+# reset_handlers() and restores with ensure_producer_client() and
 # ensure_zeitgeist_moment_handlers().
+ensure_producer_client()
 if moment_handlers_disabled_reason() is None:
     ensure_zeitgeist_moment_handlers()
