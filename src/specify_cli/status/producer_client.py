@@ -10,7 +10,7 @@ recorded warning (see ``producer_faults``) and never changes a lifecycle
 command's exit code or ``--json`` body.
 
 This is the single in-CLI entry point to the producer, in the sense of the
-accepted ADR ``2026-10-14-1-event-native-core-one-canonical-event-writer``: every
+accepted upstream ADR ``2026-10-14-1-event-native-core-one-canonical-event-writer``: every
 event type has one writer, and callers reach it only through the fan-out seam.
 """
 

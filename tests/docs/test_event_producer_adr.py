@@ -55,8 +55,9 @@ def test_the_rename_debt_is_marked_discharged() -> None:
 def test_the_new_adr_exists_with_its_recorded_choices() -> None:
     text = _NEW_ADR.read_text(encoding="utf-8")
     assert text.startswith("---\n")
-    for needle in ("JaCoCo", "80 percent", "90 percent", "bounded build glue", "#6193", "thinness"):
-        assert needle in text, f"the new ADR does not record {needle!r}"
+    lowered = text.lower()
+    for needle in ("jacoco", "80 percent", "90 percent", "bounded build glue", "#6193", "thinness"):
+        assert needle in lowered, f"the new ADR does not record {needle!r}"
 
 
 def test_the_index_lists_the_new_adr() -> None:

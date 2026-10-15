@@ -72,3 +72,4 @@ Use the shared template at [`docs/architecture/adr-template.md`](../../architect
 | 2026-10-12 | [the charter becomes an external contract package in its own repository](2026-10-12-2-charter-extraction-to-its-own-repository.md) |
 | 2026-10-13 | [acceptance scenarios link to product promises by identifier only; core checks the scenario contract per pull request and hands on versioned evidence](2026-10-13-1-acceptance-scenarios-link-to-promises-by-identifier-only.md) |
 | 2026-10-13 | [the event ledger is the publication seam, on by default, with a versioned row contract and local-log retention](2026-10-13-2-the-event-ledger-is-the-publication-seam-default-on-with-local-retention.md) |
+| 2026-10-15 | [the event producer is a Java native binary behind a thin Python client](2026-10-15-1-event-producer-java-native-binary-behind-thin-python-client.md) |
