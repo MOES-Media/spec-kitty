@@ -388,6 +388,7 @@ def test_the_allowed_capabilities_fixture_passes() -> None:
 
 _CLIENT_SOURCE = (_SRC / _CLIENT).read_text(encoding="utf-8")
 _FAULTS_SOURCE = (_SRC / _FAULTS).read_text(encoding="utf-8")
+_DOCTOR_SOURCE = (_SRC / _DOCTOR).read_text(encoding="utf-8")
 
 
 def _client_with(extra: str, *, head: str = "") -> str:
@@ -427,6 +428,25 @@ def _client_with(extra: str, *, head: str = "") -> str:
             "producer_faults:_now_utc",
         ),
         (_CLIENT, _client_with("class _Stamp:\n    def stamp(self):\n        return _now_utc()"), "wall-clock read"),
+        (_CLIENT, _client_with("class _Stamp:\n    def stamp(self):\n        return record_fault.__globals__['_now_utc']()"), "dynamic lookup"),
+        (_CLIENT, _client_with("class _Stamp:\n    def stamp(self):\n        return __import__('time').time_ns()"), "dynamic lookup"),
+        (_CLIENT, _client_with("class _Stamp:\n    def stamp(self):\n        return sys.modules['time'].time_ns()"), "dynamic lookup"),
+        (_CLIENT, _client_with("class _Stamp:\n    def stamp(self):\n        return getattr(time, 'time_ns')()"), "dynamic lookup"),
+        (_CLIENT, _client_with("class _Stamp:\n    def stamp(self):\n        return getattr(sys.modules['time'], 'time')()"), "dynamic lookup"),
+        (_CLIENT, _client_with("class _Stamp:\n    def stamp(self):\n        return importlib.import_module('time')"), "dynamic lookup"),
+        (_CLIENT, _client_with("class _Stamp:\n    def stamp(self):\n        return clock.time_ns()"), "wall-clock read"),
+        (_CLIENT, _client_with("class _Stamp:\n    def stamp(self):\n        return clock.gmtime()"), "wall-clock read"),
+        (_CLIENT, _client_with("class _Stamp:\n    def stamp(self):\n        return clock.localtime()"), "wall-clock read"),
+        (_CLIENT, _client_with("class _Stamp:\n    def stamp(self):\n        return clock.ctime()"), "wall-clock read"),
+        (_CLIENT, _client_with("class _Stamp:\n    def stamp(self):\n        return clock.fromtimestamp(0)"), "wall-clock read"),
+        (_CLIENT, _client_with("class _Stamp:\n    def stamp(self):\n        return clock.monotonic_ns()"), "wall-clock read"),
+        (_CLIENT, _client_with("class _Stamp:\n    def stamp(self):\n        return clock.perf_counter()"), "wall-clock read"),
+        (_FAULTS, _FAULTS_SOURCE.replace("def write_stderr_warning", "def _sneak() -> object:\n    return __import__('time').time()\n\n\ndef write_stderr_warning", 1), "dynamic lookup"),
+        (
+            _DOCTOR,
+            _DOCTOR_SOURCE + "\n\ndef _sneak() -> object:\n    return sys.modules['time'].time_ns()\n",
+            "dynamic lookup",
+        ),
         (_CLIENT, _client_with("class _Decode:\n    def decode(self, text):\n        return json.loads(text)"), "json.loads outside the decode site"),
         (
             _FAULTS,
